@@ -47,19 +47,19 @@ void ProjectBrowser::Render() {
 
     DrawText("Projects", (int)modal.x + 10, (int)modal.y + 10, 20, WHITE);
 
-    Rectangle newBtn = { (int)modal.x + 10, (int)modal.y + 40, 120, 25 };
+    Rectangle newBtn = { (float)(int)modal.x + 10, (float)(int)modal.y + 40, 120, 25 };
     if (GuiButton(newBtn, "New Project")) {
         wantsCreate = true;
     }
 
-    Rectangle txtBox = { (int)modal.x + 140, (int)modal.y + 40, 150, 25 };
+    Rectangle txtBox = { (float)(int)modal.x + 140, (float)(int)modal.y + 40, 150, 25 };
     if (wantsCreate) {
         GuiTextBox(txtBox, newProjectName, 256, true);
     }
 
     float y = (int)modal.y + 80;
     for (const auto& proj : projects) {
-        Rectangle btn = { (int)modal.x + 10, (int)y, 380, 25 };
+        Rectangle btn = { (float)(int)modal.x + 10, (float)(int)y, 380, 25 };
         std::string label = proj.name + (proj.exists ? "" : " (missing .starproject)");
         if (GuiButton(btn, label.c_str())) {
             if (proj.exists) {
@@ -70,12 +70,12 @@ void ProjectBrowser::Render() {
         y += 30;
     }
 
-    Rectangle createBtn = { (int)modal.x + 10, (int)modal.y + 270, 100, 25 };
+    Rectangle createBtn = { (float)(int)modal.x + 10, (float)(int)modal.y + 270, 100, 25 };
     if (GuiButton(createBtn, "Create")) {
         createConfirmed = true;
         wantsCreate = false;
     }
-    Rectangle cancelBtn = { (int)modal.x + 290, (int)modal.y + 270, 100, 25 };
+    Rectangle cancelBtn = { (float)(int)modal.x + 290, (float)(int)modal.y + 270, 100, 25 };
     if (GuiButton(cancelBtn, "Cancel")) {
         visible = false;
     }
