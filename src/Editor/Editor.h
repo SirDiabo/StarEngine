@@ -32,5 +32,4 @@ private:
     ProjectBrowser* projectBrowser = nullptr;
     std::vector<std::string> bottomTabs;
     int activeBottomTab = 0;
-    std::string newProjectName;
 };

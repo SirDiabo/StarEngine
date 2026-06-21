@@ -6,7 +6,11 @@ void DetailsPanel::Initialize() {
 }
 
 void DetailsPanel::Render() {
-    DrawRectangleRec(bounds, LIGHTGRAY);
-    DrawRectangleLinesEx(bounds, 1, DARKGRAY);
-    DrawText(name, (int)bounds.x + 10, (int)bounds.y + 5, 16, BLACK);
+    Rectangle header = {bounds.x, bounds.y, bounds.width, 25};
+    Rectangle client = {bounds.x, bounds.y + 25, bounds.width, bounds.height - 25};
+
+    DrawRectangleRec(bounds, {40, 40, 40, 255});
+    DrawRectangleRec(header, {50, 50, 50, 255});
+    DrawRectangleLinesEx(bounds, 1, {80, 80, 80, 255});
+    DrawText(name, (int)bounds.x + 5, (int)bounds.y + 5, 14, WHITE);
 }
