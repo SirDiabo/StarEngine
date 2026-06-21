@@ -13,7 +13,3 @@ target_include_directories(StarEngine PRIVATE src)
 target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raylib/examples/core")
 
 target_link_libraries(StarEngine PRIVATE raylib)
-
-if(WIN32)
-    set_target_properties(StarEngine PROPERTIES WIN32_EXECUTABLE TRUE)
-endif()
