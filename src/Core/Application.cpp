@@ -6,8 +6,9 @@ bool Application::Initialize() {
     int screenWidth = 1280;
     int screenHeight = 720;
 
+    SetTraceLogLevel(LOG_NONE);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(screenWidth, screenHeight, "StarEngine");
+    InitWindow(screenWidth, screenHeight, "Star Engine");
     SetTargetFPS(60);
 
     if (!ModuleManager::Get().InitializeAll()) {

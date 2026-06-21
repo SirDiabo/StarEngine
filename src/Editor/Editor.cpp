@@ -2,11 +2,27 @@
 #include "ViewportPanel.h"
 #include "DetailsPanel.h"
 #include "ContentBrowserPanel.h"
+#include "LogPanel.h"
+#include "raygui.h"
 
 void Editor::Initialize() {
-    panels.push_back(new ViewportPanel());
-    panels.push_back(new DetailsPanel());
-    panels.push_back(new ContentBrowserPanel());
+    bottomTabs = {"Logs", "Content"};
+
+    logPanel = new LogPanel();
+    logPanel->bounds = Rectangle{0, 0, 0, 0};
+    panels.push_back(logPanel);
+
+    contentPanel = new ContentBrowserPanel();
+    contentPanel->bounds = Rectangle{0, 0, 0, 0};
+    panels.push_back(contentPanel);
+
+    DetailsPanel* details = new DetailsPanel();
+    details->bounds = Rectangle{0, 0, 0, 0};
+    panels.push_back(details);
+
+    ViewportPanel* viewport = new ViewportPanel();
+    viewport->bounds = Rectangle{0, 0, 0, 0};
+    panels.push_back(viewport);
 
     for (auto* panel : panels) {
         panel->Initialize();
@@ -14,9 +30,33 @@ void Editor::Initialize() {
 }
 
 void Editor::Render() {
-    for (auto* panel : panels) {
-        if (panel->IsVisible()) {
-            panel->Render();
-        }
+    int width = GetScreenWidth();
+    int height = GetScreenHeight();
+
+    float topHeight = height - 200;
+    float bottomHeight = 200;
+
+    ViewportPanel* viewport = static_cast<ViewportPanel*>(panels[3]);
+    viewport->bounds = Rectangle{0, 0, (float)(width - 300), topHeight};
+    viewport->Render();
+
+    DetailsPanel* details = static_cast<DetailsPanel*>(panels[2]);
+    details->bounds = Rectangle{(float)(width - 300), 0, 300, topHeight};
+    details->Render();
+
+    DrawRectangle(0, topHeight, width, 30, DARKGRAY);
+    activeBottomTab = GuiTabBar(Rectangle{0, (float)topHeight, (float)width, 30}, const_cast<char*>(bottomTabs[0].c_str()), activeBottomTab, bottomTabs.size());
+
+    Rectangle bottomBounds = {0, (float)(topHeight + 30), (float)width, (float)bottomHeight};
+    if (activeBottomTab == 0) {
+        logPanel->bounds = bottomBounds;
+        logPanel->Render();
+    } else {
+        contentPanel->bounds = bottomBounds;
+        contentPanel->Render();
     }
+}
+
+LogPanel* Editor::GetLogPanel() {
+    return logPanel;
 }

@@ -6,6 +6,7 @@ void ContentBrowserPanel::Initialize() {
 }
 
 void ContentBrowserPanel::Render() {
-    DrawText("Content Browser", 10, 10, 20, DARKGRAY);
-    DrawText("Right-click to create new assets", 10, 40, 12, GRAY);
+    DrawRectangleRec(bounds, LIGHTGRAY);
+    DrawRectangleLinesEx(bounds, 1, DARKGRAY);
+    DrawText(name, (int)bounds.x + 10, (int)bounds.y + 5, 16, BLACK);
 }

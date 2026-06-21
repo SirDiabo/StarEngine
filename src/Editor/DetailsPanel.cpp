@@ -6,5 +6,7 @@ void DetailsPanel::Initialize() {
 }
 
 void DetailsPanel::Render() {
-    DrawText("Properties", 10, 10, 20, DARKGRAY);
+    DrawRectangleRec(bounds, LIGHTGRAY);
+    DrawRectangleLinesEx(bounds, 1, DARKGRAY);
+    DrawText(name, (int)bounds.x + 10, (int)bounds.y + 5, 16, BLACK);
 }
