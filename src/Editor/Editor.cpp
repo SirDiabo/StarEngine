@@ -11,11 +11,11 @@ static float lastClickTime = 0;
 static int lastClickedTab = -1;
 
 void Editor::Initialize() {
-    logPanel = new LogPanel();
-    panels.push_back(logPanel);
-
     contentPanel = new ContentBrowserPanel();
     panels.push_back(contentPanel);
+
+    logPanel = new LogPanel();
+    panels.push_back(logPanel);
 
     detailsPanel = new DetailsPanel();
     panels.push_back(detailsPanel);
@@ -23,7 +23,7 @@ void Editor::Initialize() {
     viewportPanel = new ViewportPanel();
     panels.push_back(viewportPanel);
 
-    bottomDock = { {logPanel, "Logs"}, {contentPanel, "Content"} };
+    bottomDock = { {contentPanel, "Content"}, {logPanel, "Logs"} };
 
     menuBar = new MenuBar();
     menuBar->Initialize();
