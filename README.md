@@ -1,6 +1,6 @@
 # StarEngine
 
-StarEngine is a game engine for making lowpoly, low resolution games in the style of the fifth console generation (Nintendo 64 / PlayStation 1).
+StarEngine is a game engine for games in the style of the fifth console generation (Nintendo 64 / PlayStation 1).
 
 ## Overview
 

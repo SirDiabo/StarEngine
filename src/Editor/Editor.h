@@ -14,11 +14,12 @@ public:
     void Render();
     LogPanel* GetLogPanel();
 
-    void ShowProjectBrowser();
+    void ShowProjectBrowser(bool forNew = false, bool allowCancel = false);
     bool IsProjectBrowserVisible() const;
     bool WantsNewProject();
     bool WantsOpenProject();
     bool WantsSaveProject();
+    bool WantsCancel();
     std::string GetNewProjectName() const;
     std::string GetOpenProjectPath() const;
     void ResetNewProjectFlag();

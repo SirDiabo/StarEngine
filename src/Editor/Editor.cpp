@@ -40,12 +40,12 @@ void Editor::Render() {
     int width = GetScreenWidth();
     int height = GetScreenHeight();
 
-    menuBar->Render();
-    projectBrowser->Render();
-
     if (projectBrowser->IsVisible()) {
+        projectBrowser->Render();
         return;
     }
+
+    menuBar->Render();
 
     float topHeight = height - 230;
 
@@ -75,27 +75,42 @@ LogPanel* Editor::GetLogPanel() {
     return logPanel;
 }
 
-void Editor::ShowProjectBrowser() {
-    projectBrowser->Show();
+void Editor::ShowProjectBrowser(bool forNew, bool allowCancel) {
+    projectBrowser->Show(forNew ? ProjectBrowser::Mode::Create : ProjectBrowser::Mode::Open, allowCancel);
 }
 
 bool Editor::IsProjectBrowserVisible() const {
-    return projectBrowser && projectBrowser->WantsNewProject() == false && projectBrowser->WantsOpenProject() == false;
+    return projectBrowser && projectBrowser->IsVisible() && !projectBrowser->WantsNewProject() && !projectBrowser->WantsOpenProject();
 }
 
 bool Editor::WantsNewProject() {
     if (projectBrowser && projectBrowser->WantsNewProject()) {
         return true;
     }
-    return menuBar && menuBar->wantsNewProject;
+    if (menuBar && menuBar->wantsNewProject) {
+        ShowProjectBrowser(true, true);
+        menuBar->wantsNewProject = false;
+    }
+    return false;
 }
 
 bool Editor::WantsOpenProject() {
-    return projectBrowser && projectBrowser->WantsOpenProject();
+    if (projectBrowser && projectBrowser->WantsOpenProject()) {
+        return true;
+    }
+    if (menuBar && menuBar->wantsOpenProject) {
+        ShowProjectBrowser(false, true);
+        menuBar->wantsOpenProject = false;
+    }
+    return false;
 }
 
 bool Editor::WantsSaveProject() {
     return menuBar && menuBar->wantsSaveProject;
+}
+
+bool Editor::WantsCancel() {
+    return projectBrowser && projectBrowser->WantsCancel();
 }
 
 std::string Editor::GetNewProjectName() const {
@@ -111,4 +126,5 @@ std::string Editor::GetOpenProjectPath() const {
 
 void Editor::ResetNewProjectFlag() {
     if (menuBar) menuBar->wantsNewProject = false;
+    projectBrowser->ResetFlags();
 }

@@ -87,6 +87,22 @@ void Application::Run() {
             editor->ResetNewProjectFlag();
         }
 
+        if (editor->WantsOpenProject()) {
+            std::string path = editor->GetOpenProjectPath();
+            if (!path.empty()) {
+                Project::Get().Load(path);
+            }
+            editor->ResetNewProjectFlag();
+        }
+
+        if (editor->WantsCancel()) {
+            if (!Project::Get().GetRootPath().empty()) {
+                editor->ResetNewProjectFlag();
+            } else {
+                running = false;
+            }
+        }
+
         BeginDrawing();
         ClearBackground({25, 25, 25, 255});
         if (editor) editor->Render();
