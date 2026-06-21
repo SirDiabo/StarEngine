@@ -44,23 +44,9 @@ Core functionality is separated into loadable modules. Each module extends the e
 
 ```
 src/
-  Core/
-    Application.h/.cpp          - Main application loop
-    Panel.h                     - Base panel interface
-    AssetRegistry.h/.cpp        - Asset cooking and tracking
-    Module.h/.cpp               - Module system
-    Project.h/.cpp              - Project file handling
-  Editor/   
-    Editor.h/.cpp               - Editor framework
-    ViewportPanel.h/.cpp        - 3D viewport panel
-    DetailsPanel.h/.cpp         - Properties panel
-    ContentBrowserPanel.h/.cpp  - Asset browser panel
-  Modules/
-    Stargraph/
-      Stargraph.h/.cpp          - Graph data structures
-      NodeRegistry.h/.cpp       - Node type registry
-    Audio/                      - Audio module
-    Particles/                  - Particles module
+  Core/                         - Core application framework
+  Editor/                       - Editor framework and panels
+  Modules/                      - Loadable engine modules
   Runtime/                      - Runtime components
 ```
 
