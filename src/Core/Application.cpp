@@ -1,8 +1,11 @@
 #include "Application.h"
 #include "Editor/Editor.h"
+#include "Core/Project.h"
 #include "raylib.h"
-#define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 static void GuiLoadStyleDark() {
     GuiSetStyle(DEFAULT, BORDER_COLOR_NORMAL, 0x525252ff);
@@ -21,7 +24,27 @@ static void GuiLoadStyleDark() {
     GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
 }
 
-bool Application::Initialize() {
+static bool CreateProject(const std::string& name) {
+    char* userProfile = getenv("USERPROFILE");
+    fs::path docsPath = userProfile ? userProfile : "";
+    docsPath /= "Documents";
+    docsPath /= "StarProjects";
+    fs::create_directories(docsPath);
+
+    fs::path projPath = docsPath / name;
+    fs::create_directories(projPath);
+    fs::create_directories(projPath / "Content");
+    fs::create_directories(projPath / "Config");
+    fs::create_directories(projPath / "Saved");
+
+    fs::path projFile = projPath / (name + ".starproject");
+    ProjectSettings settings;
+    settings.name = name;
+    Project::Get().Load(projFile.string());
+    return true;
+}
+
+bool Application::Initialize(int argc, char* argv[]) {
     int screenWidth = 1280;
     int screenHeight = 720;
 
@@ -39,6 +62,12 @@ bool Application::Initialize() {
     editor = new Editor();
     editor->Initialize();
 
+    if (argc > 1) {
+        Project::Get().Load(argv[1]);
+    } else {
+        editor->ShowProjectBrowser();
+    }
+
     running = true;
     return true;
 }
@@ -48,8 +77,20 @@ void Application::Run() {
         float deltaTime = GetFrameTime();
         ModuleManager::Get().UpdateAll(deltaTime);
 
+        if (editor->WantsNewProject()) {
+            std::string name = editor->GetNewProjectName();
+            if (!name.empty()) CreateProject(name);
+            editor->ResetNewProjectFlag();
+        }
+
+        if (editor->CheckProjectBrowserCreate()) {
+            std::string name = editor->GetProjectBrowserNewName();
+            if (!name.empty()) CreateProject(name);
+            editor->ResetProjectBrowserCreate();
+        }
+
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground({25, 25, 25, 255});
         if (editor) editor->Render();
         EndDrawing();
     }

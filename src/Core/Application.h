@@ -6,7 +6,7 @@ class Editor;
 
 class Application {
 public:
-    bool Initialize();
+    bool Initialize(int argc, char* argv[]);
     void Run();
     void Shutdown();
 
