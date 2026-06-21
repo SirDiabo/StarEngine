@@ -1,5 +1,4 @@
 #pragma once
-#include "Core/Panel.h"
 #include <string>
 #include <vector>
 

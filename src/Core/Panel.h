@@ -6,7 +6,6 @@ public:
     virtual ~Panel() = default;
     virtual void Initialize() {}
     virtual void Render() = 0;
-    virtual void RenderHeader() {}
 
     const char* GetName() const { return name; }
     bool IsVisible() const { return visible; }

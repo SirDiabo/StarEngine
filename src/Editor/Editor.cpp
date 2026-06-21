@@ -6,29 +6,24 @@
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
 #include "raygui.h"
-#include <algorithm>
 
 static float lastClickTime = 0;
 static int lastClickedTab = -1;
 
 void Editor::Initialize() {
-    bottomTabs = {"Logs", "Content"};
-
     logPanel = new LogPanel();
-    logPanel->bounds = Rectangle{0, 0, 0, 0};
     panels.push_back(logPanel);
 
     contentPanel = new ContentBrowserPanel();
-    contentPanel->bounds = Rectangle{0, 0, 0, 0};
     panels.push_back(contentPanel);
 
-    DetailsPanel* details = new DetailsPanel();
-    details->bounds = Rectangle{0, 0, 0, 0};
-    panels.push_back(details);
+    detailsPanel = new DetailsPanel();
+    panels.push_back(detailsPanel);
 
-    ViewportPanel* viewport = new ViewportPanel();
-    viewport->bounds = Rectangle{0, 0, 0, 0};
-    panels.push_back(viewport);
+    viewportPanel = new ViewportPanel();
+    panels.push_back(viewportPanel);
+
+    bottomDock = { {logPanel, "Logs"}, {contentPanel, "Content"} };
 
     menuBar = new MenuBar();
     menuBar->Initialize();
@@ -40,6 +35,10 @@ void Editor::Initialize() {
     }
 }
 
+LogPanel* Editor::GetLogPanel() {
+    return logPanel;
+}
+
 void Editor::Render() {
     int width = GetScreenWidth();
     int height = GetScreenHeight();
@@ -49,50 +48,56 @@ void Editor::Render() {
         return;
     }
 
+    Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
     Vector2 mousePos = GetMousePosition();
-    for (auto* panel : panels) {
-        if (panel->IsDetached()) {
-            if (panel->dragging) {
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-                    panel->bounds.x = mousePos.x - panel->dragOffset.x;
-                    panel->bounds.y = mousePos.y - panel->dragOffset.y;
-                    panel->header.x = panel->bounds.x;
-                    panel->header.y = panel->bounds.y;
-                } else {
-                    panel->dragging = false;
-                }
-            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                if (CheckCollisionPointRec(mousePos, panel->header)) {
-                    panel->dragging = true;
-                    panel->dragOffset.x = mousePos.x - panel->bounds.x;
-                    panel->dragOffset.y = mousePos.y - panel->bounds.y;
+    int reattachIndex = -1;
+
+    for (size_t i = 0; i < bottomDock.size(); i++) {
+        Panel* panel = bottomDock[i].panel;
+        if (!panel->IsDetached()) continue;
+
+        if (panel->dragging) {
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                panel->bounds.x = mousePos.x - panel->dragOffset.x;
+                panel->bounds.y = mousePos.y - panel->dragOffset.y;
+                panel->header.x = panel->bounds.x;
+                panel->header.y = panel->bounds.y;
+            } else {
+                panel->dragging = false;
+                if (CheckCollisionPointRec(mousePos, tabBarBounds)) {
+                    panel->SetDetached(false);
+                    reattachIndex = (int)i;
                 }
             }
-            panel->Render();
+        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, panel->header)) {
+            panel->dragging = true;
+            panel->dragOffset.x = mousePos.x - panel->bounds.x;
+            panel->dragOffset.y = mousePos.y - panel->bounds.y;
         }
+
+        panel->Render();
     }
 
     float topHeight = height - 230;
 
-    ViewportPanel* viewport = static_cast<ViewportPanel*>(panels[3]);
-    viewport->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
-    viewport->header = {viewport->bounds.x, viewport->bounds.y, viewport->bounds.width, 25};
-    viewport->Render();
+    viewportPanel->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
+    viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
+    viewportPanel->Render();
 
-    DetailsPanel* details = static_cast<DetailsPanel*>(panels[2]);
-    details->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
-    details->header = {details->bounds.x, details->bounds.y, details->bounds.width, 25};
-    details->Render();
+    detailsPanel->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
+    detailsPanel->header = {detailsPanel->bounds.x, detailsPanel->bounds.y, detailsPanel->bounds.width, 25};
+    detailsPanel->Render();
 
-    Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
-    std::vector<const char*> tabTexts = {bottomTabs[0].c_str(), bottomTabs[1].c_str()};
-    int prevTab = activeBottomTab;
-    GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomTabs.size(), &activeBottomTab);
+    std::vector<const char*> tabTexts;
+    for (const auto& tab : bottomDock) tabTexts.push_back(tab.title.c_str());
+    GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomDock.size(), &activeBottomTab);
+
+    if (reattachIndex >= 0) activeBottomTab = reattachIndex;
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, tabBarBounds)) {
         float currentTime = GetTime();
         if (lastClickedTab == activeBottomTab && (currentTime - lastClickTime) < 0.3f) {
-            Panel* panel = (activeBottomTab == 0) ? static_cast<Panel*>(logPanel) : static_cast<Panel*>(contentPanel);
+            Panel* panel = bottomDock[activeBottomTab].panel;
             if (!panel->IsDetached()) {
                 panel->SetDetached(true);
                 panel->bounds = Rectangle{200, 100, 500, 350};
@@ -102,11 +107,10 @@ void Editor::Render() {
         lastClickedTab = activeBottomTab;
     }
 
-    Rectangle bottomBounds = {0, (float)(height - 170), (float)width, 170};
-    if (activeBottomTab == 0) {
-        logPanel->bounds = bottomBounds;
-    } else {
-        contentPanel->bounds = bottomBounds;
+    Panel* activeBottomPanel = bottomDock[activeBottomTab].panel;
+    if (!activeBottomPanel->IsDetached()) {
+        activeBottomPanel->bounds = Rectangle{0, (float)(height - 170), (float)width, 170};
+        activeBottomPanel->Render();
     }
 
     menuBar->Render();
@@ -124,21 +128,15 @@ void Editor::Render() {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
             menuBar->activeMenu = -1;
         }
-    }
-
-    if (activeBottomTab == 0 && !logPanel->IsDetached()) {
-        logPanel->Render();
-    } else if (activeBottomTab == 1 && !contentPanel->IsDetached()) {
-        contentPanel->Render();
+    } else if (menuBar->activeMenu > 0) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            menuBar->activeMenu = -1;
+        }
     }
 }
 
 void Editor::ShowProjectBrowser(bool forNew, bool allowCancel) {
     projectBrowser->Show(forNew ? ProjectBrowser::Mode::Create : ProjectBrowser::Mode::Open, allowCancel);
-}
-
-bool Editor::IsProjectBrowserVisible() const {
-    return projectBrowser && projectBrowser->IsVisible() && !projectBrowser->WantsNewProject() && !projectBrowser->WantsOpenProject();
 }
 
 bool Editor::WantsNewProject() {
@@ -185,4 +183,8 @@ std::string Editor::GetOpenProjectPath() const {
 void Editor::ResetNewProjectFlag() {
     if (menuBar) menuBar->wantsNewProject = false;
     projectBrowser->ResetFlags();
+}
+
+void Editor::ResetSaveProjectFlag() {
+    if (menuBar) menuBar->wantsSaveProject = false;
 }

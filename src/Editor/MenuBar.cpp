@@ -14,7 +14,7 @@ void MenuBar::Render() {
     for (size_t i = 0; i < menus.size(); i++) {
         Rectangle btnBounds = {offset, 0, 60, 30};
         if (GuiButton(btnBounds, menus[i].c_str())) {
-            activeMenu = (int)i;
+            activeMenu = (activeMenu == (int)i) ? -1 : (int)i;
         }
         offset += 65;
     }

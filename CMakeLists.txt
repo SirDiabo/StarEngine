@@ -10,6 +10,6 @@ file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.c")
 add_executable(StarEngine ${SOURCES})
 
 target_include_directories(StarEngine PRIVATE src)
-target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raylib/examples/core")
+target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raygui")
 
 target_link_libraries(StarEngine PRIVATE raylib)

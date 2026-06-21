@@ -1,12 +1,23 @@
 #include "Application.h"
 #include "Editor/Editor.h"
+#include "Editor/LogPanel.h"
 #include "Core/Project.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
 #include <fstream>
+#include <cstdarg>
+#include <cstdio>
 
 namespace fs = std::filesystem;
+
+static LogPanel* activeLogPanel = nullptr;
+
+static void ForwardTraceLogToPanel(int logLevel, const char* text, va_list args) {
+    char buffer[512];
+    vsnprintf(buffer, sizeof(buffer), text, args);
+    if (activeLogPanel) activeLogPanel->AddLog(buffer);
+}
 
 static void GuiLoadStyleDark() {
     GuiSetStyle(DEFAULT, BORDER_COLOR_NORMAL, 0x525252ff);
@@ -26,25 +37,17 @@ static void GuiLoadStyleDark() {
 }
 
 static bool CreateProject(const std::string& name) {
-    char* userProfile = getenv("USERPROFILE");
-    fs::path docsPath = userProfile ? userProfile : "";
-    docsPath /= "Documents";
-    docsPath /= "StarProjects";
-    fs::create_directories(docsPath);
-
-    fs::path projPath = docsPath / name;
+    fs::path projPath = fs::path(Project::GetProjectsDirectory()) / name;
     fs::create_directories(projPath);
     fs::create_directories(projPath / "Content");
     fs::create_directories(projPath / "Config");
     fs::create_directories(projPath / "Saved");
 
     fs::path projFile = projPath / (name + ".starproject");
-    std::ofstream out(projFile);
-    out << "name=" << name << "\n";
-    out << "version=0.1.0\n";
-    out.close();
+    std::ofstream(projFile).close();
 
     Project::Get().Load(projFile.string());
+    Project::Get().Save();
     return true;
 }
 
@@ -65,6 +68,10 @@ bool Application::Initialize(int argc, char* argv[]) {
 
     editor = new Editor();
     editor->Initialize();
+
+    activeLogPanel = editor->GetLogPanel();
+    SetTraceLogCallback(ForwardTraceLogToPanel);
+    SetTraceLogLevel(LOG_INFO);
 
     if (argc > 1) {
         Project::Get().Load(argv[1]);
@@ -93,6 +100,11 @@ void Application::Run() {
                 Project::Get().Load(path);
             }
             editor->ResetNewProjectFlag();
+        }
+
+        if (editor->WantsSaveProject()) {
+            Project::Get().Save();
+            editor->ResetSaveProjectFlag();
         }
 
         if (editor->WantsCancel()) {

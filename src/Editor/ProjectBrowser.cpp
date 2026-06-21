@@ -1,4 +1,5 @@
 #include "ProjectBrowser.h"
+#include "Core/Project.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -26,16 +27,12 @@ void ProjectBrowser::Show(Mode m, bool allowCancel) {
 
 void ProjectBrowser::ScanProjects() {
     projects.clear();
-    char* userProfile = getenv("USERPROFILE");
-    fs::path docsPath = userProfile ? userProfile : "";
-    docsPath /= "Documents";
-    docsPath /= "StarProjects";
+    fs::path docsPath = Project::GetProjectsDirectory();
 
     if (fs::exists(docsPath)) {
         for (const auto& entry : fs::directory_iterator(docsPath)) {
             if (entry.is_directory()) {
-                fs::path projFile = entry.path();
-                projFile += "/" + entry.path().filename().string() + ".starproject";
+                fs::path projFile = entry.path() / (entry.path().filename().string() + ".starproject");
                 ProjectInfo info;
                 info.name = entry.path().filename().string();
                 info.path = projFile.string();

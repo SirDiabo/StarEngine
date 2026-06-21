@@ -11,8 +11,9 @@ struct ProjectSettings {
 class Project {
 public:
     static Project& Get();
+    static std::string GetProjectsDirectory();
 
-    bool Load(const std::string& path);
+    bool Load(const std::string& projectFilePath);
     void Save();
 
     const ProjectSettings& GetSettings() const { return settings; }
@@ -21,4 +22,5 @@ public:
 private:
     ProjectSettings settings;
     std::string rootPath;
+    std::string projectFilePath;
 };

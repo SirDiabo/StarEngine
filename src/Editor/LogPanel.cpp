@@ -5,6 +5,13 @@ void LogPanel::Initialize() {
     name = "Logs";
 }
 
+void LogPanel::AddLog(const std::string& message) {
+    logs.push_back(message);
+    while ((int)logs.size() > maxLogs) {
+        logs.pop_front();
+    }
+}
+
 void LogPanel::Render() {
     DrawRectangleRec(bounds, {40, 40, 40, 255});
     DrawRectangleLinesEx(bounds, 1, {80, 80, 80, 255});
