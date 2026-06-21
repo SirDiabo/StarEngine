@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -38,8 +39,11 @@ static bool CreateProject(const std::string& name) {
     fs::create_directories(projPath / "Saved");
 
     fs::path projFile = projPath / (name + ".starproject");
-    ProjectSettings settings;
-    settings.name = name;
+    std::ofstream out(projFile);
+    out << "name=" << name << "\n";
+    out << "version=0.1.0\n";
+    out.close();
+
     Project::Get().Load(projFile.string());
     return true;
 }
@@ -81,12 +85,6 @@ void Application::Run() {
             std::string name = editor->GetNewProjectName();
             if (!name.empty()) CreateProject(name);
             editor->ResetNewProjectFlag();
-        }
-
-        if (editor->CheckProjectBrowserCreate()) {
-            std::string name = editor->GetProjectBrowserNewName();
-            if (!name.empty()) CreateProject(name);
-            editor->ResetProjectBrowserCreate();
         }
 
         BeginDrawing();

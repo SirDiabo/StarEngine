@@ -6,6 +6,8 @@ StarEngine is a game engine for making lowpoly, low resolution games in the styl
 
 Built on [raylib](https://github.com/raysan5/raylib) for windowing, input, audio, and rendering.
 
+Uses [raygui](https://github.com/raysan5/raygui) for editor UI controls.
+
 Features a visual scripting system called Stargraph, inspired by Unreal Engine's Blueprints.
 
 ## Projects

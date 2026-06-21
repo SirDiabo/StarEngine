@@ -15,16 +15,13 @@ public:
     LogPanel* GetLogPanel();
 
     void ShowProjectBrowser();
+    bool IsProjectBrowserVisible() const;
     bool WantsNewProject();
     bool WantsOpenProject();
     bool WantsSaveProject();
     std::string GetNewProjectName() const;
     std::string GetOpenProjectPath() const;
     void ResetNewProjectFlag();
-
-    bool CheckProjectBrowserCreate();
-    std::string GetProjectBrowserNewName() const;
-    void ResetProjectBrowserCreate();
 
 private:
     std::vector<Panel*> panels;

@@ -13,15 +13,16 @@ class ProjectBrowser {
 public:
     void Show();
     void Render();
-    bool WantsNewProject() const { return wantsCreate; }
+    bool WantsNewProject() const { return createConfirmed; }
     bool WantsOpenProject() const { return openProject; }
     std::string GetSelectedPath() const { return selectedPath; }
     std::string GetNewProjectName() const { return std::string(newProjectName); }
-    void ClearCreateRequest() { wantsCreate = false; }
+    bool IsVisible() const { return visible; }
 
 private:
     bool visible = false;
     bool wantsCreate = false;
+    bool createConfirmed = false;
     bool openProject = false;
     std::string selectedPath;
     std::vector<ProjectInfo> projects;

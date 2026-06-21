@@ -7,7 +7,7 @@ namespace fs = std::filesystem;
 
 void ProjectBrowser::Show() {
     visible = true;
-    wantsCreate = false;
+    createConfirmed = false;
     openProject = false;
     ScanProjects();
 }
@@ -72,6 +72,7 @@ void ProjectBrowser::Render() {
 
     Rectangle createBtn = { (int)modal.x + 10, (int)modal.y + 270, 100, 25 };
     if (GuiButton(createBtn, "Create")) {
+        createConfirmed = true;
         wantsCreate = false;
     }
     Rectangle cancelBtn = { (int)modal.x + 290, (int)modal.y + 270, 100, 25 };

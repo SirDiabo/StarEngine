@@ -43,8 +43,11 @@ void Editor::Render() {
     menuBar->Render();
     projectBrowser->Render();
 
+    if (projectBrowser->IsVisible()) {
+        return;
+    }
+
     float topHeight = height - 230;
-    float bottomHeight = 200;
 
     ViewportPanel* viewport = static_cast<ViewportPanel*>(panels[3]);
     viewport->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
@@ -76,12 +79,19 @@ void Editor::ShowProjectBrowser() {
     projectBrowser->Show();
 }
 
+bool Editor::IsProjectBrowserVisible() const {
+    return projectBrowser && projectBrowser->WantsNewProject() == false && projectBrowser->WantsOpenProject() == false;
+}
+
 bool Editor::WantsNewProject() {
+    if (projectBrowser && projectBrowser->WantsNewProject()) {
+        return true;
+    }
     return menuBar && menuBar->wantsNewProject;
 }
 
 bool Editor::WantsOpenProject() {
-    return menuBar && menuBar->wantsOpenProject;
+    return projectBrowser && projectBrowser->WantsOpenProject();
 }
 
 bool Editor::WantsSaveProject() {
@@ -89,7 +99,10 @@ bool Editor::WantsSaveProject() {
 }
 
 std::string Editor::GetNewProjectName() const {
-    return newProjectName;
+    if (projectBrowser && projectBrowser->WantsNewProject()) {
+        return projectBrowser->GetNewProjectName();
+    }
+    return "";
 }
 
 std::string Editor::GetOpenProjectPath() const {
@@ -98,17 +111,4 @@ std::string Editor::GetOpenProjectPath() const {
 
 void Editor::ResetNewProjectFlag() {
     if (menuBar) menuBar->wantsNewProject = false;
-}
-
-bool Editor::CheckProjectBrowserCreate() {
-    return projectBrowser && projectBrowser->WantsNewProject();
-}
-
-std::string Editor::GetProjectBrowserNewName() const {
-    if (projectBrowser) return std::string(projectBrowser->GetNewProjectName());
-    return "";
-}
-
-void Editor::ResetProjectBrowserCreate() {
-    if (projectBrowser) projectBrowser->ClearCreateRequest();
 }
