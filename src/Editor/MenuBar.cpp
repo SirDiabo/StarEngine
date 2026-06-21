@@ -18,19 +18,4 @@ void MenuBar::Render() {
         }
         offset += 65;
     }
-
-    if (activeMenu == 0) {
-        Rectangle popup = {5, 30, 120, 100};
-        Rectangle newBtn = {10, 35, 110, 25};
-        Rectangle openBtn = {10, 65, 110, 25};
-        Rectangle saveBtn = {10, 95, 110, 25};
-
-        DrawRectangleRec(popup, {60, 60, 60, 255});
-        if (GuiButton(newBtn, "New Project")) wantsNewProject = true;
-        if (GuiButton(openBtn, "Open Project")) wantsOpenProject = true;
-        if (GuiButton(saveBtn, "Save Project")) wantsSaveProject = true;
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
-            activeMenu = -1;
-        }
-    }
 }

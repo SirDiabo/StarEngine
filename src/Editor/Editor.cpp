@@ -42,37 +42,47 @@ void Editor::Render() {
 
     if (projectBrowser->IsVisible()) {
         projectBrowser->Render();
-        return;
-    }
-
-    menuBar->Render();
-
-    float topHeight = height - 230;
-
-    ViewportPanel* viewport = static_cast<ViewportPanel*>(panels[3]);
-    viewport->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
-    viewport->Render();
-
-    DetailsPanel* details = static_cast<DetailsPanel*>(panels[2]);
-    details->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
-    details->Render();
-
-    Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
-    std::vector<const char*> tabTexts = {bottomTabs[0].c_str(), bottomTabs[1].c_str()};
-    GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomTabs.size(), &activeBottomTab);
-
-    Rectangle bottomBounds = {0, (float)(height - 170), (float)width, 170};
-    if (activeBottomTab == 0) {
-        logPanel->bounds = bottomBounds;
-        logPanel->Render();
     } else {
-        contentPanel->bounds = bottomBounds;
-        contentPanel->Render();
-    }
-}
+        float topHeight = height - 230;
 
-LogPanel* Editor::GetLogPanel() {
-    return logPanel;
+        ViewportPanel* viewport = static_cast<ViewportPanel*>(panels[3]);
+        viewport->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
+        viewport->Render();
+
+        DetailsPanel* details = static_cast<DetailsPanel*>(panels[2]);
+        details->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
+        details->Render();
+
+        Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
+        std::vector<const char*> tabTexts = {bottomTabs[0].c_str(), bottomTabs[1].c_str()};
+        GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomTabs.size(), &activeBottomTab);
+
+        Rectangle bottomBounds = {0, (float)(height - 170), (float)width, 170};
+        if (activeBottomTab == 0) {
+            logPanel->bounds = bottomBounds;
+            logPanel->Render();
+        } else {
+            contentPanel->bounds = bottomBounds;
+            contentPanel->Render();
+        }
+
+        menuBar->Render();
+
+        if (menuBar->activeMenu == 0) {
+            Rectangle popup = {5, 35, 120, 90};
+            Rectangle newBtn = {10, 40, 110, 25};
+            Rectangle openBtn = {10, 70, 110, 25};
+            Rectangle saveBtn = {10, 100, 110, 25};
+
+            DrawRectangleRec(popup, {60, 60, 60, 255});
+            if (GuiButton(newBtn, "New Project")) menuBar->wantsNewProject = true;
+            if (GuiButton(openBtn, "Open Project")) menuBar->wantsOpenProject = true;
+            if (GuiButton(saveBtn, "Save Project")) menuBar->wantsSaveProject = true;
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
+                menuBar->activeMenu = -1;
+            }
+        }
+    }
 }
 
 void Editor::ShowProjectBrowser(bool forNew, bool allowCancel) {

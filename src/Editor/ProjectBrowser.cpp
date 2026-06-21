@@ -2,6 +2,7 @@
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
+#include <cstring>
 
 namespace fs = std::filesystem;
 

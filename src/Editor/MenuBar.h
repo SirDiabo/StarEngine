@@ -8,11 +8,11 @@ public:
     void Initialize();
     void Render();
 
+    int activeMenu = -1;
     bool wantsNewProject = false;
     bool wantsOpenProject = false;
     bool wantsSaveProject = false;
 
 private:
     std::vector<std::string> menus = {"File", "Edit", "View", "Tools", "Window", "Help"};
-    int activeMenu = -1;
 };
