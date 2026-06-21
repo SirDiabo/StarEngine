@@ -44,8 +44,9 @@ void Editor::Render() {
     details->bounds = Rectangle{(float)(width - 300), 0, 300, topHeight};
     details->Render();
 
-    DrawRectangle(0, topHeight, width, 30, DARKGRAY);
-    activeBottomTab = GuiTabBar(Rectangle{0, (float)topHeight, (float)width, 30}, const_cast<char*>(bottomTabs[0].c_str()), activeBottomTab, bottomTabs.size());
+    Rectangle tabBarBounds = {0, (float)topHeight, (float)width, 30};
+    std::vector<const char*> tabTexts = {bottomTabs[0].c_str(), bottomTabs[1].c_str()};
+    int result = GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomTabs.size(), &activeBottomTab);
 
     Rectangle bottomBounds = {0, (float)(topHeight + 30), (float)width, (float)bottomHeight};
     if (activeBottomTab == 0) {
