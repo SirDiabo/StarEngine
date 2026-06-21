@@ -1,11 +1,14 @@
 #pragma once
 #include "Stargraph.h"
 #include <functional>
+#include <unordered_map>
 
 struct NodeTemplate {
     std::string type;
     std::string category;
+    bool isEvent = false;
     std::function<void(Node*)> createPins;
+    std::function<void(Node&)> execute;
 };
 
 class NodeRegistry {

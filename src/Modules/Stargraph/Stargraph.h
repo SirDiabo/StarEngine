@@ -1,10 +1,11 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <deque>
 
 enum class PinType {
     None,
+    Exec,
     Boolean,
     Integer,
     Float,
@@ -19,6 +20,7 @@ struct Pin {
     bool isInput = false;
     bool isOutput = false;
     int id = 0;
+    std::string defaultValue;
 };
 
 struct Node {
@@ -43,7 +45,7 @@ struct Variable {
 
 class Stargraph {
 public:
-    const std::vector<Node>& GetNodes() const { return nodes; }
+    const std::deque<Node>& GetNodes() const { return nodes; }
     const std::vector<Link>& GetLinks() const { return links; }
     const std::vector<Variable>& GetVariables() const { return variables; }
 
@@ -51,8 +53,13 @@ public:
     void AddLink(const Link& link);
     void AddVariable(const Variable& var);
 
+    Pin* FindPin(int pinId);
+    Node* FindNodeByPinId(int pinId);
+    Node* FindNodeByType(const std::string& type);
+
 private:
-    std::vector<Node> nodes;
+    std::deque<Node> nodes;
     std::vector<Link> links;
     std::vector<Variable> variables;
+    int nextPinId = 1;
 };
