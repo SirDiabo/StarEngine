@@ -3,12 +3,15 @@
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
+#include <cstring>
 
-const float StargraphEditorPanel::nodeWidth = 180.0f;
-const float StargraphEditorPanel::pinHeight = 20.0f;
-const float StargraphEditorPanel::pinRadius = 5.0f;
-const float StargraphEditorPanel::headerHeight = 24.0f;
-const float StargraphEditorPanel::sidebarWidth = 200.0f;
+const float StargraphEditorPanel::nodeWidth      = 190.0f;
+const float StargraphEditorPanel::pinHeight      = 22.0f;
+const float StargraphEditorPanel::pinRadius      = 5.0f;
+const float StargraphEditorPanel::headerHeight   = 26.0f;
+const float StargraphEditorPanel::leftPanelWidth = 200.0f;
+const float StargraphEditorPanel::rightPanelWidth= 210.0f;
+const float StargraphEditorPanel::toolbarHeight  = 30.0f;
 
 void StargraphEditorPanel::Initialize() {
     name = "Stargraph";
@@ -22,6 +25,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     selectedNodeId = -1;
     linkFromPin = -1;
     nodeMenuOpen = false;
+    editingPinId = -1;
     scroll = {0, 0};
     return true;
 }
@@ -34,91 +38,85 @@ void StargraphEditorPanel::Close() {
 
 Color StargraphEditorPanel::GetPinColor(PinType type) const {
     switch (type) {
-        case PinType::Exec:    return {220, 220, 220, 255};
-        case PinType::Boolean: return {160,  60,  60, 255};
-        case PinType::Integer: return { 90, 130, 200, 255};
-        case PinType::Float:   return {130, 200, 130, 255};
-        case PinType::String:  return {200, 140,  70, 255};
-        case PinType::Vec3:    return {160,  90, 200, 255};
-        case PinType::Object:  return { 60, 180, 180, 255};
-        default:               return {150, 150, 150, 255};
+        case PinType::Exec:    return {255, 255, 255, 255};
+        case PinType::Boolean: return {140,  20,  20, 255};
+        case PinType::Integer: return {  0, 189, 189, 255};
+        case PinType::Float:   return { 90, 195,  90, 255};
+        case PinType::String:  return {200,   0, 200, 255};
+        case PinType::Vec3:    return {255, 165,   0, 255};
+        case PinType::Object:  return {  0, 140, 255, 255};
+        default:               return {120, 120, 120, 255};
     }
 }
 
+Color StargraphEditorPanel::GetNodeHeaderColor(const Node& node) const {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (tmpl && tmpl->isEvent) return {130, 20, 20, 255};
+    return {15, 60, 120, 255};
+}
+
+float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
+    size_t rows = std::max(node.inputs.size(), node.outputs.size());
+    for (const Pin& pin : node.inputs) {
+        if (pin.type != PinType::Exec && editingPinId != pin.id) {
+            bool linked = false;
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.inputPinId == pin.id) { linked = true; break; }
+            }
+            if (!linked) rows++;
+        }
+    }
+    return headerHeight + rows * pinHeight + 6;
+}
+
 Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const {
-    Rectangle graphArea = {bounds.x, bounds.y + 25, bounds.width - sidebarWidth, bounds.height - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
 
     float nodeX = graphArea.x + node.posX + scroll.x;
     float nodeY = graphArea.y + node.posY + scroll.y;
 
-    int inputIndex = 0;
-    int outputIndex = 0;
+    float y = nodeY + headerHeight + pinHeight * 0.5f;
     for (const Pin& p : node.inputs) {
-        if (p.id == pin.id) {
-            float y = nodeY + headerHeight + inputIndex * pinHeight + pinHeight * 0.5f;
-            return {nodeX + pinRadius + 2, y};
+        if (p.id == pin.id) return {nodeX + pinRadius + 2, y};
+        y += pinHeight;
+        if (p.type != PinType::Exec) {
+            bool linked = false;
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.inputPinId == p.id) { linked = true; break; }
+            }
+            if (!linked) y += pinHeight;
         }
-        inputIndex++;
     }
+    y = nodeY + headerHeight + pinHeight * 0.5f;
     for (const Pin& p : node.outputs) {
-        if (p.id == pin.id) {
-            float y = nodeY + headerHeight + outputIndex * pinHeight + pinHeight * 0.5f;
-            return {nodeX + nodeWidth - pinRadius - 2, y};
-        }
-        outputIndex++;
+        if (p.id == pin.id) return {nodeX + nodeWidth - pinRadius - 2, y};
+        y += pinHeight;
     }
     return {0, 0};
-}
-
-bool StargraphEditorPanel::IsInputPin(int pinId) const {
-    for (const Node& node : graph.GetNodes()) {
-        for (const Pin& pin : node.inputs) {
-            if (pin.id == pinId) return true;
-        }
-    }
-    return false;
-}
-
-bool StargraphEditorPanel::IsOutputPin(int pinId) const {
-    for (const Node& node : graph.GetNodes()) {
-        for (const Pin& pin : node.outputs) {
-            if (pin.id == pinId) return true;
-        }
-    }
-    return false;
 }
 
 bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const {
     const Pin* out = nullptr;
     const Pin* in = nullptr;
     for (const Node& node : graph.GetNodes()) {
-        for (const Pin& pin : node.outputs) {
-            if (pin.id == outputPinId) out = &pin;
-        }
-        for (const Pin& pin : node.inputs) {
-            if (pin.id == inputPinId) in = &pin;
-        }
+        for (const Pin& pin : node.outputs) if (pin.id == outputPinId) out = &pin;
+        for (const Pin& pin : node.inputs)  if (pin.id == inputPinId)  in  = &pin;
     }
-    if (!out || !in) return false;
-    return out->type == in->type;
-}
-
-void StargraphEditorPanel::StartLinkFrom(int pinId, bool fromOutput) {
-    linkFromPin = pinId;
-    linkFromIsOutput = fromOutput;
+    return out && in && out->type == in->type;
 }
 
 void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
     if (linkFromPin == -1) return;
-    if (linkFromIsOutput == onInput) { linkFromPin = -1; return; }
+    if (linkFromIsOutput == onInput) { CancelLink(); return; }
 
     int outputPinId = linkFromIsOutput ? linkFromPin : pinId;
-    int inputPinId  = linkFromIsOutput ? pinId : linkFromPin;
+    int inputPinId  = linkFromIsOutput ? pinId       : linkFromPin;
 
-    if (!PinsCompatible(outputPinId, inputPinId)) { linkFromPin = -1; return; }
+    if (!PinsCompatible(outputPinId, inputPinId)) { CancelLink(); return; }
 
-    for (const Link& existing : graph.GetLinks()) {
-        if (existing.inputPinId == inputPinId) { linkFromPin = -1; return; }
+    for (const Link& lk : graph.GetLinks()) {
+        if (lk.inputPinId == inputPinId) { CancelLink(); return; }
     }
 
     graph.AddLink({outputPinId, inputPinId});
@@ -126,180 +124,322 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
     linkFromPin = -1;
 }
 
+void StargraphEditorPanel::CancelLink() {
+    linkFromPin = -1;
+}
+
 void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1) return;
-    std::vector<int> pinIds;
-    for (const Node& node : graph.GetNodes()) {
-        if (std::stoi(node.id) == selectedNodeId) {
-            for (const Pin& p : node.inputs)  pinIds.push_back(p.id);
-            for (const Pin& p : node.outputs) pinIds.push_back(p.id);
-        }
-    }
+
     Stargraph rebuilt;
-    rebuilt.assetName = graph.assetName;
-    rebuilt.parentClass = graph.parentClass;
-    rebuilt.formatVersion = graph.formatVersion;
+    rebuilt.assetName    = graph.assetName;
+    rebuilt.parentClass  = graph.parentClass;
+    rebuilt.formatVersion= graph.formatVersion;
     for (const Variable& v : graph.GetVariables()) rebuilt.AddVariable(v);
+
     for (const Node& node : graph.GetNodes()) {
         if (std::stoi(node.id) == selectedNodeId) continue;
-        Node* newNode = rebuilt.CreateNode(node.type);
-        newNode->posX = node.posX;
-        newNode->posY = node.posY;
-        for (size_t i = 0; i < node.inputs.size() && i < newNode->inputs.size(); i++) {
-            newNode->inputs[i].defaultValue = node.inputs[i].defaultValue;
-        }
+        Node* n = rebuilt.CreateNode(node.type);
+        n->posX = node.posX;
+        n->posY = node.posY;
+        for (size_t i = 0; i < node.inputs.size() && i < n->inputs.size(); i++)
+            n->inputs[i].defaultValue = node.inputs[i].defaultValue;
     }
+
     graph = std::move(rebuilt);
     selectedNodeId = -1;
     isDirty = true;
 }
 
-void StargraphEditorPanel::RenderLinkCreation() {
+Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+        float nx = graphArea.x + node.posX + scroll.x;
+        float ny = graphArea.y + node.posY + scroll.y;
+        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth, GetNodeHeight(node)})) return &node;
+    }
+    return nullptr;
+}
+
+void StargraphEditorPanel::RenderToolbar() {
+    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
+    DrawRectangleRec(toolbar, {32, 32, 36, 255});
+    DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
+             (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
+
+    std::string tabLabel = graph.assetName + (isDirty ? " *" : "");
+    DrawText(tabLabel.c_str(), (int)bounds.x + 8, (int)bounds.y + 30, 13, WHITE);
+
+    float btnY = toolbar.y + 4;
+    float btnRight = bounds.x + bounds.width - 4;
+
+    Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
+    if (GuiButton(closeBtn, "X")) {
+        if (isDirty) graph.SaveToFile(filePath);
+        Close();
+        return;
+    }
+    btnRight -= 26;
+
+    Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
+    if (GuiButton(saveBtn, "Save")) {
+        graph.SaveToFile(filePath);
+        isDirty = false;
+    }
+    btnRight -= 54;
+
+    Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
+    DrawRectangleRec(stopBtn, {130, 30, 30, 255});
+    DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
+    btnRight -= 26;
+
+    Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
+    DrawRectangleRec(playBtn, {30, 130, 60, 255});
+    DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mp = GetMousePosition();
+        if (CheckCollisionPointRec(mp, playBtn)) {
+            graph.SaveToFile(filePath);
+            isDirty = false;
+            GraphExecutor::Run(graph, "Event_BeginPlay");
+        }
+    }
+}
+
+void StargraphEditorPanel::RenderLeftPanel() {
+    Rectangle panel = {bounds.x, bounds.y + toolbarHeight + 25, leftPanelWidth, bounds.height - toolbarHeight - 25};
+    DrawRectangleRec(panel, {30, 30, 33, 255});
+    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+
+    float y = panel.y + 8;
+    auto sectionHeader = [&](const char* label) {
+        DrawText(label, (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+        y += 18;
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        y += 6;
+    };
+
+    sectionHeader("Graphs");
+    DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
+    DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, WHITE);
+    y += 22;
+
+    y += 8;
+    sectionHeader("Functions");
+
+    y += 8;
+    sectionHeader("Macros");
+
+    y += 8;
+    sectionHeader("Variables");
+    for (const Variable& var : graph.GetVariables()) {
+        DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
+        Color varColor = GetPinColor(var.type);
+        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, varColor);
+        DrawText(var.name.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+        y += 22;
+    }
+}
+
+void StargraphEditorPanel::RenderRightPanel() {
+    Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight + 25,
+                       rightPanelWidth, bounds.height - toolbarHeight - 25};
+    DrawRectangleRec(panel, {30, 30, 33, 255});
+    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+
+    float y = panel.y + 8;
+    DrawText("Details", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+    y += 20;
+    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+    y += 8;
+
+    if (selectedNodeId == -1) {
+        DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, {100, 100, 110, 255});
+        return;
+    }
+
+    for (const Node& node : graph.GetNodes()) {
+        if (std::stoi(node.id) != selectedNodeId) continue;
+        DrawText(node.title.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        y += 20;
+        DrawText(node.type.c_str(), (int)panel.x + 8, (int)y, 11, {120, 120, 130, 255});
+        y += 18;
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        y += 8;
+        for (const Pin& pin : node.inputs) {
+            if (pin.type == PinType::Exec) continue;
+            DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+            y += 14;
+            DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
+                     (int)panel.x + 12, (int)y, 11, WHITE);
+            y += 16;
+        }
+        break;
+    }
+}
+
+void StargraphEditorPanel::RenderWireInProgress() {
     if (linkFromPin == -1) return;
 
     Vector2 mousePos = GetMousePosition();
-    Vector2 fromPos = {0, 0};
+    Vector2 fromPos  = {0, 0};
+    Color wireColor  = {180, 180, 180, 200};
 
     for (const Node& node : graph.GetNodes()) {
         for (const Pin& pin : node.outputs) {
-            if (pin.id == linkFromPin) fromPos = GetPinPos(node, pin);
+            if (pin.id == linkFromPin) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
         }
         for (const Pin& pin : node.inputs) {
-            if (pin.id == linkFromPin) fromPos = GetPinPos(node, pin);
+            if (pin.id == linkFromPin) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
         }
     }
 
-    DrawLineBezier(fromPos, mousePos, 2.0f, {180, 180, 180, 200});
+    DrawLineBezier(fromPos, mousePos, 2.0f, wireColor);
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) linkFromPin = -1;
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) CancelLink();
 }
 
 void StargraphEditorPanel::RenderGraph() {
-    Rectangle graphArea = {bounds.x, bounds.y + 25, bounds.width - sidebarWidth, bounds.height - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
     Vector2 mousePos = GetMousePosition();
 
-    DrawRectangleRec(graphArea, {28, 28, 28, 255});
+    DrawRectangleRec(graphArea, {24, 24, 26, 255});
 
-    // grid
     int gridStep = 24;
-    for (float x = fmod(scroll.x, gridStep) + graphArea.x; x < graphArea.x + graphArea.width; x += gridStep) {
-        DrawLineV({x, graphArea.y}, {x, graphArea.y + graphArea.height}, {38, 38, 38, 255});
-    }
-    for (float y = fmod(scroll.y, gridStep) + graphArea.y; y < graphArea.y + graphArea.height; y += gridStep) {
-        DrawLineV({graphArea.x, y}, {graphArea.x + graphArea.width, y}, {38, 38, 38, 255});
-    }
+    for (float x = fmod(scroll.x, gridStep) + graphArea.x; x < graphArea.x + graphArea.width; x += gridStep)
+        DrawLineV({x, graphArea.y}, {x, graphArea.y + graphArea.height}, {34, 34, 36, 255});
+    for (float y = fmod(scroll.y, gridStep) + graphArea.y; y < graphArea.y + graphArea.height; y += gridStep)
+        DrawLineV({graphArea.x, y}, {graphArea.x + graphArea.width, y}, {34, 34, 36, 255});
 
     BeginScissorMode((int)graphArea.x, (int)graphArea.y, (int)graphArea.width, (int)graphArea.height);
 
-    // draw links
     for (const Link& link : graph.GetLinks()) {
-        const Pin* outPin = nullptr;
-        const Pin* inPin = nullptr;
-        const Node* outNode = nullptr;
-        const Node* inNode = nullptr;
+        const Pin* outPin = nullptr; const Node* outNode = nullptr;
+        const Pin* inPin  = nullptr; const Node* inNode  = nullptr;
         for (const Node& node : graph.GetNodes()) {
-            for (const Pin& pin : node.outputs) {
-                if (pin.id == link.outputPinId) { outPin = &pin; outNode = &node; }
-            }
-            for (const Pin& pin : node.inputs) {
-                if (pin.id == link.inputPinId) { inPin = &pin; inNode = &node; }
-            }
+            for (const Pin& pin : node.outputs) if (pin.id == link.outputPinId) { outPin = &pin; outNode = &node; }
+            for (const Pin& pin : node.inputs)  if (pin.id == link.inputPinId)  { inPin  = &pin; inNode  = &node; }
         }
         if (!outPin || !inPin || !outNode || !inNode) continue;
-
-        Vector2 from = GetPinPos(*outNode, *outPin);
-        Vector2 to   = GetPinPos(*inNode, *inPin);
-        Color linkColor = GetPinColor(outPin->type);
-        DrawLineBezier(from, to, 2.0f, linkColor);
+        DrawLineBezier(GetPinPos(*outNode, *outPin), GetPinPos(*inNode, *inPin), 2.0f, GetPinColor(outPin->type));
     }
 
-    RenderLinkCreation();
+    RenderWireInProgress();
 
-    // draw nodes
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         int nodeIdInt = std::stoi(node.id);
-        float nodeX = graphArea.x + node.posX + scroll.x;
-        float nodeY = graphArea.y + node.posY + scroll.y;
-        float nodeH = headerHeight + std::max(node.inputs.size(), node.outputs.size()) * pinHeight + 4;
-
-        Rectangle nodeRect = {nodeX, nodeY, nodeWidth, nodeH};
+        float nx = graphArea.x + node.posX + scroll.x;
+        float ny = graphArea.y + node.posY + scroll.y;
+        float nh = GetNodeHeight(node);
         bool isSelected = (selectedNodeId == nodeIdInt);
 
-        // header color
-        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-        bool isEvent = tmpl && tmpl->isEvent;
-        Color headerColor = isEvent ? Color{120, 60, 30, 255} : Color{50, 60, 80, 255};
-        Color bodyColor   = {38, 40, 45, 255};
-        Color borderColor = isSelected ? Color{100, 160, 230, 255} : Color{70, 70, 80, 255};
+        DrawRectangleRec({nx, ny, nodeWidth, headerHeight}, GetNodeHeaderColor(node));
+        DrawRectangleRec({nx, ny + headerHeight, nodeWidth, nh - headerHeight}, {38, 40, 45, 255});
+        DrawRectangleLinesEx({nx, ny, nodeWidth, nh}, isSelected ? 2.0f : 1.0f,
+                             isSelected ? Color{100, 160, 230, 255} : Color{65, 65, 75, 255});
+        DrawText(node.title.c_str(), (int)nx + 8, (int)ny + 6, 13, WHITE);
 
-        DrawRectangleRec({nodeX, nodeY, nodeWidth, headerHeight}, headerColor);
-        DrawRectangleRec({nodeX, nodeY + headerHeight, nodeWidth, nodeH - headerHeight}, bodyColor);
-        DrawRectangleLinesEx(nodeRect, 1.5f, borderColor);
-        DrawText(node.title.c_str(), (int)nodeX + 8, (int)nodeY + 5, 13, WHITE);
-
-        // input pins
+        float inputY = ny + headerHeight + pinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
-            const Pin& pin = node.inputs[i];
-            float py = nodeY + headerHeight + i * pinHeight + pinHeight * 0.5f;
-            Vector2 pinPos = {nodeX + pinRadius + 2, py};
+            Pin& pin = node.inputs[i];
+            Vector2 pinPos = {nx + pinRadius + 2, inputY};
             Color pinColor = GetPinColor(pin.type);
 
-            bool filled = false;
-            for (const Link& lk : graph.GetLinks()) {
-                if (lk.inputPinId == pin.id) { filled = true; break; }
-            }
-            if (filled) DrawCircleV(pinPos, pinRadius, pinColor);
-            else        DrawCircleV(pinPos, pinRadius, {45, 45, 45, 255});
-            DrawCircleLinesV(pinPos, pinRadius, pinColor);
+            bool linked = false;
+            for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == pin.id) { linked = true; break; }
 
-            if (pin.type != PinType::Exec) {
-                DrawText(pin.name.c_str(), (int)pinPos.x + 10, (int)py - 6, 12, LIGHTGRAY);
+            if (linked) DrawCircleV(pinPos, pinRadius, pinColor);
+            else { DrawCircleV(pinPos, pinRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, pinRadius, pinColor); }
+
+            if (pin.type == PinType::Exec) {
+                inputY += pinHeight;
+                if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                    DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        linkFromPin = pin.id; linkFromIsOutput = false; linkJustStarted = true;
+                    }
+                    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                        TryCompleteLink(pin.id, true);
+                    }
+                }
+                continue;
             }
 
-            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 3) && CheckCollisionPointRec(mousePos, graphArea)) {
-                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 80});
+            DrawText(pin.name.c_str(), (int)pinPos.x + 12, (int)inputY - 8, 12, LIGHTGRAY);
+            inputY += pinHeight;
+
+            if (!linked) {
+                Rectangle fieldRect = {nx + 10, inputY - pinHeight * 0.5f, nodeWidth - 20, pinHeight - 2};
+                if (editingPinId == pin.id) {
+                    GuiTextBox(fieldRect, editBuffer, sizeof(editBuffer), true);
+                    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE) ||
+                        (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, fieldRect))) {
+                        pin.defaultValue = editBuffer;
+                        editingPinId = -1;
+                        isDirty = true;
+                    }
+                } else {
+                    DrawRectangleRec(fieldRect, {30, 30, 32, 255});
+                    DrawRectangleLinesEx(fieldRect, 1, {70, 70, 80, 255});
+                    const char* displayText = pin.defaultValue.empty() ? pin.name.c_str() : pin.defaultValue.c_str();
+                    Color textColor = pin.defaultValue.empty() ? Color{80, 80, 90, 255} : WHITE;
+                    DrawText(displayText, (int)fieldRect.x + 4, (int)fieldRect.y + 3, 11, textColor);
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && linkFromPin == -1) {
+                        editingPinId = pin.id;
+                        snprintf(editBuffer, sizeof(editBuffer), "%s", pin.defaultValue.c_str());
+                    }
+                }
+                inputY += pinHeight;
+            }
+
+            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    if (linkFromPin == -1) StartLinkFrom(pin.id, false);
-                    else TryCompleteLink(pin.id, true);
+                    linkFromPin = pin.id; linkFromIsOutput = false; linkJustStarted = true;
+                }
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                    TryCompleteLink(pin.id, true);
                 }
             }
         }
 
-        // output pins
+        float outputY = ny + headerHeight + pinHeight * 0.5f;
         for (size_t i = 0; i < node.outputs.size(); i++) {
             const Pin& pin = node.outputs[i];
-            float py = nodeY + headerHeight + i * pinHeight + pinHeight * 0.5f;
-            Vector2 pinPos = {nodeX + nodeWidth - pinRadius - 2, py};
+            Vector2 pinPos = {nx + nodeWidth - pinRadius - 2, outputY};
             Color pinColor = GetPinColor(pin.type);
 
-            bool filled = false;
-            for (const Link& lk : graph.GetLinks()) {
-                if (lk.outputPinId == pin.id) { filled = true; break; }
-            }
-            if (filled) DrawCircleV(pinPos, pinRadius, pinColor);
-            else        DrawCircleV(pinPos, pinRadius, {45, 45, 45, 255});
-            DrawCircleLinesV(pinPos, pinRadius, pinColor);
+            bool linked = false;
+            for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == pin.id) { linked = true; break; }
+
+            if (linked) DrawCircleV(pinPos, pinRadius, pinColor);
+            else { DrawCircleV(pinPos, pinRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, pinRadius, pinColor); }
 
             if (pin.type != PinType::Exec) {
-                float textW = MeasureText(pin.name.c_str(), 12);
-                DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 10), (int)py - 6, 12, LIGHTGRAY);
+                float textW = (float)MeasureText(pin.name.c_str(), 12);
+                DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 12), (int)outputY - 8, 12, LIGHTGRAY);
             }
+            outputY += pinHeight;
 
-            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 3) && CheckCollisionPointRec(mousePos, graphArea)) {
-                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 80});
+            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    if (linkFromPin == -1) StartLinkFrom(pin.id, true);
-                    else TryCompleteLink(pin.id, false);
+                    linkFromPin = pin.id; linkFromIsOutput = true; linkJustStarted = true;
+                }
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                    TryCompleteLink(pin.id, false);
                 }
             }
         }
 
-        // node drag
-        if (CheckCollisionPointRec(mousePos, {nodeX, nodeY, nodeWidth, headerHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
+        if (CheckCollisionPointRec(mousePos, {nx, ny, nodeWidth, headerHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
                 selectedNodeId = nodeIdInt;
                 draggingNode = true;
-                nodeDragOffset = {mousePos.x - nodeX, mousePos.y - nodeY};
+                nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
             }
         }
 
@@ -310,48 +450,58 @@ void StargraphEditorPanel::RenderGraph() {
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) draggingNode = false;
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        draggingNode = false;
+        if (linkFromPin != -1 && !linkJustStarted) {
+            bool hitPin = false;
+            for (const Node& node : graph.GetNodes()) {
+                for (const Pin& pin : node.inputs) {
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius + 4)) { hitPin = true; break; }
+                }
+                for (const Pin& pin : node.outputs) {
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius + 4)) { hitPin = true; break; }
+                }
+                if (hitPin) break;
+            }
+            if (!hitPin && CheckCollisionPointRec(mousePos, graphArea)) {
+                filterCompatibleWithPin = linkFromPin;
+                CancelLink();
+                nodeMenuOpen = true;
+                nodeMenuJustOpened = true;
+                nodeMenuPos = mousePos;
+            } else {
+                CancelLink();
+            }
+        }
+        linkJustStarted = false;
+    }
 
     EndScissorMode();
 
-    // panning with middle mouse
-    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mousePos, graphArea)) {
-        panning = true;
-        panStart = mousePos;
-        scrollAtPanStart = scroll;
+    // Pan Graph
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea)) {
+        panning = true; panStart = mousePos; scrollAtPanStart = scroll;
     }
     if (panning) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             scroll.x = scrollAtPanStart.x + (mousePos.x - panStart.x);
             scroll.y = scrollAtPanStart.y + (mousePos.y - panStart.y);
-        } else {
-            panning = false;
-        }
+        } else panning = false;
     }
 
-    // deselect on empty click
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode) {
-        bool hitNode = false;
-        for (const Node& node : graph.GetNodes()) {
-            float nodeX = graphArea.x + node.posX + scroll.x;
-            float nodeY = graphArea.y + node.posY + scroll.y;
-            float nodeH = headerHeight + std::max(node.inputs.size(), node.outputs.size()) * pinHeight + 4;
-            if (CheckCollisionPointRec(mousePos, {nodeX, nodeY, nodeWidth, nodeH})) { hitNode = true; break; }
-        }
-        if (!hitNode) selectedNodeId = -1;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == -1) {
+        if (!GetNodeAtPos(mousePos)) selectedNodeId = -1;
     }
 
-    // right-click: open add node menu
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
+        filterCompatibleWithPin = -1;
         nodeMenuOpen = true;
         nodeMenuJustOpened = true;
         nodeMenuPos = mousePos;
     }
 
-    // delete key removes selected node
     if (IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
 
-    // ctrl+s saves
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
         graph.SaveToFile(filePath);
         isDirty = false;
@@ -361,137 +511,99 @@ void StargraphEditorPanel::RenderGraph() {
 void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
 
-    const std::unordered_map<std::string, NodeTemplate>& templates = NodeRegistry::Get().GetAllTemplates();
+    const auto& templates = NodeRegistry::Get().GetAllTemplates();
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& kv : templates) {
+        if (filterCompatibleWithPin != -1) {
+            const Pin* fromPin = nullptr;
+            bool fromIsOutput = false;
+            for (const Node& node : graph.GetNodes()) {
+                for (const Pin& pin : node.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; }
+                for (const Pin& pin : node.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; }
+            }
+            if (fromPin) {
+                bool hasCompatible = false;
+                if (fromIsOutput) {
+                    for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{})
+                        if (p.type == fromPin->type) { hasCompatible = true; break; }
+                } else {
+                    for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
+                        if (p.type == fromPin->type) { hasCompatible = true; break; }
+                }
+                if (!hasCompatible) continue;
+            }
+        }
         entries.push_back({kv.second.category, kv.second.type});
     }
     std::sort(entries.begin(), entries.end());
 
-    float menuW = 180;
+    if (entries.empty()) { nodeMenuOpen = false; filterCompatibleWithPin = -1; return; }
+
+    float menuW = 190;
     float itemH = 22;
-    float menuH = entries.size() * itemH + 8;
+    float menuH = entries.size() * itemH + 12;
     Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
 
-    if (popup.x + popup.width > bounds.x + bounds.width - sidebarWidth)
-        popup.x = bounds.x + bounds.width - sidebarWidth - popup.width;
-    if (popup.y + popup.height > bounds.y + bounds.height)
-        popup.y = bounds.y + bounds.height - popup.height;
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    if (popup.x + popup.width  > graphArea.x + graphArea.width)  popup.x = graphArea.x + graphArea.width  - popup.width;
+    if (popup.y + popup.height > graphArea.y + graphArea.height) popup.y = graphArea.y + graphArea.height - popup.height;
 
     if (nodeMenuJustOpened) {
         nodeMenuJustOpened = false;
     } else {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
-            nodeMenuOpen = false;
-            return;
+            nodeMenuOpen = false; filterCompatibleWithPin = -1; return;
         }
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            nodeMenuOpen = false;
-            return;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+            nodeMenuOpen = false; filterCompatibleWithPin = -1; return;
         }
     }
 
-    DrawRectangleRec(popup, {55, 55, 60, 255});
-    DrawRectangleLinesEx(popup, 1, {90, 90, 100, 255});
+    DrawRectangleRec(popup, {48, 48, 54, 255});
+    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
 
     std::string lastCategory;
-    float y = popup.y + 4;
+    float y = popup.y + 6;
     for (const auto& entry : entries) {
         if (entry.first != lastCategory && !lastCategory.empty()) {
-            DrawLineV({popup.x + 4, y}, {popup.x + popup.width - 4, y}, {90, 90, 90, 255});
-            y += 4;
+            DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {80, 80, 90, 255});
+            y += 5;
         }
         lastCategory = entry.first;
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        Vector2 mousePos = GetMousePosition();
-        if (CheckCollisionPointRec(mousePos, btn)) {
-            DrawRectangleRec(btn, {70, 70, 85, 255});
+        Vector2 mp = GetMousePosition();
+        if (CheckCollisionPointRec(mp, btn)) {
+            DrawRectangleRec(btn, {65, 65, 80, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                Rectangle graphArea = {bounds.x, bounds.y + 25, bounds.width - sidebarWidth, bounds.height - 25};
                 Node* node = graph.CreateNode(entry.second);
                 node->posX = nodeMenuPos.x - graphArea.x - scroll.x;
                 node->posY = nodeMenuPos.y - graphArea.y - scroll.y;
                 isDirty = true;
                 nodeMenuOpen = false;
+                filterCompatibleWithPin = -1;
             }
         }
-        DrawText(entry.second.c_str(), (int)btn.x + 6, (int)btn.y + 4, 12, WHITE);
+        DrawText(entry.second.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
         y += itemH;
-    }
-}
-
-void StargraphEditorPanel::RenderSidebar() {
-    Rectangle sidebar = {bounds.x + bounds.width - sidebarWidth, bounds.y + 25, sidebarWidth, bounds.height - 25};
-    DrawRectangleRec(sidebar, {35, 35, 38, 255});
-    DrawRectangleLinesEx(sidebar, 1, {60, 60, 65, 255});
-
-    float y = sidebar.y + 8;
-    DrawText("Variables", (int)sidebar.x + 8, (int)y, 13, LIGHTGRAY);
-    y += 20;
-
-    for (const Variable& var : graph.GetVariables()) {
-        DrawRectangleRec({sidebar.x + 4, y, sidebarWidth - 8, 18}, {48, 48, 52, 255});
-        Color varColor = GetPinColor(var.type);
-        DrawRectangleRec({sidebar.x + 4, y + 4, 10, 10}, varColor);
-        DrawText(var.name.c_str(), (int)sidebar.x + 20, (int)y + 2, 12, WHITE);
-        y += 22;
-    }
-
-    y += 8;
-    DrawLine((int)sidebar.x + 4, (int)y, (int)(sidebar.x + sidebarWidth - 4), (int)y, {60, 60, 65, 255});
-    y += 8;
-
-    DrawText("Graph", (int)sidebar.x + 8, (int)y, 13, LIGHTGRAY);
-    y += 20;
-    std::string classText = "Class: " + graph.parentClass;
-    DrawText(classText.c_str(), (int)sidebar.x + 8, (int)y, 12, GRAY);
-    y += 18;
-
-    if (selectedNodeId != -1) {
-        y += 8;
-        DrawLine((int)sidebar.x + 4, (int)y, (int)(sidebar.x + sidebarWidth - 4), (int)y, {60, 60, 65, 255});
-        y += 8;
-        DrawText("Selected Node", (int)sidebar.x + 8, (int)y, 13, LIGHTGRAY);
-        y += 20;
-        for (const Node& node : graph.GetNodes()) {
-            if (std::stoi(node.id) != selectedNodeId) continue;
-            DrawText(node.type.c_str(), (int)sidebar.x + 8, (int)y, 12, WHITE);
-            y += 18;
-            for (const Pin& pin : node.inputs) {
-                if (pin.type == PinType::Exec) continue;
-                DrawText(pin.name.c_str(), (int)sidebar.x + 8, (int)y, 11, GRAY);
-                y += 15;
-            }
-        }
-    }
-
-    if (isDirty) {
-        DrawText("* Unsaved", (int)sidebar.x + 8, (int)(sidebar.y + sidebar.height - 20), 11, {200, 160, 60, 255});
     }
 }
 
 void StargraphEditorPanel::Render() {
     if (!isOpen) return;
 
-    DrawRectangleRec(bounds, {28, 28, 30, 255});
-    DrawRectangleLinesEx(bounds, 1, {70, 70, 75, 255});
+    DrawRectangleRec(bounds, {24, 24, 26, 255});
 
-    // tab bar
     Rectangle tabBar = {bounds.x, bounds.y, bounds.width, 25};
-    DrawRectangleRec(tabBar, {40, 40, 45, 255});
-    std::string tabLabel = graph.assetName + (isDirty ? " *" : "");
-    DrawText(tabLabel.c_str(), (int)bounds.x + 8, (int)bounds.y + 5, 14, WHITE);
+    DrawRectangleRec(tabBar, {36, 36, 40, 255});
+    DrawLine((int)tabBar.x, (int)(tabBar.y + tabBar.height),
+             (int)(tabBar.x + tabBar.width), (int)(tabBar.y + tabBar.height), {55, 55, 60, 255});
 
-    Rectangle closeBtn = {bounds.x + bounds.width - 26, bounds.y + 2, 22, 20};
-    if (GuiButton(closeBtn, "X")) {
-        if (isDirty) graph.SaveToFile(filePath);
-        Close();
-        return;
-    }
-
+    RenderToolbar();
+    RenderLeftPanel();
     RenderGraph();
     RenderNodeContextMenu();
-    RenderSidebar();
+    RenderRightPanel();
 }
