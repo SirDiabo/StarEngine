@@ -57,9 +57,19 @@ public:
     Node* FindNodeByPinId(int pinId);
     Node* FindNodeByType(const std::string& type);
 
+    bool SaveToFile(const std::string& path) const;
+    bool LoadFromFile(const std::string& path);
+
+    std::string assetName;
+    std::string parentClass = "Actor";
+    int formatVersion = 1;
+
 private:
     std::deque<Node> nodes;
     std::vector<Link> links;
     std::vector<Variable> variables;
     int nextPinId = 1;
 };
+
+std::string PinTypeToString(PinType type);
+PinType PinTypeFromString(const std::string& text);

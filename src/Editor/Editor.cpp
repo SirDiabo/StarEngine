@@ -11,11 +11,11 @@ static float lastClickTime = 0;
 static int lastClickedTab = -1;
 
 void Editor::Initialize() {
-    contentPanel = new ContentBrowserPanel();
-    panels.push_back(contentPanel);
-
     logPanel = new LogPanel();
     panels.push_back(logPanel);
+
+    contentPanel = new ContentBrowserPanel();
+    panels.push_back(contentPanel);
 
     detailsPanel = new DetailsPanel();
     panels.push_back(detailsPanel);

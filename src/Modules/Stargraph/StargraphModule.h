@@ -11,4 +11,5 @@ public:
 
 private:
     void RegisterDefaultNodes();
+    void RegisterAssetType();
 };

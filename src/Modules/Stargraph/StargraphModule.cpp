@@ -1,5 +1,7 @@
 #include "StargraphModule.h"
 #include "NodeRegistry.h"
+#include "Stargraph.h"
+#include "Core/AssetTypeRegistry.h"
 #include "raylib.h"
 
 StargraphModule::StargraphModule() {
@@ -8,6 +10,7 @@ StargraphModule::StargraphModule() {
 
 bool StargraphModule::Initialize() {
     RegisterDefaultNodes();
+    RegisterAssetType();
     return true;
 }
 
@@ -97,4 +100,18 @@ void StargraphModule::RegisterDefaultNodes() {
         TraceLog(LOG_INFO, "Print_String: %s", text.c_str());
     };
     NodeRegistry::Get().RegisterNode(printString);
+}
+
+void StargraphModule::RegisterAssetType() {
+    AssetTypeInfo info;
+    info.typeName = "Stargraph";
+    info.extension = ".stargraph";
+    info.category = "Scripting";
+    info.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+        Stargraph graph;
+        graph.assetName = assetName;
+        graph.parentClass = "Actor";
+        return graph.SaveToFile(fullPath);
+    };
+    AssetTypeRegistry::Get().RegisterType(info);
 }

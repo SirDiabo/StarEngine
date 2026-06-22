@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(external/raylib)
 
-file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.c")
+file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.c" "src/Core/*.cpp")
 add_executable(StarEngine ${SOURCES})
 
 target_include_directories(StarEngine PRIVATE src)
