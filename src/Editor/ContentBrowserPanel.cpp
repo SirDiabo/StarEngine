@@ -140,6 +140,12 @@ void ContentBrowserPanel::Render() {
             float currentTime = (float)GetTime();
             if (entries[i].isFolder && lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
                 NavigateInto(entries[i].displayName);
+            } else if (!entries[i].isFolder && lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
+                if (onAssetOpened) {
+                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
+                    std::string ext = fs::path(entries[i].fullDiskName).extension().string();
+                    onAssetOpened(fullPath.string(), ext);
+                }
             } else {
                 selectedIndex = (int)i;
             }

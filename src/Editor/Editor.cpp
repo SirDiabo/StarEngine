@@ -5,6 +5,7 @@
 #include "LogPanel.h"
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
+#include "StargraphEditorPanel.h"
 #include "raygui.h"
 
 static float lastClickTime = 0;
@@ -23,6 +24,9 @@ void Editor::Initialize() {
     viewportPanel = new ViewportPanel();
     panels.push_back(viewportPanel);
 
+    stargraphEditor = new StargraphEditorPanel();
+    panels.push_back(stargraphEditor);
+
     bottomDock = { {contentPanel, "Content"}, {logPanel, "Logs"} };
 
     menuBar = new MenuBar();
@@ -33,10 +37,23 @@ void Editor::Initialize() {
     for (auto* panel : panels) {
         panel->Initialize();
     }
+
+    contentPanel->onAssetOpened = [this](const std::string& path, const std::string& ext) {
+        OpenAsset(path, ext);
+    };
 }
 
 LogPanel* Editor::GetLogPanel() {
     return logPanel;
+}
+
+void Editor::OpenAsset(const std::string& fullPath, const std::string& extension) {
+    if (extension == ".stargraph") {
+        if (stargraphEditor->Open(fullPath)) {
+            viewportPanel->SetVisible(false);
+            detailsPanel->SetVisible(false);
+        }
+    }
 }
 
 void Editor::Render() {
@@ -48,6 +65,7 @@ void Editor::Render() {
         return;
     }
 
+    float topHeight = (float)(height - 230);
     Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
     Vector2 mousePos = GetMousePosition();
     int reattachIndex = -1;
@@ -78,16 +96,29 @@ void Editor::Render() {
         panel->Render();
     }
 
-    float topHeight = height - 230;
+    if (stargraphEditor->IsOpen()) {
+        stargraphEditor->bounds = Rectangle{0, 30, (float)width, topHeight};
+        stargraphEditor->Render();
 
-    viewportPanel->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
-    viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
-    viewportPanel->Render();
+        if (!stargraphEditor->IsOpen()) {
+            viewportPanel->SetVisible(true);
+            detailsPanel->SetVisible(true);
+        }
+    } else {
+        if (viewportPanel->IsVisible()) {
+            viewportPanel->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
+            viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
+            viewportPanel->Render();
+        }
 
-    detailsPanel->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
-    detailsPanel->header = {detailsPanel->bounds.x, detailsPanel->bounds.y, detailsPanel->bounds.width, 25};
-    detailsPanel->Render();
+        if (detailsPanel->IsVisible()) {
+            detailsPanel->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
+            detailsPanel->header = {detailsPanel->bounds.x, detailsPanel->bounds.y, detailsPanel->bounds.width, 25};
+            detailsPanel->Render();
+        }
+    }
 
+    // bottom dock tab bar
     std::vector<const char*> tabTexts;
     for (const auto& tab : bottomDock) tabTexts.push_back(tab.title.c_str());
     GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomDock.size(), &activeBottomTab);
@@ -95,7 +126,7 @@ void Editor::Render() {
     if (reattachIndex >= 0) activeBottomTab = reattachIndex;
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, tabBarBounds)) {
-        float currentTime = GetTime();
+        float currentTime = (float)GetTime();
         if (lastClickedTab == activeBottomTab && (currentTime - lastClickTime) < 0.3f) {
             Panel* panel = bottomDock[activeBottomTab].panel;
             if (!panel->IsDetached()) {
@@ -117,21 +148,14 @@ void Editor::Render() {
 
     if (menuBar->activeMenu == 0) {
         Rectangle popup = {5, 35, 120, 90};
-        Rectangle newBtn = {10, 40, 110, 25};
-        Rectangle openBtn = {10, 70, 110, 25};
-        Rectangle saveBtn = {10, 100, 110, 25};
-
         DrawRectangleRec(popup, {60, 60, 60, 255});
-        if (GuiButton(newBtn, "New Project")) menuBar->wantsNewProject = true;
-        if (GuiButton(openBtn, "Open Project")) menuBar->wantsOpenProject = true;
-        if (GuiButton(saveBtn, "Save Project")) menuBar->wantsSaveProject = true;
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+        if (GuiButton({10, 40, 110, 25}, "New Project")) menuBar->wantsNewProject = true;
+        if (GuiButton({10, 70, 110, 25}, "Open Project")) menuBar->wantsOpenProject = true;
+        if (GuiButton({10, 100, 110, 25}, "Save Project")) menuBar->wantsSaveProject = true;
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup))
             menuBar->activeMenu = -1;
-        }
     } else if (menuBar->activeMenu > 0) {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            menuBar->activeMenu = -1;
-        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) menuBar->activeMenu = -1;
     }
 }
 
@@ -140,9 +164,7 @@ void Editor::ShowProjectBrowser(bool forNew, bool allowCancel) {
 }
 
 bool Editor::WantsNewProject() {
-    if (projectBrowser && projectBrowser->WantsNewProject()) {
-        return true;
-    }
+    if (projectBrowser && projectBrowser->WantsNewProject()) return true;
     if (menuBar && menuBar->wantsNewProject) {
         ShowProjectBrowser(true, true);
         menuBar->wantsNewProject = false;
@@ -151,9 +173,7 @@ bool Editor::WantsNewProject() {
 }
 
 bool Editor::WantsOpenProject() {
-    if (projectBrowser && projectBrowser->WantsOpenProject()) {
-        return true;
-    }
+    if (projectBrowser && projectBrowser->WantsOpenProject()) return true;
     if (menuBar && menuBar->wantsOpenProject) {
         ShowProjectBrowser(false, true);
         menuBar->wantsOpenProject = false;
@@ -170,10 +190,7 @@ bool Editor::WantsCancel() {
 }
 
 std::string Editor::GetNewProjectName() const {
-    if (projectBrowser && projectBrowser->WantsNewProject()) {
-        return projectBrowser->GetNewProjectName();
-    }
-    return "";
+    return (projectBrowser && projectBrowser->WantsNewProject()) ? projectBrowser->GetNewProjectName() : "";
 }
 
 std::string Editor::GetOpenProjectPath() const {

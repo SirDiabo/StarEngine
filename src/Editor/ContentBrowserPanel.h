@@ -3,6 +3,7 @@
 #include "Core/AssetTypeRegistry.h"
 #include <string>
 #include <vector>
+#include <functional>
 
 struct ContentEntry {
     std::string displayName;
@@ -15,6 +16,8 @@ class ContentBrowserPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+
+    std::function<void(const std::string& fullPath, const std::string& extension)> onAssetOpened;
 
 private:
     std::string GetCurrentFolderPath() const;

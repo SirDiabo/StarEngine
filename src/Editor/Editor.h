@@ -7,6 +7,7 @@ class LogPanel;
 class ContentBrowserPanel;
 class DetailsPanel;
 class ViewportPanel;
+class StargraphEditorPanel;
 class MenuBar;
 class ProjectBrowser;
 
@@ -32,6 +33,9 @@ public:
     void ResetSaveProjectFlag();
 
 private:
+    void OpenAsset(const std::string& fullPath, const std::string& extension);
+    void RenderMainLayout();
+
     std::vector<Panel*> panels;
     std::vector<DockTab> bottomDock;
     int activeBottomTab = 0;
@@ -40,6 +44,7 @@ private:
     ContentBrowserPanel* contentPanel = nullptr;
     DetailsPanel* detailsPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
+    StargraphEditorPanel* stargraphEditor = nullptr;
     MenuBar* menuBar = nullptr;
     ProjectBrowser* projectBrowser = nullptr;
 };

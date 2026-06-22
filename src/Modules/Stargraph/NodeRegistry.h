@@ -17,6 +17,7 @@ public:
 
     void RegisterNode(const NodeTemplate& nodeTemplate);
     const NodeTemplate* GetTemplate(const std::string& type);
+    const std::unordered_map<std::string, NodeTemplate>& GetAllTemplates() const { return templates; }
 
 private:
     std::unordered_map<std::string, NodeTemplate> templates;
