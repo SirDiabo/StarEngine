@@ -344,6 +344,7 @@ void StargraphEditorPanel::RenderGraph() {
     // right-click: open add node menu
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
         nodeMenuOpen = true;
+        nodeMenuJustOpened = true;
         nodeMenuPos = mousePos;
     }
 
@@ -362,7 +363,6 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     const std::unordered_map<std::string, NodeTemplate>& templates = NodeRegistry::Get().GetAllTemplates();
 
-    // group by category
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& kv : templates) {
         entries.push_back({kv.second.category, kv.second.type});
@@ -374,11 +374,23 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     float menuH = entries.size() * itemH + 8;
     Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
 
-    // keep in bounds
     if (popup.x + popup.width > bounds.x + bounds.width - sidebarWidth)
         popup.x = bounds.x + bounds.width - sidebarWidth - popup.width;
     if (popup.y + popup.height > bounds.y + bounds.height)
         popup.y = bounds.y + bounds.height - popup.height;
+
+    if (nodeMenuJustOpened) {
+        nodeMenuJustOpened = false;
+    } else {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
+            nodeMenuOpen = false;
+            return;
+        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            nodeMenuOpen = false;
+            return;
+        }
+    }
 
     DrawRectangleRec(popup, {55, 55, 60, 255});
     DrawRectangleLinesEx(popup, 1, {90, 90, 100, 255});
@@ -407,13 +419,6 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
         DrawText(entry.second.c_str(), (int)btn.x + 6, (int)btn.y + 4, 12, WHITE);
         y += itemH;
-    }
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
-        nodeMenuOpen = false;
-    }
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-        nodeMenuOpen = false;
     }
 }
 

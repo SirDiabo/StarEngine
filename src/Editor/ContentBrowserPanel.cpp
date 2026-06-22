@@ -122,7 +122,11 @@ void ContentBrowserPanel::Render() {
 
     if (!currentRelativeFolder.empty()) {
         Rectangle row = {listArea.x, y, listArea.width, rowHeight};
-        if (GuiButton(row, "..")) NavigateUp();
+        DrawRectangleRec(row, {50, 50, 50, 255});
+        DrawText("..", (int)row.x + 8, (int)row.y + 4, 14, LIGHTGRAY);
+        if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            NavigateUp();
+        }
         y += rowHeight;
     }
 
@@ -169,6 +173,7 @@ void ContentBrowserPanel::Render() {
 
     if (!contextMenuOpen && !isCreatingNewItem && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, listArea)) {
         contextMenuOpen = true;
+        contextMenuJustOpened = true;
         contextMenuPos = mousePos;
     }
 
@@ -177,20 +182,24 @@ void ContentBrowserPanel::Render() {
         float menuHeight = 30.0f * (1 + assetTypes.size());
         Rectangle popup = {contextMenuPos.x, contextMenuPos.y, 150, menuHeight};
 
-        DrawRectangleRec(popup, {60, 60, 60, 255});
-        DrawRectangleLinesEx(popup, 1, {90, 90, 90, 255});
-
-        Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
-        if (GuiButton(folderBtn, "New Folder")) BeginCreateFolder();
-
-        for (size_t i = 0; i < assetTypes.size(); i++) {
-            Rectangle btn = {popup.x + 4, popup.y + 4 + (float)(i + 1) * 30, popup.width - 8, 24};
-            std::string label = "New " + assetTypes[i].typeName;
-            if (GuiButton(btn, label.c_str())) BeginCreateAsset(assetTypes[i]);
+        if (contextMenuJustOpened) {
+            contextMenuJustOpened = false;
+        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            contextMenuOpen = false;
         }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            contextMenuOpen = false;
+        if (contextMenuOpen) {
+            DrawRectangleRec(popup, {60, 60, 60, 255});
+            DrawRectangleLinesEx(popup, 1, {90, 90, 90, 255});
+
+            Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
+            if (GuiButton(folderBtn, "New Folder")) BeginCreateFolder();
+
+            for (size_t i = 0; i < assetTypes.size(); i++) {
+                Rectangle btn = {popup.x + 4, popup.y + 4 + (float)(i + 1) * 30, popup.width - 8, 24};
+                std::string label = "New " + assetTypes[i].typeName;
+                if (GuiButton(btn, label.c_str())) BeginCreateAsset(assetTypes[i]);
+            }
         }
     }
 }

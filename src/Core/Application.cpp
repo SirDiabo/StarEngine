@@ -2,6 +2,7 @@
 #include "Editor/Editor.h"
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
+#include "Core/Module.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
@@ -41,6 +42,8 @@ bool Application::Initialize(int argc, char* argv[]) {
 
     editor = new Editor();
     editor->Initialize();
+
+    ModuleManager::Get().InitializeAll();
 
     activeLogPanel = editor->GetLogPanel();
     SetTraceLogCallback(ForwardTraceLogToPanel);

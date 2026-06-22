@@ -36,6 +36,7 @@ private:
     int lastEntryClickIndex = -1;
 
     bool contextMenuOpen = false;
+    bool contextMenuJustOpened = false;
     Vector2 contextMenuPos{0, 0};
 
     bool isCreatingNewItem = false;

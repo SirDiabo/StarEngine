@@ -46,6 +46,7 @@ private:
     bool linkFromIsOutput = false;
 
     bool nodeMenuOpen = false;
+    bool nodeMenuJustOpened = false;
     Vector2 nodeMenuPos{0, 0};
 
     bool isDirty = false;
