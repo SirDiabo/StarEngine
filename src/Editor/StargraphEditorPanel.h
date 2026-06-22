@@ -55,6 +55,7 @@ private:
     bool nodeMenuJustOpened = false;
     Vector2 nodeMenuPos{0, 0};
     int filterCompatibleWithPin = -1;
+    bool didPan = false;
 
     int editingPinId = -1;
     char editBuffer[256] = "";

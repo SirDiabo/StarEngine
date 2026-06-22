@@ -27,6 +27,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     nodeMenuOpen = false;
     editingPinId = -1;
     scroll = {0, 0};
+    didPan = false;
     return true;
 }
 
@@ -480,12 +481,15 @@ void StargraphEditorPanel::RenderGraph() {
 
     // Pan Graph
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea)) {
-        panning = true; panStart = mousePos; scrollAtPanStart = scroll;
+        panning = true; panStart = mousePos; scrollAtPanStart = scroll; didPan = false;
     }
     if (panning) {
         if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             scroll.x = scrollAtPanStart.x + (mousePos.x - panStart.x);
             scroll.y = scrollAtPanStart.y + (mousePos.y - panStart.y);
+            if (panStart != mousePos) {
+                didPan = true;
+            }
         } else panning = false;
     }
 
@@ -494,10 +498,12 @@ void StargraphEditorPanel::RenderGraph() {
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
+        if (!didPan) {
         filterCompatibleWithPin = -1;
         nodeMenuOpen = true;
         nodeMenuJustOpened = true;
         nodeMenuPos = mousePos;
+        }
     }
 
     if (IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
