@@ -43,6 +43,7 @@ private:
     bool panning = false;
     Vector2 panStart{0, 0};
     Vector2 scrollAtPanStart{0, 0};
+    float zoom = 1.0f;
 
     int selectedNodeId = -1;
     bool draggingNode = false;

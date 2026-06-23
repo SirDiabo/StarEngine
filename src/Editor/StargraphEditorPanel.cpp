@@ -74,25 +74,26 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
 
-    float nodeX = graphArea.x + node.posX + scroll.x;
-    float nodeY = graphArea.y + node.posY + scroll.y;
+    float nodeX = graphArea.x + node.posX * zoom + scroll.x;
+    float nodeY = graphArea.y + node.posY * zoom + scroll.y;
 
-    float y = nodeY + headerHeight + pinHeight * 0.5f;
+    float scaledPinHeight = pinHeight * zoom;
+    float y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.inputs) {
-        if (p.id == pin.id) return {nodeX + pinRadius + 2, y};
-        y += pinHeight;
+        if (p.id == pin.id) return {nodeX + pinRadius * zoom + 2, y};
+        y += scaledPinHeight;
         if (p.type != PinType::Exec) {
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) {
                 if (lk.inputPinId == p.id) { linked = true; break; }
             }
-            if (!linked) y += pinHeight;
+            if (!linked) y += scaledPinHeight;
         }
     }
-    y = nodeY + headerHeight + pinHeight * 0.5f;
+    y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.outputs) {
-        if (p.id == pin.id) return {nodeX + nodeWidth - pinRadius - 2, y};
-        y += pinHeight;
+        if (p.id == pin.id) return {nodeX + nodeWidth * zoom - pinRadius * zoom - 2, y};
+        y += scaledPinHeight;
     }
     return {0, 0};
 }
@@ -159,11 +160,11 @@ void StargraphEditorPanel::DeleteSelected() {
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
-        float nx = graphArea.x + node.posX + scroll.x;
-        float ny = graphArea.y + node.posY + scroll.y;
-        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth, GetNodeHeight(node)})) return &node;
+        float nx = graphArea.x + node.posX * zoom + scroll.x;
+        float ny = graphArea.y + node.posY * zoom + scroll.y;
+        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth * zoom, GetNodeHeight(node) * zoom})) return &node;
     }
     return nullptr;
 }
@@ -312,6 +313,20 @@ void StargraphEditorPanel::RenderGraph() {
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
     Vector2 mousePos = GetMousePosition();
 
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea)) {
+        float newZoom = zoom + wheel * 0.1f;
+        newZoom = fmax(0.1f, fmin(3.0f, newZoom));
+        
+        Vector2 mouseBeforeZoom = {
+            (mousePos.x - graphArea.x - scroll.x) / zoom,
+            (mousePos.y - graphArea.y - scroll.y) / zoom
+        };
+        zoom = newZoom;
+        scroll.x = mousePos.x - graphArea.x - mouseBeforeZoom.x * zoom;
+        scroll.y = mousePos.y - graphArea.y - mouseBeforeZoom.y * zoom;
+    }
+
     DrawRectangleRec(graphArea, {24, 24, 26, 255});
 
     int gridStep = 24;
@@ -337,34 +352,39 @@ void StargraphEditorPanel::RenderGraph() {
 
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         int nodeIdInt = std::stoi(node.id);
-        float nx = graphArea.x + node.posX + scroll.x;
-        float ny = graphArea.y + node.posY + scroll.y;
-        float nh = GetNodeHeight(node);
+        float nx = graphArea.x + node.posX * zoom + scroll.x;
+        float ny = graphArea.y + node.posY * zoom + scroll.y;
+        float scaledNodeWidth = nodeWidth * zoom;
+        float scaledHeaderHeight = headerHeight * zoom;
+        float scaledPinHeight = pinHeight * zoom;
+        float nh = GetNodeHeight(node) * zoom;
         bool isSelected = (selectedNodeId == nodeIdInt);
 
-        DrawRectangleRec({nx, ny, nodeWidth, headerHeight}, GetNodeHeaderColor(node));
-        DrawRectangleRec({nx, ny + headerHeight, nodeWidth, nh - headerHeight}, {38, 40, 45, 255});
-        DrawRectangleLinesEx({nx, ny, nodeWidth, nh}, isSelected ? 2.0f : 1.0f,
+        DrawRectangleRec({nx, ny, scaledNodeWidth, scaledHeaderHeight}, GetNodeHeaderColor(node));
+        DrawRectangleRec({nx, ny + scaledHeaderHeight, scaledNodeWidth, nh - scaledHeaderHeight}, {38, 40, 45, 255});
+        DrawRectangleLinesEx({nx, ny, scaledNodeWidth, nh}, isSelected ? 2.0f : 1.0f,
                              isSelected ? Color{100, 160, 230, 255} : Color{65, 65, 75, 255});
-        DrawText(node.title.c_str(), (int)nx + 8, (int)ny + 6, 13, WHITE);
+        DrawText(node.title.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
 
-        float inputY = ny + headerHeight + pinHeight * 0.5f;
+        float inputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
             Pin& pin = node.inputs[i];
-            Vector2 pinPos = {nx + pinRadius + 2, inputY};
+            Vector2 pinPos = {nx + pinRadius * zoom + 2, inputY};
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == pin.id) { linked = true; break; }
 
-            if (linked) DrawCircleV(pinPos, pinRadius, pinColor);
-            else { DrawCircleV(pinPos, pinRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, pinRadius, pinColor); }
+            float scaledRadius = pinRadius * zoom;
+
+            if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
+            else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
 
             if (pin.type == PinType::Exec) {
-                inputY += pinHeight;
+                inputY += scaledPinHeight;
                 bool isDraggingLink = linkFromPin != -1;
-                if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
-                    DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
+                if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                    DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                             RemoveLinkFromPin(pin.id);
@@ -393,10 +413,10 @@ void StargraphEditorPanel::RenderGraph() {
             }
 
             DrawText(pin.name.c_str(), (int)pinPos.x + 12, (int)inputY - 8, 12, LIGHTGRAY);
-            inputY += pinHeight;
+            inputY += scaledPinHeight;
 
             if (!linked) {
-                Rectangle fieldRect = {nx + 10, inputY - pinHeight * 0.5f, nodeWidth - 20, pinHeight - 2};
+                Rectangle fieldRect = {nx + 10, inputY - scaledPinHeight * 0.5f, scaledNodeWidth - 20, scaledPinHeight - 2};
                 if (editingPinId == pin.id) {
                     GuiTextBox(fieldRect, editBuffer, sizeof(editBuffer), true);
                     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE) ||
@@ -416,11 +436,11 @@ void StargraphEditorPanel::RenderGraph() {
                         snprintf(editBuffer, sizeof(editBuffer), "%s", pin.defaultValue.c_str());
                     }
                 }
-                inputY += pinHeight;
+                inputY += scaledPinHeight;
             }
 
-            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
-                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
+            if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
@@ -447,26 +467,28 @@ void StargraphEditorPanel::RenderGraph() {
             }
         }
 
-        float outputY = ny + headerHeight + pinHeight * 0.5f;
+        float outputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.outputs.size(); i++) {
             const Pin& pin = node.outputs[i];
-            Vector2 pinPos = {nx + nodeWidth - pinRadius - 2, outputY};
+            Vector2 pinPos = {nx + scaledNodeWidth - pinRadius * zoom - 2, outputY};
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == pin.id) { linked = true; break; }
 
-            if (linked) DrawCircleV(pinPos, pinRadius, pinColor);
-            else { DrawCircleV(pinPos, pinRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, pinRadius, pinColor); }
+            float scaledRadius = pinRadius * zoom;
+
+            if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
+            else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
 
             if (pin.type != PinType::Exec) {
                 float textW = (float)MeasureText(pin.name.c_str(), 12);
                 DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 12), (int)outputY - 8, 12, LIGHTGRAY);
             }
-            outputY += pinHeight;
+            outputY += pinHeight * zoom;
 
-if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
-                DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
+if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
@@ -493,7 +515,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollision
             }
         }
 
-        if (CheckCollisionPointRec(mousePos, {nx, ny, nodeWidth, headerHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
+        if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
                 selectedNodeId = nodeIdInt;
                 draggingNode = true;
@@ -502,8 +524,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollision
         }
 
         if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            node.posX = mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x;
-            node.posY = mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y;
+            node.posX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
+            node.posY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
             isDirty = true;
         }
     }
@@ -514,10 +536,10 @@ if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollision
             bool hitPin = false;
             for (const Node& node : graph.GetNodes()) {
                 for (const Pin& pin : node.inputs) {
-                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius + 4)) { hitPin = true; break; }
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * zoom + 4)) { hitPin = true; break; }
                 }
                 for (const Pin& pin : node.outputs) {
-                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius + 4)) { hitPin = true; break; }
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * zoom + 4)) { hitPin = true; break; }
                 }
                 if (hitPin) break;
             }
