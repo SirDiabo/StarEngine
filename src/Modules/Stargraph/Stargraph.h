@@ -51,6 +51,7 @@ public:
 
     Node* CreateNode(const std::string& type);
     void AddLink(const Link& link);
+    void RemoveLink(int pinId);
     void AddVariable(const Variable& var);
 
     Pin* FindPin(int pinId);

@@ -129,6 +129,11 @@ void StargraphEditorPanel::CancelLink() {
     linkFromIsOutput = false;
 }
 
+void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
+    graph.RemoveLink(pinId);
+    isDirty = true;
+}
+
 void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1) return;
 
@@ -360,10 +365,28 @@ void StargraphEditorPanel::RenderGraph() {
                 bool isDraggingLink = linkFromPin != -1;
                 if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                     DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && isDraggingLink) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        if (linked && IsKeyDown(KEY_LEFT_ALT)) {
+                            RemoveLinkFromPin(pin.id);
+                        } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
+                            int otherPinId = -1;
+                            for (const Link& lk : graph.GetLinks()) {
+                                if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
+                                if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
+                            }
+                            if (otherPinId != -1) {
+                                RemoveLinkFromPin(pin.id);
+                                linkFromPin = otherPinId;
+                                for (const Node& n : graph.GetNodes()) {
+                                    for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
+                                    for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
+                                }
+                            }
+                        } else if (!isDraggingLink) {
+                            linkFromPin = pin.id; linkFromIsOutput = false;
+                        }
+                    } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && isDraggingLink) {
                         TryCompleteLink(pin.id, true);
-                    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !isDraggingLink) {
-                        linkFromPin = pin.id; linkFromIsOutput = false;
                     }
                 }
                 continue;
@@ -398,10 +421,28 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (linked && IsKeyDown(KEY_LEFT_ALT)) {
+                        RemoveLinkFromPin(pin.id);
+                    } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
+                        int otherPinId = -1;
+                        for (const Link& lk : graph.GetLinks()) {
+                            if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
+                            if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
+                        }
+                        if (otherPinId != -1) {
+                            RemoveLinkFromPin(pin.id);
+                            linkFromPin = otherPinId;
+                            for (const Node& n : graph.GetNodes()) {
+                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
+                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
+                            }
+                        }
+                    } else if (linkFromPin == -1) {
+                        linkFromPin = pin.id; linkFromIsOutput = false;
+                    }
+                } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
                     TryCompleteLink(pin.id, true);
-                } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
-                    linkFromPin = pin.id; linkFromIsOutput = false;
                 }
             }
         }
@@ -424,12 +465,30 @@ void StargraphEditorPanel::RenderGraph() {
             }
             outputY += pinHeight;
 
-            if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (linked && IsKeyDown(KEY_LEFT_ALT)) {
+                        RemoveLinkFromPin(pin.id);
+                    } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
+                        int otherPinId = -1;
+                        for (const Link& lk : graph.GetLinks()) {
+                            if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
+                            if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
+                        }
+                        if (otherPinId != -1) {
+                            RemoveLinkFromPin(pin.id);
+                            linkFromPin = otherPinId;
+                            for (const Node& n : graph.GetNodes()) {
+                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
+                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
+                            }
+                        }
+                    } else if (linkFromPin == -1) {
+                        linkFromPin = pin.id; linkFromIsOutput = true;
+                    }
+                } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
                     TryCompleteLink(pin.id, false);
-                } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
-                    linkFromPin = pin.id; linkFromIsOutput = true;
                 }
             }
         }

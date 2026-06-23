@@ -24,6 +24,7 @@ private:
 
     void TryCompleteLink(int pinId, bool onInput);
     void CancelLink();
+    void RemoveLinkFromPin(int pinId);
     void DeleteSelected();
 
     bool PinsCompatible(int outputPinId, int inputPinId) const;

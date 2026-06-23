@@ -24,6 +24,16 @@ void Stargraph::AddLink(const Link& link) {
     links.push_back(link);
 }
 
+void Stargraph::RemoveLink(int pinId) {
+    for (auto it = links.begin(); it != links.end();) {
+        if (it->inputPinId == pinId || it->outputPinId == pinId) {
+            it = links.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 void Stargraph::AddVariable(const Variable& var) {
     variables.push_back(var);
 }
