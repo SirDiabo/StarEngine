@@ -77,35 +77,36 @@ jobs:
       contents: write
     if: github.event_name == 'push'
     steps:
-      - name: Get latest release version
+      - uses: actions/checkout@v4
+
+      - name: Set version
         id: version
         run: |
-          LATEST=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | grep '"tag_name"' | head -1 | sed 's/.*"v\([0-9.]*\)".*/\1/')
-          if [ -z "$LATEST" ]; then
-            NEW_VERSION="0.0.1"
-          else
-            NEW_VERSION=$(echo $LATEST | awk -F. '{print $1"."$2"."$3+1}')
-          fi
-          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(grep -m1 'project(StarEngine VERSION' CMakeLists.txt | sed 's/.*VERSION \([0-9.]*\).*/\1/')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$VERSION-${{ github.run_number }}" >> $GITHUB_OUTPUT
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Rename artifacts
+      - name: Package artifacts
         run: |
           mkdir -p release
-          cp artifacts/star-engine-windows/StarEngine.exe release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.exe
-          cp artifacts/star-engine-linux/StarEngine release/StarEngine-${{ steps.version.outputs.VERSION }}-linux
-          cp artifacts/star-engine-macos/StarEngine release/StarEngine-${{ steps.version.outputs.VERSION }}-macos
+          cd artifacts/star-engine-windows
+          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine.exe
+          cd ../../artifacts/star-engine-linux
+          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine
+          cd ../../artifacts/star-engine-macos
+          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
+          tag_name: v${{ steps.version.outputs.TAG }}
           name: Release ${{ steps.version.outputs.VERSION }}
-          files: release/*
+          files: release/*.zip
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
