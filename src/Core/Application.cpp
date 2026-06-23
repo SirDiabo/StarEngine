@@ -3,6 +3,9 @@
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
 #include "Core/Module.h"
+#include "Core/AssetTypeRegistry.h"
+#include "Runtime/StarMap.h"
+#include "Runtime/World.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
@@ -47,6 +50,17 @@ bool Application::Initialize(int argc, char* argv[]) {
 
     ModuleManager::Get().InitializeAll();
 
+    AssetTypeInfo mapType;
+    mapType.typeName = "StarMap";
+    mapType.extension = ".starmap";
+    mapType.category = "Scene";
+    mapType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+        StarMap map;
+        map.mapName = assetName;
+        return map.SaveToFile(fullPath);
+    };
+    AssetTypeRegistry::Get().RegisterType(mapType);
+
     activeLogPanel = editor->GetLogPanel();
     SetTraceLogCallback(ForwardTraceLogToPanel);
     SetTraceLogLevel(LOG_INFO);
@@ -90,6 +104,8 @@ void Application::Run() {
 
         BeginDrawing();
         ClearBackground({20, 20, 20, 255});
+        float deltaTime = GetFrameTime();
+        World::Get().Tick(deltaTime);
         editor->Render();
         EndDrawing();
     }

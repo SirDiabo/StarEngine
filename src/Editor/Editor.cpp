@@ -53,6 +53,8 @@ void Editor::OpenAsset(const std::string& fullPath, const std::string& extension
             viewportPanel->SetVisible(false);
             detailsPanel->SetVisible(false);
         }
+    } else if (extension == ".starmap") {
+        viewportPanel->LoadMap(fullPath);
     }
 }
 
