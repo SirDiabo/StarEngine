@@ -75,4 +75,8 @@ private:
     static const float leftPanelWidth;
     static const float rightPanelWidth;
     static const float toolbarHeight;
+
+    int variableDragIndex = -1;
+    Vector2 variableDragPos{0, 0};
+    bool variableDragActive = false;
 };

@@ -28,6 +28,8 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     editingPinId = -1;
     scroll = {0, 0};
     didPan = false;
+    variableDragActive = false;
+    variableDragIndex = -1;
     return true;
 }
 
@@ -254,12 +256,23 @@ void StargraphEditorPanel::RenderLeftPanel() {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     selectedVariableIndex = (int)i;
                     varContextMenuOpen = false;
+                    variableDragIndex = (int)i;
+                    variableDragActive = false;
+                    variableDragPos = mousePos;
                 }
                 if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
                     selectedVariableIndex = (int)i;
                     varContextMenuOpen = true;
                     varContextMenuIndex = (int)i;
                 }
+            }
+        }
+
+        if (variableDragIndex >= 0 && variableDragIndex < (int)vars.size() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float dx = mousePos.x - variableDragPos.x;
+            float dy = mousePos.y - variableDragPos.y;
+            if (!variableDragActive && (dx*dx + dy*dy > 25)) {
+                variableDragActive = true;
             }
         }
 
@@ -304,7 +317,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
         Rectangle popup = {panel.x + leftPanelWidth, 0, 110, 50};
         for (size_t i = 0; i < vars.size(); i++) {
             if ((int)i == varContextMenuIndex) {
-                popup.y = panel.y + 8 + 22 + 8 + 18 + 6 + 8 + 18 + 6 + 8 + 18 + 6 + (float)i * 22;
+                popup.y = panel.y + 8 + 24 + 22 + 8 + 24 + 8 + 24 + 8 + 24 + (float)i * 22 - 4;
                 break;
             }
         }
@@ -353,8 +366,18 @@ void StargraphEditorPanel::RenderRightPanel() {
 
         DrawText("Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
-        DrawText(var.name.c_str(), (int)panel.x + 12, (int)y, 11, WHITE);
-        y += 20;
+
+        static char varNameEditBuf[128] = "";
+        static int lastNameEditIndex = -1;
+        if (lastNameEditIndex != selectedVariableIndex) {
+            snprintf(varNameEditBuf, sizeof(varNameEditBuf), "%s", var.name.c_str());
+            lastNameEditIndex = selectedVariableIndex;
+        }
+        if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varNameEditBuf, sizeof(varNameEditBuf), true)) {
+            var.name = varNameEditBuf;
+            isDirty = true;
+        }
+        y += 24;
 
         DrawText("Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
@@ -374,15 +397,30 @@ void StargraphEditorPanel::RenderRightPanel() {
         DrawText("Default Value", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
 
-        static char varValBuffer[128] = "";
-        static int lastVarIndex = -1;
-        if (lastVarIndex != selectedVariableIndex) {
-            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
-            lastVarIndex = selectedVariableIndex;
-        }
-        if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varValBuffer, sizeof(varValBuffer), true)) {
-            var.value = varValBuffer;
-            isDirty = true;
+        if (var.type == PinType::Boolean) {
+            static bool boolVal = false;
+            static int lastBoolIndex = -1;
+            if (lastBoolIndex != selectedVariableIndex) {
+                boolVal = (var.value == "true" || var.value == "1");
+                lastBoolIndex = selectedVariableIndex;
+            }
+            bool temp = boolVal;
+            if (GuiCheckBox({panel.x + 8, y, 20, 20}, "", &temp)) {
+                boolVal = temp;
+                var.value = boolVal ? "true" : "false";
+                isDirty = true;
+            }
+        } else {
+            static char varValBuffer[128] = "";
+            static int lastVarIndex = -1;
+            if (lastVarIndex != selectedVariableIndex) {
+                snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+                lastVarIndex = selectedVariableIndex;
+            }
+            if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varValBuffer, sizeof(varValBuffer), true)) {
+                var.value = varValBuffer;
+                isDirty = true;
+            }
         }
         return;
     }
@@ -681,6 +719,47 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 
     EndScissorMode();
 
+    if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)graph.GetVariables().size()) {
+        Vector2 mp = GetMousePosition();
+        const Variable& var = graph.GetVariables()[variableDragIndex];
+        std::string label = var.name + " (" + PinTypeToString(var.type) + ")";
+        int w = (int)MeasureText(label.c_str(), 12) + 12;
+        DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
+        DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
+        DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
+
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
+                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+            if (CheckCollisionPointRec(mp, graphArea)) {
+                if (IsKeyDown(KEY_LEFT_CONTROL)) {
+                    Node* node = graph.CreateNode("Get_Variable");
+                    node->title = "Get: " + var.name;
+                    for (Pin& p : node->outputs) {
+                        if (p.name == "Value") p.type = var.type;
+                    }
+                    node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
+                    node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
+                    isDirty = true;
+                } else if (IsKeyDown(KEY_LEFT_ALT)) {
+                    Node* node = graph.CreateNode("Set_Variable");
+                    node->title = "Set: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Value") p.type = var.type;
+                    }
+                    node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
+                    node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
+                    isDirty = true;
+                }
+            }
+            variableDragActive = false;
+            variableDragIndex = -1;
+        }
+    } else if (variableDragIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        variableDragActive = false;
+        variableDragIndex = -1;
+    }
+
     // Pan Graph
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea)) {
         panning = true; panStart = mousePos; scrollAtPanStart = scroll; didPan = false;
@@ -723,6 +802,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& kv : templates) {
+        if (kv.second.type == "Get_Variable" || kv.second.type == "Set_Variable") continue;
         if (filterCompatibleWithPin != -1) {
             const Pin* fromPin = nullptr;
             bool fromIsOutput = false;

@@ -279,6 +279,24 @@ void StargraphModule::RegisterDefaultNodes() {
     RegisterVec3Math("Vec3_Subtract", '-');
     RegisterVec3Math("Vec3_Multiply", '*');
     RegisterVec3Math("Vec3_Divide",   '/');
+
+    NodeTemplate getVar;
+    getVar.type = "Get_Variable";
+    getVar.category = "Variables";
+    getVar.createPins = [](Node* node) {
+        node->outputs.push_back({"Value", PinType::Float, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(getVar);
+
+    NodeTemplate setVar;
+    setVar.type = "Set_Variable";
+    setVar.category = "Variables";
+    setVar.createPins = [](Node* node) {
+        node->inputs.push_back({"In",    PinType::Exec,   true,  false});
+        node->inputs.push_back({"Value", PinType::Float,  true,  false, 0, "0.0"});
+        node->outputs.push_back({"Out",   PinType::Exec,   false, true});
+    };
+    NodeRegistry::Get().RegisterNode(setVar);
 }
 
 void StargraphModule::RegisterAssetType() {
