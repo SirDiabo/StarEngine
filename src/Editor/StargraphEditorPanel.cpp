@@ -368,14 +368,31 @@ void StargraphEditorPanel::RenderRightPanel() {
         y += 14;
 
         static char varNameEditBuf[128] = "";
-        static int lastNameEditIndex = -1;
-        if (lastNameEditIndex != selectedVariableIndex) {
+        static char varValBuffer[128] = "";
+        static int lastDetailIndex = -1;
+        static int activeField = 0; // 0=none 1=name 2=value
+
+        if (lastDetailIndex != selectedVariableIndex) {
             snprintf(varNameEditBuf, sizeof(varNameEditBuf), "%s", var.name.c_str());
-            lastNameEditIndex = selectedVariableIndex;
+            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+            lastDetailIndex = selectedVariableIndex;
+            activeField = 0;
         }
-        if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varNameEditBuf, sizeof(varNameEditBuf), true)) {
-            var.name = varNameEditBuf;
-            isDirty = true;
+
+        Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+        if (activeField == 1) {
+            GuiTextBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), true);
+            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), nameRect))) {
+                var.name = varNameEditBuf;
+                isDirty = true;
+                activeField = 0;
+            }
+        } else {
+            DrawRectangleRec(nameRect, {38, 38, 42, 255});
+            DrawRectangleLinesEx(nameRect, 1, {70, 70, 80, 255});
+            DrawText(varNameEditBuf, (int)nameRect.x + 4, (int)nameRect.y + 3, 11, WHITE);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), nameRect))
+                activeField = 1;
         }
         y += 24;
 
@@ -390,7 +407,9 @@ void StargraphEditorPanel::RenderRightPanel() {
             int next = (typeIndex + 1) % 8;
             if (next == 0 || next == 1) next = 2;
             var.type = (PinType)next;
+            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
             isDirty = true;
+            activeField = 0;
         }
         y += 24;
 
@@ -398,28 +417,25 @@ void StargraphEditorPanel::RenderRightPanel() {
         y += 14;
 
         if (var.type == PinType::Boolean) {
-            static bool boolVal = false;
-            static int lastBoolIndex = -1;
-            if (lastBoolIndex != selectedVariableIndex) {
-                boolVal = (var.value == "true" || var.value == "1");
-                lastBoolIndex = selectedVariableIndex;
-            }
-            bool temp = boolVal;
-            if (GuiCheckBox({panel.x + 8, y, 20, 20}, "", &temp)) {
-                boolVal = temp;
-                var.value = boolVal ? "true" : "false";
-                isDirty = true;
-            }
+            bool bval = (var.value == "true" || var.value == "1");
+            bool prev = bval;
+            GuiCheckBox({panel.x + 8, y, 18, 18}, bval ? "true" : "false", &bval);
+            if (bval != prev) { var.value = bval ? "true" : "false"; isDirty = true; }
         } else {
-            static char varValBuffer[128] = "";
-            static int lastVarIndex = -1;
-            if (lastVarIndex != selectedVariableIndex) {
-                snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
-                lastVarIndex = selectedVariableIndex;
-            }
-            if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varValBuffer, sizeof(varValBuffer), true)) {
-                var.value = varValBuffer;
-                isDirty = true;
+            Rectangle valRect = {panel.x + 8, y, panel.width - 16, 18};
+            if (activeField == 2) {
+                GuiTextBox(valRect, varValBuffer, sizeof(varValBuffer), true);
+                if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), valRect))) {
+                    var.value = varValBuffer;
+                    isDirty = true;
+                    activeField = 0;
+                }
+            } else {
+                DrawRectangleRec(valRect, {38, 38, 42, 255});
+                DrawRectangleLinesEx(valRect, 1, {70, 70, 80, 255});
+                DrawText(varValBuffer[0] ? varValBuffer : "(empty)", (int)valRect.x + 4, (int)valRect.y + 3, 11, varValBuffer[0] ? WHITE : Color{80,80,90,255});
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), valRect))
+                    activeField = 2;
             }
         }
         return;
@@ -585,12 +601,24 @@ void StargraphEditorPanel::RenderGraph() {
             inputY += scaledPinHeight;
 
             if (!linked) {
-                Rectangle fieldRect = {nx + 10, inputY - scaledPinHeight * 0.5f, scaledNodeWidth - 20, scaledPinHeight - 2};
-                if (editingPinId == pin.id) {
+                float fieldX = nx + pinRadius * zoom + 18;
+                float fieldW = scaledNodeWidth - pinRadius * zoom - 26;
+                Rectangle fieldRect = {fieldX, inputY - scaledPinHeight * 0.5f, fieldW, scaledPinHeight - 2};
+
+                if (pin.type == PinType::Boolean) {
+                    bool bval = (pin.defaultValue == "true" || pin.defaultValue == "1");
+                    if (GuiCheckBox({fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2}, "", &bval)) {
+                        for (Pin& mp : node.inputs) {
+                            if (mp.id == pin.id) { mp.defaultValue = bval ? "true" : "false"; isDirty = true; break; }
+                        }
+                    }
+                } else if (editingPinId == pin.id) {
                     GuiTextBox(fieldRect, editBuffer, sizeof(editBuffer), true);
-                    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE) ||
+                    if (IsKeyPressed(KEY_ENTER) ||
                         (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, fieldRect))) {
-                        pin.defaultValue = editBuffer;
+                        for (Pin& mp : node.inputs) {
+                            if (mp.id == pin.id) { mp.defaultValue = editBuffer; break; }
+                        }
                         editingPinId = -1;
                         isDirty = true;
                     }
@@ -690,10 +718,11 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 selectedVariableIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
+                break;
             }
         }
 
-        if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             node.posX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
             node.posY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
             isDirty = true;
