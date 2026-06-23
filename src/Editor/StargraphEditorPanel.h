@@ -49,7 +49,6 @@ private:
 
     int linkFromPin = -1;
     bool linkFromIsOutput = false;
-    bool linkJustStarted = false;
 
     bool nodeMenuOpen = false;
     bool nodeMenuJustOpened = false;

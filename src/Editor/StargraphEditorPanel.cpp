@@ -109,7 +109,6 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
 
 void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
     if (linkFromPin == -1) return;
-    if (linkFromIsOutput == onInput) { CancelLink(); return; }
 
     int outputPinId = linkFromIsOutput ? linkFromPin : pinId;
     int inputPinId  = linkFromIsOutput ? pinId       : linkFromPin;
@@ -122,11 +121,12 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
 
     graph.AddLink({outputPinId, inputPinId});
     isDirty = true;
-    linkFromPin = -1;
+    CancelLink();
 }
 
 void StargraphEditorPanel::CancelLink() {
     linkFromPin = -1;
+    linkFromIsOutput = false;
 }
 
 void StargraphEditorPanel::DeleteSelected() {
@@ -357,13 +357,13 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (pin.type == PinType::Exec) {
                 inputY += pinHeight;
+                bool isDraggingLink = linkFromPin != -1;
                 if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                     DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        linkFromPin = pin.id; linkFromIsOutput = false; linkJustStarted = true;
-                    }
-                    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && isDraggingLink) {
                         TryCompleteLink(pin.id, true);
+                    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !isDraggingLink) {
+                        linkFromPin = pin.id; linkFromIsOutput = false;
                     }
                 }
                 continue;
@@ -398,11 +398,10 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    linkFromPin = pin.id; linkFromIsOutput = false; linkJustStarted = true;
-                }
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
                     TryCompleteLink(pin.id, true);
+                } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
+                    linkFromPin = pin.id; linkFromIsOutput = false;
                 }
             }
         }
@@ -427,11 +426,10 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (CheckCollisionPointCircle(mousePos, pinPos, pinRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, pinRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    linkFromPin = pin.id; linkFromIsOutput = true; linkJustStarted = true;
-                }
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !linkJustStarted && linkFromPin != -1) {
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
                     TryCompleteLink(pin.id, false);
+                } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
+                    linkFromPin = pin.id; linkFromIsOutput = true;
                 }
             }
         }
@@ -453,7 +451,7 @@ void StargraphEditorPanel::RenderGraph() {
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         draggingNode = false;
-        if (linkFromPin != -1 && !linkJustStarted) {
+        if (linkFromPin != -1) {
             bool hitPin = false;
             for (const Node& node : graph.GetNodes()) {
                 for (const Pin& pin : node.inputs) {
@@ -466,15 +464,12 @@ void StargraphEditorPanel::RenderGraph() {
             }
             if (!hitPin && CheckCollisionPointRec(mousePos, graphArea)) {
                 filterCompatibleWithPin = linkFromPin;
-                CancelLink();
                 nodeMenuOpen = true;
                 nodeMenuJustOpened = true;
                 nodeMenuPos = mousePos;
-            } else {
-                CancelLink();
             }
+            CancelLink();
         }
-        linkJustStarted = false;
     }
 
     EndScissorMode();
