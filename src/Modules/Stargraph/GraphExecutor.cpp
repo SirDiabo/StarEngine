@@ -64,7 +64,6 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
                 }
                 Node* body = FollowExecLink(graph, next, "Loop Body");
                 if (body) {
-                    Stargraph subGraph;
                     Node* subCurrent = body;
                     int subLimit = 1000;
                     while (subLimit-- > 0) {

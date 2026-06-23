@@ -440,6 +440,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         y += 8;
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
+            if (pin.name == "Variable_Name") continue;
             DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
             y += 14;
             DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
@@ -542,6 +543,11 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
             else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
+
+            if (pin.name == "Variable_Name") {
+                inputY += scaledPinHeight;
+                continue;
+            }
 
             if (pin.type == PinType::Exec) {
                 inputY += scaledPinHeight;
@@ -722,35 +728,45 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)graph.GetVariables().size()) {
         Vector2 mp = GetMousePosition();
         const Variable& var = graph.GetVariables()[variableDragIndex];
-        std::string label = var.name + " (" + PinTypeToString(var.type) + ")";
-        int w = (int)MeasureText(label.c_str(), 12) + 12;
+        bool makingSet = IsKeyDown(KEY_LEFT_ALT);
+        std::string label = (makingSet ? "Set: " : "Get: ") + var.name;
+        std::string hint = makingSet ? "" : "  (Alt = Set)";
+        std::string full = label + hint;
+        int w = (int)MeasureText(full.c_str(), 12) + 12;
         DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
         DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
         DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
+        if (!hint.empty())
+            DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
                                    bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
             if (CheckCollisionPointRec(mp, graphArea)) {
-                if (IsKeyDown(KEY_LEFT_CONTROL)) {
-                    Node* node = graph.CreateNode("Get_Variable");
+                Node* node = nullptr;
+                const Variable& var = graph.GetVariables()[variableDragIndex];
+
+                if (IsKeyDown(KEY_LEFT_ALT)) {
+                    node = graph.CreateNode("Set_Variable");
+                    node->title = "Set: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Variable_Name") p.defaultValue = var.name;
+                        if (p.name == "Value")         p.type = var.type;
+                    }
+                } else {
+                    node = graph.CreateNode("Get_Variable");
                     node->title = "Get: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Variable_Name") p.defaultValue = var.name;
+                    }
                     for (Pin& p : node->outputs) {
                         if (p.name == "Value") p.type = var.type;
                     }
-                    node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
-                    node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
-                    isDirty = true;
-                } else if (IsKeyDown(KEY_LEFT_ALT)) {
-                    Node* node = graph.CreateNode("Set_Variable");
-                    node->title = "Set: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Value") p.type = var.type;
-                    }
-                    node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
-                    node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
-                    isDirty = true;
                 }
+
+                node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
+                node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
+                isDirty = true;
             }
             variableDragActive = false;
             variableDragIndex = -1;
