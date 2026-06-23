@@ -153,11 +153,17 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         const Node& node = nodes[i];
         out << "[Node" << i << "]\n";
         out << "Type=" << node.type << "\n";
+        out << "Title=" << node.title << "\n";
         out << "PosX=" << node.posX << "\n";
         out << "PosY=" << node.posY << "\n";
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
             out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
+            out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
+        }
+        for (const Pin& pin : node.outputs) {
+            if (pin.type == PinType::Exec) continue;
+            out << "OutPinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
         }
         out << "\n";
     }
@@ -244,16 +250,25 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (!typeValue) continue;
 
             Node* node = CreateNode(*typeValue);
+            if (const std::string* v = FindEntry(section, "Title")) node->title = *v;
             if (const std::string* v = FindEntry(section, "PosX")) node->posX = std::stof(*v);
             if (const std::string* v = FindEntry(section, "PosY")) node->posY = std::stof(*v);
 
             for (const auto& entry : section.entries) {
-                if (entry.first.rfind("Pin.", 0) != 0) continue;
-                std::string pinName = entry.first.substr(4);
-                for (Pin& pin : node->inputs) {
-                    if (pin.name == pinName) {
-                        pin.defaultValue = entry.second;
-                        break;
+                if (entry.first.rfind("Pin.", 0) == 0) {
+                    std::string pinName = entry.first.substr(4);
+                    for (Pin& pin : node->inputs) {
+                        if (pin.name == pinName) { pin.defaultValue = entry.second; break; }
+                    }
+                } else if (entry.first.rfind("PinType.", 0) == 0) {
+                    std::string pinName = entry.first.substr(8);
+                    for (Pin& pin : node->inputs) {
+                        if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
+                    }
+                } else if (entry.first.rfind("OutPinType.", 0) == 0) {
+                    std::string pinName = entry.first.substr(11);
+                    for (Pin& pin : node->outputs) {
+                        if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
                     }
                 }
             }

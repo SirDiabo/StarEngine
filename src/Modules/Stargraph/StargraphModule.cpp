@@ -280,6 +280,78 @@ void StargraphModule::RegisterDefaultNodes() {
     RegisterVec3Math("Vec3_Multiply", '*');
     RegisterVec3Math("Vec3_Divide",   '/');
 
+    NodeTemplate floatToStr;
+    floatToStr.type = "Float_To_String";
+    floatToStr.category = "Conversions";
+    floatToStr.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    floatToStr.execute = [](Node& node, Stargraph&) {
+        float v = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
+        char buf[64]; snprintf(buf, sizeof(buf), "%g", v);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(floatToStr);
+
+    NodeTemplate intToStr;
+    intToStr.type = "Int_To_String";
+    intToStr.category = "Conversions";
+    intToStr.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    intToStr.execute = [](Node& node, Stargraph&) {
+        int v = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(v);
+    };
+    NodeRegistry::Get().RegisterNode(intToStr);
+
+    NodeTemplate boolToStr;
+    boolToStr.type = "Bool_To_String";
+    boolToStr.category = "Conversions";
+    boolToStr.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Boolean, true, false, 0, "false"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    boolToStr.execute = [](Node& node, Stargraph&) {
+        bool v = false;
+        for (const Pin& p : node.inputs) if (p.name == "Value") v = (p.defaultValue == "true" || p.defaultValue == "1");
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = v ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(boolToStr);
+
+    NodeTemplate floatToInt;
+    floatToInt.type = "Float_To_Int";
+    floatToInt.category = "Conversions";
+    floatToInt.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Result", PinType::Integer, false, true});
+    };
+    floatToInt.execute = [](Node& node, Stargraph&) {
+        float v = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string((int)v);
+    };
+    NodeRegistry::Get().RegisterNode(floatToInt);
+
+    NodeTemplate intToFloat;
+    intToFloat.type = "Int_To_Float";
+    intToFloat.category = "Conversions";
+    intToFloat.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
+        node->outputs.push_back({"Result", PinType::Float, false, true});
+    };
+    intToFloat.execute = [](Node& node, Stargraph&) {
+        int v = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", (float)v);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(intToFloat);
+
     NodeTemplate getVar;
     getVar.type = "Get_Variable";
     getVar.category = "Variables";
