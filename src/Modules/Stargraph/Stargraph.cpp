@@ -69,6 +69,18 @@ Node* Stargraph::FindNodeByType(const std::string& type) {
     return nullptr;
 }
 
+bool Stargraph::RemoveNode(int nodeId) {
+    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+        if (std::stoi(it->id) == nodeId) {
+            for (const Pin& pin : it->inputs) RemoveLink(pin.id);
+            for (const Pin& pin : it->outputs) RemoveLink(pin.id);
+            nodes.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string PinTypeToString(PinType type) {
     switch (type) {
         case PinType::Exec: return "Exec";

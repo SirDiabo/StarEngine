@@ -57,6 +57,7 @@ public:
     Pin* FindPin(int pinId);
     Node* FindNodeByPinId(int pinId);
     Node* FindNodeByType(const std::string& type);
+    bool RemoveNode(int nodeId);
 
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);

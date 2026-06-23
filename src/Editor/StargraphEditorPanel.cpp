@@ -138,24 +138,10 @@ void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
 void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1) return;
 
-    Stargraph rebuilt;
-    rebuilt.assetName    = graph.assetName;
-    rebuilt.parentClass  = graph.parentClass;
-    rebuilt.formatVersion= graph.formatVersion;
-    for (const Variable& v : graph.GetVariables()) rebuilt.AddVariable(v);
-
-    for (const Node& node : graph.GetNodes()) {
-        if (std::stoi(node.id) == selectedNodeId) continue;
-        Node* n = rebuilt.CreateNode(node.type);
-        n->posX = node.posX;
-        n->posY = node.posY;
-        for (size_t i = 0; i < node.inputs.size() && i < n->inputs.size(); i++)
-            n->inputs[i].defaultValue = node.inputs[i].defaultValue;
+    if (graph.RemoveNode(selectedNodeId)) {
+        selectedNodeId = -1;
+        isDirty = true;
     }
-
-    graph = std::move(rebuilt);
-    selectedNodeId = -1;
-    isDirty = true;
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
