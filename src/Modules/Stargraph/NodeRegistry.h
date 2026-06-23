@@ -8,7 +8,7 @@ struct NodeTemplate {
     std::string category;
     bool isEvent = false;
     std::function<void(Node*)> createPins;
-    std::function<void(Node&)> execute;
+    std::function<void(Node&, Stargraph&)> execute;
 };
 
 class NodeRegistry {

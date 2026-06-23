@@ -61,6 +61,13 @@ private:
     int editingPinId = -1;
     char editBuffer[256] = "";
 
+    int selectedVariableIndex = -1;
+    bool varContextMenuOpen = false;
+    int varContextMenuIndex = -1;
+    int renamingVariableIndex = -1;
+    char varNameBuffer[128] = "";
+    bool addingVariable = false;
+
     static const float nodeWidth;
     static const float pinHeight;
     static const float pinRadius;

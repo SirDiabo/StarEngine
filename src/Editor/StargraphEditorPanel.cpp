@@ -206,7 +206,9 @@ void StargraphEditorPanel::RenderLeftPanel() {
     DrawRectangleRec(panel, {30, 30, 33, 255});
     DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
 
+    Vector2 mousePos = GetMousePosition();
     float y = panel.y + 8;
+
     auto sectionHeader = [&](const char* label) {
         DrawText(label, (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
         y += 18;
@@ -227,12 +229,104 @@ void StargraphEditorPanel::RenderLeftPanel() {
 
     y += 8;
     sectionHeader("Variables");
-    for (const Variable& var : graph.GetVariables()) {
-        DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
-        Color varColor = GetPinColor(var.type);
-        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, varColor);
-        DrawText(var.name.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+
+    std::vector<Variable>& vars = graph.GetVariables();
+    for (size_t i = 0; i < vars.size(); i++) {
+        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
+        bool isSelected = (selectedVariableIndex == (int)i);
+
+        DrawRectangleRec(row, isSelected ? Color{55, 60, 80, 255} : Color{42, 42, 48, 255});
+        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(vars[i].type));
+
+        if (renamingVariableIndex == (int)i) {
+            GuiTextBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer, sizeof(varNameBuffer), true);
+            if (IsKeyPressed(KEY_ENTER)) {
+                vars[i].name = varNameBuffer;
+                renamingVariableIndex = -1;
+                isDirty = true;
+            } else if (IsKeyPressed(KEY_ESCAPE)) {
+                renamingVariableIndex = -1;
+            }
+        } else {
+            DrawText(vars[i].name.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+
+            if (CheckCollisionPointRec(mousePos, row)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    selectedVariableIndex = (int)i;
+                    varContextMenuOpen = false;
+                }
+                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                    selectedVariableIndex = (int)i;
+                    varContextMenuOpen = true;
+                    varContextMenuIndex = (int)i;
+                }
+            }
+        }
+
+        if (isSelected && IsKeyPressed(KEY_DELETE)) {
+            vars.erase(vars.begin() + i);
+            selectedVariableIndex = -1;
+            isDirty = true;
+            break;
+        }
+
         y += 22;
+    }
+
+    if (addingVariable) {
+        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
+        DrawRectangleRec(row, {42, 42, 48, 255});
+        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
+        GuiTextBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer, sizeof(varNameBuffer), true);
+
+        if (IsKeyPressed(KEY_ENTER) && varNameBuffer[0] != '\0') {
+            Variable v;
+            v.name = varNameBuffer;
+            v.type = PinType::Boolean;
+            graph.AddVariable(v);
+            selectedVariableIndex = (int)graph.GetVariables().size() - 1;
+            addingVariable = false;
+            isDirty = true;
+        } else if (IsKeyPressed(KEY_ESCAPE)) {
+            addingVariable = false;
+        }
+        y += 22;
+    }
+
+    Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
+    if (GuiButton(addBtn, "+ Variable")) {
+        addingVariable = true;
+        varNameBuffer[0] = '\0';
+        snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
+    }
+
+    if (varContextMenuOpen) {
+        Rectangle popup = {panel.x + leftPanelWidth, 0, 110, 50};
+        for (size_t i = 0; i < vars.size(); i++) {
+            if ((int)i == varContextMenuIndex) {
+                popup.y = panel.y + 8 + 22 + 8 + 18 + 6 + 8 + 18 + 6 + 8 + 18 + 6 + (float)i * 22;
+                break;
+            }
+        }
+
+        DrawRectangleRec(popup, {55, 55, 60, 255});
+        DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+
+        if (GuiButton({popup.x + 4, popup.y + 4, popup.width - 8, 18}, "Rename")) {
+            renamingVariableIndex = varContextMenuIndex;
+            snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
+            varContextMenuOpen = false;
+        }
+        if (GuiButton({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
+            vars.erase(vars.begin() + varContextMenuIndex);
+            selectedVariableIndex = -1;
+            varContextMenuOpen = false;
+            isDirty = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            varContextMenuOpen = false;
+        }
     }
 }
 
@@ -247,6 +341,51 @@ void StargraphEditorPanel::RenderRightPanel() {
     y += 20;
     DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
     y += 8;
+
+    std::vector<Variable>& vars = graph.GetVariables();
+    if (selectedVariableIndex >= 0 && selectedVariableIndex < (int)vars.size()) {
+        Variable& var = vars[selectedVariableIndex];
+
+        DrawText("Variable", (int)panel.x + 8, (int)y, 13, WHITE);
+        y += 20;
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        y += 8;
+
+        DrawText("Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        DrawText(var.name.c_str(), (int)panel.x + 12, (int)y, 11, WHITE);
+        y += 20;
+
+        DrawText("Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object"};
+        int typeIndex = (int)var.type;
+        if (typeIndex < 0 || typeIndex > 7) typeIndex = 0;
+
+        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, typeNames[typeIndex])) {
+            int next = (typeIndex + 1) % 8;
+            if (next == 0 || next == 1) next = 2;
+            var.type = (PinType)next;
+            isDirty = true;
+        }
+        y += 24;
+
+        DrawText("Default Value", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static char varValBuffer[128] = "";
+        static int lastVarIndex = -1;
+        if (lastVarIndex != selectedVariableIndex) {
+            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+            lastVarIndex = selectedVariableIndex;
+        }
+        if (GuiTextBox({panel.x + 8, y, panel.width - 16, 18}, varValBuffer, sizeof(varValBuffer), true)) {
+            var.value = varValBuffer;
+            isDirty = true;
+        }
+        return;
+    }
 
     if (selectedNodeId == -1) {
         DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, {100, 100, 110, 255});
@@ -504,6 +643,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
                 selectedNodeId = nodeIdInt;
+                selectedVariableIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
             }
@@ -647,8 +787,8 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             DrawRectangleRec(btn, {65, 65, 80, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 Node* node = graph.CreateNode(entry.second);
-                node->posX = nodeMenuPos.x - graphArea.x - scroll.x;
-                node->posY = nodeMenuPos.y - graphArea.y - scroll.y;
+                node->posX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
+                node->posY = (nodeMenuPos.y - graphArea.y - scroll.y) / zoom;
                 isDirty = true;
                 nodeMenuOpen = false;
                 filterCompatibleWithPin = -1;

@@ -48,11 +48,14 @@ public:
     const std::deque<Node>& GetNodes() const { return nodes; }
     const std::vector<Link>& GetLinks() const { return links; }
     const std::vector<Variable>& GetVariables() const { return variables; }
+    std::vector<Variable>& GetVariables() { return variables; }
 
     Node* CreateNode(const std::string& type);
     void AddLink(const Link& link);
     void RemoveLink(int pinId);
     void AddVariable(const Variable& var);
+    void RemoveVariable(size_t index);
+    void RenameVariable(size_t index, const std::string& newName);
 
     Pin* FindPin(int pinId);
     Node* FindNodeByPinId(int pinId);

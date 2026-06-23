@@ -9,5 +9,6 @@ public:
     static void Run(Stargraph& graph, const std::string& eventType);
 
 private:
-    static Node* FollowExecLink(Stargraph& graph, Node* fromNode);
+    static void PropagateDataPins(Stargraph& graph, Node* node);
+    static Node* FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName = "Out");
 };

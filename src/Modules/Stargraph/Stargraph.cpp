@@ -38,6 +38,14 @@ void Stargraph::AddVariable(const Variable& var) {
     variables.push_back(var);
 }
 
+void Stargraph::RemoveVariable(size_t index) {
+    if (index < variables.size()) variables.erase(variables.begin() + index);
+}
+
+void Stargraph::RenameVariable(size_t index, const std::string& newName) {
+    if (index < variables.size()) variables[index].name = newName;
+}
+
 Pin* Stargraph::FindPin(int pinId) {
     for (Node& node : nodes) {
         for (Pin& pin : node.inputs) {
