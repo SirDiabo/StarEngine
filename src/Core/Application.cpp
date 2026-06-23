@@ -37,6 +37,7 @@ static bool CreateProject(const std::string& name) {
 
 bool Application::Initialize(int argc, char* argv[]) {
     SetTraceLogLevel(LOG_NONE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, "Star Engine");
     SetTargetFPS(60);
 
