@@ -501,7 +501,7 @@ void StargraphEditorPanel::RenderGraph() {
     Vector2 mousePos = GetMousePosition();
 
     float wheel = GetMouseWheelMove();
-    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea)) {
+    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea) && !nodeMenuOpen) {
         float newZoom = zoom + wheel * 0.1f;
         newZoom = fmax(0.1f, fmin(3.0f, newZoom));
         
@@ -515,12 +515,17 @@ void StargraphEditorPanel::RenderGraph() {
     }
 
     DrawRectangleRec(graphArea, {24, 24, 26, 255});
-
-    int gridStep = 24;
-    for (float x = fmod(scroll.x, gridStep) + graphArea.x; x < graphArea.x + graphArea.width; x += gridStep)
-        DrawLineV({x, graphArea.y}, {x, graphArea.y + graphArea.height}, {34, 34, 36, 255});
-    for (float y = fmod(scroll.y, gridStep) + graphArea.y; y < graphArea.y + graphArea.height; y += gridStep)
-        DrawLineV({graphArea.x, y}, {graphArea.x + graphArea.width, y}, {34, 34, 36, 255});
+    
+    const float gridPitch = 16.0f;
+    float stepX = gridPitch * zoom;
+    float stepY = gridPitch * zoom;
+    float startX = fmod(scroll.x, stepX) + graphArea.x;
+    float startY = fmod(scroll.y, stepY) + graphArea.y;
+    for (float gx = startX; gx < graphArea.x + graphArea.width; gx += stepX) {
+        for (float gy = startY; gy < graphArea.y + graphArea.height; gy += stepY) {
+            DrawPixel((int)gx, (int)gy, {55, 55, 60, 255});
+        }
+    }
 
     BeginScissorMode((int)graphArea.x, (int)graphArea.y, (int)graphArea.width, (int)graphArea.height);
 
@@ -551,7 +556,9 @@ void StargraphEditorPanel::RenderGraph() {
         DrawRectangleRec({nx, ny + scaledHeaderHeight, scaledNodeWidth, nh - scaledHeaderHeight}, {38, 40, 45, 255});
         DrawRectangleLinesEx({nx, ny, scaledNodeWidth, nh}, isSelected ? 2.0f : 1.0f,
                              isSelected ? Color{100, 160, 230, 255} : Color{65, 65, 75, 255});
-        DrawText(node.title.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
+        std::string displayTitle = node.title;
+        for (char& c : displayTitle) if (c == '_') c = ' ';
+        DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
 
         float inputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
@@ -961,7 +968,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 filterCompatibleWithPin = -1;
             }
         }
-        DrawText(entry.second.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
+        std::string entryDisplay = entry.second;
+        for (char& c : entryDisplay) if (c == '_') c = ' ';
+        DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
         y += itemH;
     }
 
