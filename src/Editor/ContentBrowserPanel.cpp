@@ -180,7 +180,13 @@ void ContentBrowserPanel::Render() {
     if (contextMenuOpen) {
         const std::vector<AssetTypeInfo>& assetTypes = AssetTypeRegistry::Get().GetAll();
         float menuHeight = 30.0f * (1 + assetTypes.size());
-        Rectangle popup = {contextMenuPos.x, contextMenuPos.y, 150, menuHeight};
+        float popupX = contextMenuPos.x;
+        float popupY = contextMenuPos.y;
+        if (popupX + 150 > bounds.x + bounds.width)  popupX = bounds.x + bounds.width - 150;
+        if (popupY + menuHeight > bounds.y + bounds.height) popupY = bounds.y + bounds.height - menuHeight;
+        if (popupX < bounds.x) popupX = bounds.x;
+        if (popupY < bounds.y) popupY = bounds.y;
+        Rectangle popup = {popupX, popupY, 150, menuHeight};
 
         if (contextMenuJustOpened) {
             contextMenuJustOpened = false;
