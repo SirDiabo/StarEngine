@@ -17,11 +17,10 @@ public:
 
 private:
     void EnsureRenderTarget(int width, int height);
-    void UpdateCamera(Rectangle graphArea);
+    void UpdateCamera(Rectangle client);
     void RenderScene();
     void RenderToolbar();
-    void RenderActorContextMenu();
-    void HandleMapInteraction(Rectangle graphArea);
+    void HandleMapInteraction(Rectangle client);
 
     Camera3D camera{};
     RenderTexture2D renderTarget{};
@@ -34,18 +33,20 @@ private:
     bool mapDirty = false;
 
     int selectedActorIndex = -1;
-    bool actorMenuOpen = false;
-    bool actorMenuJustOpened = false;
-    Vector2 actorMenuPos{0, 0};
-    Vector2 actorMenuWorldPos{0, 0};
 
     bool playing = false;
 
+    bool flying = false;
     bool orbiting = false;
+    Vector2 lookStart{0, 0};
     Vector2 orbitStart{0, 0};
+
     float yaw = 45.0f;
     float pitch = 35.0f;
     float orbitRadius = 20.0f;
+    float flySpeed = 10.0f;
+
+    Vector3 cameraTarget{0, 0, 0};
 
     static const float toolbarHeight;
 };

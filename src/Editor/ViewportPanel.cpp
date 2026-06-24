@@ -2,6 +2,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
+#include "Modules/Stargraph/Stargraph.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <filesystem>
@@ -12,20 +13,23 @@ namespace fs = std::filesystem;
 
 const float ViewportPanel::toolbarHeight = 28.0f;
 
+static void UpdateOrbitPosition(Camera3D& camera, float yaw, float pitch, float radius, Vector3 target) {
+    float yr = yaw   * DEG2RAD;
+    float pr = pitch * DEG2RAD;
+    camera.position = {
+        target.x + cosf(pr) * sinf(yr) * radius,
+        target.y + sinf(pr) * radius,
+        target.z + cosf(pr) * cosf(yr) * radius
+    };
+    camera.target = target;
+}
+
 void ViewportPanel::Initialize() {
     name = "Viewport";
-    camera.up = Vector3{0, 1, 0};
+    camera.up = {0, 1, 0};
     camera.fovy = 50.0f;
     camera.projection = CAMERA_PERSPECTIVE;
-
-    float yawRad   = yaw   * DEG2RAD;
-    float pitchRad = pitch * DEG2RAD;
-    camera.position = {
-        cosf(pitchRad) * sinf(yawRad) * orbitRadius,
-        sinf(pitchRad) * orbitRadius,
-        cosf(pitchRad) * cosf(yawRad) * orbitRadius
-    };
-    camera.target = {0, 0, 0};
+    UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
 }
 
 ViewportPanel::~ViewportPanel() {
@@ -55,40 +59,89 @@ void ViewportPanel::SaveMap() {
     }
 }
 
-void ViewportPanel::UpdateCamera(Rectangle graphArea) {
-    Vector2 mousePos = GetMousePosition();
-    if (!CheckCollisionPointRec(mousePos, graphArea)) return;
+void ViewportPanel::UpdateCamera(Rectangle client) {
+    Vector2 mp = GetMousePosition();
+    if (!CheckCollisionPointRec(mp, client) && !flying && !orbiting) return;
 
-    float scroll = GetMouseWheelMove();
-    if (scroll != 0) {
-        orbitRadius -= scroll * 1.5f;
-        if (orbitRadius < 2.0f) orbitRadius = 2.0f;
+    float dt = GetFrameTime();
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client)) {
+        flying = true;
+        lookStart = mp;
+        HideCursor();
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
+    if (flying) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+            Vector2 delta = {mp.x - lookStart.x, mp.y - lookStart.y};
+            yaw   -= delta.x * 0.3f;
+            pitch -= delta.y * 0.3f;
+            if (pitch >  89.0f) pitch =  89.0f;
+            if (pitch < -89.0f) pitch = -89.0f;
+            SetMousePosition((int)lookStart.x, (int)lookStart.y);
+
+            float wheel = GetMouseWheelMove();
+            if (wheel != 0) {
+                flySpeed += wheel * 2.0f;
+                if (flySpeed < 1.0f) flySpeed = 1.0f;
+                if (flySpeed > 100.0f) flySpeed = 100.0f;
+            }
+
+            float yr = yaw   * DEG2RAD;
+            float pr = pitch * DEG2RAD;
+            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            Vector3 right   = {cosf(yr), 0, -sinf(yr)};
+            Vector3 up      = {0, 1, 0};
+
+            if (IsKeyDown(KEY_W)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(forward, -flySpeed * dt));
+            if (IsKeyDown(KEY_S)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(forward,  flySpeed * dt));
+            if (IsKeyDown(KEY_A)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(right,   -flySpeed * dt));
+            if (IsKeyDown(KEY_D)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(right,    flySpeed * dt));
+            if (IsKeyDown(KEY_Q)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(up,       -flySpeed * dt));
+            if (IsKeyDown(KEY_E)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(up,        flySpeed * dt));
+
+            camera.position = {
+                cameraTarget.x + cosf(pr) * sinf(yr) * orbitRadius,
+                cameraTarget.y + sinf(pr) * orbitRadius,
+                cameraTarget.z + cosf(pr) * cosf(yr) * orbitRadius
+            };
+            camera.target = cameraTarget;
+        } else {
+            flying = false;
+            ShowCursor();
+        }
+        return;
+    }
+
+    float scroll = GetMouseWheelMove();
+    if (scroll != 0 && CheckCollisionPointRec(mp, client)) {
+        orbitRadius -= scroll * 1.5f;
+        if (orbitRadius < 1.0f) orbitRadius = 1.0f;
+    }
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mp, client)) {
         orbiting = true;
-        orbitStart = mousePos;
+        orbitStart = mp;
     }
     if (orbiting) {
         if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
-            Vector2 delta = {mousePos.x - orbitStart.x, mousePos.y - orbitStart.y};
+            Vector2 delta = {mp.x - orbitStart.x, mp.y - orbitStart.y};
             yaw   -= delta.x * 0.4f;
             pitch += delta.y * 0.4f;
             if (pitch >  89.0f) pitch =  89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
-            orbitStart = mousePos;
+            orbitStart = mp;
         } else {
             orbiting = false;
         }
     }
 
-    float yawRad   = yaw   * DEG2RAD;
-    float pitchRad = pitch * DEG2RAD;
-    camera.position = {
-        cosf(pitchRad) * sinf(yawRad) * orbitRadius,
-        sinf(pitchRad) * orbitRadius,
-        cosf(pitchRad) * cosf(yawRad) * orbitRadius
-    };
+    if (IsKeyPressed(KEY_F) && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
+        const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
+        cameraTarget = {inst.posX, inst.posY, inst.posZ};
+    }
+
+    UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
 }
 
 static Color ClassColor(const std::string& className) {
@@ -99,7 +152,6 @@ static Color ClassColor(const std::string& className) {
 
 void ViewportPanel::RenderScene() {
     BeginMode3D(camera);
-
     DrawGrid(40, 1.0f);
 
     const auto& instances = starMap.GetInstances();
@@ -109,37 +161,50 @@ void ViewportPanel::RenderScene() {
         Color color = (selectedActorIndex == (int)i) ? Color{255, 200, 50, 255} : ClassColor(inst.className);
         DrawCube(pos, inst.scaleX, inst.scaleY, inst.scaleZ, color);
         DrawCubeWires(pos, inst.scaleX, inst.scaleY, inst.scaleZ, {0, 0, 0, 120});
-        DrawBillboard(camera, {0}, pos + Vector3{0, inst.scaleY * 0.5f + 0.3f, 0}, 0.3f, WHITE);
     }
 
     EndMode3D();
 }
 
-void ViewportPanel::HandleMapInteraction(Rectangle graphArea) {
-    if (!mapLoaded) return;
-    Vector2 mousePos = GetMousePosition();
-    if (!CheckCollisionPointRec(mousePos, graphArea)) return;
+void ViewportPanel::HandleMapInteraction(Rectangle client) {
+    if (!mapLoaded || flying) return;
+    Vector2 mp = GetMousePosition();
+    if (!CheckCollisionPointRec(mp, client)) return;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-        actorMenuOpen = true;
-        actorMenuJustOpened = true;
-        actorMenuPos = mousePos;
-        float relX = (mousePos.x - graphArea.x - graphArea.width  * 0.5f) * 0.05f * orbitRadius;
-        float relZ = (mousePos.y - graphArea.y - graphArea.height * 0.5f) * 0.05f * orbitRadius;
-        actorMenuWorldPos = {relX, relZ};
-    }
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !actorMenuOpen) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         selectedActorIndex = -1;
 
+        Vector2 localMp = {mp.x - client.x, mp.y - client.y};
         Camera3D projCam = camera;
+        projCam.fovy = camera.fovy;
+
         const auto& instances = starMap.GetInstances();
         for (size_t i = 0; i < instances.size(); i++) {
             const ActorInstance& inst = instances[i];
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-            Vector2 fboPos = GetWorldToScreen(pos, projCam);
-            Vector2 windowPos = {fboPos.x + graphArea.x, fboPos.y + graphArea.y};
-            if (CheckCollisionPointCircle(mousePos, windowPos, 18.0f)) {
+
+            Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
+            Matrix proj = MatrixPerspective(projCam.fovy * DEG2RAD,
+                                            fboSize.x / fboSize.y, 0.01f, 1000.0f);
+            Matrix view = MatrixLookAt(projCam.position, projCam.target, projCam.up);
+            Matrix mvp  = MatrixMultiply(view, proj);
+
+            Vector4 clip = {
+                pos.x * mvp.m0 + pos.y * mvp.m4 + pos.z * mvp.m8  + mvp.m12,
+                pos.x * mvp.m1 + pos.y * mvp.m5 + pos.z * mvp.m9  + mvp.m13,
+                pos.x * mvp.m2 + pos.y * mvp.m6 + pos.z * mvp.m10 + mvp.m14,
+                pos.x * mvp.m3 + pos.y * mvp.m7 + pos.z * mvp.m11 + mvp.m15
+            };
+
+            if (clip.w <= 0) continue;
+
+            Vector2 ndc = {clip.x / clip.w, clip.y / clip.w};
+            Vector2 screen = {
+                (ndc.x + 1.0f) * 0.5f * fboSize.x,
+                (1.0f - ndc.y) * 0.5f * fboSize.y
+            };
+
+            if (CheckCollisionPointCircle(localMp, screen, 20.0f)) {
                 selectedActorIndex = (int)i;
                 break;
             }
@@ -147,58 +212,12 @@ void ViewportPanel::HandleMapInteraction(Rectangle graphArea) {
     }
 
     if (IsKeyPressed(KEY_DELETE) && selectedActorIndex >= 0) {
-        starMap.RemoveInstance(selectedActorIndex);
+        starMap.RemoveInstance((size_t)selectedActorIndex);
         selectedActorIndex = -1;
         mapDirty = true;
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && mapDirty) SaveMap();
-}
-
-void ViewportPanel::RenderActorContextMenu() {
-    if (!actorMenuOpen) return;
-
-    static const char* classes[] = {"Actor", "Pawn", "Character"};
-    float menuW = 130;
-    float itemH = 22;
-    float menuH = 8 + (float)(3 * itemH) + 8;
-    Rectangle popup = {actorMenuPos.x, actorMenuPos.y, menuW, menuH};
-
-    if (actorMenuJustOpened) {
-        actorMenuJustOpened = false;
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
-        actorMenuOpen = false;
-        return;
-    }
-
-    DrawRectangleRec(popup, {50, 50, 55, 255});
-    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
-
-    float y = popup.y + 6;
-    DrawText("Place Actor", (int)popup.x + 8, (int)y, 11, {140, 140, 150, 255});
-    y += 16;
-
-    for (int i = 0; i < 3; i++) {
-        Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        Vector2 mp = GetMousePosition();
-        if (CheckCollisionPointRec(mp, btn)) {
-            DrawRectangleRec(btn, {70, 70, 85, 255});
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                ActorInstance inst;
-                inst.name = std::string(classes[i]) + "_" + std::to_string(starMap.GetInstances().size() + 1);
-                inst.className = classes[i];
-                inst.posX = actorMenuWorldPos.x;
-                inst.posY = 0;
-                inst.posZ = actorMenuWorldPos.y;
-                starMap.AddInstance(inst);
-                selectedActorIndex = (int)starMap.GetInstances().size() - 1;
-                mapDirty = true;
-                actorMenuOpen = false;
-            }
-        }
-        DrawText(classes[i], (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
-        y += itemH;
-    }
 }
 
 void ViewportPanel::RenderToolbar() {
@@ -223,7 +242,6 @@ void ViewportPanel::RenderToolbar() {
                 actor->position = {inst.posX, inst.posY, inst.posZ};
                 actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
                 actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
-
                 if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
                     auto* behavior = new StargraphBehavior(Stargraph{});
                     behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
@@ -248,18 +266,15 @@ void ViewportPanel::RenderToolbar() {
         Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
         if (GuiButton(saveBtn, "Save")) SaveMap();
         btnRight -= 54;
-
-        if (mapDirty) {
-            DrawText("*", (int)btnRight - 12, (int)btnY + 4, 14, {200, 160, 60, 255});
-        }
+        if (mapDirty) DrawText("*", (int)btnRight - 10, (int)btnY + 4, 14, {200, 160, 60, 255});
     }
 }
 
 void ViewportPanel::Render() {
     Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
     Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - 25 - toolbarHeight};
-    int clientWidth  = (int)client.width;
-    int clientHeight = (int)client.height;
+    int clientWidth   = (int)client.width;
+    int clientHeight  = (int)client.height;
 
     if (clientWidth > 0 && clientHeight > 0) {
         EnsureRenderTarget(clientWidth, clientHeight);
@@ -272,18 +287,22 @@ void ViewportPanel::Render() {
         EndTextureMode();
 
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
-        DrawTextureRec(renderTarget.texture, source, Vector2{client.x, client.y}, WHITE);
+        DrawTextureRec(renderTarget.texture, source, {client.x, client.y}, WHITE);
     }
 
     DrawRectangleLinesEx(bounds, 1, {70, 70, 75, 255});
     RenderToolbar();
-    RenderActorContextMenu();
 
     if (mapLoaded && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
         char info[128];
         snprintf(info, sizeof(info), "%s (%s)", inst.name.c_str(), inst.className.c_str());
-        DrawText(info, (int)bounds.x + 8, (int)(bounds.y + 25 + toolbarHeight + 6), 12, {200, 200, 210, 255});
+        DrawText(info, (int)bounds.x + 8, (int)(client.y + 6), 12, {200, 200, 210, 255});
+    }
+
+    if (flying) {
+        const char* hint = "WASD fly  Q/E up/down  Scroll=speed  Release RMB to exit";
+        DrawText(hint, (int)bounds.x + 8, (int)(client.y + client.height - 20), 11, {160, 160, 170, 200});
     }
 
     if (!mapLoaded) {
