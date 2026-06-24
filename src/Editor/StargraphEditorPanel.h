@@ -56,6 +56,8 @@ private:
     bool nodeMenuJustOpened = false;
     Vector2 nodeMenuPos{0, 0};
     int filterCompatibleWithPin = -1;
+    float nodeMenuScrollOffset = 0;
+    char nodeMenuSearch[64] = "";
     bool didPan = false;
 
     int editingPinId = -1;

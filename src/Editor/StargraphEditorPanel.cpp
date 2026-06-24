@@ -59,8 +59,14 @@ Color StargraphEditorPanel::GetNodeHeaderColor(const Node& node) const {
 }
 
 float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
-    size_t rows = std::max(node.inputs.size(), node.outputs.size());
+    size_t visibleInputs = 0;
     for (const Pin& pin : node.inputs) {
+        if (pin.name == "Variable_Name") continue;
+        visibleInputs++;
+    }
+    size_t rows = std::max(visibleInputs, node.outputs.size());
+    for (const Pin& pin : node.inputs) {
+        if (pin.name == "Variable_Name") continue;
         if (pin.type != PinType::Exec && editingPinId != pin.id) {
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) {
@@ -82,6 +88,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     float scaledPinHeight = pinHeight * zoom;
     float y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.inputs) {
+        if (p.name == "Variable_Name") continue;
         if (p.id == pin.id) return {nodeX + pinRadius * zoom + 2, y};
         y += scaledPinHeight;
         if (p.type != PinType::Exec) {
@@ -549,6 +556,7 @@ void StargraphEditorPanel::RenderGraph() {
         float inputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
             Pin& pin = node.inputs[i];
+            if (pin.name == "Variable_Name") continue;
             Vector2 pinPos = {nx + pinRadius * zoom + 2, inputY};
             Color pinColor = GetPinColor(pin.type);
 
@@ -747,6 +755,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 nodeMenuOpen = true;
                 nodeMenuJustOpened = true;
                 nodeMenuPos = mousePos;
+                nodeMenuScrollOffset = 0;
+                nodeMenuSearch[0] = '\0';
             }
             CancelLink();
         }
@@ -829,6 +839,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         nodeMenuOpen = true;
         nodeMenuJustOpened = true;
         nodeMenuPos = mousePos;
+        nodeMenuScrollOffset = 0;
+        nodeMenuSearch[0] = '\0';
         }
     }
 
@@ -844,10 +856,19 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
 
     const auto& templates = NodeRegistry::Get().GetAllTemplates();
+    std::string searchLower = nodeMenuSearch;
+    for (char& c : searchLower) c = (char)tolower(c);
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& kv : templates) {
         if (kv.second.type == "Get_Variable" || kv.second.type == "Set_Variable") continue;
+
+        if (!searchLower.empty()) {
+            std::string typeLower = kv.second.type;
+            for (char& c : typeLower) c = (char)tolower(c);
+            if (typeLower.find(searchLower) == std::string::npos) continue;
+        }
+
         if (filterCompatibleWithPin != -1) {
             const Pin* fromPin = nullptr;
             bool fromIsOutput = false;
@@ -871,22 +892,29 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     }
     std::sort(entries.begin(), entries.end());
 
-    if (entries.empty()) { nodeMenuOpen = false; filterCompatibleWithPin = -1; return; }
+    if (entries.empty() && searchLower.empty()) { nodeMenuOpen = false; filterCompatibleWithPin = -1; return; }
 
-    float menuW = 190;
-    float itemH = 22;
-    float menuH = entries.size() * itemH + 12;
-    Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
+    float menuW   = 200;
+    float itemH   = 22;
+    float searchH = 26;
+    float maxVisibleH = 300.0f;
+    float totalItemsH = (float)entries.size() * itemH + 12;
+    float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
+    float menuH   = searchH + listH;
 
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+
+    Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
     if (popup.x + popup.width  > graphArea.x + graphArea.width)  popup.x = graphArea.x + graphArea.width  - popup.width;
     if (popup.y + popup.height > graphArea.y + graphArea.height) popup.y = graphArea.y + graphArea.height - popup.height;
+
+    Vector2 mp = GetMousePosition();
 
     if (nodeMenuJustOpened) {
         nodeMenuJustOpened = false;
     } else {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), popup)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, popup)) {
             nodeMenuOpen = false; filterCompatibleWithPin = -1; return;
         }
         if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
@@ -894,22 +922,36 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
     }
 
-    DrawRectangleRec(popup, {48, 48, 54, 255});
+    DrawRectangleRec(popup, {44, 44, 50, 255});
     DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
 
+    Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
+    GuiTextBox(searchRect, nodeMenuSearch, sizeof(nodeMenuSearch), true);
+
+    Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
+    if (CheckCollisionPointRec(mp, listArea)) {
+        float wheel = GetMouseWheelMove();
+        nodeMenuScrollOffset -= wheel * itemH * 2;
+    }
+    float maxScroll = totalItemsH - listH;
+    if (maxScroll < 0) maxScroll = 0;
+    if (nodeMenuScrollOffset < 0) nodeMenuScrollOffset = 0;
+    if (nodeMenuScrollOffset > maxScroll) nodeMenuScrollOffset = maxScroll;
+
+    BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
+
     std::string lastCategory;
-    float y = popup.y + 6;
+    float y = popup.y + searchH + 6 - nodeMenuScrollOffset;
     for (const auto& entry : entries) {
         if (entry.first != lastCategory && !lastCategory.empty()) {
-            DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {80, 80, 90, 255});
+            DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {70, 70, 80, 255});
             y += 5;
         }
         lastCategory = entry.first;
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        Vector2 mp = GetMousePosition();
-        if (CheckCollisionPointRec(mp, btn)) {
-            DrawRectangleRec(btn, {65, 65, 80, 255});
+        if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
+            DrawRectangleRec(btn, {65, 65, 85, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 Node* node = graph.CreateNode(entry.second);
                 node->posX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
@@ -921,6 +963,15 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
         DrawText(entry.second.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
         y += itemH;
+    }
+
+    EndScissorMode();
+
+    if (totalItemsH > listH) {
+        float scrollRatio = (maxScroll > 0) ? nodeMenuScrollOffset / maxScroll : 0;
+        float barH = (listH / totalItemsH) * listH;
+        float barY = listArea.y + scrollRatio * (listH - barH);
+        DrawRectangleRec({popup.x + popup.width - 4, barY, 3, barH}, {100, 100, 120, 200});
     }
 }
 

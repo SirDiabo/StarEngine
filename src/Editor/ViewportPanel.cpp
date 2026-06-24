@@ -72,8 +72,8 @@ void ViewportPanel::UpdateCamera(Rectangle graphArea) {
     if (orbiting) {
         if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
             Vector2 delta = {mousePos.x - orbitStart.x, mousePos.y - orbitStart.y};
-            yaw   += delta.x * 0.4f;
-            pitch -= delta.y * 0.4f;
+            yaw   -= delta.x * 0.4f;
+            pitch += delta.y * 0.4f;
             if (pitch >  89.0f) pitch =  89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
             orbitStart = mousePos;
@@ -120,7 +120,7 @@ void ViewportPanel::HandleMapInteraction(Rectangle graphArea) {
     Vector2 mousePos = GetMousePosition();
     if (!CheckCollisionPointRec(mousePos, graphArea)) return;
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
         actorMenuOpen = true;
         actorMenuJustOpened = true;
         actorMenuPos = mousePos;
@@ -131,12 +131,15 @@ void ViewportPanel::HandleMapInteraction(Rectangle graphArea) {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !actorMenuOpen) {
         selectedActorIndex = -1;
+
+        Camera3D projCam = camera;
         const auto& instances = starMap.GetInstances();
         for (size_t i = 0; i < instances.size(); i++) {
             const ActorInstance& inst = instances[i];
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-            Vector2 screenPos = GetWorldToScreen(pos, camera);
-            if (CheckCollisionPointCircle(mousePos, screenPos, 20.0f)) {
+            Vector2 fboPos = GetWorldToScreen(pos, projCam);
+            Vector2 windowPos = {fboPos.x + graphArea.x, fboPos.y + graphArea.y};
+            if (CheckCollisionPointCircle(mousePos, windowPos, 18.0f)) {
                 selectedActorIndex = (int)i;
                 break;
             }

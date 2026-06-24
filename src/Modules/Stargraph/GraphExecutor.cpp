@@ -9,6 +9,10 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin) {
         Node* fromNode = graph.FindNodeByPinId(link.outputPinId);
         if (!fromNode) continue;
 
+        for (Pin& upPin : fromNode->inputs) {
+            if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin);
+        }
+
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
         if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph);
 
