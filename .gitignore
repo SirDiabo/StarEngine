@@ -12,6 +12,7 @@ obj/
 *.dylib
 
 # IDE
+.vs/
 .vscode/
 .idea/
 *.swp
