@@ -544,7 +544,41 @@ void StargraphEditorPanel::RenderGraph() {
             for (const Pin& pin : node.inputs)  if (pin.id == link.inputPinId)  { inPin  = &pin; inNode  = &node; }
         }
         if (!outPin || !inPin || !outNode || !inNode) continue;
-        DrawLineBezier(GetPinPos(*outNode, *outPin), GetPinPos(*inNode, *inPin), 2.0f, GetPinColor(outPin->type));
+
+        Vector2 from = GetPinPos(*outNode, *outPin);
+        Vector2 to   = GetPinPos(*inNode, *inPin);
+        Color wireColor = GetPinColor(outPin->type);
+
+        bool hovered = false;
+        if (IsKeyDown(KEY_LEFT_ALT)) {
+            Vector2 mid = {(from.x + to.x) * 0.5f, (from.y + to.y) * 0.5f};
+            if (CheckCollisionPointCircle(mousePos, mid, 8.0f) ||
+                Vector2Distance(mousePos, from) < 12.0f ||
+                Vector2Distance(mousePos, to)   < 12.0f) {
+                hovered = true;
+            }
+            
+            for (float t = 0.0f; t <= 1.0f; t += 0.1f) {
+                float cx1 = from.x + (to.x - from.x) * 0.5f;
+                float cy1 = from.y;
+                float cx2 = cx1;
+                float cy2 = to.y;
+                float bx = (1-t)*(1-t)*(1-t)*from.x + 3*(1-t)*(1-t)*t*cx1 + 3*(1-t)*t*t*cx2 + t*t*t*to.x;
+                float by = (1-t)*(1-t)*(1-t)*from.y + 3*(1-t)*(1-t)*t*cy1 + 3*(1-t)*t*t*cy2 + t*t*t*to.y;
+                if (CheckCollisionPointCircle(mousePos, {bx, by}, 7.0f)) { hovered = true; break; }
+            }
+        }
+
+        if (hovered) {
+            DrawLineBezier(from, to, 3.0f, {255, 80, 80, 255});
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                graph.RemoveLink(link.outputPinId);
+                isDirty = true;
+                break;
+            }
+        } else {
+            DrawLineBezier(from, to, 2.0f, wireColor);
+        }
     }
 
     RenderWireInProgress();
