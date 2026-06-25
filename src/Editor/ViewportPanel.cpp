@@ -69,6 +69,8 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         flying = true;
         lookStart = mp;
         flyPosition = camera.position;
+        yaw   = yaw + 180.0f;
+        pitch = -pitch;
         HideCursor();
     }
 
@@ -76,7 +78,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             Vector2 delta = {mp.x - lookStart.x, mp.y - lookStart.y};
             yaw   -= delta.x * 0.3f;
-            pitch += delta.y * 0.3f;
+            pitch -= delta.y * 0.3f;
             if (pitch >  89.0f) pitch =  89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
             SetMousePosition((int)lookStart.x, (int)lookStart.y);
@@ -106,9 +108,12 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         } else {
             flying = false;
             ShowCursor();
-            cameraTarget = camera.target;
-            orbitRadius  = Vector3Length(Vector3Subtract(camera.position, cameraTarget));
-            if (orbitRadius < 1.0f) orbitRadius = 1.0f;
+            yaw   = yaw + 180.0f;
+            pitch = -pitch;
+            float yr = yaw   * DEG2RAD;
+            float pr = pitch * DEG2RAD;
+            Vector3 lookDir = {cosf(-pr) * sinf(yr + 3.14159265f), sinf(-pr), cosf(-pr) * cosf(yr + 3.14159265f)};
+            cameraTarget = Vector3Add(flyPosition, Vector3Scale(lookDir, -orbitRadius));
         }
         return;
     }

@@ -12,6 +12,8 @@ public:
 
     void LoadMap(const std::string& path);
     void SaveMap();
+    const StarMap* GetStarMap() const { return &starMap; }
+    int* GetSelectedActorIndexPtr() { return &selectedActorIndex; }
 
     bool IsPlaying() const { return playing; }
 

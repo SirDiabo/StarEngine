@@ -55,6 +55,8 @@ void Editor::OpenAsset(const std::string& fullPath, const std::string& extension
         }
     } else if (extension == ".starmap") {
         viewportPanel->LoadMap(fullPath);
+        detailsPanel->starMap = viewportPanel->GetStarMap();
+        detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     }
 }
 
