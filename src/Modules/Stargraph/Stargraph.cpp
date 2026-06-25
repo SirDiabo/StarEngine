@@ -5,7 +5,7 @@
 Node* Stargraph::CreateNode(const std::string& type) {
     nodes.emplace_back();
     Node* node = &nodes.back();
-    node->id = std::to_string(nodes.size());
+    node->id = std::to_string(nextNodeId++);
     node->type = type;
     node->title = type;
 

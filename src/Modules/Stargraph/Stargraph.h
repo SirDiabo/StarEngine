@@ -74,6 +74,7 @@ private:
     std::vector<Link> links;
     std::vector<Variable> variables;
     int nextPinId = 1;
+    int nextNodeId = 1;
 };
 
 std::string PinTypeToString(PinType type);
