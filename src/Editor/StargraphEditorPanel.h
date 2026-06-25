@@ -3,6 +3,7 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include <string>
+#include <vector>
 
 class StargraphEditorPanel : public Panel {
 public:
@@ -46,6 +47,13 @@ private:
     float zoom = 1.0f;
 
     int selectedNodeId = -1;
+    std::vector<int> selectedNodeIds;
+    bool boxSelecting = false;
+    Vector2 boxSelectStart{0, 0};
+    Vector2 boxSelectEnd{0, 0};
+    bool draggingMulti = false;
+    Vector2 multiDragAnchor{0, 0};
+    std::vector<Vector2> multiDragStartPositions;
     bool draggingNode = false;
     Vector2 nodeDragOffset{0, 0};
 

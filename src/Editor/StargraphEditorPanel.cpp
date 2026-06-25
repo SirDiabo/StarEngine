@@ -23,6 +23,8 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     isOpen = true;
     isDirty = false;
     selectedNodeId = -1;
+    selectedNodeIds.clear();
+    boxSelecting = false;
     linkFromPin = -1;
     nodeMenuOpen = false;
     editingPinId = -1;
@@ -145,12 +147,17 @@ void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
 }
 
 void StargraphEditorPanel::DeleteSelected() {
-    if (selectedNodeId == -1) return;
+    if (selectedNodeId == -1 && selectedNodeIds.empty()) return;
 
-    if (graph.RemoveNode(selectedNodeId)) {
+    if (!selectedNodeIds.empty()) {
+        for (int id : selectedNodeIds) graph.RemoveNode(id);
+        selectedNodeIds.clear();
         selectedNodeId = -1;
-        isDirty = true;
+    } else {
+        graph.RemoveNode(selectedNodeId);
+        selectedNodeId = -1;
     }
+    isDirty = true;
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
@@ -515,7 +522,7 @@ void StargraphEditorPanel::RenderGraph() {
     }
 
     DrawRectangleRec(graphArea, {24, 24, 26, 255});
-    
+
     const float gridPitch = 16.0f;
     float stepX = gridPitch * zoom;
     float stepY = gridPitch * zoom;
@@ -550,7 +557,9 @@ void StargraphEditorPanel::RenderGraph() {
         float scaledHeaderHeight = headerHeight * zoom;
         float scaledPinHeight = pinHeight * zoom;
         float nh = GetNodeHeight(node) * zoom;
-        bool isSelected = (selectedNodeId == nodeIdInt);
+        bool inMulti = false;
+        for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
+        bool isSelected = (selectedNodeId == nodeIdInt) || inMulti;
 
         DrawRectangleRec({nx, ny, scaledNodeWidth, scaledHeaderHeight}, GetNodeHeaderColor(node));
         DrawRectangleRec({nx, ny + scaledHeaderHeight, scaledNodeWidth, nh - scaledHeaderHeight}, {38, 40, 45, 255});
@@ -729,7 +738,28 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 
         if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
-                selectedNodeId = nodeIdInt;
+                if (IsKeyDown(KEY_LEFT_CONTROL)) {
+                    bool found = false;
+                    for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
+                    if (found) {
+                        selectedNodeIds.erase(std::remove(selectedNodeIds.begin(), selectedNodeIds.end(), nodeIdInt), selectedNodeIds.end());
+                    } else {
+                        if (selectedNodeId != -1 && selectedNodeId != nodeIdInt) {
+                            bool already = false;
+                            for (int sid : selectedNodeIds) if (sid == selectedNodeId) { already = true; break; }
+                            if (!already) selectedNodeIds.push_back(selectedNodeId);
+                        }
+                        selectedNodeIds.push_back(nodeIdInt);
+                        selectedNodeId = nodeIdInt;
+                    }
+                } else {
+                    bool inMulti = false;
+                    for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
+                    if (!inMulti) {
+                        selectedNodeIds.clear();
+                        selectedNodeId = nodeIdInt;
+                    }
+                }
                 selectedVariableIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
@@ -738,10 +768,40 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
 
         if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            node.posX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
-            node.posY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
+            float rawX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
+            float rawY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
+            const float gridSnap = 16.0f;
+            float snappedX = roundf(rawX / gridSnap) * gridSnap;
+            float snappedY = roundf(rawY / gridSnap) * gridSnap;
+            float deltaX = snappedX - node.posX;
+            float deltaY = snappedY - node.posY;
+            node.posX = snappedX;
+            node.posY = snappedY;
+
+            if (!selectedNodeIds.empty()) {
+                for (Node& other : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                    int oid = std::stoi(other.id);
+                    if (oid == nodeIdInt) continue;
+                    for (int sid : selectedNodeIds) {
+                        if (sid == oid) {
+                            other.posX = roundf((other.posX + deltaX) / gridSnap) * gridSnap;
+                            other.posY = roundf((other.posY + deltaY) / gridSnap) * gridSnap;
+                            break;
+                        }
+                    }
+                }
+            }
             isDirty = true;
         }
+    }
+
+    if (boxSelecting) {
+        float minX = (boxSelectStart.x < boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
+        float minY = (boxSelectStart.y < boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
+        float maxX = (boxSelectStart.x > boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
+        float maxY = (boxSelectStart.y > boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
+        DrawRectangleLinesEx({minX, minY, maxX - minX, maxY - minY}, 1, {100, 160, 230, 200});
+        DrawRectangleRec({minX, minY, maxX - minX, maxY - minY}, {100, 160, 230, 30});
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
@@ -810,8 +870,11 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     }
                 }
 
-                node->posX = (mp.x - graphArea.x - scroll.x) / zoom;
-                node->posY = (mp.y - graphArea.y - scroll.y) / zoom;
+                float rawVX = (mp.x - graphArea.x - scroll.x) / zoom;
+                float rawVY = (mp.y - graphArea.y - scroll.y) / zoom;
+                const float gridSnap = 16.0f;
+                node->posX = roundf(rawVX / gridSnap) * gridSnap;
+                node->posY = roundf(rawVY / gridSnap) * gridSnap;
                 isDirty = true;
             }
             variableDragActive = false;
@@ -837,7 +900,43 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == -1) {
-        if (!GetNodeAtPos(mousePos)) selectedNodeId = -1;
+        if (!GetNodeAtPos(mousePos)) {
+            if (!IsKeyDown(KEY_LEFT_CONTROL)) {
+                selectedNodeId = -1;
+                selectedNodeIds.clear();
+            }
+            boxSelecting = true;
+            boxSelectStart = mousePos;
+            boxSelectEnd = mousePos;
+        }
+    }
+
+    if (boxSelecting) {
+        boxSelectEnd = mousePos;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            boxSelecting = false;
+            float minX = (boxSelectStart.x < boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
+            float minY = (boxSelectStart.y < boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
+            float maxX = (boxSelectStart.x > boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
+            float maxY = (boxSelectStart.y > boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
+            Rectangle sel = {minX, minY, maxX - minX, maxY - minY};
+            if (sel.width > 4 || sel.height > 4) {
+                if (!IsKeyDown(KEY_LEFT_CONTROL)) selectedNodeIds.clear();
+                for (const Node& node : graph.GetNodes()) {
+                    float nx2 = graphArea.x + node.posX * zoom + scroll.x;
+                    float ny2 = graphArea.y + node.posY * zoom + scroll.y;
+                    float nw2 = nodeWidth * zoom;
+                    float nh2 = GetNodeHeight(node) * zoom;
+                    if (CheckCollisionRecs(sel, {nx2, ny2, nw2, nh2})) {
+                        int nid = std::stoi(node.id);
+                        bool found = false;
+                        for (int sid : selectedNodeIds) if (sid == nid) { found = true; break; }
+                        if (!found) selectedNodeIds.push_back(nid);
+                    }
+                }
+                if (!selectedNodeIds.empty()) selectedNodeId = selectedNodeIds.back();
+            }
+        }
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
@@ -905,7 +1004,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     float itemH   = 22;
     float searchH = 26;
     float maxVisibleH = 300.0f;
-    float totalItemsH = (float)entries.size() * itemH + 12;
+    float totalItemsH = (float)entries.size() * itemH + 20;
     float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
     float menuH   = searchH + listH;
 
@@ -961,8 +1060,11 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             DrawRectangleRec(btn, {65, 65, 85, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 Node* node = graph.CreateNode(entry.second);
-                node->posX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
-                node->posY = (nodeMenuPos.y - graphArea.y - scroll.y) / zoom;
+                float rawNX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
+                float rawNY = (nodeMenuPos.y - graphArea.y - scroll.y) / zoom;
+                const float gridSnap = 16.0f;
+                node->posX = roundf(rawNX / gridSnap) * gridSnap;
+                node->posY = roundf(rawNY / gridSnap) * gridSnap;
                 isDirty = true;
                 nodeMenuOpen = false;
                 filterCompatibleWithPin = -1;
