@@ -71,6 +71,8 @@ private:
     int editingPinId = -1;
     char editBuffer[256] = "";
 
+    std::vector<std::string> varValueSnapshot;
+
     int selectedVariableIndex = -1;
     bool varContextMenuOpen = false;
     int varContextMenuIndex = -1;

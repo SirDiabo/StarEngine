@@ -209,7 +209,17 @@ void StargraphEditorPanel::RenderToolbar() {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         Vector2 mp = GetMousePosition();
+        if (CheckCollisionPointRec(mp, stopBtn)) {
+            for (size_t i = 0; i < graph.GetVariables().size() && i < varValueSnapshot.size(); i++) {
+                graph.GetVariables()[i].value = varValueSnapshot[i];
+            }
+            varValueSnapshot.clear();
+        }
         if (CheckCollisionPointRec(mp, playBtn)) {
+            varValueSnapshot.clear();
+            for (const Variable& v : graph.GetVariables()) {
+                varValueSnapshot.push_back(v.value);
+            }
             graph.SaveToFile(filePath);
             isDirty = false;
             GraphExecutor::Run(graph, "Event_BeginPlay");
@@ -791,8 +801,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
                     if (!inMulti) {
                         selectedNodeIds.clear();
-                        selectedNodeId = nodeIdInt;
                     }
+                    selectedNodeId = nodeIdInt;
                 }
                 selectedVariableIndex = -1;
                 draggingNode = true;
@@ -1038,7 +1048,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     float itemH   = 22;
     float searchH = 26;
     float maxVisibleH = 300.0f;
-    float totalItemsH = (float)entries.size() * itemH + 20;
+    float totalItemsH = (float)entries.size() * itemH + 30;
     float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
     float menuH   = searchH + listH;
 
