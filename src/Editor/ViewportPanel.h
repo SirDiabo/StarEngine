@@ -40,6 +40,7 @@ private:
     bool orbiting = false;
     Vector2 lookStart{0, 0};
     Vector2 orbitStart{0, 0};
+    Vector3 flyPosition{0, 0, 0};
 
     float yaw = 45.0f;
     float pitch = 35.0f;

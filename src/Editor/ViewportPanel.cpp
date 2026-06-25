@@ -68,6 +68,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client)) {
         flying = true;
         lookStart = mp;
+        flyPosition = camera.position;
         HideCursor();
     }
 
@@ -75,7 +76,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             Vector2 delta = {mp.x - lookStart.x, mp.y - lookStart.y};
             yaw   -= delta.x * 0.3f;
-            pitch -= delta.y * 0.3f;
+            pitch += delta.y * 0.3f;
             if (pitch >  89.0f) pitch =  89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
             SetMousePosition((int)lookStart.x, (int)lookStart.y);
@@ -83,32 +84,31 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
             float wheel = GetMouseWheelMove();
             if (wheel != 0) {
                 flySpeed += wheel * 2.0f;
-                if (flySpeed < 1.0f) flySpeed = 1.0f;
+                if (flySpeed < 1.0f)   flySpeed = 1.0f;
                 if (flySpeed > 100.0f) flySpeed = 100.0f;
             }
 
             float yr = yaw   * DEG2RAD;
             float pr = pitch * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
-            Vector3 right   = {cosf(yr), 0, -sinf(yr)};
-            Vector3 up      = {0, 1, 0};
+            Vector3 right   = {cosf(yr), 0.0f, -sinf(yr)};
+            Vector3 up      = {0.0f, 1.0f, 0.0f};
 
-            if (IsKeyDown(KEY_W)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(forward, -flySpeed * dt));
-            if (IsKeyDown(KEY_S)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(forward,  flySpeed * dt));
-            if (IsKeyDown(KEY_A)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(right,   -flySpeed * dt));
-            if (IsKeyDown(KEY_D)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(right,    flySpeed * dt));
-            if (IsKeyDown(KEY_Q)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(up,       -flySpeed * dt));
-            if (IsKeyDown(KEY_E)) cameraTarget = Vector3Add(cameraTarget, Vector3Scale(up,        flySpeed * dt));
+            if (IsKeyDown(KEY_W)) flyPosition = Vector3Add(flyPosition, Vector3Scale(forward,  flySpeed * dt));
+            if (IsKeyDown(KEY_S)) flyPosition = Vector3Add(flyPosition, Vector3Scale(forward, -flySpeed * dt));
+            if (IsKeyDown(KEY_A)) flyPosition = Vector3Add(flyPosition, Vector3Scale(right,   -flySpeed * dt));
+            if (IsKeyDown(KEY_D)) flyPosition = Vector3Add(flyPosition, Vector3Scale(right,    flySpeed * dt));
+            if (IsKeyDown(KEY_E)) flyPosition = Vector3Add(flyPosition, Vector3Scale(up,        flySpeed * dt));
+            if (IsKeyDown(KEY_Q)) flyPosition = Vector3Add(flyPosition, Vector3Scale(up,       -flySpeed * dt));
 
-            camera.position = {
-                cameraTarget.x + cosf(pr) * sinf(yr) * orbitRadius,
-                cameraTarget.y + sinf(pr) * orbitRadius,
-                cameraTarget.z + cosf(pr) * cosf(yr) * orbitRadius
-            };
-            camera.target = cameraTarget;
+            camera.position = flyPosition;
+            camera.target   = Vector3Add(flyPosition, forward);
         } else {
             flying = false;
             ShowCursor();
+            cameraTarget = camera.target;
+            orbitRadius  = Vector3Length(Vector3Subtract(camera.position, cameraTarget));
+            if (orbitRadius < 1.0f) orbitRadius = 1.0f;
         }
         return;
     }
