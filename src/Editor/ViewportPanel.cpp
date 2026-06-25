@@ -113,7 +113,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
             float yr = yaw   * DEG2RAD;
             float pr = pitch * DEG2RAD;
             Vector3 lookDir = {cosf(-pr) * sinf(yr + 3.14159265f), sinf(-pr), cosf(-pr) * cosf(yr + 3.14159265f)};
-            cameraTarget = Vector3Add(flyPosition, Vector3Scale(lookDir, -orbitRadius));
+            cameraTarget = Vector3Add(flyPosition, Vector3Scale(lookDir, orbitRadius));
         }
         return;
     }
