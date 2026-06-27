@@ -12,6 +12,7 @@ public:
 
     void LoadMap(const std::string& path);
     void SaveMap();
+    void DropActorAsset(const std::string& assetPath, Vector2 screenPos);
     const StarMap* GetStarMap() const { return &starMap; }
     int* GetSelectedActorIndexPtr() { return &selectedActorIndex; }
 

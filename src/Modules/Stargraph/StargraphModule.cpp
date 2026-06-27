@@ -400,9 +400,9 @@ void StargraphModule::RegisterDefaultNodes() {
 
 void StargraphModule::RegisterAssetType() {
     AssetTypeInfo info;
-    info.typeName = "Stargraph";
-    info.extension = ".stargraph";
-    info.category = "Scripting";
+    info.typeName = "Actor";
+    info.extension = ".staractor";
+    info.category = "Gameplay";
     info.createAsset = [](const std::string& fullPath, const std::string& assetName) {
         Stargraph graph;
         graph.assetName = assetName;

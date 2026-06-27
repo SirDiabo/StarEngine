@@ -41,6 +41,14 @@ void Editor::Initialize() {
     contentPanel->onAssetOpened = [this](const std::string& path, const std::string& ext) {
         OpenAsset(path, ext);
     };
+
+    contentPanel->onAssetDragged = [this](const std::string& path, const std::string& ext, Vector2 dropPos) {
+        if (ext == ".staractor" || ext == ".stargraph") {
+            if (viewportPanel->IsVisible()) {
+                viewportPanel->DropActorAsset(path, dropPos);
+            }
+        }
+    };
 }
 
 LogPanel* Editor::GetLogPanel() {
@@ -48,7 +56,7 @@ LogPanel* Editor::GetLogPanel() {
 }
 
 void Editor::OpenAsset(const std::string& fullPath, const std::string& extension) {
-    if (extension == ".stargraph") {
+    if (extension == ".staractor" || extension == ".stargraph") {
         if (stargraphEditor->Open(fullPath)) {
             viewportPanel->SetVisible(false);
             detailsPanel->SetVisible(false);

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Panel.h"
 #include "Core/AssetTypeRegistry.h"
+#include "raylib.h"
 #include <string>
 #include <vector>
 #include <functional>
@@ -18,6 +19,7 @@ public:
     void Render() override;
 
     std::function<void(const std::string& fullPath, const std::string& extension)> onAssetOpened;
+    std::function<void(const std::string& fullPath, const std::string& extension, Vector2 dropPos)> onAssetDragged;
 
 private:
     std::string GetCurrentFolderPath() const;
@@ -38,6 +40,11 @@ private:
     bool contextMenuOpen = false;
     bool contextMenuJustOpened = false;
     Vector2 contextMenuPos{0, 0};
+
+    bool draggingAsset = false;
+    int dragEntryIndex = -1;
+    std::string dragEntryPath;
+    std::string dragEntryExt;
 
     bool isCreatingNewItem = false;
     bool isCreatingFolder = false;

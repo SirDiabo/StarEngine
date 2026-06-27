@@ -52,6 +52,45 @@ void ViewportPanel::LoadMap(const std::string& path) {
     selectedActorIndex = -1;
 }
 
+void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenPos) {
+    if (!mapLoaded) return;
+
+    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
+    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - 25 - toolbarHeight};
+
+    if (!CheckCollisionPointRec(screenPos, client)) return;
+
+    float u = (screenPos.x - client.x) / client.width;
+    float v = (screenPos.y - client.y) / client.height;
+
+    Ray ray = GetScreenToWorldRayEx(
+        {u * (float)renderTargetWidth, v * (float)renderTargetHeight},
+        camera, renderTargetWidth, renderTargetHeight);
+
+    float worldX = 0, worldZ = 0;
+    if (fabsf(ray.direction.y) > 0.001f) {
+        float t = -ray.position.y / ray.direction.y;
+        worldX = ray.position.x + ray.direction.x * t;
+        worldZ = ray.position.z + ray.direction.z * t;
+    }
+
+    std::filesystem::path p = assetPath;
+    std::string assetName = p.stem().string();
+
+    ActorInstance inst;
+    inst.name = assetName + "_" + std::to_string(starMap.GetInstances().size() + 1);
+    inst.className = "Actor";
+    inst.graphAssetPath = assetPath;
+    inst.posX = worldX;
+    inst.posY = 0;
+    inst.posZ = worldZ;
+    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
+
+    starMap.AddInstance(inst);
+    selectedActorIndex = (int)starMap.GetInstances().size() - 1;
+    mapDirty = true;
+}
+
 void ViewportPanel::SaveMap() {
     if (!mapPath.empty()) {
         starMap.SaveToFile(mapPath);

@@ -152,9 +152,21 @@ void ContentBrowserPanel::Render() {
                 }
             } else {
                 selectedIndex = (int)i;
+                if (!entries[i].isFolder) {
+                    dragEntryIndex = (int)i;
+                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
+                    dragEntryPath = fullPath.string();
+                    dragEntryExt = fs::path(entries[i].fullDiskName).extension().string();
+                }
             }
             lastEntryClickTime = currentTime;
             lastEntryClickIndex = (int)i;
+        }
+
+        if (!entries[i].isFolder && dragEntryIndex == (int)i && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float dx = mousePos.x - (row.x + row.width * 0.5f);
+            float dy = mousePos.y - (row.y + row.height * 0.5f);
+            if (dx*dx + dy*dy > 36) draggingAsset = true;
         }
 
         y += rowHeight;
@@ -169,6 +181,27 @@ void ContentBrowserPanel::Render() {
         if (IsKeyPressed(KEY_ENTER)) ConfirmPendingCreate();
         if (IsKeyPressed(KEY_ESCAPE)) CancelPendingCreate();
         y += rowHeight;
+    }
+
+    if (draggingAsset) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            std::string label = fs::path(dragEntryPath).stem().string();
+            int labelW = MeasureText(label.c_str(), 12);
+            DrawRectangleRec({mousePos.x + 10, mousePos.y - 2, (float)labelW + 16, 18}, {60, 60, 80, 220});
+            DrawRectangleLinesEx({mousePos.x + 10, mousePos.y - 2, (float)labelW + 16, 18}, 1, {120, 120, 200, 255});
+            DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, {90, 150, 210, 255});
+            DrawText(label.c_str(), (int)mousePos.x + 28, (int)mousePos.y + 1, 12, WHITE);
+        } else {
+            if (onAssetDragged) {
+                onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
+            }
+            draggingAsset = false;
+            dragEntryIndex = -1;
+        }
+    }
+
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) {
+        dragEntryIndex = -1;
     }
 
     if (!contextMenuOpen && !isCreatingNewItem && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, listArea)) {
