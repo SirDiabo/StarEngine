@@ -242,6 +242,8 @@ void StargraphEditorPanel::RenderLeftPanel() {
         y += 6;
     };
 
+    sectionHeader("Components");
+
     sectionHeader("Graphs");
     DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
     DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, WHITE);
