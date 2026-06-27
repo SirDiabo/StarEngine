@@ -1,5 +1,6 @@
 #pragma once
 #include "Stargraph.h"
+#include "ExecutionContext.h"
 #include <functional>
 #include <unordered_map>
 
@@ -8,7 +9,7 @@ struct NodeTemplate {
     std::string category;
     bool isEvent = false;
     std::function<void(Node*)> createPins;
-    std::function<void(Node&, Stargraph&)> execute;
+    std::function<void(Node&, Stargraph&, ExecutionContext&)> execute;
 };
 
 class NodeRegistry {

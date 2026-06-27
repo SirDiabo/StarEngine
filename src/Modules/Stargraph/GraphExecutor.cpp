@@ -1,8 +1,9 @@
 #include "GraphExecutor.h"
 #include "Stargraph.h"
 #include "NodeRegistry.h"
+#include <cstdlib>
 
-static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin) {
+static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx) {
     for (const Link& link : graph.GetLinks()) {
         if (link.inputPinId != inputPin.id) continue;
 
@@ -10,11 +11,11 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin) {
         if (!fromNode) continue;
 
         for (Pin& upPin : fromNode->inputs) {
-            if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin);
+            if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx);
         }
 
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
-        if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph);
+        if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
 
         for (const Pin& outPin : fromNode->outputs) {
             if (outPin.id == link.outputPinId) {
@@ -26,23 +27,33 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin) {
     }
 }
 
-void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node) {
+void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionContext& ctx) {
     for (Pin& pin : node->inputs) {
         if (pin.type == PinType::Exec) continue;
-        PropagateDataPin(graph, node, pin);
+        PropagateDataPin(graph, node, pin, ctx);
     }
 }
 
-void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
+void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
     Node* current = graph.FindNodeByType(eventType);
     if (!current) return;
+
+    if (eventType == "Event_Tick") {
+        for (Pin& p : current->outputs) {
+            if (p.name == "Delta Seconds") {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%f", ctx.deltaTime);
+                p.defaultValue = buf;
+            }
+        }
+    }
 
     int safetyLimit = 10000;
     while (safetyLimit-- > 0) {
         Node* next = FollowExecLink(graph, current);
         if (!next) break;
 
-        PropagateDataPins(graph, next);
+        PropagateDataPins(graph, next, ctx);
 
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(next->type);
 
@@ -59,8 +70,8 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
         if (next->type == "For_Loop") {
             int first = 0, last = 9;
             for (const Pin& p : next->inputs) {
-                if (p.name == "First" && !p.defaultValue.empty()) first = std::stoi(p.defaultValue);
-                if (p.name == "Last"  && !p.defaultValue.empty()) last  = std::stoi(p.defaultValue);
+                if (p.name == "First" && !p.defaultValue.empty()) first = atoi(p.defaultValue.c_str());
+                if (p.name == "Last"  && !p.defaultValue.empty()) last  = atoi(p.defaultValue.c_str());
             }
             for (int i = first; i <= last; i++) {
                 for (Pin& p : next->outputs) {
@@ -71,9 +82,9 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
                     Node* subCurrent = body;
                     int subLimit = 1000;
                     while (subLimit-- > 0) {
-                        PropagateDataPins(graph, subCurrent);
+                        PropagateDataPins(graph, subCurrent, ctx);
                         const NodeTemplate* subTmpl = NodeRegistry::Get().GetTemplate(subCurrent->type);
-                        if (subTmpl && subTmpl->execute) subTmpl->execute(*subCurrent, graph);
+                        if (subTmpl && subTmpl->execute) subTmpl->execute(*subCurrent, graph, ctx);
                         Node* subNext = FollowExecLink(graph, subCurrent);
                         if (!subNext || subNext == next) break;
                         subCurrent = subNext;
@@ -93,9 +104,9 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
                 Node* seqCurrent = seqNode;
                 int seqLimit = 1000;
                 while (seqLimit-- > 0) {
-                    PropagateDataPins(graph, seqCurrent);
+                    PropagateDataPins(graph, seqCurrent, ctx);
                     const NodeTemplate* seqTmpl = NodeRegistry::Get().GetTemplate(seqCurrent->type);
-                    if (seqTmpl && seqTmpl->execute) seqTmpl->execute(*seqCurrent, graph);
+                    if (seqTmpl && seqTmpl->execute) seqTmpl->execute(*seqCurrent, graph, ctx);
                     Node* seqNext = FollowExecLink(graph, seqCurrent);
                     if (!seqNext) break;
                     seqCurrent = seqNext;
@@ -104,7 +115,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType) {
             break;
         }
 
-        if (tmpl && tmpl->execute) tmpl->execute(*next, graph);
+        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
         current = next;
     }
 }

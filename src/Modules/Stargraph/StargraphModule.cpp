@@ -1,5 +1,7 @@
 #include "StargraphModule.h"
 #include "NodeRegistry.h"
+#include "ExecutionContext.h"
+#include "Runtime/Actor.h"
 #include "Stargraph.h"
 #include "Core/AssetTypeRegistry.h"
 #include "raylib.h"
@@ -29,7 +31,7 @@ static void RegisterFloatMath(const std::string& nodeType, char op) {
         node->outputs.push_back({"Result", PinType::Float, false, true});
     };
     switch (op) {
-        case '+': t.execute = [](Node& node, Stargraph&) {
+        case '+': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             float a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
@@ -37,7 +39,7 @@ static void RegisterFloatMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a + b);
         }; break;
-        case '-': t.execute = [](Node& node, Stargraph&) {
+        case '-': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             float a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
@@ -45,7 +47,7 @@ static void RegisterFloatMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a - b);
         }; break;
-        case '*': t.execute = [](Node& node, Stargraph&) {
+        case '*': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             float a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
@@ -53,7 +55,7 @@ static void RegisterFloatMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a * b);
         }; break;
-        case '/': t.execute = [](Node& node, Stargraph&) {
+        case '/': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             float a = 0, b = 1;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
@@ -76,7 +78,7 @@ static void RegisterIntMath(const std::string& nodeType, char op) {
         node->outputs.push_back({"Result", PinType::Integer, false, true});
     };
     switch (op) {
-        case '+': t.execute = [](Node& node, Stargraph&) {
+        case '+': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             int a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
@@ -84,7 +86,7 @@ static void RegisterIntMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a + b);
         }; break;
-        case '-': t.execute = [](Node& node, Stargraph&) {
+        case '-': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             int a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
@@ -92,7 +94,7 @@ static void RegisterIntMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a - b);
         }; break;
-        case '*': t.execute = [](Node& node, Stargraph&) {
+        case '*': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             int a = 0, b = 0;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
@@ -100,7 +102,7 @@ static void RegisterIntMath(const std::string& nodeType, char op) {
             }
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(a * b);
         }; break;
-        case '/': t.execute = [](Node& node, Stargraph&) {
+        case '/': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             int a = 0, b = 1;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
@@ -128,7 +130,7 @@ static void RegisterVec3Math(const std::string& nodeType, char op) {
         return v;
     };
     switch (op) {
-        case '+': t.execute = [](Node& node, Stargraph&) {
+        case '+': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             Vector3 a = {0,0,0}, b = {0,0,0};
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
@@ -138,7 +140,7 @@ static void RegisterVec3Math(const std::string& nodeType, char op) {
             char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
         }; break;
-        case '-': t.execute = [](Node& node, Stargraph&) {
+        case '-': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             Vector3 a = {0,0,0}, b = {0,0,0};
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
@@ -148,7 +150,7 @@ static void RegisterVec3Math(const std::string& nodeType, char op) {
             char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
         }; break;
-        case '*': t.execute = [](Node& node, Stargraph&) {
+        case '*': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             Vector3 a = {0,0,0}, b = {0,0,0};
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
@@ -158,7 +160,7 @@ static void RegisterVec3Math(const std::string& nodeType, char op) {
             char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
             for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
         }; break;
-        case '/': t.execute = [](Node& node, Stargraph&) {
+        case '/': t.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             Vector3 a = {0,0,0}, b = {1,1,1};
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
@@ -210,7 +212,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Text", PinType::String, true,  false, 0, "Hello"});
         node->outputs.push_back({"Out", PinType::Exec,   false, true});
     };
-    printString.execute = [](Node& node, Stargraph&) {
+    printString.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string text = "Hello";
         for (const Pin& pin : node.inputs) {
             if (pin.name == "Text") { text = pin.defaultValue; break; }
@@ -287,7 +289,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Result", PinType::String, false, true});
     };
-    floatToStr.execute = [](Node& node, Stargraph&) {
+    floatToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float v = 0;
         for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
         char buf[64]; snprintf(buf, sizeof(buf), "%g", v);
@@ -302,7 +304,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
         node->outputs.push_back({"Result", PinType::String, false, true});
     };
-    intToStr.execute = [](Node& node, Stargraph&) {
+    intToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int v = 0;
         for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(v);
@@ -316,7 +318,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Result", PinType::String, false, true});
     };
-    boolToStr.execute = [](Node& node, Stargraph&) {
+    boolToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         bool v = false;
         for (const Pin& p : node.inputs) if (p.name == "Value") v = (p.defaultValue == "true" || p.defaultValue == "1");
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = v ? "true" : "false";
@@ -330,7 +332,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Result", PinType::Integer, false, true});
     };
-    floatToInt.execute = [](Node& node, Stargraph&) {
+    floatToInt.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float v = 0;
         for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string((int)v);
@@ -344,7 +346,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
         node->outputs.push_back({"Result", PinType::Float, false, true});
     };
-    intToFloat.execute = [](Node& node, Stargraph&) {
+    intToFloat.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int v = 0;
         for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
         char buf[32]; snprintf(buf, sizeof(buf), "%g", (float)v);
@@ -359,7 +361,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Variable_Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Value", PinType::Float, false, true});
     };
-    getVar.execute = [](Node& node, Stargraph& graph) {
+    getVar.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string varName;
         for (const Pin& p : node.inputs) {
             if (p.name == "Variable_Name") { varName = p.defaultValue; break; }
@@ -384,7 +386,7 @@ void StargraphModule::RegisterDefaultNodes() {
         node->inputs.push_back({"Value",         PinType::Float,  true,  false, 0, "0.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
-    setVar.execute = [](Node& node, Stargraph& graph) {
+    setVar.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string varName;
         std::string value;
         for (const Pin& p : node.inputs) {
@@ -396,6 +398,113 @@ void StargraphModule::RegisterDefaultNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(setVar);
+
+    NodeTemplate getActorLocation;
+    getActorLocation.type = "Get_Actor_Location";
+    getActorLocation.category = "Actor";
+    getActorLocation.createPins = [](Node* node) {
+        node->outputs.push_back({"Location", PinType::Vec3, false, true});
+    };
+    getActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", ctx.actor->position.x, ctx.actor->position.y, ctx.actor->position.z);
+        for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getActorLocation);
+
+    NodeTemplate setActorLocation;
+    setActorLocation.type = "Set_Actor_Location";
+    setActorLocation.category = "Actor";
+    setActorLocation.createPins = [](Node* node) {
+        node->inputs.push_back({"In",       PinType::Exec, true,  false});
+        node->inputs.push_back({"Location", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->outputs.push_back({"Out",     PinType::Exec, false, true});
+    };
+    setActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Location") {
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
+                    &ctx.actor->position.x, &ctx.actor->position.y, &ctx.actor->position.z);
+                break;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setActorLocation);
+
+    NodeTemplate getActorForward;
+    getActorForward.type = "Get_Actor_Forward_Vector";
+    getActorForward.category = "Actor";
+    getActorForward.createPins = [](Node* node) {
+        node->outputs.push_back({"Forward", PinType::Vec3, false, true});
+    };
+    getActorForward.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        float yr = ctx.actor->rotation.y * DEG2RAD;
+        float pr = ctx.actor->rotation.x * DEG2RAD;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
+            cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr));
+        for (Pin& p : node.outputs) if (p.name == "Forward") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getActorForward);
+
+
+    auto makeKeyNode = [](const std::string& nodeType, int key) {
+        NodeTemplate t;
+        t.type = nodeType;
+        t.category = "Input";
+        t.isEvent = true;
+        t.createPins = [](Node* node) {
+            node->outputs.push_back({"Out",      PinType::Exec,    false, true});
+            node->outputs.push_back({"Is Held",  PinType::Boolean, false, true});
+        };
+        t.execute = [key](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            bool held = IsKeyDown(key);
+            for (Pin& p : node.outputs) {
+                if (p.name == "Is Held") p.defaultValue = held ? "true" : "false";
+            }
+        };
+        return t;
+    };
+
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_W",     KEY_W));
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_A",     KEY_A));
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_S",     KEY_S));
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_D",     KEY_D));
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_Space", KEY_SPACE));
+    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_Shift", KEY_LEFT_SHIFT));
+
+    NodeTemplate getAxisH;
+    getAxisH.type = "Get_Axis_Horizontal";
+    getAxisH.category = "Input";
+    getAxisH.createPins = [](Node* node) {
+        node->outputs.push_back({"Axis", PinType::Float, false, true});
+    };
+    getAxisH.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float axis = 0;
+        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) axis += 1.0f;
+        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))  axis -= 1.0f;
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", axis);
+        for (Pin& p : node.outputs) if (p.name == "Axis") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getAxisH);
+
+    NodeTemplate getAxisV;
+    getAxisV.type = "Get_Axis_Vertical";
+    getAxisV.category = "Input";
+    getAxisV.createPins = [](Node* node) {
+        node->outputs.push_back({"Axis", PinType::Float, false, true});
+    };
+    getAxisV.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float axis = 0;
+        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))   axis += 1.0f;
+        if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))  axis -= 1.0f;
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", axis);
+        for (Pin& p : node.outputs) if (p.name == "Axis") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getAxisV);
 }
 
 void StargraphModule::RegisterAssetType() {
