@@ -1,0 +1,23 @@
+#pragma once
+#include "Runtime/Object.h"
+#include "Runtime/Property.h"
+#include "raymath.h"
+
+class PropertyList;
+
+class Component : public Object {
+public:
+    Vector3 position = {0, 0, 0};
+    Vector3 rotation = {0, 0, 0};
+    Vector3 scale = {1, 1, 1};
+
+    Component* parent = nullptr;
+
+    virtual void GetEditorProperties(PropertyList& outProperties) { }
+    virtual void Update(float deltaTime) = 0;
+
+    virtual void GetProperties(PropertyList& outProperties) override {
+        Object::GetProperties(outProperties);
+        GetEditorProperties(outProperties);
+    }
+};

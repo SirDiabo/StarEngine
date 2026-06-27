@@ -2,6 +2,9 @@
 #include "Object.h"
 #include "GraphBehavior.h"
 #include "raylib.h"
+#include <vector>
+
+class Component;
 
 class Actor : public Object {
 public:
@@ -16,7 +19,6 @@ public:
     void EndPlay();
 
     void SetGraphBehavior(GraphBehavior* behavior);
-
     Matrix GetWorldMatrix() const;
 
     Vector3 position{ 0, 0, 0 };
@@ -25,6 +27,10 @@ public:
 
     bool hasBegunPlay = false;
 
+    void AddComponent(Component* component);
+    void RemoveComponent(Component* component);
+    Component* GetRootComponent();
+
 protected:
     virtual void OnBeginPlay() {}
     virtual void OnTick(float deltaTime) {}
@@ -32,4 +38,6 @@ protected:
 
 private:
     GraphBehavior* graphBehavior = nullptr;
+    std::vector<Component*> components;
+    Component* rootComponent = nullptr;
 };

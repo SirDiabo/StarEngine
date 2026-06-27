@@ -1,12 +1,19 @@
 #include "Actor.h"
+#include "Components/Component.h"
+#include "Components/SceneComponent.h"
 #include "raymath.h"
+#include <algorithm>
 
 Actor::Actor() {
     name = "Actor";
+    rootComponent = new SceneComponent();
+    rootComponent->SetName("SceneRoot");
+    components.push_back(rootComponent);
 }
 
 Actor::~Actor() {
     delete graphBehavior;
+    for (Component* c : components) delete c;
 }
 
 void Actor::GetProperties(PropertyList& outProperties) {
@@ -30,6 +37,7 @@ void Actor::BeginPlay() {
 void Actor::Tick(float deltaTime) {
     OnTick(deltaTime);
     if (graphBehavior) graphBehavior->OnTick(this, deltaTime);
+    for (Component* c : components) c->Update(deltaTime);
 }
 
 void Actor::EndPlay() {
@@ -43,4 +51,26 @@ Matrix Actor::GetWorldMatrix() const {
     Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * rotation.x, DEG2RAD * rotation.y, DEG2RAD * rotation.z });
     Matrix translationMatrix = MatrixTranslate(position.x, position.y, position.z);
     return MatrixMultiply(MatrixMultiply(scaleMatrix, rotationMatrix), translationMatrix);
+}
+
+void Actor::AddComponent(Component* component) {
+    components.push_back(component);
+    component->parent = GetRootComponent();
+}
+
+void Actor::RemoveComponent(Component* component) {
+    auto it = std::find(components.begin(), components.end(), component);
+    if (it != components.end()) {
+        components.erase(it);
+        delete component;
+    }
+}
+
+Component* Actor::GetRootComponent() {
+    if (!rootComponent) {
+        rootComponent = new SceneComponent();
+        rootComponent->SetName("SceneRoot");
+        components.push_back(rootComponent);
+    }
+    return rootComponent;
 }
