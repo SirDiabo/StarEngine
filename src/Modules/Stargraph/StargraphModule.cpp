@@ -473,7 +473,121 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(vec3Scale);
 
-    // Input nodes
+    NodeTemplate vec3Make;
+    vec3Make.type = "Vec3_Make";
+    vec3Make.category = "Math";
+    vec3Make.createPins = [](Node* node) {
+        node->inputs.push_back({"X", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Y", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Z", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Vector", PinType::Vec3, false, true});
+    };
+    vec3Make.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "X" && !p.defaultValue.empty()) x = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Y" && !p.defaultValue.empty()) y = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Z" && !p.defaultValue.empty()) z = (float)atof(p.defaultValue.c_str());
+        }
+        char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Vector") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(vec3Make);
+
+    NodeTemplate vec3Break;
+    vec3Break.type = "Vec3_Break";
+    vec3Break.category = "Math";
+    vec3Break.createPins = [](Node* node) {
+        node->inputs.push_back({"Vector", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"X", PinType::Float, false, true});
+        node->outputs.push_back({"Y", PinType::Float, false, true});
+        node->outputs.push_back({"Z", PinType::Float, false, true});
+    };
+    vec3Break.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+        }
+        char buf[32];
+        for (Pin& p : node.outputs) {
+            if (p.name == "X") { snprintf(buf, sizeof(buf), "%g", x); p.defaultValue = buf; }
+            if (p.name == "Y") { snprintf(buf, sizeof(buf), "%g", y); p.defaultValue = buf; }
+            if (p.name == "Z") { snprintf(buf, sizeof(buf), "%g", z); p.defaultValue = buf; }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(vec3Break);
+
+    NodeTemplate getActorRotation;
+    getActorRotation.type = "Get_Actor_Rotation";
+    getActorRotation.category = "Actor";
+    getActorRotation.createPins = [](Node* node) {
+        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+    };
+    getActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
+            ctx.actor->rotation.x, ctx.actor->rotation.y, ctx.actor->rotation.z);
+        for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getActorRotation);
+
+    NodeTemplate setActorRotation;
+    setActorRotation.type = "Set_Actor_Rotation";
+    setActorRotation.category = "Actor";
+    setActorRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"In",       PinType::Exec, true,  false});
+        node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->outputs.push_back({"Out",     PinType::Exec, false, true});
+    };
+    setActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Rotation") {
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
+                    &ctx.actor->rotation.x, &ctx.actor->rotation.y, &ctx.actor->rotation.z);
+                break;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setActorRotation);
+
+    NodeTemplate getActorScale;
+    getActorScale.type = "Get_Actor_Scale";
+    getActorScale.category = "Actor";
+    getActorScale.createPins = [](Node* node) {
+        node->outputs.push_back({"Scale", PinType::Vec3, false, true});
+    };
+    getActorScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
+            ctx.actor->scale.x, ctx.actor->scale.y, ctx.actor->scale.z);
+        for (Pin& p : node.outputs) if (p.name == "Scale") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getActorScale);
+
+    NodeTemplate setActorScale;
+    setActorScale.type = "Set_Actor_Scale";
+    setActorScale.category = "Actor";
+    setActorScale.createPins = [](Node* node) {
+        node->inputs.push_back({"In",    PinType::Exec, true,  false});
+        node->inputs.push_back({"Scale", PinType::Vec3, true,  false, 0, "1,1,1"});
+        node->outputs.push_back({"Out",  PinType::Exec, false, true});
+    };
+    setActorScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Scale") {
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
+                    &ctx.actor->scale.x, &ctx.actor->scale.y, &ctx.actor->scale.z);
+                break;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setActorScale);
+
+    // Input nodes (read keyboard state at execution time)
 
     auto makeKeyNode = [](const std::string& nodeType, int key) {
         NodeTemplate t;

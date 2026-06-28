@@ -185,6 +185,14 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         cameraTarget = {inst.posX, inst.posY, inst.posZ};
     }
 
+    if (playing) {
+        const auto& actors = World::Get().GetActors();
+        if (!actors.empty()) {
+            Actor* first = actors.front().get();
+            cameraTarget = first->position;
+        }
+    }
+
     UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
 }
 
@@ -198,13 +206,22 @@ void ViewportPanel::RenderScene() {
     BeginMode3D(camera);
     DrawGrid(40, 1.0f);
 
-    const auto& instances = starMap.GetInstances();
-    for (size_t i = 0; i < instances.size(); i++) {
-        const ActorInstance& inst = instances[i];
-        Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-        Color color = (selectedActorIndex == (int)i) ? Color{255, 200, 50, 255} : ClassColor(inst.className);
-        DrawCube(pos, inst.scaleX, inst.scaleY, inst.scaleZ, color);
-        DrawCubeWires(pos, inst.scaleX, inst.scaleY, inst.scaleZ, {0, 0, 0, 120});
+    if (playing) {
+        for (const auto& actor : World::Get().GetActors()) {
+            Vector3 pos = actor->position;
+            Vector3 sc  = actor->scale;
+            DrawCube(pos, sc.x, sc.y, sc.z, {100, 200, 100, 255});
+            DrawCubeWires(pos, sc.x, sc.y, sc.z, {0, 0, 0, 120});
+        }
+    } else {
+        const auto& instances = starMap.GetInstances();
+        for (size_t i = 0; i < instances.size(); i++) {
+            const ActorInstance& inst = instances[i];
+            Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+            Color color = (selectedActorIndex == (int)i) ? Color{255, 200, 50, 255} : ClassColor(inst.className);
+            DrawCube(pos, inst.scaleX, inst.scaleY, inst.scaleZ, color);
+            DrawCubeWires(pos, inst.scaleX, inst.scaleY, inst.scaleZ, {0, 0, 0, 120});
+        }
     }
 
     EndMode3D();
