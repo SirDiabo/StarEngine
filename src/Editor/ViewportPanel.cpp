@@ -104,7 +104,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 
     float dt = GetFrameTime();
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client) && !playing) {
         flying = true;
         lookStart = mp;
         flyPosition = camera.position;
@@ -158,12 +158,12 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     }
 
     float scroll = GetMouseWheelMove();
-    if (scroll != 0 && CheckCollisionPointRec(mp, client)) {
+    if (scroll != 0 && CheckCollisionPointRec(mp, client) && !playing) {
         orbitRadius -= scroll * 1.5f;
         if (orbitRadius < 1.0f) orbitRadius = 1.0f;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mp, client)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mp, client) && !playing) {
         orbiting = true;
         orbitStart = mp;
     }
@@ -281,6 +281,7 @@ void ViewportPanel::RenderToolbar() {
         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
             playing = true;
+            if (flying) { flying = false; ShowCursor(); }
             for (const ActorInstance& inst : starMap.GetInstances()) {
                 Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
                 actor->position = {inst.posX, inst.posY, inst.posZ};
@@ -335,6 +336,14 @@ void ViewportPanel::Render() {
     }
 
     DrawRectangleLinesEx(bounds, 1, {70, 70, 75, 255});
+
+    if (playing) {
+        DrawRectangleLinesEx(bounds, 3, {60, 180, 60, 255});
+        const char* pieLabel = "PLAYING - Press S to Stop";
+        int tw = MeasureText(pieLabel, 12);
+        DrawText(pieLabel, (int)(bounds.x + bounds.width / 2 - tw / 2),
+                 (int)(bounds.y + 28 + toolbarHeight + 4), 12, {60, 200, 60, 255});
+    }
     RenderToolbar();
 
     if (mapLoaded && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {

@@ -399,6 +399,8 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(setVar);
 
+    // Actor self-reference nodes
+
     NodeTemplate getActorLocation;
     getActorLocation.type = "Get_Actor_Location";
     getActorLocation.category = "Actor";
@@ -450,6 +452,28 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(getActorForward);
 
+    NodeTemplate vec3Scale;
+    vec3Scale.type = "Vec3_Scale";
+    vec3Scale.category = "Math";
+    vec3Scale.createPins = [](Node* node) {
+        node->inputs.push_back({"Vector", PinType::Vec3,  true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Scale",  PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Result", PinType::Vec3, false, true});
+    };
+    vec3Scale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 v = {0, 0, 0};
+        float s = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
+            if (p.name == "Scale" && !p.defaultValue.empty()) s = (float)atof(p.defaultValue.c_str());
+        }
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", v.x * s, v.y * s, v.z * s);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(vec3Scale);
+
+    // Input nodes
 
     auto makeKeyNode = [](const std::string& nodeType, int key) {
         NodeTemplate t;
