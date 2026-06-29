@@ -122,6 +122,7 @@ void Editor::Render() {
         if (!stargraphEditor->IsOpen()) {
             viewportPanel->SetVisible(true);
             detailsPanel->SetVisible(true);
+            outlinerPanel->SetVisible(true);
         }
     } else {
         float rightPanelWidth = 300.0f;
