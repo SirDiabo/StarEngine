@@ -6,6 +6,7 @@
 class LogPanel;
 class ContentBrowserPanel;
 class DetailsPanel;
+class OutlinerPanel;
 class ViewportPanel;
 class StargraphEditorPanel;
 class MenuBar;
@@ -43,6 +44,7 @@ private:
     LogPanel* logPanel = nullptr;
     ContentBrowserPanel* contentPanel = nullptr;
     DetailsPanel* detailsPanel = nullptr;
+    OutlinerPanel* outlinerPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
     StargraphEditorPanel* stargraphEditor = nullptr;
     MenuBar* menuBar = nullptr;

@@ -1,6 +1,7 @@
 #include "Editor.h"
 #include "ViewportPanel.h"
 #include "DetailsPanel.h"
+#include "OutlinerPanel.h"
 #include "ContentBrowserPanel.h"
 #include "LogPanel.h"
 #include "MenuBar.h"
@@ -20,6 +21,9 @@ void Editor::Initialize() {
 
     detailsPanel = new DetailsPanel();
     panels.push_back(detailsPanel);
+
+    outlinerPanel = new OutlinerPanel();
+    panels.push_back(outlinerPanel);
 
     viewportPanel = new ViewportPanel();
     panels.push_back(viewportPanel);
@@ -60,11 +64,14 @@ void Editor::OpenAsset(const std::string& fullPath, const std::string& extension
         if (stargraphEditor->Open(fullPath)) {
             viewportPanel->SetVisible(false);
             detailsPanel->SetVisible(false);
+            outlinerPanel->SetVisible(false);
         }
     } else if (extension == ".starmap") {
         viewportPanel->LoadMap(fullPath);
         detailsPanel->starMap = viewportPanel->GetStarMap();
         detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+        outlinerPanel->starMap = viewportPanel->GetStarMap();
+        outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     }
 }
 
@@ -118,9 +125,15 @@ void Editor::Render() {
         }
     } else {
         if (viewportPanel->IsVisible()) {
-            viewportPanel->bounds = Rectangle{0, 30, (float)(width - 300), topHeight};
+            viewportPanel->bounds = Rectangle{0, 30, (float)(width - 600), topHeight};
             viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
             viewportPanel->Render();
+        }
+
+        if (outlinerPanel->IsVisible() && viewportPanel->GetStarMap()) {
+            outlinerPanel->bounds = Rectangle{(float)(width - 600), 30, 300, topHeight};
+            outlinerPanel->header = {outlinerPanel->bounds.x, outlinerPanel->bounds.y, outlinerPanel->bounds.width, 25};
+            outlinerPanel->Render();
         }
 
         if (detailsPanel->IsVisible()) {
