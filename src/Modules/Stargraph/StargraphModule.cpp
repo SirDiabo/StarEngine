@@ -2,6 +2,7 @@
 #include "NodeRegistry.h"
 #include "ExecutionContext.h"
 #include "Runtime/Actor.h"
+#include "Runtime/World.h"
 #include "Stargraph.h"
 #include "Core/AssetTypeRegistry.h"
 #include "raylib.h"
@@ -553,6 +554,52 @@ void StargraphModule::RegisterDefaultNodes() {
         for (Pin& p : node.outputs) if (p.name == "Axis") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getAxisV);
+
+    NodeTemplate spawnActor;
+    spawnActor.type = "Spawn_Actor";
+    spawnActor.category = "Actor";
+    spawnActor.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Class Name", PinType::String, true, false, 0, "Actor"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Spawned Actor", PinType::Object, false, true});
+    };
+    spawnActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string className = "Actor";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Class Name") { className = p.defaultValue; break; }
+        }
+        Actor* spawned = World::Get().SpawnActor(className);
+        if (spawned) {
+            spawned->SetName(className + "_Instance");
+            for (Pin& p : node.outputs) {
+                if (p.name == "Spawned Actor") {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "%p", (void*)spawned);
+                    p.defaultValue = buf;
+                    break;
+                }
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(spawnActor);
+
+    NodeTemplate destroyActor;
+    destroyActor.type = "Destroy_Actor";
+    destroyActor.category = "Actor";
+    destroyActor.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+    };
+    destroyActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target") {
+                Actor* target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                if (target) World::Get().DestroyActor(target);
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(destroyActor);
 }
 
 void StargraphModule::RegisterAssetType() {
