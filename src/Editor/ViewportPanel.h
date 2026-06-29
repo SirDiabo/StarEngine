@@ -47,8 +47,8 @@ private:
 
     float yaw = 45.0f;
     float pitch = 35.0f;
-    float orbitRadius = 20.0f;
-    float flySpeed = 10.0f;
+    float orbitRadius = 800.0f;
+    float flySpeed = 400.0f;
 
     Vector3 cameraTarget{0, 0, 0};
 

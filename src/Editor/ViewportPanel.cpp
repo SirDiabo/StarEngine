@@ -84,7 +84,7 @@ void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenP
     inst.posX = worldX;
     inst.posY = 0;
     inst.posZ = worldZ;
-    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
+    inst.scaleX = inst.scaleY = inst.scaleZ = 50.0f;
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
@@ -124,9 +124,9 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 
             float wheel = GetMouseWheelMove();
             if (wheel != 0) {
-                flySpeed += wheel * 2.0f;
-                if (flySpeed < 1.0f)   flySpeed = 1.0f;
-                if (flySpeed > 100.0f) flySpeed = 100.0f;
+                flySpeed += wheel * 100.0f;
+                if (flySpeed < 40.0f)   flySpeed = 40.0f;
+                if (flySpeed > 4000.0f) flySpeed = 4000.0f;
             }
 
             float yr = yaw   * DEG2RAD;
@@ -159,8 +159,8 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 
     float scroll = GetMouseWheelMove();
     if (scroll != 0 && CheckCollisionPointRec(mp, client) && !playing) {
-        orbitRadius -= scroll * 1.5f;
-        if (orbitRadius < 1.0f) orbitRadius = 1.0f;
+        orbitRadius -= scroll * 100.0f;
+        if (orbitRadius < 100.0f) orbitRadius = 100.0f;
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mp, client) && !playing) {
@@ -204,7 +204,7 @@ static Color ClassColor(const std::string& className) {
 
 void ViewportPanel::RenderScene() {
     BeginMode3D(camera);
-    DrawGrid(40, 1.0f);
+    DrawGrid(40, 100.0f);
 
     if (playing) {
         for (const auto& actor : World::Get().GetActors()) {
@@ -244,9 +244,9 @@ void ViewportPanel::HandleMapInteraction(Rectangle client) {
             const ActorInstance& inst = instances[i];
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
 
-            Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
+Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
             Matrix proj = MatrixPerspective(projCam.fovy * DEG2RAD,
-                                            fboSize.x / fboSize.y, 0.01f, 1000.0f);
+                                             fboSize.x / fboSize.y, 1.0f, 50000.0f);
             Matrix view = MatrixLookAt(projCam.position, projCam.target, projCam.up);
             Matrix mvp  = MatrixMultiply(view, proj);
 
