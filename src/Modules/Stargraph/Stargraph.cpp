@@ -46,6 +46,10 @@ void Stargraph::RenameVariable(size_t index, const std::string& newName) {
     if (index < variables.size()) variables[index].name = newName;
 }
 
+void Stargraph::AddComponent(const ComponentDecl& comp) {
+    components.push_back(comp);
+}
+
 Pin* Stargraph::FindPin(int pinId) {
     for (Node& node : nodes) {
         for (Pin& pin : node.inputs) {
@@ -134,6 +138,16 @@ bool Stargraph::SaveToFile(const std::string& path) const {
     out << "Name=" << assetName << "\n";
     out << "ParentClass=" << parentClass << "\n";
     out << "\n";
+
+    out << "[Components]\n";
+    out << "Count=" << components.size() << "\n";
+    out << "\n";
+    for (size_t i = 0; i < components.size(); i++) {
+        out << "[Component" << i << "]\n";
+        out << "Type=" << components[i].componentType << "\n";
+        out << "Name=" << components[i].name << "\n";
+        out << "\n";
+    }
 
     out << "[Variables]\n";
     out << "Count=" << variables.size() << "\n";
@@ -235,6 +249,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
     nodes.clear();
     links.clear();
     variables.clear();
+    components.clear();
     nextPinId = 1;
 
     std::vector<ParsedSection> sections = ParseSections(in);
@@ -245,6 +260,11 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Version")) formatVersion = std::stoi(*v);
             if (const std::string* v = FindEntry(section, "Name")) assetName = *v;
             if (const std::string* v = FindEntry(section, "ParentClass")) parentClass = *v;
+        } else if (section.name != "Components" && section.name.rfind("Component", 0) == 0) {
+            ComponentDecl comp;
+            if (const std::string* v = FindEntry(section, "Type")) comp.componentType = *v;
+            if (const std::string* v = FindEntry(section, "Name")) comp.name = *v;
+            components.push_back(comp);
         } else if (section.name != "Nodes" && section.name.rfind("Node", 0) == 0) {
             const std::string* typeValue = FindEntry(section, "Type");
             if (!typeValue) continue;

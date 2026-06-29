@@ -44,12 +44,19 @@ struct Variable {
     std::string value;
 };
 
+struct ComponentDecl {
+    std::string componentType;
+    std::string name;
+};
+
 class Stargraph {
 public:
     const std::deque<Node>& GetNodes() const { return nodes; }
     const std::vector<Link>& GetLinks() const { return links; }
     const std::vector<Variable>& GetVariables() const { return variables; }
     std::vector<Variable>& GetVariables() { return variables; }
+    const std::vector<ComponentDecl>& GetComponents() const { return components; }
+    std::vector<ComponentDecl>& GetComponents() { return components; }
 
     Node* CreateNode(const std::string& type);
     void AddLink(const Link& link);
@@ -57,6 +64,7 @@ public:
     void AddVariable(const Variable& var);
     void RemoveVariable(size_t index);
     void RenameVariable(size_t index, const std::string& newName);
+    void AddComponent(const ComponentDecl& comp);
 
     Pin* FindPin(int pinId);
     Node* FindNodeByPinId(int pinId);
@@ -74,6 +82,7 @@ private:
     std::deque<Node> nodes;
     std::vector<Link> links;
     std::vector<Variable> variables;
+    std::vector<ComponentDecl> components;
     int nextPinId = 1;
     int nextNodeId = 1;
 };

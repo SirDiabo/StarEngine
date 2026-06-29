@@ -124,26 +124,28 @@ void Editor::Render() {
             detailsPanel->SetVisible(true);
         }
     } else {
+        float rightPanelWidth = 300.0f;
+        float outlinerHeight = (topHeight * 0.5f) - 15.0f;
+        float detailsY = 30.0f + outlinerHeight + 10.0f;
         if (viewportPanel->IsVisible()) {
-            viewportPanel->bounds = Rectangle{0, 30, (float)(width - 600), topHeight};
+            viewportPanel->bounds = Rectangle{0, 30, (float)(width) - rightPanelWidth, topHeight};
             viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
             viewportPanel->Render();
         }
 
         if (outlinerPanel->IsVisible() && viewportPanel->GetStarMap()) {
-            outlinerPanel->bounds = Rectangle{(float)(width - 600), 30, 300, topHeight};
+            outlinerPanel->bounds = Rectangle{(float)(width) - rightPanelWidth, 30, rightPanelWidth, outlinerHeight};
             outlinerPanel->header = {outlinerPanel->bounds.x, outlinerPanel->bounds.y, outlinerPanel->bounds.width, 25};
             outlinerPanel->Render();
         }
 
         if (detailsPanel->IsVisible()) {
-            detailsPanel->bounds = Rectangle{(float)(width - 300), 30, 300, topHeight};
+            detailsPanel->bounds = Rectangle{(float)(width) - rightPanelWidth, detailsY, rightPanelWidth, outlinerHeight};
             detailsPanel->header = {detailsPanel->bounds.x, detailsPanel->bounds.y, detailsPanel->bounds.width, 25};
             detailsPanel->Render();
         }
     }
 
-    // bottom dock tab bar
     std::vector<const char*> tabTexts;
     for (const auto& tab : bottomDock) tabTexts.push_back(tab.title.c_str());
     GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomDock.size(), &activeBottomTab);
