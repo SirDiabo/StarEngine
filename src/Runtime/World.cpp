@@ -49,6 +49,7 @@ void World::Tick(float deltaTime) {
 void World::EndPlay() {
     for (auto& actor : actors) {
         actor->EndPlay();
+        DestroyActor(actor.get());
     }
     FlushDestroyQueue();
     playing = false;
