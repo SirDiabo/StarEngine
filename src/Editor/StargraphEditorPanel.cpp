@@ -748,7 +748,7 @@ void StargraphEditorPanel::RenderGraph() {
             if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
             else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
 
-            if (pin.type != PinType::Exec) {
+            if (pin.name != "Out") {
                 float textW = (float)MeasureText(pin.name.c_str(), 12);
                 DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 12), (int)outputY - 8, 12, LIGHTGRAY);
             }
