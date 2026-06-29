@@ -52,5 +52,10 @@ private:
 
     Vector3 cameraTarget{0, 0, 0};
 
+    float savedYaw = 45.0f;
+    float savedPitch = 35.0f;
+    float savedOrbitRadius = 800.0f;
+    Vector3 savedCameraTarget{0, 0, 0};
+
     static const float toolbarHeight;
 };

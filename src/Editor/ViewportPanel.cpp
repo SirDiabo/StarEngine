@@ -293,35 +293,45 @@ void ViewportPanel::RenderToolbar() {
     float btnY = toolbar.y + 3;
 
     if (!playing) {
-        Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
-        DrawRectangleRec(playBtn, {30, 130, 60, 255});
-        DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
-            playing = true;
-            if (flying) { flying = false; ShowCursor(); }
-            for (const ActorInstance& inst : starMap.GetInstances()) {
-                Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
-                actor->position = {inst.posX, inst.posY, inst.posZ};
-                actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
-                actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
-                if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
-                    auto* behavior = new StargraphBehavior(Stargraph{});
-                    behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
-                    actor->SetGraphBehavior(behavior);
-                }
-            }
-            World::Get().BeginPlay();
-        }
-        btnRight -= 26;
+Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
+         DrawRectangleRec(playBtn, {30, 130, 60, 255});
+         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
+         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
+             playing = true;
+             savedYaw = yaw;
+             savedPitch = pitch;
+             savedOrbitRadius = orbitRadius;
+             savedCameraTarget = cameraTarget;
+             if (flying) { flying = false; ShowCursor(); }
+             for (const ActorInstance& inst : starMap.GetInstances()) {
+                 Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
+                 actor->position = {inst.posX, inst.posY, inst.posZ};
+                 actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
+                 actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
+                 if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
+                     auto* behavior = new StargraphBehavior(Stargraph{});
+                     behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
+                     actor->SetGraphBehavior(behavior);
+                 }
+             }
+             World::Get().BeginPlay();
+         }
+         btnRight -= 26;
     } else {
-        Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
-        DrawRectangleRec(stopBtn, {160, 40, 40, 255});
-        DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
-            World::Get().EndPlay();
-            playing = false;
-        }
-        btnRight -= 26;
+Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
+         DrawRectangleRec(stopBtn, {160, 40, 40, 255});
+         DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
+if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
+              World::Get().EndPlay();
+              yaw = savedYaw;
+              pitch = savedPitch;
+              orbitRadius = savedOrbitRadius;
+              cameraTarget = savedCameraTarget;
+              UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
+              if (flying) { flying = false; ShowCursor(); }
+              playing = false;
+          }
+          btnRight -= 26;
     }
 
     if (mapLoaded) {
