@@ -2,6 +2,7 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
 #include <cstdlib>
+#include <vector>
 
 static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx) {
     for (const Link& link : graph.GetLinks()) {
@@ -36,7 +37,53 @@ void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionCon
 
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
     Node* current = graph.FindNodeByType(eventType);
-    if (!current) return;
+    if (!current) {
+        if (eventType == "Event_Tick") {
+            std::deque<Node>& nodes = const_cast<std::deque<Node>&>(graph.GetNodes());
+            for (Node& node : nodes) {
+                const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+                if (!tmpl) continue;
+                if (node.type == "Input_Key_W" || node.type == "Input_Key_A" || node.type == "Input_Key_S" || 
+                    node.type == "Input_Key_D" || node.type == "Input_Key_Space" || node.type == "Input_Key_Shift") {
+                    tmpl->execute(node, graph, ctx);
+                    bool keyHeld = false;
+                    for (const Pin& p : node.outputs) {
+                        if (p.type == PinType::Boolean && p.name == "Is Held") {
+                            keyHeld = (p.defaultValue == "true");
+                            break;
+                        }
+                    }
+                    if (keyHeld) {
+                        for (const Pin& outPin : node.outputs) {
+                            if (outPin.type == PinType::Exec && outPin.name == "Out") {
+                                for (const Link& link : graph.GetLinks()) {
+                                    if (link.outputPinId == outPin.id) {
+                                        Node* nextNode = graph.FindNodeByPinId(link.inputPinId);
+                                        if (nextNode) {
+                                            Node* inputCurrent = nextNode;
+                                            int inputLimit = 1000;
+                                            while (inputLimit-- > 0) {
+                                                PropagateDataPins(graph, inputCurrent, ctx);
+                                                const NodeTemplate* inputTmpl = NodeRegistry::Get().GetTemplate(inputCurrent->type);
+                                                if (inputTmpl && inputTmpl->execute) inputTmpl->execute(*inputCurrent, graph, ctx);
+                                                Node* inputNext = FollowExecLink(graph, inputCurrent);
+                                                if (!inputNext) break;
+                                                inputCurrent = inputNext;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
+                    tmpl->execute(node, graph, ctx);
+                }
+            }
+        }
+        return;
+    }
 
     if (eventType == "Event_Tick") {
         for (Pin& p : current->outputs) {
@@ -44,6 +91,48 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%f", ctx.deltaTime);
                 p.defaultValue = buf;
+            }
+        }
+        std::deque<Node>& nodes = const_cast<std::deque<Node>&>(graph.GetNodes());
+        for (Node& node : nodes) {
+            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+            if (!tmpl) continue;
+            if (node.type == "Input_Key_W" || node.type == "Input_Key_A" || node.type == "Input_Key_S" || 
+                node.type == "Input_Key_D" || node.type == "Input_Key_Space" || node.type == "Input_Key_Shift") {
+                tmpl->execute(node, graph, ctx);
+                bool keyHeld = false;
+                for (const Pin& p : node.outputs) {
+                    if (p.type == PinType::Boolean && p.name == "Is Held") {
+                        keyHeld = (p.defaultValue == "true");
+                        break;
+                    }
+                }
+                if (keyHeld) {
+                    for (const Pin& outPin : node.outputs) {
+                        if (outPin.type == PinType::Exec && outPin.name == "Out") {
+                            for (const Link& link : graph.GetLinks()) {
+                                if (link.outputPinId == outPin.id) {
+                                    Node* nextNode = graph.FindNodeByPinId(link.inputPinId);
+                                    if (nextNode) {
+                                        Node* inputCurrent = nextNode;
+                                        int inputLimit = 1000;
+                                        while (inputLimit-- > 0) {
+                                            PropagateDataPins(graph, inputCurrent, ctx);
+                                            const NodeTemplate* inputTmpl = NodeRegistry::Get().GetTemplate(inputCurrent->type);
+                                            if (inputTmpl && inputTmpl->execute) inputTmpl->execute(*inputCurrent, graph, ctx);
+                                            Node* inputNext = FollowExecLink(graph, inputCurrent);
+                                            if (!inputNext) break;
+                                            inputCurrent = inputNext;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
+                tmpl->execute(node, graph, ctx);
             }
         }
     }
@@ -68,6 +157,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
         }
 
         if (next->type == "For_Loop") {
+            PropagateDataPins(graph, next, ctx);
             int first = 0, last = 9;
             for (const Pin& p : next->inputs) {
                 if (p.name == "First" && !p.defaultValue.empty()) first = atoi(p.defaultValue.c_str());
@@ -113,6 +203,33 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 }
             }
             break;
+        }
+
+        if (next->type == "While_Loop") {
+            while (true) {
+                PropagateDataPins(graph, next, ctx);
+                bool condition = false;
+                for (const Pin& p : next->inputs) {
+                    if (p.name == "Condition") { condition = (p.defaultValue == "true" || p.defaultValue == "1"); break; }
+                }
+                if (!condition) break;
+                Node* body = FollowExecLink(graph, next, "Loop Body");
+                if (body) {
+                    Node* subCurrent = body;
+                    int subLimit = 1000;
+                    while (subLimit-- > 0) {
+                        PropagateDataPins(graph, subCurrent, ctx);
+                        const NodeTemplate* subTmpl = NodeRegistry::Get().GetTemplate(subCurrent->type);
+                        if (subTmpl && subTmpl->execute) subTmpl->execute(*subCurrent, graph, ctx);
+                        Node* subNext = FollowExecLink(graph, subCurrent);
+                        if (!subNext || subNext == next) break;
+                        subCurrent = subNext;
+                    }
+                }
+            }
+            current = FollowExecLink(graph, next, "Completed");
+            if (!current) break;
+            continue;
         }
 
         if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
