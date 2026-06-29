@@ -4,11 +4,64 @@
 #include "raylib.h"
 #include <filesystem>
 #include <cstring>
+#include <cstdio>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
+static std::string FindAssetsDir() {
+    fs::path exe = GetApplicationDirectory();
+    for (int i = 0; i < 5; i++) {
+        fs::path candidate = exe / "Assets";
+        if (fs::exists(candidate)) return candidate.string();
+        exe = exe.parent_path();
+    }
+    return "";
+}
+
+void ContentBrowserPanel::LoadIcons() {
+    std::string dir = FindAssetsDir();
+    if (dir.empty()) return;
+
+    auto load = [&](const std::string& key, const std::string& file) {
+        fs::path p = fs::path(dir) / file;
+        if (fs::exists(p)) {
+            Texture2D tex = LoadTexture(p.string().c_str());
+            if (tex.id != 0) icons[key] = tex;
+        }
+    };
+
+    load("folder",   "icon_folder.png");
+    load("actor",    "icon_actor.png");
+    load("starmap",  "icon_starmap.png");
+    load("asset",    "icon_asset.png");
+    iconsLoaded = true;
+}
+
+void ContentBrowserPanel::UnloadIcons() {
+    for (auto& kv : icons) UnloadTexture(kv.second);
+    icons.clear();
+}
+
+ContentBrowserPanel::~ContentBrowserPanel() {
+    UnloadIcons();
+}
+
 void ContentBrowserPanel::Initialize() {
     name = "Content";
+}
+
+Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const {
+    std::string key = "asset";
+    if (entry.isFolder) key = "folder";
+    else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
+    else if (entry.extension == ".starmap") key = "starmap";
+
+    auto it = icons.find(key);
+    if (it != icons.end()) return it->second;
+    auto fallback = icons.find("asset");
+    if (fallback != icons.end()) return fallback->second;
+    return Texture2D{};
 }
 
 std::string ContentBrowserPanel::GetCurrentFolderPath() const {
@@ -27,6 +80,7 @@ std::vector<ContentEntry> ContentBrowserPanel::ScanCurrentFolder() const {
     for (const auto& entry : fs::directory_iterator(folder)) {
         ContentEntry item;
         item.fullDiskName = entry.path().filename().string();
+        item.extension    = entry.path().extension().string();
 
         if (entry.is_directory()) {
             item.isFolder = true;
@@ -35,9 +89,8 @@ std::vector<ContentEntry> ContentBrowserPanel::ScanCurrentFolder() const {
         } else {
             item.isFolder = false;
             item.displayName = entry.path().stem().string();
-            std::string extension = entry.path().extension().string();
-            const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(extension);
-            item.typeName = info ? info->typeName : extension;
+            const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(item.extension);
+            item.typeName = info ? info->typeName : item.extension;
             files.push_back(item);
         }
     }
@@ -47,13 +100,15 @@ std::vector<ContentEntry> ContentBrowserPanel::ScanCurrentFolder() const {
 }
 
 void ContentBrowserPanel::NavigateInto(const std::string& folderName) {
-    currentRelativeFolder = currentRelativeFolder.empty() ? folderName : currentRelativeFolder + "/" + folderName;
+    currentRelativeFolder = currentRelativeFolder.empty()
+        ? folderName
+        : currentRelativeFolder + "/" + folderName;
     selectedIndex = -1;
 }
 
 void ContentBrowserPanel::NavigateUp() {
-    size_t separator = currentRelativeFolder.find_last_of('/');
-    currentRelativeFolder = (separator == std::string::npos) ? "" : currentRelativeFolder.substr(0, separator);
+    size_t sep = currentRelativeFolder.find_last_of('/');
+    currentRelativeFolder = (sep == std::string::npos) ? "" : currentRelativeFolder.substr(0, sep);
     selectedIndex = -1;
 }
 
@@ -78,7 +133,10 @@ void ContentBrowserPanel::ConfirmPendingCreate() {
     if (typedName.empty()) return;
 
     fs::path folder = GetCurrentFolderPath();
-    fs::path target = isCreatingFolder ? (folder / typedName) : (folder / (typedName + pendingExtension));
+    fs::path target = isCreatingFolder
+        ? (folder / typedName)
+        : (folder / (typedName + pendingExtension));
+
     if (fs::exists(target)) return;
 
     bool success = false;
@@ -97,58 +155,95 @@ void ContentBrowserPanel::CancelPendingCreate() {
 }
 
 void ContentBrowserPanel::Render() {
-    DrawRectangleRec(bounds, {40, 40, 40, 255});
-    DrawRectangleLinesEx(bounds, 1, {80, 80, 80, 255});
-    if (detached) {
-        DrawRectangleRec(header, {50, 50, 50, 255});
-        DrawText(name, (int)bounds.x + 5, (int)bounds.y + 5, 14, WHITE);
-    }
+    if (!iconsLoaded && IsWindowReady()) LoadIcons();
+
+    DrawRectangleRec(bounds, {38, 38, 42, 255});
+    DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
 
     if (Project::Get().GetRootPath().empty()) {
-        DrawText("No Project Loaded", (int)bounds.x + 10, (int)bounds.y + (detached ? 35 : 10), 14, GRAY);
+        DrawText("No Project Loaded", (int)bounds.x + 10, (int)bounds.y + 10, 14, GRAY);
         return;
     }
 
-    float topOffset = detached ? 25 : 0;
+    float topOffset = detached ? 25.0f : 0.0f;
+    if (detached) {
+        DrawRectangleRec(header, {50, 50, 55, 255});
+        DrawText(name, (int)bounds.x + 5, (int)bounds.y + 5, 14, WHITE);
+    }
+
     Rectangle client = {bounds.x, bounds.y + topOffset, bounds.width, bounds.height - topOffset};
     Vector2 mousePos = GetMousePosition();
 
+    // Breadcrumb path bar
+    Rectangle pathBar = {client.x, client.y, client.width, 22};
+    DrawRectangleRec(pathBar, {30, 30, 34, 255});
     std::string pathLabel = "Content" + (currentRelativeFolder.empty() ? "" : "/" + currentRelativeFolder);
-    DrawText(pathLabel.c_str(), (int)client.x + 6, (int)client.y + 4, 12, LIGHTGRAY);
-
-    Rectangle listArea = {client.x, client.y + 22, client.width, client.height - 22};
-    float rowHeight = 22;
-    float y = listArea.y;
+    DrawText(pathLabel.c_str(), (int)pathBar.x + 6, (int)pathBar.y + 4, 12, LIGHTGRAY);
 
     if (!currentRelativeFolder.empty()) {
-        Rectangle row = {listArea.x, y, listArea.width, rowHeight};
-        DrawRectangleRec(row, {50, 50, 50, 255});
-        DrawText("..", (int)row.x + 8, (int)row.y + 4, 14, LIGHTGRAY);
-        if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            NavigateUp();
-        }
-        y += rowHeight;
+        int backW = MeasureText("< Back", 12) + 12;
+        Rectangle backBtn = {client.x + client.width - backW - 4, client.y + 2, (float)backW, 18};
+        if (GuiButton(backBtn, "< Back")) NavigateUp();
     }
 
+    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
     std::vector<ContentEntry> entries = ScanCurrentFolder();
+
+    float padding = 8.0f;
+    float cellSize = tileSize + padding;
+    int cols = (int)((gridArea.width - padding) / cellSize);
+    if (cols < 1) cols = 1;
+
+    float startX = gridArea.x + padding;
+    float startY = gridArea.y + padding;
+
+    BeginScissorMode((int)gridArea.x, (int)gridArea.y, (int)gridArea.width, (int)gridArea.height);
+
     for (size_t i = 0; i < entries.size(); i++) {
-        Rectangle row = {listArea.x, y, listArea.width, rowHeight};
-        Color rowColor = (selectedIndex == (int)i) ? Color{70, 70, 95, 255} : Color{45, 45, 45, 255};
-        DrawRectangleRec(row, rowColor);
+        int col = (int)i % cols;
+        int row = (int)i / cols;
+        float tx = startX + col * cellSize;
+        float ty = startY + row * cellSize;
 
-        Color tagColor = entries[i].isFolder ? Color{210, 180, 90, 255} : Color{90, 150, 210, 255};
-        DrawRectangleRec({row.x + 4, row.y + 4, 14, 14}, tagColor);
-        DrawText(entries[i].displayName.c_str(), (int)row.x + 24, (int)row.y + 4, 14, WHITE);
+        Rectangle tileRect = {tx, ty, tileSize, tileSize};
+        Rectangle iconRect  = {tx + 4, ty + 4, tileSize - 8, tileSize - 22};
+        Rectangle labelRect = {tx, ty + tileSize - 18, tileSize, 18};
 
-        if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        bool isSelected = (selectedIndex == (int)i);
+        Color tileBg = isSelected ? Color{60, 80, 120, 255} : Color{48, 48, 54, 255};
+        if (CheckCollisionPointRec(mousePos, tileRect) && !isSelected)
+            tileBg = {55, 55, 62, 255};
+
+        DrawRectangleRounded(tileRect, 0.1f, 4, tileBg);
+        if (isSelected) DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {100, 140, 220, 255});
+
+        Texture2D icon = GetIconForEntry(entries[i]);
+        if (icon.id != 0) {
+            DrawTexturePro(icon,
+                {0, 0, (float)icon.width, (float)icon.height},
+                {iconRect.x + 4, iconRect.y, iconRect.width - 8, iconRect.height},
+                {0, 0}, 0, WHITE);
+        } else {
+            Color iconColor = entries[i].isFolder ? Color{210, 180, 90, 255} : Color{90, 150, 210, 255};
+            DrawRectangleRec({iconRect.x + iconRect.width * 0.25f, iconRect.y + iconRect.height * 0.2f,
+                              iconRect.width * 0.5f, iconRect.height * 0.6f}, iconColor);
+        }
+
+        DrawRectangleRec(labelRect, {35, 35, 40, 200});
+        std::string label = entries[i].displayName;
+        int labelW = MeasureText(label.c_str(), 10);
+        if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
+        int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
+        DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, WHITE);
+
+        if (CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float currentTime = (float)GetTime();
-            if (entries[i].isFolder && lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
-                NavigateInto(entries[i].displayName);
-            } else if (!entries[i].isFolder && lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
-                if (onAssetOpened) {
+            if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
+                if (entries[i].isFolder) {
+                    NavigateInto(entries[i].displayName);
+                } else if (onAssetOpened) {
                     fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
-                    std::string ext = fs::path(entries[i].fullDiskName).extension().string();
-                    onAssetOpened(fullPath.string(), ext);
+                    onAssetOpened(fullPath.string(), entries[i].extension);
                 }
             } else {
                 selectedIndex = (int)i;
@@ -156,7 +251,7 @@ void ContentBrowserPanel::Render() {
                     dragEntryIndex = (int)i;
                     fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
                     dragEntryPath = fullPath.string();
-                    dragEntryExt = fs::path(entries[i].fullDiskName).extension().string();
+                    dragEntryExt  = entries[i].extension;
                 }
             }
             lastEntryClickTime = currentTime;
@@ -164,47 +259,46 @@ void ContentBrowserPanel::Render() {
         }
 
         if (!entries[i].isFolder && dragEntryIndex == (int)i && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mousePos.x - (row.x + row.width * 0.5f);
-            float dy = mousePos.y - (row.y + row.height * 0.5f);
+            float dx = mousePos.x - (tx + tileSize * 0.5f);
+            float dy = mousePos.y - (ty + tileSize * 0.5f);
             if (dx*dx + dy*dy > 36) draggingAsset = true;
         }
-
-        y += rowHeight;
     }
 
     if (isCreatingNewItem) {
-        Rectangle row = {listArea.x, y, listArea.width, rowHeight};
-        Color tagColor = isCreatingFolder ? Color{210, 180, 90, 255} : Color{90, 150, 210, 255};
-        DrawRectangleRec({row.x + 4, row.y + 4, 14, 14}, tagColor);
-        GuiTextBox({row.x + 24, row.y, row.width - 28, rowHeight}, nameBuffer, sizeof(nameBuffer), true);
-
+        int col = (int)entries.size() % cols;
+        int row = (int)entries.size() / cols;
+        float tx = startX + col * cellSize;
+        float ty = startY + row * cellSize;
+        Rectangle tileRect = {tx, ty, tileSize, tileSize};
+        DrawRectangleRounded(tileRect, 0.1f, 4, {55, 80, 100, 255});
+        DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {100, 160, 220, 255});
+        GuiTextBox({tx + 2, ty + tileSize - 20, tileSize - 4, 18}, nameBuffer, sizeof(nameBuffer), true);
         if (IsKeyPressed(KEY_ENTER)) ConfirmPendingCreate();
         if (IsKeyPressed(KEY_ESCAPE)) CancelPendingCreate();
-        y += rowHeight;
     }
+
+    EndScissorMode();
 
     if (draggingAsset) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             std::string label = fs::path(dragEntryPath).stem().string();
-            int labelW = MeasureText(label.c_str(), 12);
-            DrawRectangleRec({mousePos.x + 10, mousePos.y - 2, (float)labelW + 16, 18}, {60, 60, 80, 220});
-            DrawRectangleLinesEx({mousePos.x + 10, mousePos.y - 2, (float)labelW + 16, 18}, 1, {120, 120, 200, 255});
+            int lw = MeasureText(label.c_str(), 12) + 16;
+            DrawRectangleRec({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, {55, 55, 75, 220});
+            DrawRectangleLinesEx({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, 1, {120, 120, 200, 255});
             DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, {90, 150, 210, 255});
             DrawText(label.c_str(), (int)mousePos.x + 28, (int)mousePos.y + 1, 12, WHITE);
         } else {
-            if (onAssetDragged) {
-                onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
-            }
+            if (onAssetDragged) onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
             draggingAsset = false;
             dragEntryIndex = -1;
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) {
-        dragEntryIndex = -1;
-    }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) dragEntryIndex = -1;
 
-    if (!contextMenuOpen && !isCreatingNewItem && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, listArea)) {
+    if (!contextMenuOpen && !isCreatingNewItem &&
+        IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, gridArea)) {
         contextMenuOpen = true;
         contextMenuJustOpened = true;
         contextMenuPos = mousePos;
@@ -228,8 +322,8 @@ void ContentBrowserPanel::Render() {
         }
 
         if (contextMenuOpen) {
-            DrawRectangleRec(popup, {60, 60, 60, 255});
-            DrawRectangleLinesEx(popup, 1, {90, 90, 90, 255});
+            DrawRectangleRec(popup, {55, 55, 60, 255});
+            DrawRectangleLinesEx(popup, 1, {85, 85, 90, 255});
 
             Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
             if (GuiButton(folderBtn, "New Folder")) BeginCreateFolder();

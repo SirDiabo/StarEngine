@@ -5,18 +5,21 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <unordered_map>
 
 struct ContentEntry {
     std::string displayName;
     std::string fullDiskName;
     bool isFolder = false;
     std::string typeName;
+    std::string extension;
 };
 
 class ContentBrowserPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    ~ContentBrowserPanel() override;
 
     std::function<void(const std::string& fullPath, const std::string& extension)> onAssetOpened;
     std::function<void(const std::string& fullPath, const std::string& extension, Vector2 dropPos)> onAssetDragged;
@@ -31,6 +34,10 @@ private:
     void BeginCreateAsset(const AssetTypeInfo& info);
     void ConfirmPendingCreate();
     void CancelPendingCreate();
+
+    Texture2D GetIconForEntry(const ContentEntry& entry) const;
+    void LoadIcons();
+    void UnloadIcons();
 
     std::string currentRelativeFolder;
     int selectedIndex = -1;
@@ -50,4 +57,9 @@ private:
     bool isCreatingFolder = false;
     std::string pendingExtension;
     char nameBuffer[128] = "";
+
+    float tileSize = 80.0f;
+
+    std::unordered_map<std::string, Texture2D> icons;
+    bool iconsLoaded = false;
 };
