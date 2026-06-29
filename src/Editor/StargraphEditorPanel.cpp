@@ -50,6 +50,7 @@ Color StargraphEditorPanel::GetPinColor(PinType type) const {
         case PinType::String:  return {200,   0, 200, 255};
         case PinType::Vec3:    return {255, 165,   0, 255};
         case PinType::Object:  return {  0, 140, 255, 255};
+        case PinType::Wildcard: return {180, 180, 180, 255};
         default:               return {120, 120, 120, 255};
     }
 }
@@ -116,7 +117,10 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
         for (const Pin& pin : node.outputs) if (pin.id == outputPinId) out = &pin;
         for (const Pin& pin : node.inputs)  if (pin.id == inputPinId)  in  = &pin;
     }
-    return out && in && out->type == in->type;
+    if (!out || !in) return false;
+    if (out->type == in->type) return true;
+    if (out->type == PinType::Wildcard || in->type == PinType::Wildcard) return true;
+    return false;
 }
 
 void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
@@ -425,12 +429,12 @@ void StargraphEditorPanel::RenderRightPanel() {
         DrawText("Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
 
-        static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object"};
+        static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object","Wildcard"};
         int typeIndex = (int)var.type;
-        if (typeIndex < 0 || typeIndex > 7) typeIndex = 0;
+        if (typeIndex < 0 || typeIndex > 8) typeIndex = 0;
 
         if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, typeNames[typeIndex])) {
-            int next = (typeIndex + 1) % 8;
+            int next = (typeIndex + 1) % 9;
             if (next == 0 || next == 1) next = 2;
             var.type = (PinType)next;
             snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
@@ -1021,7 +1025,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             if (typeLower.find(searchLower) == std::string::npos) continue;
         }
 
-        if (filterCompatibleWithPin != -1) {
+if (filterCompatibleWithPin != -1) {
             const Pin* fromPin = nullptr;
             bool fromIsOutput = false;
             for (const Node& node : graph.GetNodes()) {
@@ -1032,10 +1036,10 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 bool hasCompatible = false;
                 if (fromIsOutput) {
                     for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{})
-                        if (p.type == fromPin->type) { hasCompatible = true; break; }
+                        if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 } else {
                     for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
-                        if (p.type == fromPin->type) { hasCompatible = true; break; }
+                        if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 }
                 if (!hasCompatible) continue;
             }

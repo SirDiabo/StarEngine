@@ -4,12 +4,71 @@
 #include <cstdlib>
 #include <vector>
 
+static void ResolveWildcardPins(Stargraph& graph, Node* node) {
+    bool hasWildcard = false;
+    PinType resolvedType = PinType::None;
+    
+    for (const Pin& pin : node->inputs) {
+        if (pin.type == PinType::Wildcard) {
+            hasWildcard = true;
+            for (const Link& link : graph.GetLinks()) {
+                if (link.inputPinId == pin.id) {
+                    const Pin* outPin = nullptr;
+                    for (const Node& n : graph.GetNodes()) {
+                        for (const Pin& p : n.outputs) {
+                            if (p.id == link.outputPinId && p.type != PinType::Wildcard) {
+                                resolvedType = p.type;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (!hasWildcard) {
+        for (const Pin& pin : node->outputs) {
+            if (pin.type == PinType::Wildcard) {
+                hasWildcard = true;
+                for (const Link& link : graph.GetLinks()) {
+                    if (link.outputPinId == pin.id) {
+                        const Pin* inPin = nullptr;
+                        for (const Node& n : graph.GetNodes()) {
+                            for (const Pin& p : n.inputs) {
+                                if (p.id == link.inputPinId && p.type != PinType::Wildcard) {
+                                    resolvedType = p.type;
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (resolvedType == PinType::None) resolvedType = PinType::Float;
+    
+    for (Pin& pin : node->inputs) {
+        if (pin.type == PinType::Wildcard) pin.type = resolvedType;
+    }
+    for (Pin& pin : node->outputs) {
+        if (pin.type == PinType::Wildcard) pin.type = resolvedType;
+    }
+}
+
 static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx) {
     for (const Link& link : graph.GetLinks()) {
         if (link.inputPinId != inputPin.id) continue;
 
         Node* fromNode = graph.FindNodeByPinId(link.outputPinId);
         if (!fromNode) continue;
+
+        ResolveWildcardPins(graph, fromNode);
+        ResolveWildcardPins(graph, toNode);
 
         for (Pin& upPin : fromNode->inputs) {
             if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx);

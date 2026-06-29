@@ -11,7 +11,8 @@ enum class PinType {
     Float,
     String,
     Vec3,
-    Object
+    Object,
+    Wildcard
 };
 
 struct Pin {

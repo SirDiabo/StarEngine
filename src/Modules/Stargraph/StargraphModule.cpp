@@ -267,20 +267,83 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(sequence);
 
-    RegisterFloatMath("Float_Add",      '+');
-    RegisterFloatMath("Float_Subtract", '-');
-    RegisterFloatMath("Float_Multiply", '*');
-    RegisterFloatMath("Float_Divide",   '/');
+    // Math nodes
+    auto RegisterWildcardMath = [](const std::string& nodeType, char op) {
+        NodeTemplate t;
+        t.type = nodeType;
+        t.category = "Math";
+        t.createPins = [](Node* node) {
+            node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
+            node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
+            node->outputs.push_back({"Result", PinType::Wildcard, false, true});
+        };
+        t.execute = [op](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            PinType resolvedType = PinType::Float;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "A") {
+                    for (const Link& lk : graph.GetLinks()) {
+                        if (lk.inputPinId == p.id) {
+                            for (const Node& n : graph.GetNodes()) {
+                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { resolvedType = op.type; break; }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            if (resolvedType == PinType::Integer) {
+                int a = 0, b = 0;
+                for (const Pin& p : node.inputs) {
+                    if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
+                    if (p.name == "B" && !p.defaultValue.empty()) b = atoi(p.defaultValue.c_str());
+                }
+                int result = 0;
+                switch (op) {
+                    case '+': result = a + b; break;
+                    case '-': result = a - b; break;
+                    case '*': result = a * b; break;
+                    case '/': result = (b != 0) ? a / b : 0; break;
+                }
+                for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(result);
+            } else if (resolvedType == PinType::Float) {
+                float a = 0, b = 0;
+                for (const Pin& p : node.inputs) {
+                    if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
+                    if (p.name == "B" && !p.defaultValue.empty()) b = (float)atof(p.defaultValue.c_str());
+                }
+                float result = 0;
+                switch (op) {
+                    case '+': result = a + b; break;
+                    case '-': result = a - b; break;
+                    case '*': result = a * b; break;
+                    case '/': result = (b != 0) ? a / b : 0; break;
+                }
+                char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
+                for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+            } else if (resolvedType == PinType::Vec3) {
+                Vector3 a = {0,0,0}, b = {0,0,0};
+                for (const Pin& p : node.inputs) {
+                    if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
+                    if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
+                }
+                Vector3 r = {0,0,0};
+                switch (op) {
+                    case '+': r = Vector3Add(a, b); break;
+                    case '-': r = Vector3Subtract(a, b); break;
+                    case '*': r = Vector3Multiply(a, b); break;
+                    case '/': r = Vector3Divide(a, b); break;
+                }
+                char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
+                for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+            }
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    };
 
-    RegisterIntMath("Int_Add",      '+');
-    RegisterIntMath("Int_Subtract", '-');
-    RegisterIntMath("Int_Multiply", '*');
-    RegisterIntMath("Int_Divide",   '/');
-
-    RegisterVec3Math("Vec3_Add",      '+');
-    RegisterVec3Math("Vec3_Subtract", '-');
-    RegisterVec3Math("Vec3_Multiply", '*');
-    RegisterVec3Math("Vec3_Divide",   '/');
+    RegisterWildcardMath("Add",      '+');
+    RegisterWildcardMath("Subtract", '-');
+    RegisterWildcardMath("Multiply", '*');
+    RegisterWildcardMath("Divide",   '/');
 
     NodeTemplate floatToStr;
     floatToStr.type = "Float_To_String";
