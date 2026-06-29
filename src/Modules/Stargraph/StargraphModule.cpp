@@ -22,6 +22,12 @@ bool StargraphModule::Initialize() {
 void StargraphModule::Shutdown() {}
 void StargraphModule::Update(float deltaTime) {}
 
+static float GetScalarValue(const Pin& p) {
+    if (p.type == PinType::Boolean) return (p.defaultValue == "true" || p.defaultValue == "1") ? 1.0f : 0.0f;
+    if (p.type == PinType::Integer) return (float)atoi(p.defaultValue.c_str());
+    return (float)atof(p.defaultValue.c_str());
+}
+
 void StargraphModule::RegisterDefaultNodes() {
 
     NodeTemplate beginPlay;
@@ -115,7 +121,7 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(sequence);
 
-    // Math nodes
+    // Math nodes - wildcard with mixed scalar support
     auto RegisterWildcardMath = [](const std::string& nodeType, char op) {
         NodeTemplate t;
         t.type = nodeType;
@@ -126,24 +132,88 @@ void StargraphModule::RegisterDefaultNodes() {
             node->outputs.push_back({"Result", PinType::Wildcard, false, true});
         };
         t.execute = [op](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-            PinType resolvedType = PinType::Float;
+            PinType typeA = PinType::Float, typeB = PinType::Float;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") {
                     for (const Link& lk : graph.GetLinks()) {
                         if (lk.inputPinId == p.id) {
                             for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { resolvedType = op.type; break; }
+                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { typeA = op.type; break; }
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (p.name == "B") {
+                    for (const Link& lk : graph.GetLinks()) {
+                        if (lk.inputPinId == p.id) {
+                            for (const Node& n : graph.GetNodes()) {
+                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { typeB = op.type; break; }
                             }
                             break;
                         }
                     }
                 }
             }
-            if (resolvedType == PinType::Integer) {
+
+            bool aIsVec = (typeA == PinType::Vec3), bIsVec = (typeB == PinType::Vec3);
+            PinType resultType = (aIsVec || bIsVec) ? PinType::Vec3 : 
+                                (typeA == PinType::Integer || typeB == PinType::Integer) ? PinType::Integer : PinType::Float;
+
+            if (resultType == PinType::Vec3) {
+                Vector3 aVec = {0,0,0}, bVec = {0,0,0};
+                float aScalar = 0, bScalar = 0;
+                bool aIsScalar = !aIsVec, bIsScalar = !bIsVec;
+                for (const Pin& p : node.inputs) {
+                    if (p.name == "A") {
+                        if (aIsVec) sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aVec.x, &aVec.y, &aVec.z);
+                        else aScalar = GetScalarValue(p);
+                    }
+                    if (p.name == "B") {
+                        if (bIsVec) sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bVec.x, &bVec.y, &bVec.z);
+                        else bScalar = GetScalarValue(p);
+                    }
+                }
+                Vector3 r = {0,0,0};
+                if (aIsScalar && bIsScalar) {
+                    r.x = r.y = r.z = aScalar;
+                    switch (op) {
+                        case '+': r.x += bScalar; break;
+                        case '-': r.x -= bScalar; break;
+                        case '*': r.x *= bScalar; break;
+                        case '/': if (bScalar != 0) r.x /= bScalar; break;
+                    }
+                } else if (bIsScalar) {
+                    r = aVec;
+                    switch (op) {
+                        case '+': r.x += bScalar; r.y += bScalar; r.z += bScalar; break;
+                        case '-': r.x -= bScalar; r.y -= bScalar; r.z -= bScalar; break;
+                        case '*': r.x *= bScalar; r.y *= bScalar; r.z *= bScalar; break;
+                        case '/': if (bScalar != 0) { r.x /= bScalar; r.y /= bScalar; r.z /= bScalar; } break;
+                    }
+                } else if (aIsScalar) {
+                    r = bVec;
+                    switch (op) {
+                        case '+': r.x += aScalar; r.y += aScalar; r.z += aScalar; break;
+                        case '-': r.x -= aScalar; r.y -= aScalar; r.z -= aScalar; break;
+                        case '*': r.x *= aScalar; r.y *= aScalar; r.z *= aScalar; break;
+                        case '/': if (aScalar != 0) { r.x /= aScalar; r.y /= aScalar; r.z /= aScalar; } break;
+                    }
+                } else {
+                    switch (op) {
+                        case '+': r = Vector3Add(aVec, bVec); break;
+                        case '-': r = Vector3Subtract(aVec, bVec); break;
+                        case '*': r = Vector3Multiply(aVec, bVec); break;
+                        case '/': r = Vector3Divide(aVec, bVec); break;
+                    }
+                }
+                char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
+                for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+            } else if (resultType == PinType::Integer) {
                 int a = 0, b = 0;
                 for (const Pin& p : node.inputs) {
-                    if (p.name == "A" && !p.defaultValue.empty()) a = atoi(p.defaultValue.c_str());
-                    if (p.name == "B" && !p.defaultValue.empty()) b = atoi(p.defaultValue.c_str());
+                    if (p.name == "A") a = (int)GetScalarValue(p);
+                    if (p.name == "B") b = (int)GetScalarValue(p);
                 }
                 int result = 0;
                 switch (op) {
@@ -153,11 +223,11 @@ void StargraphModule::RegisterDefaultNodes() {
                     case '/': result = (b != 0) ? a / b : 0; break;
                 }
                 for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(result);
-            } else if (resolvedType == PinType::Float) {
+            } else {
                 float a = 0, b = 0;
                 for (const Pin& p : node.inputs) {
-                    if (p.name == "A" && !p.defaultValue.empty()) a = (float)atof(p.defaultValue.c_str());
-                    if (p.name == "B" && !p.defaultValue.empty()) b = (float)atof(p.defaultValue.c_str());
+                    if (p.name == "A") a = GetScalarValue(p);
+                    if (p.name == "B") b = GetScalarValue(p);
                 }
                 float result = 0;
                 switch (op) {
@@ -167,21 +237,6 @@ void StargraphModule::RegisterDefaultNodes() {
                     case '/': result = (b != 0) ? a / b : 0; break;
                 }
                 char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
-                for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
-            } else if (resolvedType == PinType::Vec3) {
-                Vector3 a = {0,0,0}, b = {0,0,0};
-                for (const Pin& p : node.inputs) {
-                    if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
-                    if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
-                }
-                Vector3 r = {0,0,0};
-                switch (op) {
-                    case '+': r = Vector3Add(a, b); break;
-                    case '-': r = Vector3Subtract(a, b); break;
-                    case '*': r = Vector3Multiply(a, b); break;
-                    case '/': r = Vector3Divide(a, b); break;
-                }
-                char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
                 for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
             }
         };
