@@ -184,8 +184,7 @@ jobs:
             CHANGELOG="- No significant changes since last release"
           fi
           
-          CHANGELOG="${CHANGELOG//'%'/'%25'}"
-          echo "CHANGELOG=$CHANGELOG" >> $GITHUB_OUTPUT
+          printf 'CHANGELOG<<DELIM\n%s\nDELIM\n' "$CHANGELOG" >> $GITHUB_OUTPUT
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
