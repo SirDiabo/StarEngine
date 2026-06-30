@@ -157,7 +157,7 @@ jobs:
       - name: Extract Version
         id: version
         run: |
-          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
+          VERSION=$(grep -oP 'project\(\w+\s+VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
           if [ -z "$VERSION" ]; then
             echo "❌ Could not extract version from CMakeLists.txt"
             exit 1
