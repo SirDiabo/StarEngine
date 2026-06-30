@@ -172,6 +172,7 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
             }
         }
         auto* sgTab = new StargraphEditorTab(fullPath);
+        sgTab->SetSharedLogPanel(levelTab->GetLogPanel());
         sgTab->Initialize();
         editorTabs.emplace_back(sgTab);
         editorTabs[activeEditorTab]->OnDeactivated();

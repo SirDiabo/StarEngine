@@ -17,6 +17,7 @@ public:
 
 private:
     void RenderToolbar();
+    void RenderComponentOutliner(Rectangle area);
     void RenderLeftPanel();
     void RenderGraph();
     void RenderRightPanel();
@@ -91,4 +92,9 @@ private:
     int variableDragIndex = -1;
     Vector2 variableDragPos{0, 0};
     bool variableDragActive = false;
+
+    int selectedComponentIndex = -1;
+    bool addComponentMenuOpen = false;
+    Vector2 addComponentMenuPos{0, 0};
+    static const float componentOutlinerHeight;
 };

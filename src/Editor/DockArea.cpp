@@ -61,6 +61,9 @@ void DockArea::LayoutNode(DockNode* node, Rectangle area) {
 void DockArea::Render(Rectangle area) {
     lastArea = area;
     if (!root) return;
+    // Reset cursor each frame; hover checks below will override if still applicable.
+    if (!dragging && !pendingDrag && !activeSplitter)
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     LayoutNode(root.get(), area);
     RenderNode(root.get());
 }

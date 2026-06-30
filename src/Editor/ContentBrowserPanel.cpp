@@ -243,6 +243,7 @@ void ContentBrowserPanel::Render() {
                 selectedIndex = (int)i;
                 if (!entries[i].isFolder) {
                     dragEntryIndex = (int)i;
+                    dragPressPos   = mousePos;
                     fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
                     dragEntryPath = fullPath.string();
                     dragEntryExt  = entries[i].extension;
@@ -253,8 +254,8 @@ void ContentBrowserPanel::Render() {
         }
 
         if (!entries[i].isFolder && dragEntryIndex == (int)i && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mousePos.x - (tx + tileSize * 0.5f);
-            float dy = mousePos.y - (ty + tileSize * 0.5f);
+            float dx = mousePos.x - dragPressPos.x;
+            float dy = mousePos.y - dragPressPos.y;
             if (dx*dx + dy*dy > 36) draggingAsset = true;
         }
     }

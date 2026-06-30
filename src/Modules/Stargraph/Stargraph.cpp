@@ -50,6 +50,10 @@ void Stargraph::AddComponent(const ComponentDecl& comp) {
     components.push_back(comp);
 }
 
+void Stargraph::RemoveComponent(size_t index) {
+    if (index < components.size()) components.erase(components.begin() + index);
+}
+
 Pin* Stargraph::FindPin(int pinId) {
     for (Node& node : nodes) {
         for (Pin& pin : node.inputs) {

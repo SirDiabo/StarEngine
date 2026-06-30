@@ -65,6 +65,7 @@ public:
     void RemoveVariable(size_t index);
     void RenameVariable(size_t index, const std::string& newName);
     void AddComponent(const ComponentDecl& comp);
+    void RemoveComponent(size_t index);
 
     Pin* FindPin(int pinId);
     Node* FindNodeByPinId(int pinId);

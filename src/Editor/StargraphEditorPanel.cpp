@@ -12,6 +12,7 @@ const float StargraphEditorPanel::headerHeight   = 26.0f;
 const float StargraphEditorPanel::leftPanelWidth = 200.0f;
 const float StargraphEditorPanel::rightPanelWidth= 210.0f;
 const float StargraphEditorPanel::toolbarHeight  = 30.0f;
+const float StargraphEditorPanel::componentOutlinerHeight = 130.0f;
 
 void StargraphEditorPanel::Initialize() {
     name = "Stargraph";
@@ -82,8 +83,8 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
 }
 
 Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     float nodeX = graphArea.x + node.posX * zoom + scroll.x;
     float nodeY = graphArea.y + node.posY * zoom + scroll.y;
@@ -165,8 +166,8 @@ void StargraphEditorPanel::DeleteSelected() {
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         float nx = graphArea.x + node.posX * zoom + scroll.x;
         float ny = graphArea.y + node.posY * zoom + scroll.y;
@@ -176,13 +177,13 @@ Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
 }
 
 void StargraphEditorPanel::RenderToolbar() {
-    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     DrawRectangleRec(toolbar, {32, 32, 36, 255});
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
 
     std::string tabLabel = graph.assetName + (isDirty ? " *" : "");
-    DrawText(tabLabel.c_str(), (int)bounds.x + 8, (int)bounds.y + 30, 13, WHITE);
+    DrawText(tabLabel.c_str(), (int)bounds.x + 8, (int)bounds.y + 8, 13, WHITE);
 
     float btnY = toolbar.y + 4;
     float btnRight = bounds.x + bounds.width - 4;
@@ -231,8 +232,94 @@ void StargraphEditorPanel::RenderToolbar() {
     }
 }
 
+void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
+    DrawRectangleRec(area, {28, 28, 31, 255});
+    DrawRectangleLinesEx(area, 1, {55, 55, 60, 255});
+
+    Vector2 mousePos = GetMousePosition();
+    float y = area.y + 6;
+
+    DrawText("Components", (int)area.x + 8, (int)y, 12, {160, 160, 170, 255});
+
+    // Add Component button.
+    Rectangle addBtn = {area.x + area.width - 50, y - 2, 44, 16};
+    if (GuiButton(addBtn, "+ Add")) {
+        addComponentMenuOpen = !addComponentMenuOpen;
+        addComponentMenuPos  = {addBtn.x, addBtn.y + addBtn.height};
+    }
+
+    y += 18;
+    DrawLine((int)area.x + 4, (int)y, (int)(area.x + area.width - 4), (int)y, {55, 55, 60, 255});
+    y += 6;
+
+    std::vector<ComponentDecl>& comps = graph.GetComponents();
+    float listBottom = area.y + area.height - 4;
+
+    for (size_t i = 0; i < comps.size() && y + 18 <= listBottom; i++) {
+        Rectangle row = {area.x + 4, y, area.width - 8, 18};
+        bool isSelected = (selectedComponentIndex == (int)i);
+
+        DrawRectangleRec(row, isSelected ? Color{55, 60, 80, 255} : Color{38, 38, 42, 255});
+        DrawRectangleRec({area.x + 8, y + 4, 10, 10}, {90, 150, 210, 255});
+
+        std::string label = comps[i].name + " (" + comps[i].componentType + ")";
+        DrawText(label.c_str(), (int)area.x + 24, (int)y + 2, 11, WHITE);
+
+        if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            selectedComponentIndex = (int)i;
+        }
+
+        if (isSelected && IsKeyPressed(KEY_DELETE)) {
+            graph.RemoveComponent(i);
+            selectedComponentIndex = -1;
+            isDirty = true;
+            break;
+        }
+
+        y += 20;
+    }
+
+    if (comps.empty()) {
+        DrawText("No components", (int)area.x + 8, (int)y, 11, {100, 100, 108, 255});
+    }
+
+    // Add Component dropdown menu, listing the known component types.
+    if (addComponentMenuOpen) {
+        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent" };
+        float menuW = 150.0f;
+        float menuH = (float)(sizeof(componentTypes) / sizeof(componentTypes[0])) * 20.0f + 4.0f;
+        Rectangle menu = {addComponentMenuPos.x - menuW + 44, addComponentMenuPos.y, menuW, menuH};
+
+        DrawRectangleRec(menu, {45, 45, 50, 255});
+        DrawRectangleLinesEx(menu, 1, {80, 80, 88, 255});
+
+        float my = menu.y + 2;
+        for (const char* typeName : componentTypes) {
+            Rectangle item = {menu.x + 1, my, menu.width - 2, 18};
+            bool hov = CheckCollisionPointRec(mousePos, item);
+            if (hov) DrawRectangleRec(item, {70, 70, 80, 255});
+            DrawText(typeName, (int)item.x + 6, (int)item.y + 3, 11, WHITE);
+
+            if (hov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                ComponentDecl comp;
+                comp.componentType = typeName;
+                comp.name          = typeName;
+                graph.AddComponent(comp);
+                selectedComponentIndex = (int)graph.GetComponents().size() - 1;
+                isDirty = true;
+                addComponentMenuOpen = false;
+            }
+            my += 20.0f;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, menu) && !CheckCollisionPointRec(mousePos, addBtn))
+            addComponentMenuOpen = false;
+    }
+}
+
 void StargraphEditorPanel::RenderLeftPanel() {
-    Rectangle panel = {bounds.x, bounds.y + toolbarHeight + 25, leftPanelWidth, bounds.height - toolbarHeight - 25};
+    float topY = bounds.y + toolbarHeight + componentOutlinerHeight;
+    Rectangle panel = {bounds.x, topY, leftPanelWidth, bounds.height - toolbarHeight - componentOutlinerHeight};
     DrawRectangleRec(panel, {30, 30, 33, 255});
     DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
 
@@ -245,8 +332,6 @@ void StargraphEditorPanel::RenderLeftPanel() {
         DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
         y += 6;
     };
-
-    sectionHeader("Components");
 
     sectionHeader("Graphs");
     DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
@@ -374,8 +459,8 @@ void StargraphEditorPanel::RenderLeftPanel() {
 }
 
 void StargraphEditorPanel::RenderRightPanel() {
-    Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight + 25,
-                       rightPanelWidth, bounds.height - toolbarHeight - 25};
+    Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight,
+                       rightPanelWidth, bounds.height - toolbarHeight};
     DrawRectangleRec(panel, {30, 30, 33, 255});
     DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
 
@@ -510,8 +595,8 @@ void StargraphEditorPanel::RenderWireInProgress() {
 }
 
 void StargraphEditorPanel::RenderGraph() {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     Vector2 mousePos = GetMousePosition();
 
     float wheel = GetMouseWheelMove();
@@ -887,8 +972,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = nullptr;
                 const Variable& var = graph.GetVariables()[variableDragIndex];
@@ -1049,8 +1134,8 @@ if (filterCompatibleWithPin != -1) {
     float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
     float menuH   = searchH + listH;
 
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight + 25,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight - 25};
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
     if (popup.x + popup.width  > graphArea.x + graphArea.width)  popup.x = graphArea.x + graphArea.width  - popup.width;
@@ -1132,12 +1217,8 @@ void StargraphEditorPanel::Render() {
 
     DrawRectangleRec(bounds, {24, 24, 26, 255});
 
-    Rectangle tabBar = {bounds.x, bounds.y, bounds.width, 25};
-    DrawRectangleRec(tabBar, {36, 36, 40, 255});
-    DrawLine((int)tabBar.x, (int)(tabBar.y + tabBar.height),
-             (int)(tabBar.x + tabBar.width), (int)(tabBar.y + tabBar.height), {55, 55, 60, 255});
-
     RenderToolbar();
+    RenderComponentOutliner({bounds.x, bounds.y + toolbarHeight, leftPanelWidth, componentOutlinerHeight});
     RenderLeftPanel();
     RenderGraph();
     RenderNodeContextMenu();

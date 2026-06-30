@@ -50,6 +50,7 @@ private:
 
     bool draggingAsset = false;
     int dragEntryIndex = -1;
+    Vector2 dragPressPos{0, 0};
     std::string dragEntryPath;
     std::string dragEntryExt;
 

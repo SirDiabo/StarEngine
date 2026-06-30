@@ -97,6 +97,14 @@ void LevelEditorTab::Render(float x, float y, float width, float height) {
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
 
+    // Update tab title to reflect the currently open map.
+    if (viewportPanel->IsMapLoaded()) {
+        std::filesystem::path p(viewportPanel->GetMapPath());
+        title = p.stem().string();
+    } else {
+        title = "Level Editor";
+    }
+
     dockArea.Render({ x, y, width, height });
 }
 
