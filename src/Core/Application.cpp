@@ -128,6 +128,6 @@ void Application::Shutdown() {
 }
 
 void Application::Relaunch() {
-    std::string cmd = "start \"\" .\build\Debug\StarEngine.exe \"" + projectPath + "\"";
+    std::string cmd = "start \"\" .\\build\\Release\\StarEngine.exe \"" + projectPath + "\"";
     system(cmd.c_str());
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Panel.h"
+#include "Core/Module.h"
 #include <string>
 
 class LogPanel;
