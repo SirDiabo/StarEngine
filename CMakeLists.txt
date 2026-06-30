@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(StarEngine VERSION 0.2.0 LANGUAGES C CXX)
+project(StarEngine VERSION 0.3 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
