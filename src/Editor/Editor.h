@@ -27,12 +27,14 @@ public:
     void ResetNewProjectFlag();
     void ResetSaveProjectFlag();
 
+    void SaveLayout() const;
+    void LoadLayout();
+
 private:
     void RenderEditorTabBar(float x, float y, float width);
     void OpenAssetInTab(const std::string& fullPath, const std::string& extension);
     void HandleWindowMenuAction(const std::string& item);
-    void SaveLayout() const;
-    void LoadLayout();
+
     std::string GetLayoutPath() const;
 
     static const float EDITOR_TAB_BAR_H;

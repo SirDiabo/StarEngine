@@ -1087,21 +1087,21 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
 
-    const auto& templates = NodeRegistry::Get().GetAllTemplates();
+    const auto& templates = NodeRegistry::Get().GetFilteredTemplates();
     std::string searchLower = nodeMenuSearch;
     for (char& c : searchLower) c = (char)tolower(c);
 
     std::vector<std::pair<std::string, std::string>> entries;
-    for (const auto& kv : templates) {
-        if (kv.second.type == "Get_Variable" || kv.second.type == "Set_Variable") continue;
+    for (const auto& t : templates) {
+        if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
 
         if (!searchLower.empty()) {
-            std::string typeLower = kv.second.type;
+            std::string typeLower = t.type;
             for (char& c : typeLower) c = (char)tolower(c);
             if (typeLower.find(searchLower) == std::string::npos) continue;
         }
 
-if (filterCompatibleWithPin != -1) {
+        if (filterCompatibleWithPin != -1) {
             const Pin* fromPin = nullptr;
             bool fromIsOutput = false;
             for (const Node& node : graph.GetNodes()) {
@@ -1111,16 +1111,16 @@ if (filterCompatibleWithPin != -1) {
             if (fromPin) {
                 bool hasCompatible = false;
                 if (fromIsOutput) {
-                    for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{})
+                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{})
                         if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 } else {
-                    for (const Pin& p : kv.second.createPins ? [&]() { Node tmp; kv.second.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
+                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
                         if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 }
                 if (!hasCompatible) continue;
             }
         }
-        entries.push_back({kv.second.category, kv.second.type});
+        entries.push_back({t.category, t.type});
     }
     std::sort(entries.begin(), entries.end());
 

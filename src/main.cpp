@@ -1,9 +1,9 @@
 #include "Core/Application.h"
 #include "Core/Module.h"
-#include "Modules/Stargraph/StargraphModule.h"
+#include "Modules.modules.generated.h"
 
 int main(int argc, char* argv[]) {
-    ModuleManager::Get().Register(new StargraphModule());
+    RegisterAllModules();
 
     Application app;
     if (!app.Initialize(argc, argv)) {

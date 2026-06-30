@@ -300,7 +300,7 @@ void ContentBrowserPanel::Render() {
     }
 
     if (contextMenuOpen) {
-        const std::vector<AssetTypeInfo>& assetTypes = AssetTypeRegistry::Get().GetAll();
+        const std::vector<AssetTypeInfo>& assetTypes = AssetTypeRegistry::Get().GetFilteredTypes();
         float menuHeight = 30.0f * (1 + assetTypes.size());
         float popupX = contextMenuPos.x;
         float popupY = contextMenuPos.y;

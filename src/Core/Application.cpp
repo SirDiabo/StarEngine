@@ -4,6 +4,7 @@
 #include "Core/Project.h"
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
+#include "Core/BuildRunner.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "raylib.h"
@@ -67,11 +68,20 @@ bool Application::Initialize(int argc, char* argv[]) {
 
     if (argc > 1) {
         Project::Get().Load(argv[1]);
+        projectPath = argv[1];
     } else {
         editor->ShowProjectBrowser();
     }
 
     running = true;
+    
+    BuildRunner::Get().SetRelaunchCallback([this]() {
+        this->projectPath = Project::Get().GetRootPath();
+        this->editor->SaveLayout();
+        this->Shutdown();
+        this->Relaunch();
+    });
+    
     return true;
 }
 
@@ -115,4 +125,9 @@ void Application::Shutdown() {
     delete editor;
     editor = nullptr;
     CloseWindow();
+}
+
+void Application::Relaunch() {
+    std::string cmd = "start \"\" .\build\Debug\StarEngine.exe \"" + projectPath + "\"";
+    system(cmd.c_str());
 }

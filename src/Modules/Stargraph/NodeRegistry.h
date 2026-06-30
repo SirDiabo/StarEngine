@@ -7,6 +7,7 @@
 struct NodeTemplate {
     std::string type;
     std::string category;
+    std::string moduleName;
     bool isEvent = false;
     std::function<void(Node*)> createPins;
     std::function<void(Node&, Stargraph&, ExecutionContext&)> execute;
@@ -18,6 +19,7 @@ public:
 
     void RegisterNode(const NodeTemplate& nodeTemplate);
     const NodeTemplate* GetTemplate(const std::string& type);
+    std::vector<NodeTemplate> GetFilteredTemplates() const;
     const std::unordered_map<std::string, NodeTemplate>& GetAllTemplates() const { return templates; }
 
 private:

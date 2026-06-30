@@ -16,6 +16,7 @@ void ModuleManager::Register(Module* module) {
 
 bool ModuleManager::InitializeAll() {
     for (auto* module : modules) {
+        if (!module->IsEnabled()) continue;
         if (!module->Initialize()) return false;
     }
     return true;

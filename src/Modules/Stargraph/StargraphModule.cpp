@@ -33,6 +33,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate beginPlay;
     beginPlay.type = "Event_BeginPlay";
     beginPlay.category = "Events";
+    beginPlay.moduleName = "Stargraph";
     beginPlay.isEvent = true;
     beginPlay.createPins = [](Node* node) {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -42,6 +43,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate tick;
     tick.type = "Event_Tick";
     tick.category = "Events";
+    tick.moduleName = "Stargraph";
     tick.isEvent = true;
     tick.createPins = [](Node* node) {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -52,6 +54,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate endPlay;
     endPlay.type = "Event_EndPlay";
     endPlay.category = "Events";
+    endPlay.moduleName = "Stargraph";
     endPlay.isEvent = true;
     endPlay.createPins = [](Node* node) {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -61,6 +64,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate printString;
     printString.type = "Print_String";
     printString.category = "Utility";
+    printString.moduleName = "Stargraph";
     printString.createPins = [](Node* node) {
         node->inputs.push_back({"In",   PinType::Exec,   true,  false});
         node->inputs.push_back({"Text", PinType::String, true,  false, 0, "Hello"});
@@ -78,6 +82,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate branch;
     branch.type = "Branch";
     branch.category = "Flow";
+    branch.moduleName = "Stargraph";
     branch.createPins = [](Node* node) {
         node->inputs.push_back({"In",        PinType::Exec,    true,  false});
         node->inputs.push_back({"Condition", PinType::Boolean, true,  false, 0, "false"});
@@ -89,6 +94,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate forLoop;
     forLoop.type = "For_Loop";
     forLoop.category = "Flow";
+    forLoop.moduleName = "Stargraph";
     forLoop.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec,    true,  false});
         node->inputs.push_back({"First", PinType::Integer, true,  false, 0, "0"});
@@ -102,6 +108,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate whileLoop;
     whileLoop.type = "While_Loop";
     whileLoop.category = "Flow";
+    whileLoop.moduleName = "Stargraph";
     whileLoop.createPins = [](Node* node) {
         node->inputs.push_back({"In",        PinType::Exec,    true,  false});
         node->inputs.push_back({"Condition", PinType::Boolean, true,  false, 0, "false"});
@@ -113,6 +120,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate sequence;
     sequence.type = "Sequence";
     sequence.category = "Flow";
+    sequence.moduleName = "Stargraph";
     sequence.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->outputs.push_back({"0", PinType::Exec, false, true});
@@ -126,6 +134,7 @@ void StargraphModule::RegisterDefaultNodes() {
         NodeTemplate t;
         t.type = nodeType;
         t.category = "Math";
+        t.moduleName = "Stargraph";
         t.createPins = [](Node* node) {
             node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
             node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
@@ -251,6 +260,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate floatToStr;
     floatToStr.type = "Float_To_String";
     floatToStr.category = "Conversions";
+    floatToStr.moduleName = "Stargraph";
     floatToStr.createPins = [](Node* node) {
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Result", PinType::String, false, true});
@@ -266,6 +276,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate intToStr;
     intToStr.type = "Int_To_String";
     intToStr.category = "Conversions";
+    intToStr.moduleName = "Stargraph";
     intToStr.createPins = [](Node* node) {
         node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
         node->outputs.push_back({"Result", PinType::String, false, true});
@@ -280,6 +291,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate boolToStr;
     boolToStr.type = "Bool_To_String";
     boolToStr.category = "Conversions";
+    boolToStr.moduleName = "Stargraph";
     boolToStr.createPins = [](Node* node) {
         node->inputs.push_back({"Value", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Result", PinType::String, false, true});
@@ -294,6 +306,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate floatToInt;
     floatToInt.type = "Float_To_Int";
     floatToInt.category = "Conversions";
+    floatToInt.moduleName = "Stargraph";
     floatToInt.createPins = [](Node* node) {
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Result", PinType::Integer, false, true});
@@ -308,6 +321,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate intToFloat;
     intToFloat.type = "Int_To_Float";
     intToFloat.category = "Conversions";
+    intToFloat.moduleName = "Stargraph";
     intToFloat.createPins = [](Node* node) {
         node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
         node->outputs.push_back({"Result", PinType::Float, false, true});
@@ -323,6 +337,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getVar;
     getVar.type = "Get_Variable";
     getVar.category = "Variables";
+    getVar.moduleName = "Stargraph";
     getVar.createPins = [](Node* node) {
         node->inputs.push_back({"Variable_Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Value", PinType::Float, false, true});
@@ -346,6 +361,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate setVar;
     setVar.type = "Set_Variable";
     setVar.category = "Variables";
+    setVar.moduleName = "Stargraph";
     setVar.createPins = [](Node* node) {
         node->inputs.push_back({"In",            PinType::Exec,   true,  false});
         node->inputs.push_back({"Variable_Name", PinType::String, true,  false, 0, ""});
@@ -370,6 +386,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getActorLocation;
     getActorLocation.type = "Get_Actor_Location";
     getActorLocation.category = "Actor";
+    getActorLocation.moduleName = "Stargraph";
     getActorLocation.createPins = [](Node* node) {
         node->outputs.push_back({"Location", PinType::Vec3, false, true});
     };
@@ -384,6 +401,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate setActorLocation;
     setActorLocation.type = "Set_Actor_Location";
     setActorLocation.category = "Actor";
+    setActorLocation.moduleName = "Stargraph";
     setActorLocation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
         node->inputs.push_back({"Location", PinType::Vec3, true,  false, 0, "0,0,0"});
@@ -404,6 +422,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getActorForward;
     getActorForward.type = "Get_Actor_Forward_Vector";
     getActorForward.category = "Actor";
+    getActorForward.moduleName = "Stargraph";
     getActorForward.createPins = [](Node* node) {
         node->outputs.push_back({"Forward", PinType::Vec3, false, true});
     };
@@ -421,6 +440,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate vec3Scale;
     vec3Scale.type = "Vec3_Scale";
     vec3Scale.category = "Math";
+    vec3Scale.moduleName = "Stargraph";
     vec3Scale.createPins = [](Node* node) {
         node->inputs.push_back({"Vector", PinType::Vec3,  true, false, 0, "0,0,0"});
         node->inputs.push_back({"Scale",  PinType::Float, true, false, 0, "1.0"});
@@ -442,6 +462,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate vec3Make;
     vec3Make.type = "Vec3_Make";
     vec3Make.category = "Math";
+    vec3Make.moduleName = "Stargraph";
     vec3Make.createPins = [](Node* node) {
         node->inputs.push_back({"X", PinType::Float, true, false, 0, "0.0"});
         node->inputs.push_back({"Y", PinType::Float, true, false, 0, "0.0"});
@@ -463,6 +484,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate vec3Break;
     vec3Break.type = "Vec3_Break";
     vec3Break.category = "Math";
+    vec3Break.moduleName = "Stargraph";
     vec3Break.createPins = [](Node* node) {
         node->inputs.push_back({"Vector", PinType::Vec3, true, false, 0, "0,0,0"});
         node->outputs.push_back({"X", PinType::Float, false, true});
@@ -486,6 +508,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getActorRotation;
     getActorRotation.type = "Get_Actor_Rotation";
     getActorRotation.category = "Actor";
+    getActorRotation.moduleName = "Stargraph";
     getActorRotation.createPins = [](Node* node) {
         node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
     };
@@ -501,6 +524,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate setActorRotation;
     setActorRotation.type = "Set_Actor_Rotation";
     setActorRotation.category = "Actor";
+    setActorRotation.moduleName = "Stargraph";
     setActorRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
         node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
@@ -521,6 +545,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getActorScale;
     getActorScale.type = "Get_Actor_Scale";
     getActorScale.category = "Actor";
+    getActorScale.moduleName = "Stargraph";
     getActorScale.createPins = [](Node* node) {
         node->outputs.push_back({"Scale", PinType::Vec3, false, true});
     };
@@ -536,6 +561,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate setActorScale;
     setActorScale.type = "Set_Actor_Scale";
     setActorScale.category = "Actor";
+    setActorScale.moduleName = "Stargraph";
     setActorScale.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
         node->inputs.push_back({"Scale", PinType::Vec3, true,  false, 0, "1,1,1"});
@@ -555,10 +581,11 @@ void StargraphModule::RegisterDefaultNodes() {
 
     // Input nodes (read keyboard state at execution time)
 
-    auto makeKeyNode = [](const std::string& nodeType, int key) {
+    auto makeKeyNode = [this](const std::string& nodeType, int key) {
         NodeTemplate t;
         t.type = nodeType;
         t.category = "Input";
+        t.moduleName = "Stargraph";
         t.isEvent = true;
         t.createPins = [](Node* node) {
             node->outputs.push_back({"Out",      PinType::Exec,    false, true});
@@ -583,6 +610,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getAxisH;
     getAxisH.type = "Get_Axis_Horizontal";
     getAxisH.category = "Input";
+    getAxisH.moduleName = "Stargraph";
     getAxisH.createPins = [](Node* node) {
         node->outputs.push_back({"Axis", PinType::Float, false, true});
     };
@@ -598,6 +626,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate getAxisV;
     getAxisV.type = "Get_Axis_Vertical";
     getAxisV.category = "Input";
+    getAxisV.moduleName = "Stargraph";
     getAxisV.createPins = [](Node* node) {
         node->outputs.push_back({"Axis", PinType::Float, false, true});
     };
@@ -613,6 +642,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate spawnActor;
     spawnActor.type = "Spawn_Actor";
     spawnActor.category = "Actor";
+    spawnActor.moduleName = "Stargraph";
     spawnActor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Class Name", PinType::String, true, false, 0, "Actor"});
@@ -642,6 +672,7 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeTemplate destroyActor;
     destroyActor.type = "Destroy_Actor";
     destroyActor.category = "Actor";
+    destroyActor.moduleName = "Stargraph";
     destroyActor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false});
@@ -662,6 +693,7 @@ void StargraphModule::RegisterAssetType() {
     info.typeName = "Actor";
     info.extension = ".staractor";
     info.category = "Gameplay";
+    info.moduleName = "Stargraph";
     info.createAsset = [](const std::string& fullPath, const std::string& assetName) {
         Stargraph graph;
         graph.assetName = assetName;

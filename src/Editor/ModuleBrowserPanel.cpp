@@ -1,6 +1,9 @@
 #include "ModuleBrowserPanel.h"
 #include "NativeFileDialog.h"
 #include "Core/Module.h"
+#include "Core/BuildRunner.h"
+#include "Core/Project.h"
+#include "LogPanel.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -136,5 +139,17 @@ void ModuleBrowserPanel::ImportModule() {
     }
 
     ModuleManager::Get().ScanManifests();
-    statusMessage = "Imported " + manifest.name + ". Rebuild the engine to compile it in.";
+    statusMessage = "Imported " + manifest.name + ". Rebuilding...";
+
+    BuildResult result = BuildRunner::Get().RunBuild(".");
+    if (result.success) {
+        statusMessage = "Rebuild complete. Restarting...";
+        BuildRunner::Get().TriggerRelaunch();
+    } else {
+        statusMessage = "Build failed. See log for details.";
+        if (logPanel) {
+            logPanel->AddLog("[Build Error] " + result.error);
+            logPanel->AddLog(result.output);
+        }
+    }
 }
