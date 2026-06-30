@@ -100,11 +100,22 @@ jobs:
       - name: Package artifacts
         run: |
           mkdir -p release
-          cd artifacts/star-engine-windows
+          mkdir -p staging/windows
+          cp artifacts/star-engine-windows/build/Release/StarEngine.exe staging/windows/
+          cp -r artifacts/star-engine-windows/Assets staging/windows/
+          cd staging/windows
           zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine.exe Assets
-          cd ../../artifacts/star-engine-linux
+
+          mkdir -p staging/linux
+          cp artifacts/star-engine-linux/build/StarEngine staging/linux/
+          cp -r artifacts/star-engine-linux/Assets staging/linux/
+          cd staging/linux
           zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine Assets
-          cd ../../artifacts/star-engine-macos
+
+          mkdir -p staging/macos
+          cp artifacts/star-engine-macos/build/StarEngine staging/macos/
+          cp -r artifacts/star-engine-macos/Assets staging/macos/
+          cd staging/macos
           zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine Assets
 
       - name: Create Release
