@@ -9,6 +9,7 @@ class DetailsPanel;
 class OutlinerPanel;
 class ContentBrowserPanel;
 class LogPanel;
+class ModuleBrowserPanel;
 class MenuBar;
 
 class LevelEditorTab : public EditorTab {
@@ -43,4 +44,5 @@ private:
     OutlinerPanel*       outlinerPanel  = nullptr;
     ContentBrowserPanel* contentPanel   = nullptr;
     LogPanel*            logPanel       = nullptr;
+    ModuleBrowserPanel*  modulePanel    = nullptr;
 };

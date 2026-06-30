@@ -1,4 +1,5 @@
 #pragma once
+#include "ModuleManifest.h"
 #include <string>
 #include <vector>
 
@@ -11,10 +12,17 @@ public:
 
     const std::string& GetName() const { return name; }
     bool IsEnabled() const { return enabled; }
+    void SetEnabled(bool value) { enabled = value; }
 
 protected:
     std::string name;
     bool enabled = true;
+};
+
+struct ModuleEntry {
+    Module* instance = nullptr;
+    ModuleManifest manifest;
+    bool hasManifest = false;
 };
 
 class ModuleManager {
@@ -26,6 +34,22 @@ public:
     void ShutdownAll();
     void UpdateAll(float deltaTime);
 
+    void ScanManifests();
+
+    const std::vector<ModuleEntry>& GetEntries() const { return entries; }
+    ModuleEntry* FindEntry(const std::string& moduleName);
+
+    void SetModuleEnabled(const std::string& moduleName, bool value);
+    bool IsModuleEnabled(const std::string& moduleName) const;
+
+    std::vector<std::string> GetDisabledModuleNames() const;
+    void ApplyDisabledModuleNames(const std::vector<std::string>& disabledNames);
+
+    static std::string GetModulesSourceRoot();
+
 private:
     std::vector<Module*> modules;
+    std::vector<ModuleEntry> entries;
+
+    void RebuildEntries();
 };

@@ -1,4 +1,5 @@
 #include "Project.h"
+#include "Module.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -43,13 +44,25 @@ bool Project::Load(const std::string& path) {
         else if (key == "targetWidth") settings.targetWidth = std::stoi(value);
         else if (key == "targetHeight") settings.targetHeight = std::stoi(value);
         else if (key == "startupModule") settings.startupModule = value;
+        else if (key == "disabledModules") {
+            settings.disabledModules.clear();
+            std::stringstream ss(value);
+            std::string moduleName;
+            while (std::getline(ss, moduleName, ',')) {
+                if (!moduleName.empty()) settings.disabledModules.push_back(moduleName);
+            }
+        }
     }
+
+    ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
 
     return true;
 }
 
 void Project::Save() {
     if (projectFilePath.empty()) return;
+
+    settings.disabledModules = ModuleManager::Get().GetDisabledModuleNames();
 
     std::ofstream out(projectFilePath);
     if (!out.is_open()) return;
@@ -58,4 +71,11 @@ void Project::Save() {
     out << "targetWidth=" << settings.targetWidth << "\n";
     out << "targetHeight=" << settings.targetHeight << "\n";
     out << "startupModule=" << settings.startupModule << "\n";
+
+    out << "disabledModules=";
+    for (size_t i = 0; i < settings.disabledModules.size(); i++) {
+        if (i > 0) out << ",";
+        out << settings.disabledModules[i];
+    }
+    out << "\n";
 }

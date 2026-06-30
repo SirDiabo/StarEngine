@@ -14,6 +14,8 @@ target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/rayg
 
 target_link_libraries(StarEngine PRIVATE raylib)
 
+target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
+
 if(WIN32)
     target_link_libraries(StarEngine PRIVATE comdlg32)
 endif()

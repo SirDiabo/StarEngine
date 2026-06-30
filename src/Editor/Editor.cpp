@@ -201,7 +201,7 @@ void Editor::HandleWindowMenuAction(const std::string& item) {
     if (item == "Load Layout")       { levelTab->LoadLayoutFromDialog();  return; }
     // Toggle named panels in the level editor's dock area.
     static const std::vector<std::string> panelNames = {
-        "Viewport", "Details", "Outliner", "Content Browser", "Logs"
+        "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules"
     };
     for (const auto& name : panelNames) {
         if (item == name) {

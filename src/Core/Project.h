@@ -1,11 +1,13 @@
 #pragma once
 #include <string>
+#include <vector>
 
 struct ProjectSettings {
     std::string name;
     int targetWidth = 640;
     int targetHeight = 480;
     std::string startupModule;
+    std::vector<std::string> disabledModules;
 };
 
 class Project {

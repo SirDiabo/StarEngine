@@ -4,6 +4,7 @@
 #include "OutlinerPanel.h"
 #include "ContentBrowserPanel.h"
 #include "LogPanel.h"
+#include "ModuleBrowserPanel.h"
 #include "MenuBar.h"
 #include "LayoutSerializer.h"
 #include "NativeFileDialog.h"
@@ -18,12 +19,14 @@ void LevelEditorTab::Initialize() {
     outlinerPanel  = new OutlinerPanel();
     contentPanel   = new ContentBrowserPanel();
     logPanel       = new LogPanel();
+    modulePanel    = new ModuleBrowserPanel();
 
     viewportPanel->Initialize();
     detailsPanel->Initialize();
     outlinerPanel->Initialize();
     contentPanel->Initialize();
     logPanel->Initialize();
+    modulePanel->Initialize();
 
     // Wire viewport -> details and outliner selection pointers.
     detailsPanel->starMap            = viewportPanel->GetStarMap();
@@ -41,7 +44,7 @@ void LevelEditorTab::Initialize() {
     };
 
     dockArea.SetPanels({
-        viewportPanel, detailsPanel, outlinerPanel, contentPanel, logPanel
+        viewportPanel, detailsPanel, outlinerPanel, contentPanel, logPanel, modulePanel
     });
 
     BuildDefaultLayout();
@@ -58,7 +61,7 @@ void LevelEditorTab::BuildDefaultLayout() {
     viewportLeaf->activeTab  = 0;
 
     auto bottomLeaf = std::make_unique<DockNode>();
-    bottomLeaf->panelNames = { "Content Browser", "Logs" };
+    bottomLeaf->panelNames = { "Content Browser", "Logs", "Modules" };
     bottomLeaf->activeTab  = 0;
 
     auto leftCol = std::make_unique<DockNode>();
@@ -116,7 +119,7 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { } },
-        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
+        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
         { "Help",   { } },
     });
 }
