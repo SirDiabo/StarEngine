@@ -14,10 +14,13 @@ public:
     void SetProjectPath(const std::string& path) { projectPath = path; }
     const std::string& GetProjectPath() const { return projectPath; }
 
-    void Relaunch();
+    void RequestRelaunch();
 
 private:
+    void Relaunch();
+
     bool running = false;
+    bool pendingRelaunch = false;
     Editor* editor = nullptr;
     std::string projectPath;
 };

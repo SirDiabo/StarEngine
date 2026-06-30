@@ -10,17 +10,18 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp" "src/*.c")
 
 set(MODULES_GENERATED_FILE "${CMAKE_BINARY_DIR}/Modules.modules.generated.h")
 
-add_custom_command(
-    OUTPUT ${MODULES_GENERATED_FILE}
+add_custom_target(generate_modules ALL
     COMMAND ${CMAKE_COMMAND} -E echo "Generating Modules.modules.generated.h"
-    COMMAND ${CMAKE_COMMAND} 
+    COMMAND ${CMAKE_COMMAND}
         -DMODULES_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src/Modules"
         -DMODULES_OUTPUT_FILE="${MODULES_GENERATED_FILE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/GenerateModules.cmake"
+    BYPRODUCTS ${MODULES_GENERATED_FILE}
     COMMENT "Generating module registration"
 )
 
 add_executable(StarEngine ${SOURCES} ${MODULES_GENERATED_FILE})
+add_dependencies(StarEngine generate_modules)
 
 target_include_directories(StarEngine PRIVATE src)
 target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raygui")

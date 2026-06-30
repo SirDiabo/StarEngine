@@ -76,10 +76,7 @@ bool Application::Initialize(int argc, char* argv[]) {
     running = true;
     
     BuildRunner::Get().SetRelaunchCallback([this]() {
-        this->projectPath = Project::Get().GetRootPath();
-        this->editor->SaveLayout();
-        this->Shutdown();
-        this->Relaunch();
+        this->RequestRelaunch();
     });
     
     return true;
@@ -87,6 +84,15 @@ bool Application::Initialize(int argc, char* argv[]) {
 
 void Application::Run() {
     while (!WindowShouldClose() && running) {
+        if (pendingRelaunch) {
+            projectPath = Project::Get().GetProjectFilePath();
+            editor->SaveLayout();
+            Shutdown();
+            Relaunch();
+            running = false;
+            break;
+        }
+
         if (editor->WantsNewProject()) {
             std::string name = editor->GetNewProjectName();
             if (!name.empty()) {
@@ -127,7 +133,18 @@ void Application::Shutdown() {
     CloseWindow();
 }
 
+void Application::RequestRelaunch() {
+    pendingRelaunch = true;
+}
+
 void Application::Relaunch() {
-    std::string cmd = "start \"\" .\\build\\Release\\StarEngine.exe \"" + projectPath + "\"";
+    fs::path exeDir = GetApplicationDirectory();
+#ifdef _WIN32
+    fs::path exePath = exeDir / "StarEngine.exe";
+    std::string cmd = "start \"\" \"" + exePath.string() + "\" \"" + projectPath + "\"";
+#else
+    fs::path exePath = exeDir / "StarEngine";
+    std::string cmd = "\"" + exePath.string() + "\" \"" + projectPath + "\" &";
+#endif
     system(cmd.c_str());
 }

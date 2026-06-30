@@ -20,6 +20,7 @@ public:
 
     const ProjectSettings& GetSettings() const { return settings; }
     const std::string& GetRootPath() const { return rootPath; }
+    const std::string& GetProjectFilePath() const { return projectFilePath; }
 
 private:
     ProjectSettings settings;
