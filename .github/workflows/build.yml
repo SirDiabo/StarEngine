@@ -110,11 +110,7 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B build \
-            ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} \
-            ${{ matrix.arch != '' && matrix.arch || '' }} \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=install
+          cmake -B build ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} ${{ matrix.arch != '' && matrix.arch || '' }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install
 
       - name: Build
         run: cmake --build build --config Release
