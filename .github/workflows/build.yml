@@ -9,121 +9,287 @@ on:
 permissions:
   contents: read
 
-jobs:
-  build-windows:
-    runs-on: windows-2022
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-      - name: Configure CMake
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release --parallel
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: star-engine-windows
-          path: |
-            build/Release/StarEngine.exe
-            Assets
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
 
-  build-linux:
+jobs:
+  lint:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    name: Code Quality
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install dependencies
+
+      - name: CMake Lint
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libglfw3 libglfw3-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libwayland-dev libxkbcommon-dev libopenal-dev libvorbis-dev
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release --parallel
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: star-engine-linux
-          path: |
-            build/StarEngine
-            Assets
+          sudo apt-get install -y --no-install-recommends cmake-format clang-format
+          
+          cmake-format --check CMakeLists.txt || echo "⚠️ CMake format issues (non-blocking)"
+          
+          find src -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) 2>/dev/null | \
+            xargs clang-format --dry-run --Werror 2>/dev/null || \
+            echo "⚠️ Code style issues (non-blocking)"
 
-  build-macos:
-    runs-on: macos-latest
+      - name: Static Analysis
+        run: |
+          sudo apt-get install -y --no-install-recommends cppcheck
+          cppcheck --enable=all --suppress=missingIncludeSystem src/ 2>&1 || true
+
+  build:
+    needs: lint
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            name: windows
+            artifact-name: StarEngine.exe
+            artifact-path: build/Release/StarEngine.exe
+            generator: "Visual Studio 17 2022"
+            arch: "-A x64"
+
+          - os: ubuntu-latest
+            name: linux
+            artifact-name: StarEngine
+            artifact-path: build/StarEngine
+
+          - os: macos-latest
+            name: macos
+            artifact-name: StarEngine
+            artifact-path: build/StarEngine
+
+    name: Build (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      # Windows Setup
+      - name: Setup MSBuild (Windows)
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v2
+
+      # Linux Dependencies with Caching
+      - name: Cache Linux Dependencies
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libglfw3-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxinerama-dev libxi-dev libxext-dev libxfixes-dev \
+            libwayland-dev libxkbcommon-dev libopenal-dev libvorbis-dev
+
+      # macOS Dependencies
+      - name: Install macOS Dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install glfw3 openal-soft libvorbis
+
+      # CMake Build Cache
+      - name: Cache CMake Build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt', 'src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-
+
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -B build \
+            ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} \
+            ${{ matrix.arch != '' && matrix.arch || '' }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=install
+
       - name: Build
-        run: cmake --build build --config Release --parallel
-      - name: Upload artifact
+        run: cmake --build build --config Release
+
+      - name: Verify Build Artifacts
+        shell: bash
+        run: |
+          if [ ! -f "${{ matrix.artifact-path }}" ]; then
+            echo "❌ Artifact not found: ${{ matrix.artifact-path }}"
+            ls -la build/ || true
+            exit 1
+          fi
+          echo "✅ Build verified: ${{ matrix.artifact-name }}"
+
+      - name: Strip Debug Symbols (Linux & macOS)
+        if: runner.os != 'Windows'
+        continue-on-error: true
+        run: |
+          strip -s "${{ matrix.artifact-path }}" || true
+          du -h "${{ matrix.artifact-path }}"
+
+      - name: Upload Artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: star-engine-macos
+          name: star-engine-${{ matrix.name }}
           path: |
-            build/StarEngine
-            Assets
+            ${{ matrix.artifact-path }}
+            Assets/
+          retention-days: 30
+          compression-level: 9
 
   release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set version
+      - name: Extract Version
         id: version
         run: |
-          VERSION=$(grep -m1 'project(StarEngine VERSION' CMakeLists.txt | sed 's/.*VERSION \([0-9.]*\).*/\1/')
+          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "❌ Could not extract version from CMakeLists.txt"
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAG=$VERSION-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "TAG=v${VERSION}-build.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "DATE=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
 
-      - name: Download all artifacts
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log --oneline --pretty=format:"- %s" | head -20)
+          else
+            CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --oneline --pretty=format:"- %s")
+          fi
+          
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="No commits since last release"
+          fi
+          
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          echo "CHANGELOG=$CHANGELOG" >> $GITHUB_OUTPUT
+
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Package artifacts
+      - name: Package Artifacts
         run: |
-          mkdir -p release
-          mkdir -p staging/windows
-          cp artifacts/star-engine-windows/build/Release/StarEngine.exe staging/windows/
-          cp -r artifacts/star-engine-windows/Assets staging/windows/
-          cd staging/windows
-          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine.exe Assets
+          mkdir -p release staging
+          
+          # Windows
+          mkdir -p staging/StarEngine
+          cp artifacts/star-engine-windows/build/Release/StarEngine.exe staging/StarEngine/ || exit 1
+          cp -r artifacts/star-engine-windows/Assets staging/StarEngine/ || exit 1
+          (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine/ && rm -rf StarEngine)
+          
+          # Linux
+          mkdir -p staging/StarEngine
+          cp artifacts/star-engine-linux/build/StarEngine staging/StarEngine/ || exit 1
+          cp -r artifacts/star-engine-linux/Assets staging/StarEngine/ || exit 1
+          chmod +x staging/StarEngine/StarEngine
+          (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine/ && rm -rf StarEngine)
+          
+          # macOS
+          mkdir -p staging/StarEngine
+          cp artifacts/star-engine-macos/build/StarEngine staging/StarEngine/ || exit 1
+          cp -r artifacts/star-engine-macos/Assets staging/StarEngine/ || exit 1
+          chmod +x staging/StarEngine/StarEngine
+          (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine/ && rm -rf StarEngine)
+          
+          rm -rf staging
+          ls -lh release/
 
-          mkdir -p staging/linux
-          cp artifacts/star-engine-linux/build/StarEngine staging/linux/
-          cp -r artifacts/star-engine-linux/Assets staging/linux/
-          cd staging/linux
-          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine Assets
 
-          mkdir -p staging/macos
-          cp artifacts/star-engine-macos/build/StarEngine staging/macos/
-          cp -r artifacts/star-engine-macos/Assets staging/macos/
-          cd staging/macos
-          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine Assets
 
-      - name: Create Release
+      - name: Verify Release Artifacts
+        run: |
+          expected_files=3
+          actual_files=$(ls release/*.zip 2>/dev/null | wc -l)
+          if [ "$actual_files" -ne "$expected_files" ]; then
+            echo "❌ Expected $expected_files zip files, found $actual_files"
+            ls -la release/
+            exit 1
+          fi
+          echo "✅ All release artifacts verified"
+          du -sh release/
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.TAG }}
+          tag_name: ${{ steps.version.outputs.TAG }}
           name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Release Information
+            **Version:** ${{ steps.version.outputs.VERSION }}  
+            **Build:** #${{ github.run_number }}  
+            **Date:** ${{ steps.version.outputs.DATE }}  
+            **Commit:** [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            
+            ## Recent Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## Downloads
+            - **Windows x64:** `StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip`
+            - **Linux x64:** `StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip`
+            - **macOS:** `StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip`
+            
+            ## Installation
+            Extract the zip file for your platform and run the executable.
+            
+            ---
+            *Automatically built by GitHub Actions*
           files: release/*.zip
           draft: false
+          prerelease: false
+          make_latest: true
+
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete Old Releases
+        run: |
+          # Keep only the last 5 releases
+          KEEP=5
+          DELETE_COUNT=$(gh release list --limit 100 | tail -n +$((KEEP+1)) | wc -l)
+          
+          if [ "$DELETE_COUNT" -gt 0 ]; then
+            echo "🗑️ Deleting $DELETE_COUNT old releases (keeping $KEEP)"
+            gh release list --limit 100 | tail -n +$((KEEP+1)) | cut -f3 | while read tag; do
+              gh release delete "$tag" --yes
+              echo "  ✓ Deleted $tag"
+            done
+          else
+            echo "✅ No old releases to delete"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
