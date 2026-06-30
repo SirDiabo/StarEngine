@@ -28,7 +28,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: star-engine-windows
-          path: build/Release/StarEngine.exe
+          path: |
+            build/Release/StarEngine.exe
+            Assets
 
   build-linux:
     runs-on: ubuntu-latest
@@ -50,7 +52,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: star-engine-linux
-          path: build/StarEngine
+          path: |
+            build/StarEngine
+            Assets
 
   build-macos:
     runs-on: macos-latest
@@ -68,7 +72,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: star-engine-macos
-          path: build/StarEngine
+          path: |
+            build/StarEngine
+            Assets
 
   release:
     needs: [build-windows, build-linux, build-macos]
@@ -95,11 +101,11 @@ jobs:
         run: |
           mkdir -p release
           cd artifacts/star-engine-windows
-          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine.exe
+          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine.exe Assets
           cd ../../artifacts/star-engine-linux
-          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine
+          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine Assets
           cd ../../artifacts/star-engine-macos
-          zip ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine
+          zip -r ../../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine Assets
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
