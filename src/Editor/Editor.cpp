@@ -1,191 +1,244 @@
 #include "Editor.h"
-#include "ViewportPanel.h"
-#include "DetailsPanel.h"
-#include "OutlinerPanel.h"
-#include "ContentBrowserPanel.h"
-#include "LogPanel.h"
+#include "EditorTab.h"
+#include "LevelEditorTab.h"
+#include "StargraphEditorTab.h"
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
-#include "StargraphEditorPanel.h"
+#include "LogPanel.h"
+#include "ViewportPanel.h"
+#include "LayoutSerializer.h"
 #include "raygui.h"
+#include "raylib.h"
+#include <filesystem>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
-static float lastClickTime = 0;
-static int lastClickedTab = -1;
+namespace fs = std::filesystem;
+
+const float Editor::EDITOR_TAB_BAR_H = 28.0f;
+const float Editor::MENU_BAR_H       = 20.0f;
+
+static const Color COLOR_EDITOR_TAB_BAR  = { 30, 30, 33, 255 };
+static const Color COLOR_EDITOR_TAB_ACT  = { 50, 50, 58, 255 };
+static const Color COLOR_EDITOR_TAB_HOV  = { 40, 40, 46, 255 };
+static const Color COLOR_EDITOR_TAB_IDLE = { 30, 30, 33, 255 };
+static const Color COLOR_EDITOR_TAB_TEXT = { 200, 200, 210, 255 };
+static const Color COLOR_EDITOR_TAB_LINE = { 70, 120, 220, 255 };
+
+Editor::~Editor() {
+    SaveLayout();
+    delete menuBar;
+    delete projectBrowser;
+}
 
 void Editor::Initialize() {
-    logPanel = new LogPanel();
-    panels.push_back(logPanel);
-
-    contentPanel = new ContentBrowserPanel();
-    panels.push_back(contentPanel);
-
-    detailsPanel = new DetailsPanel();
-    panels.push_back(detailsPanel);
-
-    outlinerPanel = new OutlinerPanel();
-    panels.push_back(outlinerPanel);
-
-    viewportPanel = new ViewportPanel();
-    panels.push_back(viewportPanel);
-
-    stargraphEditor = new StargraphEditorPanel();
-    panels.push_back(stargraphEditor);
-
-    bottomDock = { {contentPanel, "Content"}, {logPanel, "Logs"} };
+    auto* tab = new LevelEditorTab();
+    tab->onAssetOpened = [this](const std::string& path, const std::string& ext) {
+        OpenAssetInTab(path, ext);
+    };
+    tab->Initialize();
+    levelTab = tab;
+    editorTabs.emplace_back(tab);
 
     menuBar = new MenuBar();
     menuBar->Initialize();
 
     projectBrowser = new ProjectBrowser();
 
-    for (auto* panel : panels) {
-        panel->Initialize();
-    }
+    menuBar->SetActionCallback([this](const std::string& menu, const std::string& item) {
+        if (menu == "Window") HandleWindowMenuAction(item);
+    });
 
-    contentPanel->onAssetOpened = [this](const std::string& path, const std::string& ext) {
-        OpenAsset(path, ext);
-    };
+    // Build initial menu from the first (level) tab.
+    editorTabs[activeEditorTab]->BuildMenus(menuBar);
 
-    contentPanel->onAssetDragged = [this](const std::string& path, const std::string& ext, Vector2 dropPos) {
-        if (ext == ".staractor" || ext == ".stargraph") {
-            if (viewportPanel->IsVisible()) {
-                viewportPanel->DropActorAsset(path, dropPos);
-            }
-        }
-    };
+    LoadLayout();
 }
 
-LogPanel* Editor::GetLogPanel() {
-    return logPanel;
-}
-
-void Editor::OpenAsset(const std::string& fullPath, const std::string& extension) {
-    if (extension == ".staractor" || extension == ".stargraph") {
-        if (stargraphEditor->Open(fullPath)) {
-            viewportPanel->SetVisible(false);
-            detailsPanel->SetVisible(false);
-            outlinerPanel->SetVisible(false);
-        }
-    } else if (extension == ".starmap") {
-        viewportPanel->LoadMap(fullPath);
-        detailsPanel->starMap = viewportPanel->GetStarMap();
-        detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
-        outlinerPanel->starMap = viewportPanel->GetStarMap();
-        outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
-    }
+LogPanel* Editor::GetLogPanel() const {
+    return levelTab ? levelTab->GetLogPanel() : nullptr;
 }
 
 void Editor::Render() {
-    int width = GetScreenWidth();
-    int height = GetScreenHeight();
-
     if (projectBrowser->IsVisible()) {
         projectBrowser->Render();
         return;
     }
 
-    float topHeight = (float)(height - 230);
-    Rectangle tabBarBounds = {0, (float)(height - 200), (float)width, 30};
-    Vector2 mousePos = GetMousePosition();
-    int reattachIndex = -1;
+    int w = GetScreenWidth();
+    int h = GetScreenHeight();
 
-    for (size_t i = 0; i < bottomDock.size(); i++) {
-        Panel* panel = bottomDock[i].panel;
-        if (!panel->IsDetached()) continue;
+    // Layer 1: menu bar background and buttons.
+    menuBar->RenderBar();
 
-        if (panel->dragging) {
-            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-                panel->bounds.x = mousePos.x - panel->dragOffset.x;
-                panel->bounds.y = mousePos.y - panel->dragOffset.y;
-                panel->header.x = panel->bounds.x;
-                panel->header.y = panel->bounds.y;
-            } else {
-                panel->dragging = false;
-                if (CheckCollisionPointRec(mousePos, tabBarBounds)) {
-                    panel->SetDetached(false);
-                    reattachIndex = (int)i;
-                }
+    float tabBarY  = MENU_BAR_H;
+    float contentY = MENU_BAR_H + EDITOR_TAB_BAR_H;
+    float contentH = (float)h - contentY;
+
+    // Layer 2: editor tab bar.
+    RenderEditorTabBar(0, tabBarY, (float)w);
+
+    // Layer 3: active editor tab panel content.
+    if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
+        EditorTab* tab = editorTabs[activeEditorTab].get();
+        tab->Render(0, contentY, (float)w, contentH);
+
+        if (!tab->IsOpen() && !tab->IsPermanent()) {
+            editorTabs.erase(editorTabs.begin() + activeEditorTab);
+            if (activeEditorTab >= (int)editorTabs.size())
+                activeEditorTab = (int)editorTabs.size() - 1;
+            if (activeEditorTab >= 0)
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+        }
+    }
+
+    // Layer 4: floating panels, drag ghost, drop highlights (above panel content).
+    levelTab->RenderOverlays();
+
+    // Layer 5: menu popup (above everything).
+    menuBar->RenderPopup();
+}
+
+void Editor::RenderEditorTabBar(float x, float y, float width) {
+    Rectangle bar = { x, y, width, EDITOR_TAB_BAR_H };
+    DrawRectangleRec(bar, COLOR_EDITOR_TAB_BAR);
+
+    Vector2 mouse = GetMousePosition();
+    float tabX = x + 4;
+    const float tabPad   = 12.0f;
+    const float closeW   = 14.0f;
+    const float tabH     = EDITOR_TAB_BAR_H - 2;
+
+    for (int i = 0; i < (int)editorTabs.size(); i++) {
+        EditorTab* tab = editorTabs[i].get();
+        const std::string& title = tab->GetTitle();
+        float textW = (float)MeasureText(title.c_str(), 12);
+        float tabW  = textW + tabPad * 2 + (tab->IsPermanent() ? 0 : closeW + 4);
+
+        Rectangle tabRect = { tabX, y + 1, tabW, tabH };
+        bool hovered = CheckCollisionPointRec(mouse, tabRect);
+        bool active  = (i == activeEditorTab);
+
+        // Beveled editor tab style (trapezoid approximated with a rectangle + indicator line).
+        DrawRectangleRec(tabRect, active ? COLOR_EDITOR_TAB_ACT : (hovered ? COLOR_EDITOR_TAB_HOV : COLOR_EDITOR_TAB_IDLE));
+        if (active)
+            DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 2), (int)tabRect.width, 2, COLOR_EDITOR_TAB_LINE);
+
+        DrawText(title.c_str(), (int)(tabX + tabPad), (int)(y + (EDITOR_TAB_BAR_H - 12) / 2.0f + 1), 12, COLOR_EDITOR_TAB_TEXT);
+
+        // Close button for non-permanent tabs.
+        if (!tab->IsPermanent()) {
+            Rectangle closeRect = { tabX + tabW - closeW - 3, y + (EDITOR_TAB_BAR_H - closeW) / 2.0f, closeW, closeW };
+            bool closeHov = CheckCollisionPointRec(mouse, closeRect);
+            if (closeHov) DrawRectangleRec(closeRect, { 180, 60, 60, 200 });
+            DrawText("x", (int)closeRect.x + 3, (int)closeRect.y + 2, 10, closeHov ? WHITE : Color{ 120, 120, 120, 255 });
+
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && closeHov) {
+                editorTabs.erase(editorTabs.begin() + i);
+                if (activeEditorTab >= (int)editorTabs.size())
+                    activeEditorTab = (int)editorTabs.size() - 1;
+                if (activeEditorTab >= 0)
+                    editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                return;
             }
-        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, panel->header)) {
-            panel->dragging = true;
-            panel->dragOffset.x = mousePos.x - panel->bounds.x;
-            panel->dragOffset.y = mousePos.y - panel->bounds.y;
         }
 
-        panel->Render();
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && activeEditorTab != i) {
+            editorTabs[activeEditorTab]->OnDeactivated();
+            activeEditorTab = i;
+            editorTabs[activeEditorTab]->OnActivated();
+            editorTabs[activeEditorTab]->BuildMenus(menuBar);
+        }
+
+        tabX += tabW + 2;
     }
 
-    if (stargraphEditor->IsOpen()) {
-        stargraphEditor->bounds = Rectangle{0, 30, (float)width, topHeight};
-        stargraphEditor->Render();
+    // Separator line at bottom of tab bar.
+    DrawLine((int)x, (int)(y + EDITOR_TAB_BAR_H - 1), (int)(x + width), (int)(y + EDITOR_TAB_BAR_H - 1), { 22, 22, 25, 255 });
+}
 
-        if (!stargraphEditor->IsOpen()) {
-            viewportPanel->SetVisible(true);
-            detailsPanel->SetVisible(true);
-            outlinerPanel->SetVisible(true);
-        }
-    } else {
-        float rightPanelWidth = 300.0f;
-        float outlinerHeight = (topHeight * 0.5f) - 15.0f;
-        float detailsY = 30.0f + outlinerHeight + 10.0f;
-        if (viewportPanel->IsVisible()) {
-            viewportPanel->bounds = Rectangle{0, 30, (float)(width) - rightPanelWidth, topHeight};
-            viewportPanel->header = {viewportPanel->bounds.x, viewportPanel->bounds.y, viewportPanel->bounds.width, 25};
-            viewportPanel->Render();
-        }
-
-        if (outlinerPanel->IsVisible() && viewportPanel->GetStarMap()) {
-            outlinerPanel->bounds = Rectangle{(float)(width) - rightPanelWidth, 30, rightPanelWidth, outlinerHeight};
-            outlinerPanel->header = {outlinerPanel->bounds.x, outlinerPanel->bounds.y, outlinerPanel->bounds.width, 25};
-            outlinerPanel->Render();
-        }
-
-        if (detailsPanel->IsVisible()) {
-            detailsPanel->bounds = Rectangle{(float)(width) - rightPanelWidth, detailsY, rightPanelWidth, outlinerHeight};
-            detailsPanel->header = {detailsPanel->bounds.x, detailsPanel->bounds.y, detailsPanel->bounds.width, 25};
-            detailsPanel->Render();
-        }
-    }
-
-    std::vector<const char*> tabTexts;
-    for (const auto& tab : bottomDock) tabTexts.push_back(tab.title.c_str());
-    GuiTabBar(tabBarBounds, const_cast<char**>(tabTexts.data()), (int)bottomDock.size(), &activeBottomTab);
-
-    if (reattachIndex >= 0) activeBottomTab = reattachIndex;
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, tabBarBounds)) {
-        float currentTime = (float)GetTime();
-        if (lastClickedTab == activeBottomTab && (currentTime - lastClickTime) < 0.3f) {
-            Panel* panel = bottomDock[activeBottomTab].panel;
-            if (!panel->IsDetached()) {
-                panel->SetDetached(true);
-                panel->bounds = Rectangle{200, 100, 500, 350};
+void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& extension) {
+    if (extension == ".staractor" || extension == ".stargraph") {
+        // Check if already open.
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[i].get());
+            if (sgTab && sgTab->GetAssetPath() == fullPath) {
+                editorTabs[activeEditorTab]->OnDeactivated();
+                activeEditorTab = i;
+                editorTabs[activeEditorTab]->OnActivated();
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                return;
             }
         }
-        lastClickTime = currentTime;
-        lastClickedTab = activeBottomTab;
-    }
-
-    Panel* activeBottomPanel = bottomDock[activeBottomTab].panel;
-    if (!activeBottomPanel->IsDetached()) {
-        activeBottomPanel->bounds = Rectangle{0, (float)(height - 170), (float)width, 170};
-        activeBottomPanel->Render();
-    }
-
-    menuBar->Render();
-
-    if (menuBar->activeMenu == 0) {
-        Rectangle popup = {5, 35, 120, 90};
-        DrawRectangleRec(popup, {60, 60, 60, 255});
-        if (GuiButton({10, 40, 110, 25}, "New Project")) menuBar->wantsNewProject = true;
-        if (GuiButton({10, 70, 110, 25}, "Open Project")) menuBar->wantsOpenProject = true;
-        if (GuiButton({10, 100, 110, 25}, "Save Project")) menuBar->wantsSaveProject = true;
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup))
-            menuBar->activeMenu = -1;
-    } else if (menuBar->activeMenu > 0) {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) menuBar->activeMenu = -1;
+        auto* sgTab = new StargraphEditorTab(fullPath);
+        sgTab->Initialize();
+        editorTabs.emplace_back(sgTab);
+        editorTabs[activeEditorTab]->OnDeactivated();
+        activeEditorTab = (int)editorTabs.size() - 1;
+        editorTabs[activeEditorTab]->OnActivated();
+        editorTabs[activeEditorTab]->BuildMenus(menuBar);
+    } else if (extension == ".starmap") {
+        // Map loads into the level editor tab.
+        levelTab->GetViewport()->LoadMap(fullPath);
+        // Switch to level editor.
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            if (editorTabs[i].get() == levelTab) {
+                editorTabs[activeEditorTab]->OnDeactivated();
+                activeEditorTab = i;
+                editorTabs[activeEditorTab]->OnActivated();
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                break;
+            }
+        }
     }
 }
+
+void Editor::HandleWindowMenuAction(const std::string& item) {
+    if (item == "Reset Layout")      { levelTab->ResetLayout();          return; }
+    if (item == "Save Layout As")    { levelTab->SaveLayoutAs();         return; }
+    if (item == "Load Layout")       { levelTab->LoadLayoutFromDialog();  return; }
+    // Toggle named panels in the level editor's dock area.
+    static const std::vector<std::string> panelNames = {
+        "Viewport", "Details", "Outliner", "Content Browser", "Logs"
+    };
+    for (const auto& name : panelNames) {
+        if (item == name) {
+            levelTab->TogglePanelVisible(name);
+            return;
+        }
+    }
+}
+
+void Editor::SaveLayout() const {
+    levelTab->SaveLayout(GetLayoutPath());
+}
+
+void Editor::LoadLayout() {
+    levelTab->LoadLayout(GetLayoutPath());
+}
+
+std::string Editor::GetLayoutPath() const {
+    std::string home;
+#ifdef _WIN32
+    char* buf = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
+        home = buf;
+        free(buf);
+    } else {
+        home = ".";
+    }
+#else
+    const char* h = getenv("HOME");
+    home = h ? h : ".";
+#endif
+    fs::path dir = fs::path(home) / ".starengine";
+    fs::create_directories(dir);
+    return (dir / "layout.cfg").string();
+}
+
+// Project browser delegation
 
 void Editor::ShowProjectBrowser(bool forNew, bool allowCancel) {
     projectBrowser->Show(forNew ? ProjectBrowser::Mode::Create : ProjectBrowser::Mode::Open, allowCancel);

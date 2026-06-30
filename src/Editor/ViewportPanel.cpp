@@ -55,8 +55,8 @@ void ViewportPanel::LoadMap(const std::string& path) {
 void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenPos) {
     if (!mapLoaded) return;
 
-    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
-    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - 25 - toolbarHeight};
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
 
     if (!CheckCollisionPointRec(screenPos, client)) return;
 
@@ -282,12 +282,12 @@ Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
 }
 
 void ViewportPanel::RenderToolbar() {
-    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     DrawRectangleRec(toolbar, {36, 36, 40, 255});
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
 
-    DrawText(name, (int)bounds.x + 6, (int)bounds.y + 30, 13, WHITE);
+    DrawText(name, (int)bounds.x + 6, (int)bounds.y + 8, 13, WHITE);
 
     float btnRight = bounds.x + bounds.width - 4;
     float btnY = toolbar.y + 3;
@@ -343,8 +343,8 @@ if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePo
 }
 
 void ViewportPanel::Render() {
-    Rectangle toolbar = {bounds.x, bounds.y + 25, bounds.width, toolbarHeight};
-    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - 25 - toolbarHeight};
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
     int clientWidth   = (int)client.width;
     int clientHeight  = (int)client.height;
 
@@ -369,7 +369,7 @@ void ViewportPanel::Render() {
         const char* pieLabel = "PLAYING - Press S to Stop";
         int tw = MeasureText(pieLabel, 12);
         DrawText(pieLabel, (int)(bounds.x + bounds.width / 2 - tw / 2),
-                 (int)(bounds.y + 28 + toolbarHeight + 4), 12, {60, 200, 60, 255});
+                 (int)(bounds.y + toolbarHeight + 4), 12, {60, 200, 60, 255});
     }
     RenderToolbar();
 

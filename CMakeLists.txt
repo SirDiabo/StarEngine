@@ -13,3 +13,7 @@ target_include_directories(StarEngine PRIVATE src)
 target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raygui")
 
 target_link_libraries(StarEngine PRIVATE raylib)
+
+if(WIN32)
+    target_link_libraries(StarEngine PRIVATE comdlg32)
+endif()

@@ -1,27 +1,21 @@
 #pragma once
-#include "Core/Panel.h"
+#include "EditorTab.h"
 #include <vector>
 #include <string>
+#include <memory>
 
-class LogPanel;
-class ContentBrowserPanel;
-class DetailsPanel;
-class OutlinerPanel;
-class ViewportPanel;
-class StargraphEditorPanel;
+class LevelEditorTab;
 class MenuBar;
 class ProjectBrowser;
-
-struct DockTab {
-    Panel* panel;
-    std::string title;
-};
+class LogPanel;
 
 class Editor {
 public:
     void Initialize();
+    ~Editor();
     void Render();
-    LogPanel* GetLogPanel();
+
+    LogPanel* GetLogPanel() const;
 
     void ShowProjectBrowser(bool forNew = false, bool allowCancel = false);
     bool WantsNewProject();
@@ -34,19 +28,20 @@ public:
     void ResetSaveProjectFlag();
 
 private:
-    void OpenAsset(const std::string& fullPath, const std::string& extension);
-    void RenderMainLayout();
+    void RenderEditorTabBar(float x, float y, float width);
+    void OpenAssetInTab(const std::string& fullPath, const std::string& extension);
+    void HandleWindowMenuAction(const std::string& item);
+    void SaveLayout() const;
+    void LoadLayout();
+    std::string GetLayoutPath() const;
 
-    std::vector<Panel*> panels;
-    std::vector<DockTab> bottomDock;
-    int activeBottomTab = 0;
+    static const float EDITOR_TAB_BAR_H;
+    static const float MENU_BAR_H;
 
-    LogPanel* logPanel = nullptr;
-    ContentBrowserPanel* contentPanel = nullptr;
-    DetailsPanel* detailsPanel = nullptr;
-    OutlinerPanel* outlinerPanel = nullptr;
-    ViewportPanel* viewportPanel = nullptr;
-    StargraphEditorPanel* stargraphEditor = nullptr;
-    MenuBar* menuBar = nullptr;
+    std::vector<std::unique_ptr<EditorTab>> editorTabs;
+    int activeEditorTab = 0;
+
+    LevelEditorTab* levelTab = nullptr;
+    MenuBar*        menuBar  = nullptr;
     ProjectBrowser* projectBrowser = nullptr;
 };

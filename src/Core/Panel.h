@@ -10,14 +10,8 @@ public:
     const char* GetName() const { return name; }
     bool IsVisible() const { return visible; }
     void SetVisible(bool v) { visible = v; }
-    bool IsDetached() const { return detached; }
-    void SetDetached(bool d) { detached = d; }
 
-    Rectangle bounds = {0, 0, 300, 400};
-    Rectangle header = {0, 0, 0, 25};
-    bool detached = false;
-    bool dragging = false;
-    Vector2 dragOffset = {0, 0};
+    Rectangle bounds = { 0, 0, 300, 400 };
 
 protected:
     const char* name = "Panel";

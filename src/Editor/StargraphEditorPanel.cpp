@@ -380,19 +380,10 @@ void StargraphEditorPanel::RenderRightPanel() {
     DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
 
     float y = panel.y + 8;
-    DrawText("Details", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
-    y += 20;
-    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
-    y += 8;
 
     std::vector<Variable>& vars = graph.GetVariables();
     if (selectedVariableIndex >= 0 && selectedVariableIndex < (int)vars.size()) {
         Variable& var = vars[selectedVariableIndex];
-
-        DrawText("Variable", (int)panel.x + 8, (int)y, 13, WHITE);
-        y += 20;
-        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
-        y += 8;
 
         DrawText("Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;

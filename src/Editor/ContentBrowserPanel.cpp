@@ -48,7 +48,7 @@ ContentBrowserPanel::~ContentBrowserPanel() {
 }
 
 void ContentBrowserPanel::Initialize() {
-    name = "Content";
+    name = "Content Browser";
 }
 
 Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const {
@@ -165,13 +165,7 @@ void ContentBrowserPanel::Render() {
         return;
     }
 
-    float topOffset = detached ? 25.0f : 0.0f;
-    if (detached) {
-        DrawRectangleRec(header, {50, 50, 55, 255});
-        DrawText(name, (int)bounds.x + 5, (int)bounds.y + 5, 14, WHITE);
-    }
-
-    Rectangle client = {bounds.x, bounds.y + topOffset, bounds.width, bounds.height - topOffset};
+    Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
 
     // Breadcrumb path bar

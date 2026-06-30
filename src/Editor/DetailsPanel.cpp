@@ -16,11 +16,6 @@ void DetailsPanel::Render() {
     float w = bounds.width;
     Vector2 mp = GetMousePosition();
 
-    DrawText("Details", (int)x + 8, (int)y, 13, {160, 160, 170, 255});
-    y += 22;
-    DrawLine((int)x + 4, (int)y, (int)(x + w - 4), (int)y, {60, 60, 65, 255});
-    y += 8;
-
     if (!starMap || !selectedActorIndex || *selectedActorIndex < 0 ||
         *selectedActorIndex >= (int)starMap->GetInstances().size()) {
         DrawText("Nothing selected", (int)x + 8, (int)y, 11, {100, 100, 110, 255});

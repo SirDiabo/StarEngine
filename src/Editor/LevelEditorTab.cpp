@@ -1,0 +1,156 @@
+#include "LevelEditorTab.h"
+#include "ViewportPanel.h"
+#include "DetailsPanel.h"
+#include "OutlinerPanel.h"
+#include "ContentBrowserPanel.h"
+#include "LogPanel.h"
+#include "MenuBar.h"
+#include "LayoutSerializer.h"
+#include "NativeFileDialog.h"
+#include <filesystem>
+
+void LevelEditorTab::Initialize() {
+    title     = "Level Editor";
+    permanent = true;
+
+    viewportPanel  = new ViewportPanel();
+    detailsPanel   = new DetailsPanel();
+    outlinerPanel  = new OutlinerPanel();
+    contentPanel   = new ContentBrowserPanel();
+    logPanel       = new LogPanel();
+
+    viewportPanel->Initialize();
+    detailsPanel->Initialize();
+    outlinerPanel->Initialize();
+    contentPanel->Initialize();
+    logPanel->Initialize();
+
+    // Wire viewport -> details and outliner selection pointers.
+    detailsPanel->starMap            = viewportPanel->GetStarMap();
+    detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+    outlinerPanel->starMap            = viewportPanel->GetStarMap();
+    outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+
+    contentPanel->onAssetOpened = [this](const std::string& path, const std::string& ext) {
+        if (onAssetOpened) onAssetOpened(path, ext);
+    };
+
+    contentPanel->onAssetDragged = [this](const std::string& path, const std::string& ext, Vector2 dropPos) {
+        if (ext == ".staractor" || ext == ".stargraph")
+            viewportPanel->DropActorAsset(path, dropPos);
+    };
+
+    dockArea.SetPanels({
+        viewportPanel, detailsPanel, outlinerPanel, contentPanel, logPanel
+    });
+
+    BuildDefaultLayout();
+}
+
+void LevelEditorTab::BuildDefaultLayout() {
+    // Layout from user spec (level.cfg):
+    // Root splits vertically at 0.75: left column (0) and right column (1).
+    // Left column (0) splits vertically at 0.70: Viewport (0.0) on top, Content+Logs (0.1) on bottom.
+    // Right column (1) splits vertically at 0.333: Outliner (1.0) on top, Details (1.1) on bottom.
+
+    auto viewportLeaf = std::make_unique<DockNode>();
+    viewportLeaf->panelNames = { "Viewport" };
+    viewportLeaf->activeTab  = 0;
+
+    auto bottomLeaf = std::make_unique<DockNode>();
+    bottomLeaf->panelNames = { "Content Browser", "Logs" };
+    bottomLeaf->activeTab  = 0;
+
+    auto leftCol = std::make_unique<DockNode>();
+    leftCol->type       = DockNode::Type::SplitV;
+    leftCol->splitRatio = 0.70f;
+    leftCol->first      = std::move(viewportLeaf);
+    leftCol->second     = std::move(bottomLeaf);
+
+    auto outlinerLeaf = std::make_unique<DockNode>();
+    outlinerLeaf->panelNames = { "Outliner" };
+    outlinerLeaf->activeTab  = 0;
+
+    auto detailsLeaf = std::make_unique<DockNode>();
+    detailsLeaf->panelNames = { "Details" };
+    detailsLeaf->activeTab  = 0;
+
+    auto rightCol = std::make_unique<DockNode>();
+    rightCol->type       = DockNode::Type::SplitV;
+    rightCol->splitRatio = 0.333f;
+    rightCol->first      = std::move(outlinerLeaf);
+    rightCol->second     = std::move(detailsLeaf);
+
+    auto root = std::make_unique<DockNode>();
+    root->type       = DockNode::Type::SplitH;
+    root->splitRatio = 0.75f;
+    root->first      = std::move(leftCol);
+    root->second     = std::move(rightCol);
+
+    dockArea.SetDefaultLayout(std::move(root));
+}
+
+void LevelEditorTab::Render(float x, float y, float width, float height) {
+    // Sync starmap pointers each frame in case the viewport loaded a new map.
+    detailsPanel->starMap            = viewportPanel->GetStarMap();
+    detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+    outlinerPanel->starMap            = viewportPanel->GetStarMap();
+    outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+
+    dockArea.Render({ x, y, width, height });
+}
+
+void LevelEditorTab::RenderOverlays() {
+    dockArea.RenderOverlays();
+}
+
+void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
+    menuBar->SetMenus({
+        { "File",   { "New Project", "Open Project", "Save Project" } },
+        { "Edit",   { } },
+        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
+        { "Help",   { } },
+    });
+}
+
+void LevelEditorTab::SaveLayout(const std::string& filePath) const {
+    std::unordered_map<std::string, std::string> data;
+    dockArea.SaveLayout(data, "level");
+    LayoutSerializer::Save(filePath, data);
+}
+
+void LevelEditorTab::LoadLayout(const std::string& filePath) {
+    std::unordered_map<std::string, std::string> data;
+    if (LayoutSerializer::Load(filePath, data))
+        dockArea.LoadLayout(data, "level");
+}
+
+void LevelEditorTab::ResetLayout() {
+    BuildDefaultLayout();
+}
+
+void LevelEditorTab::SaveLayoutAs() {
+    std::string dir = (std::filesystem::path(getenv("USERPROFILE") ? getenv("USERPROFILE") :
+                        (getenv("HOME") ? getenv("HOME") : ".")) / ".starengine").string();
+    std::string path = NativeFileDialog::SaveFile(
+        "Save Layout", dir, "my_layout.cfg", "Layout Files", "*.cfg");
+    if (!path.empty()) {
+        if (path.size() < 4 || path.substr(path.size() - 4) != ".cfg")
+            path += ".cfg";
+        SaveLayout(path);
+    }
+}
+
+void LevelEditorTab::LoadLayoutFromDialog() {
+    std::string dir = (std::filesystem::path(getenv("USERPROFILE") ? getenv("USERPROFILE") :
+                        (getenv("HOME") ? getenv("HOME") : ".")) / ".starengine").string();
+    std::string path = NativeFileDialog::OpenFile(
+        "Load Layout", dir, "Layout Files", "*.cfg");
+    if (!path.empty())
+        LoadLayout(path);
+}
+
+void LevelEditorTab::TogglePanelVisible(const std::string& name) {
+    bool current = dockArea.IsPanelVisible(name);
+    dockArea.SetPanelVisible(name, !current);
+}

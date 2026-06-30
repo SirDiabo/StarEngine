@@ -10,11 +10,8 @@ void OutlinerPanel::Render() {
     DrawRectangleRec(bounds, {38, 38, 42, 255});
     DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
 
-    DrawText("Outliner", (int)bounds.x + 8, (int)bounds.y + 8, 13, {160, 160, 170, 255});
-    DrawLine((int)bounds.x + 4, (int)bounds.y + 24, (int)(bounds.x + bounds.width - 4), (int)bounds.y + 24, {60, 60, 65, 255});
-
     Vector2 mp = GetMousePosition();
-    float y = bounds.y + 32;
+    float y = bounds.y + 4;
     float rowH = 20.0f;
 
     if (!starMap) {
