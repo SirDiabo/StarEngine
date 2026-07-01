@@ -56,11 +56,15 @@ Matrix Actor::GetWorldMatrix() const {
 void Actor::AddComponent(Component* component) {
     components.push_back(component);
     component->parent = GetRootComponent();
+    if (MeshComponent* mc = dynamic_cast<MeshComponent*>(component)) {
+        meshComponent = mc;
+    }
 }
 
 void Actor::RemoveComponent(Component* component) {
     auto it = std::find(components.begin(), components.end(), component);
     if (it != components.end()) {
+        if (meshComponent == component) meshComponent = nullptr;
         components.erase(it);
         delete component;
     }

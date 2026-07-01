@@ -4,7 +4,6 @@
 
 class MeshComponent : public SceneComponent {
 public:
-    Mesh mesh = {0};
     std::string meshPath;
 
     void GetEditorProperties(PropertyList& outProperties) override;

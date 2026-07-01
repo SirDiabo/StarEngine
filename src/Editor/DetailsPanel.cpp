@@ -1,6 +1,8 @@
 #include "DetailsPanel.h"
+#include "Core/StarAsset.h"
 #include "raygui.h"
 #include "raylib.h"
+#include <filesystem>
 #include <cstdio>
 
 void DetailsPanel::Initialize() {
@@ -57,6 +59,17 @@ void DetailsPanel::Render() {
 
     DrawText(inst.className.c_str(), (int)x + 8, (int)y, 13, WHITE);
     y += 20;
+
+    if (!inst.meshAssetPath.empty()) {
+        StarAsset asset;
+        std::string meshLabel = "Mesh: (missing)";
+        if (StarAsset::LoadFromFile(inst.meshAssetPath, asset) && !asset.sourcePath.empty()) {
+            meshLabel = "Mesh: " + std::filesystem::path(asset.sourcePath).filename().string();
+        }
+        DrawText(meshLabel.c_str(), (int)x + 8, (int)y, 11, {150, 180, 220, 255});
+        y += 18;
+    }
+
     DrawText("Name", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
     y += 14;
     Rectangle nameRect = {x + 8, y, w - 16, 18};

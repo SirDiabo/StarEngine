@@ -1,8 +1,10 @@
 #include "ViewportPanel.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
+#include "Runtime/Components/MeshComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Core/StarAsset.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <filesystem>
@@ -34,6 +36,52 @@ void ViewportPanel::Initialize() {
 
 ViewportPanel::~ViewportPanel() {
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
+    UnloadMeshCache();
+}
+
+void ViewportPanel::UnloadMeshCache() {
+    for (auto& kv : meshCache) UnloadModel(kv.second);
+    meshCache.clear();
+}
+
+Model* ViewportPanel::GetOrLoadModel(const std::string& sourceMeshPath) {
+    auto it = meshCache.find(sourceMeshPath);
+    if (it != meshCache.end()) return &it->second;
+
+    if (sourceMeshPath.empty() || !FileExists(sourceMeshPath.c_str())) return nullptr;
+
+    Model model = LoadModel(sourceMeshPath.c_str());
+    if (model.meshCount == 0) {
+        UnloadModel(model);
+        return nullptr;
+    }
+
+    auto inserted = meshCache.emplace(sourceMeshPath, model);
+    return &inserted.first->second;
+}
+
+void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, Vector3 pos, Vector3 rot, Vector3 scale, Color tint) {
+    Model* model = nullptr;
+    if (!meshAssetPath.empty()) {
+        StarAsset asset;
+        if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
+            model = GetOrLoadModel(asset.sourcePath);
+        }
+    }
+
+    if (model) {
+        Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
+        Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+        model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
+        DrawModel(*model, pos, 1.0f, tint);
+    } else {
+        DrawCube(pos, scale.x, scale.y, scale.z, tint);
+        DrawCubeWires(pos, scale.x, scale.y, scale.z, {0, 0, 0, 120});
+        if (!meshAssetPath.empty()) {
+            // A mesh is referenced but couldn't be resolved
+            DrawCubeWires(pos, scale.x * 1.08f, scale.y * 1.08f, scale.z * 1.08f, {220, 40, 200, 200});
+        }
+    }
 }
 
 void ViewportPanel::EnsureRenderTarget(int width, int height) {
@@ -85,6 +133,49 @@ void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenP
     inst.posY = 0;
     inst.posZ = worldZ;
     inst.scaleX = inst.scaleY = inst.scaleZ = 50.0f;
+
+    starMap.AddInstance(inst);
+    selectedActorIndex = (int)starMap.GetInstances().size() - 1;
+    mapDirty = true;
+}
+
+void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 screenPos) {
+    if (!mapLoaded) return;
+
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
+
+    if (!CheckCollisionPointRec(screenPos, client)) return;
+
+    float u = (screenPos.x - client.x) / client.width;
+    float v = (screenPos.y - client.y) / client.height;
+
+    Ray ray = GetScreenToWorldRayEx(
+        {u * (float)renderTargetWidth, v * (float)renderTargetHeight},
+        camera, renderTargetWidth, renderTargetHeight);
+
+    float worldX = 0, worldZ = 0;
+    if (fabsf(ray.direction.y) > 0.001f) {
+        float t = -ray.position.y / ray.direction.y;
+        worldX = ray.position.x + ray.direction.x * t;
+        worldZ = ray.position.z + ray.direction.z * t;
+    }
+
+    StarAsset asset;
+    StarAsset::LoadFromFile(assetPath, asset);
+    fs::path src = asset.sourcePath.empty() ? fs::path(assetPath) : fs::path(asset.sourcePath);
+    std::string baseName = src.stem().string();
+
+    ActorInstance inst;
+    inst.name = baseName + "_" + std::to_string(starMap.GetInstances().size() + 1);
+    inst.className = "StaticMeshActor";
+    inst.meshAssetPath = assetPath;
+    inst.posX = worldX;
+    inst.posY = 0;
+    inst.posZ = worldZ;
+    // Mesh scale is a 1.0 = original-size multiplier, unlike the placeholder
+    // box scale (which is an absolute box dimension) used by graph actors.
+    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
@@ -209,18 +300,22 @@ void ViewportPanel::RenderScene() {
     if (playing) {
         for (const auto& actor : World::Get().GetActors()) {
             Vector3 pos = actor->position;
+            Vector3 rot = actor->rotation;
             Vector3 sc  = actor->scale;
-            DrawCube(pos, sc.x, sc.y, sc.z, {100, 200, 100, 255});
-            DrawCubeWires(pos, sc.x, sc.y, sc.z, {0, 0, 0, 120});
+            MeshComponent* mc = actor->GetMeshComponent();
+            std::string meshAssetPath = mc ? mc->meshPath : std::string();
+            Color tint = meshAssetPath.empty() ? Color{100, 200, 100, 255} : WHITE;
+            DrawInstanceOrMesh(meshAssetPath, pos, rot, sc, tint);
         }
     } else {
         const auto& instances = starMap.GetInstances();
         for (size_t i = 0; i < instances.size(); i++) {
             const ActorInstance& inst = instances[i];
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+            Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
+            Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
             Color color = (selectedActorIndex == (int)i) ? Color{255, 200, 50, 255} : ClassColor(inst.className);
-            DrawCube(pos, inst.scaleX, inst.scaleY, inst.scaleZ, color);
-            DrawCubeWires(pos, inst.scaleX, inst.scaleY, inst.scaleZ, {0, 0, 0, 120});
+            DrawInstanceOrMesh(inst.meshAssetPath, pos, rot, scl, color);
         }
     }
 
@@ -312,6 +407,11 @@ Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
                      auto* behavior = new StargraphBehavior(Stargraph{});
                      behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
                      actor->SetGraphBehavior(behavior);
+                 }
+                 if (!inst.meshAssetPath.empty()) {
+                     auto* meshComp = new MeshComponent();
+                     meshComp->SetMeshPath(inst.meshAssetPath);
+                     actor->AddComponent(meshComp);
                  }
              }
              World::Get().BeginPlay();

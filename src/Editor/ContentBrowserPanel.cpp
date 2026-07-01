@@ -1,5 +1,9 @@
 #include "ContentBrowserPanel.h"
 #include "Core/Project.h"
+#include "Core/AssetRegistry.h"
+#include "Core/StarAsset.h"
+#include "Core/Module.h"
+#include "NativeFileDialog.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -154,6 +158,36 @@ void ContentBrowserPanel::CancelPendingCreate() {
     isCreatingNewItem = false;
 }
 
+void ContentBrowserPanel::ImportStaticMesh() {
+    std::string path = NativeFileDialog::OpenFile(
+        "Import Static Mesh", "", "Static Mesh (obj, gltf, glb, iqm)", "*.obj;*.gltf;*.glb;*.iqm");
+    if (path.empty()) return;
+
+    fs::path src(path);
+    std::error_code ec;
+    fs::path absoluteSrc = fs::absolute(src, ec);
+    if (ec) absoluteSrc = src;
+
+    std::string assetName = src.stem().string();
+    fs::path folder = GetCurrentFolderPath();
+    fs::path target = folder / (assetName + ".starasset");
+    int suffix = 1;
+    while (fs::exists(target)) {
+        target = folder / (assetName + "_" + std::to_string(suffix++) + ".starasset");
+    }
+
+    StarAsset asset;
+    asset.assetType = "StaticMesh";
+    asset.sourcePath = absoluteSrc.string();
+
+    if (asset.SaveToFile(target.string())) {
+        AssetRegistry::Get().RegisterAsset(target.string(), asset.sourcePath, target.string());
+        importStatus = "Imported " + target.stem().string();
+    } else {
+        importStatus = "Import failed: could not write " + target.string();
+    }
+}
+
 void ContentBrowserPanel::Render() {
     if (!iconsLoaded && IsWindowReady()) LoadIcons();
 
@@ -167,6 +201,8 @@ void ContentBrowserPanel::Render() {
 
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
+    const bool meshImportEnabled = ModuleManager::Get().IsModuleEnabled("Meshes");
+    const float importBarHeight = meshImportEnabled ? 30.0f : 0.0f;
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
@@ -180,7 +216,7 @@ void ContentBrowserPanel::Render() {
         if (GuiButton(backBtn, "< Back")) NavigateUp();
     }
 
-    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
+    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22 - importBarHeight};
     std::vector<ContentEntry> entries = ScanCurrentFolder();
 
     float padding = 8.0f;
@@ -300,8 +336,13 @@ void ContentBrowserPanel::Render() {
     }
 
     if (contextMenuOpen) {
-        const std::vector<AssetTypeInfo>& assetTypes = AssetTypeRegistry::Get().GetFilteredTypes();
-        float menuHeight = 30.0f * (1 + assetTypes.size());
+        const std::vector<AssetTypeInfo>& allAssetTypes = AssetTypeRegistry::Get().GetFilteredTypes();
+        std::vector<const AssetTypeInfo*> creatableTypes;
+        for (const AssetTypeInfo& info : allAssetTypes) {
+            if (info.createAsset) creatableTypes.push_back(&info);
+        }
+
+        float menuHeight = 30.0f * (1 + creatableTypes.size());
         float popupX = contextMenuPos.x;
         float popupY = contextMenuPos.y;
         if (popupX + 150 > bounds.x + bounds.width)  popupX = bounds.x + bounds.width - 150;
@@ -323,11 +364,20 @@ void ContentBrowserPanel::Render() {
             Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
             if (GuiButton(folderBtn, "New Folder")) BeginCreateFolder();
 
-            for (size_t i = 0; i < assetTypes.size(); i++) {
+            for (size_t i = 0; i < creatableTypes.size(); i++) {
                 Rectangle btn = {popup.x + 4, popup.y + 4 + (float)(i + 1) * 30, popup.width - 8, 24};
-                std::string label = "New " + assetTypes[i].typeName;
-                if (GuiButton(btn, label.c_str())) BeginCreateAsset(assetTypes[i]);
+                std::string label = "New " + creatableTypes[i]->typeName;
+                if (GuiButton(btn, label.c_str())) BeginCreateAsset(*creatableTypes[i]);
             }
+        }
+    }
+
+    // Import bar (bottom strip, always visible regardless of scroll/context menu)
+    if (meshImportEnabled) {
+        Rectangle importBar = {client.x + 8, client.y + client.height - importBarHeight + 4, client.width - 16, 22};
+        if (GuiButton(importBar, "Import Static Mesh...")) ImportStaticMesh();
+        if (!importStatus.empty()) {
+            DrawText(importStatus.c_str(), (int)importBar.x, (int)(importBar.y - 14), 11, {150, 200, 150, 255});
         }
     }
 }

@@ -43,6 +43,8 @@ void LevelEditorTab::Initialize() {
     contentPanel->onAssetDragged = [this](const std::string& path, const std::string& ext, Vector2 dropPos) {
         if (ext == ".staractor" || ext == ".stargraph")
             viewportPanel->DropActorAsset(path, dropPos);
+        else if (ext == ".starasset")
+            viewportPanel->DropStaticMeshAsset(path, dropPos);
     };
 
     dockArea.SetPanels({

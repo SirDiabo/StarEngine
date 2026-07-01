@@ -3,6 +3,7 @@
 #include "Runtime/StarMap.h"
 #include "raylib.h"
 #include <string>
+#include <unordered_map>
 
 class ViewportPanel : public Panel {
 public:
@@ -13,6 +14,7 @@ public:
     void LoadMap(const std::string& path);
     void SaveMap();
     void DropActorAsset(const std::string& assetPath, Vector2 screenPos);
+    void DropStaticMeshAsset(const std::string& assetPath, Vector2 screenPos);
     const StarMap* GetStarMap() const { return &starMap; }
     int* GetSelectedActorIndexPtr() { return &selectedActorIndex; }
     const std::string& GetMapPath() const { return mapPath; }
@@ -26,6 +28,9 @@ private:
     void RenderScene();
     void RenderToolbar();
     void HandleMapInteraction(Rectangle client);
+    Model* GetOrLoadModel(const std::string& sourceMeshPath);
+    void DrawInstanceOrMesh(const std::string& meshAssetPath, Vector3 pos, Vector3 rot, Vector3 scale, Color tint);
+    void UnloadMeshCache();
 
     Camera3D camera{};
     RenderTexture2D renderTarget{};
@@ -58,6 +63,8 @@ private:
     float savedPitch = 35.0f;
     float savedOrbitRadius = 800.0f;
     Vector3 savedCameraTarget{0, 0, 0};
+
+    std::unordered_map<std::string, Model> meshCache;
 
     static const float toolbarHeight;
 };

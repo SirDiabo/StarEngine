@@ -1,0 +1,9 @@
+name=Meshes
+version=1.0
+description=Static mesh import (OBJ, glTF) and rendering via raylib's model loader.
+author=StarEngine
+category=Rendering
+enabledByDefault=true
+dependencies=
+assetTypes=.starasset
+nodeCategories=

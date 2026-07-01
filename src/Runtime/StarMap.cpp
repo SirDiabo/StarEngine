@@ -22,6 +22,7 @@ bool StarMap::SaveToFile(const std::string& path) const {
         out << "Name=" << inst.name << "\n";
         out << "Class=" << inst.className << "\n";
         out << "Graph=" << inst.graphAssetPath << "\n";
+        out << "Mesh=" << inst.meshAssetPath << "\n";
         out << "PosX=" << inst.posX << "\n";
         out << "PosY=" << inst.posY << "\n";
         out << "PosZ=" << inst.posZ << "\n";
@@ -83,6 +84,7 @@ bool StarMap::LoadFromFile(const std::string& path) {
             if (const std::string* v = Find(section, "Name"))   inst.name  = *v;
             if (const std::string* v = Find(section, "Class"))  inst.className = *v;
             if (const std::string* v = Find(section, "Graph"))  inst.graphAssetPath = *v;
+            if (const std::string* v = Find(section, "Mesh"))   inst.meshAssetPath = *v;
             if (const std::string* v = Find(section, "PosX"))   inst.posX   = std::stof(*v);
             if (const std::string* v = Find(section, "PosY"))   inst.posY   = std::stof(*v);
             if (const std::string* v = Find(section, "PosZ"))   inst.posZ   = std::stof(*v);

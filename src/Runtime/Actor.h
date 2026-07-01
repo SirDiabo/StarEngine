@@ -1,6 +1,7 @@
 #pragma once
 #include "Object.h"
 #include "GraphBehavior.h"
+#include "Components/MeshComponent.h"
 #include "raylib.h"
 #include <vector>
 
@@ -30,6 +31,7 @@ public:
     void AddComponent(Component* component);
     void RemoveComponent(Component* component);
     Component* GetRootComponent();
+    MeshComponent* GetMeshComponent() const { return meshComponent; }
 
 protected:
     virtual void OnBeginPlay() {}
@@ -40,4 +42,5 @@ private:
     GraphBehavior* graphBehavior = nullptr;
     std::vector<Component*> components;
     Component* rootComponent = nullptr;
+    MeshComponent* meshComponent = nullptr;
 };

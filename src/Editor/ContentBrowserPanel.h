@@ -34,6 +34,7 @@ private:
     void BeginCreateAsset(const AssetTypeInfo& info);
     void ConfirmPendingCreate();
     void CancelPendingCreate();
+    void ImportStaticMesh();
 
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
     void LoadIcons();
@@ -58,6 +59,8 @@ private:
     bool isCreatingFolder = false;
     std::string pendingExtension;
     char nameBuffer[128] = "";
+
+    std::string importStatus;
 
     float tileSize = 80.0f;
 
