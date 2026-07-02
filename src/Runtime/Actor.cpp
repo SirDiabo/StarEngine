@@ -58,6 +58,10 @@ void Actor::AddComponent(Component* component) {
     component->parent = GetRootComponent();
     if (MeshComponent* mc = dynamic_cast<MeshComponent*>(component)) {
         meshComponent = mc;
+    } else if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(component)) {
+        collisionComponent = cc;
+    } else if (AudioComponent* ac = dynamic_cast<AudioComponent*>(component)) {
+        audioComponent = ac;
     }
 }
 
@@ -65,6 +69,8 @@ void Actor::RemoveComponent(Component* component) {
     auto it = std::find(components.begin(), components.end(), component);
     if (it != components.end()) {
         if (meshComponent == component) meshComponent = nullptr;
+        if (collisionComponent == component) collisionComponent = nullptr;
+        if (audioComponent == component) audioComponent = nullptr;
         components.erase(it);
         delete component;
     }

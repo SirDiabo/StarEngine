@@ -1,9 +1,12 @@
 #pragma once
 #include "Core/Panel.h"
 #include "Runtime/StarMap.h"
+#include "Modules/Stargraph/Stargraph.h"
 #include "raylib.h"
 #include <string>
 #include <unordered_map>
+
+class Actor;
 
 class ViewportPanel : public Panel {
 public:
@@ -29,7 +32,12 @@ private:
     void RenderToolbar();
     void HandleMapInteraction(Rectangle client);
     Model* GetOrLoadModel(const std::string& sourceMeshPath);
-    void DrawInstanceOrMesh(const std::string& meshAssetPath, Vector3 pos, Vector3 rot, Vector3 scale, Color tint);
+    Texture2D* GetOrLoadTexture(const std::string& textureAssetPath);
+    const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
+    void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
+                             Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
+    void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
+    void SpawnActorFromInstance(const ActorInstance& inst);
     void UnloadMeshCache();
 
     Camera3D camera{};
@@ -65,6 +73,8 @@ private:
     Vector3 savedCameraTarget{0, 0, 0};
 
     std::unordered_map<std::string, Model> meshCache;
+    std::unordered_map<std::string, Texture2D> textureCache;
+    std::unordered_map<std::string, Stargraph> classGraphCache;
 
     static const float toolbarHeight;
 };

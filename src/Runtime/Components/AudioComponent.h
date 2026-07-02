@@ -9,6 +9,7 @@ public:
     bool looping = false;
     float volume = 1.0f;
 
+    const char* GetClassName() const override { return "AudioComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
 };

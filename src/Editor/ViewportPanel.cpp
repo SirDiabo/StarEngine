@@ -2,11 +2,15 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/MeshComponent.h"
+#include "Runtime/Components/CollisionComponent.h"
+#include "Runtime/Components/AudioComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Core/StarAsset.h"
+#include "Core/StarMaterial.h"
 #include "raygui.h"
 #include "raymath.h"
+#include "rlgl.h"
 #include <filesystem>
 #include <cmath>
 #include <cstdio>
@@ -42,6 +46,8 @@ ViewportPanel::~ViewportPanel() {
 void ViewportPanel::UnloadMeshCache() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
     meshCache.clear();
+    for (auto& kv : textureCache) UnloadTexture(kv.second);
+    textureCache.clear();
 }
 
 Model* ViewportPanel::GetOrLoadModel(const std::string& sourceMeshPath) {
@@ -60,7 +66,36 @@ Model* ViewportPanel::GetOrLoadModel(const std::string& sourceMeshPath) {
     return &inserted.first->second;
 }
 
-void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, Vector3 pos, Vector3 rot, Vector3 scale, Color tint) {
+Texture2D* ViewportPanel::GetOrLoadTexture(const std::string& textureAssetPath) {
+    auto it = textureCache.find(textureAssetPath);
+    if (it != textureCache.end()) return &it->second;
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(textureAssetPath, asset) || asset.assetType != "Texture") return nullptr;
+    if (asset.sourcePath.empty() || !FileExists(asset.sourcePath.c_str())) return nullptr;
+
+    Texture2D tex = LoadTexture(asset.sourcePath.c_str());
+    if (tex.id == 0) return nullptr;
+
+    auto inserted = textureCache.emplace(textureAssetPath, tex);
+    return &inserted.first->second;
+}
+
+const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
+    auto it = classGraphCache.find(graphAssetPath);
+    if (it != classGraphCache.end()) return &it->second;
+
+    if (graphAssetPath.empty() || !fs::exists(graphAssetPath)) return nullptr;
+
+    Stargraph graph;
+    if (!graph.LoadFromFile(graphAssetPath)) return nullptr;
+
+    auto inserted = classGraphCache.emplace(graphAssetPath, std::move(graph));
+    return &inserted.first->second;
+}
+
+void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
+                                        Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor) {
     Model* model = nullptr;
     if (!meshAssetPath.empty()) {
         StarAsset asset;
@@ -73,15 +108,53 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, Vector3
         Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
         Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
+
+        Color tint = WHITE;
+        if (!materialAssetPath.empty()) {
+            StarMaterial material;
+            if (StarMaterial::LoadFromFile(materialAssetPath, material)) {
+                tint = material.baseColor;
+                if (!material.textureAssetPath.empty()) {
+                    if (Texture2D* tex = GetOrLoadTexture(material.textureAssetPath)) {
+                        for (int i = 0; i < model->materialCount; i++) {
+                            model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
+                        }
+                    }
+                }
+            }
+        }
+
         DrawModel(*model, pos, 1.0f, tint);
+        if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
     } else {
-        DrawCube(pos, scale.x, scale.y, scale.z, tint);
+        DrawCube(pos, scale.x, scale.y, scale.z, fallbackColor);
         DrawCubeWires(pos, scale.x, scale.y, scale.z, {0, 0, 0, 120});
         if (!meshAssetPath.empty()) {
-            // A mesh is referenced but couldn't be resolved
+            // A mesh is referenced but couldn't be resolved.
             DrawCubeWires(pos, scale.x * 1.08f, scale.y * 1.08f, scale.z * 1.08f, {220, 40, 200, 200});
         }
     }
+}
+
+void ViewportPanel::DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color) {
+    rlPushMatrix();
+    rlTranslatef(pos.x, pos.y, pos.z);
+    rlRotatef(rot.y, 0, 1, 0);
+    rlRotatef(rot.x, 1, 0, 0);
+    rlRotatef(rot.z, 0, 0, 1);
+
+    if (comp.collisionShape == "Sphere") {
+        DrawSphereWires({0, 0, 0}, comp.collisionRadius, 8, 12, color);
+    } else if (comp.collisionShape == "Capsule") {
+        float half = comp.collisionHeight * 0.5f;
+        DrawCylinderWires({0, -half, 0}, comp.collisionRadius, comp.collisionRadius, comp.collisionHeight, 12, color);
+        DrawSphereWires({0, half, 0}, comp.collisionRadius, 8, 12, color);
+        DrawSphereWires({0, -half, 0}, comp.collisionRadius, 8, 12, color);
+    } else {
+        DrawCubeWiresV({0, 0, 0}, {comp.scaleX, comp.scaleY, comp.scaleZ}, color);
+    }
+
+    rlPopMatrix();
 }
 
 void ViewportPanel::EnsureRenderTarget(int width, int height) {
@@ -98,6 +171,7 @@ void ViewportPanel::LoadMap(const std::string& path) {
     mapLoaded = true;
     mapDirty = false;
     selectedActorIndex = -1;
+    classGraphCache.clear();
 }
 
 void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenPos) {
@@ -132,7 +206,7 @@ void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenP
     inst.posX = worldX;
     inst.posY = 0;
     inst.posZ = worldZ;
-    inst.scaleX = inst.scaleY = inst.scaleZ = 50.0f;
+    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
@@ -180,6 +254,58 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
     mapDirty = true;
+}
+
+void ViewportPanel::SpawnActorFromInstance(const ActorInstance& inst) {
+    Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
+    actor->position = {inst.posX, inst.posY, inst.posZ};
+    actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
+    actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
+
+    if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
+        auto* behavior = new StargraphBehavior(Stargraph{});
+        behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
+        actor->SetGraphBehavior(behavior);
+
+        for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
+            Component* comp = nullptr;
+            if (decl.componentType == "MeshComponent") {
+                auto* mesh = new MeshComponent();
+                mesh->SetMeshPath(decl.meshAssetPath);
+                mesh->SetMaterialPath(decl.materialAssetPath);
+                comp = mesh;
+            } else if (decl.componentType == "CollisionComponent") {
+                auto* collision = new CollisionComponent();
+                collision->shapeType = decl.collisionShape == "Sphere" ? CollisionComponent::Sphere
+                                     : decl.collisionShape == "Capsule" ? CollisionComponent::Capsule
+                                     : CollisionComponent::Box;
+                collision->radius = decl.collisionRadius;
+                collision->height = decl.collisionHeight;
+                comp = collision;
+            } else if (decl.componentType == "AudioComponent") {
+                auto* audio = new AudioComponent();
+                audio->soundPath = decl.soundAssetPath;
+                audio->autoPlay = decl.autoPlay;
+                audio->looping = decl.looping;
+                audio->volume = decl.volume;
+                comp = audio;
+            } else {
+                comp = new SceneComponent();
+            }
+
+            comp->position = {decl.posX, decl.posY, decl.posZ};
+            comp->rotation = {decl.rotX, decl.rotY, decl.rotZ};
+            comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
+            actor->AddComponent(comp);
+        }
+    }
+
+    if (!inst.meshAssetPath.empty()) {
+        auto* meshComp = new MeshComponent();
+        meshComp->SetMeshPath(inst.meshAssetPath);
+        meshComp->SetMaterialPath(inst.materialAssetPath);
+        actor->AddComponent(meshComp);
+    }
 }
 
 void ViewportPanel::SaveMap() {
@@ -294,18 +420,31 @@ static Color ClassColor(const std::string& className) {
 }
 
 void ViewportPanel::RenderScene() {
+    const float placeholderSize = 50.0f;
+
     BeginMode3D(camera);
     DrawGrid(40, 100.0f);
 
     if (playing) {
         for (const auto& actor : World::Get().GetActors()) {
-            Vector3 pos = actor->position;
-            Vector3 rot = actor->rotation;
-            Vector3 sc  = actor->scale;
-            MeshComponent* mc = actor->GetMeshComponent();
-            std::string meshAssetPath = mc ? mc->meshPath : std::string();
-            Color tint = meshAssetPath.empty() ? Color{100, 200, 100, 255} : WHITE;
-            DrawInstanceOrMesh(meshAssetPath, pos, rot, sc, tint);
+            Vector3 basePos = actor->position;
+            Vector3 baseRot = actor->rotation;
+            Vector3 baseScale = actor->scale;
+
+            bool drewAnyMesh = false;
+            for (Component* comp : actor->GetComponents()) {
+                if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
+                    Vector3 pos = Vector3Add(basePos, comp->position);
+                    Vector3 rot = Vector3Add(baseRot, comp->rotation);
+                    Vector3 scl = Vector3Multiply(baseScale, comp->scale);
+                    DrawInstanceOrMesh(mc->meshPath, mc->materialPath, pos, rot, scl, false, WHITE);
+                    drewAnyMesh = true;
+                }
+            }
+            if (!drewAnyMesh) {
+                Vector3 boxSize = {placeholderSize * baseScale.x, placeholderSize * baseScale.y, placeholderSize * baseScale.z};
+                DrawInstanceOrMesh("", "", basePos, baseRot, boxSize, false, {100, 200, 100, 255});
+            }
         }
     } else {
         const auto& instances = starMap.GetInstances();
@@ -314,8 +453,36 @@ void ViewportPanel::RenderScene() {
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
             Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
             Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
-            Color color = (selectedActorIndex == (int)i) ? Color{255, 200, 50, 255} : ClassColor(inst.className);
-            DrawInstanceOrMesh(inst.meshAssetPath, pos, rot, scl, color);
+            bool selected = (selectedActorIndex == (int)i);
+            Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
+
+            if (!inst.graphAssetPath.empty()) {
+                const Stargraph* classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
+                bool drewAnyMesh = false;
+
+                if (classGraph) {
+                    for (const ComponentDecl& comp : classGraph->GetComponents()) {
+                        Vector3 compPos = {pos.x + comp.posX, pos.y + comp.posY, pos.z + comp.posZ};
+                        Vector3 compRot = {rot.x + comp.rotX, rot.y + comp.rotY, rot.z + comp.rotZ};
+                        Vector3 compScale = {scl.x * comp.scaleX, scl.y * comp.scaleY, scl.z * comp.scaleZ};
+
+                        if (comp.componentType == "MeshComponent") {
+                            DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPath, compPos, compRot,
+                                                compScale, selected, fallbackColor);
+                            drewAnyMesh = true;
+                        } else if (comp.componentType == "CollisionComponent" && selected) {
+                            DrawCollisionShape(comp, compPos, compRot, {90, 200, 255, 200});
+                        }
+                    }
+                }
+
+                if (!drewAnyMesh) {
+                    Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
+                    DrawInstanceOrMesh("", "", pos, rot, boxSize, false, fallbackColor);
+                }
+            } else {
+                DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPath, pos, rot, scl, selected, fallbackColor);
+            }
         }
     }
 
@@ -399,20 +566,7 @@ Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
              savedCameraTarget = cameraTarget;
              if (flying) { flying = false; ShowCursor(); }
              for (const ActorInstance& inst : starMap.GetInstances()) {
-                 Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
-                 actor->position = {inst.posX, inst.posY, inst.posZ};
-                 actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
-                 actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
-                 if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
-                     auto* behavior = new StargraphBehavior(Stargraph{});
-                     behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
-                     actor->SetGraphBehavior(behavior);
-                 }
-                 if (!inst.meshAssetPath.empty()) {
-                     auto* meshComp = new MeshComponent();
-                     meshComp->SetMeshPath(inst.meshAssetPath);
-                     actor->AddComponent(meshComp);
-                 }
+                 SpawnActorFromInstance(inst);
              }
              World::Get().BeginPlay();
          }

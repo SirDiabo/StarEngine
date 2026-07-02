@@ -18,6 +18,9 @@ public:
 
     virtual void GetProperties(PropertyList& outProperties) override {
         Object::GetProperties(outProperties);
+        outProperties.AddVector3("Position", &position.x);
+        outProperties.AddVector3("Rotation", &rotation.x);
+        outProperties.AddVector3("Scale", &scale.x);
         GetEditorProperties(outProperties);
     }
 };

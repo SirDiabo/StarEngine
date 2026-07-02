@@ -1,6 +1,8 @@
 #pragma once
 #include "Core/Panel.h"
 #include "Core/AssetTypeRegistry.h"
+#include "Core/StarMaterial.h"
+#include "AssetPickerPopup.h"
 #include "raylib.h"
 #include <string>
 #include <vector>
@@ -34,11 +36,17 @@ private:
     void BeginCreateAsset(const AssetTypeInfo& info);
     void ConfirmPendingCreate();
     void CancelPendingCreate();
+    void ImportAsset(const std::string& dialogTitle, const std::string& filterDesc,
+                      const std::string& filterExt, const std::string& assetType,
+                      const std::string& extension);
     void ImportStaticMesh();
+    void ImportTexture();
 
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
     void LoadIcons();
     void UnloadIcons();
+    void OpenMaterialEditor(const std::string& fullPath);
+    void RenderMaterialEditor();
 
     std::string currentRelativeFolder;
     int selectedIndex = -1;
@@ -66,4 +74,11 @@ private:
 
     std::unordered_map<std::string, Texture2D> icons;
     bool iconsLoaded = false;
+
+    bool materialEditorOpen = false;
+    std::string materialEditorPath;
+    StarMaterial materialEditorData;
+    char materialColorBuf[4][8] = {"", "", "", ""};
+    int materialActiveField = 0;
+    AssetPickerPopup materialTexturePicker;
 };

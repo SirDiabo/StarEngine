@@ -158,9 +158,10 @@ void ContentBrowserPanel::CancelPendingCreate() {
     isCreatingNewItem = false;
 }
 
-void ContentBrowserPanel::ImportStaticMesh() {
-    std::string path = NativeFileDialog::OpenFile(
-        "Import Static Mesh", "", "Static Mesh (obj, gltf, glb, iqm)", "*.obj;*.gltf;*.glb;*.iqm");
+void ContentBrowserPanel::ImportAsset(const std::string& dialogTitle, const std::string& filterDesc,
+                                       const std::string& filterExt, const std::string& assetType,
+                                       const std::string& extension) {
+    std::string path = NativeFileDialog::OpenFile(dialogTitle, "", filterDesc, filterExt);
     if (path.empty()) return;
 
     fs::path src(path);
@@ -170,14 +171,14 @@ void ContentBrowserPanel::ImportStaticMesh() {
 
     std::string assetName = src.stem().string();
     fs::path folder = GetCurrentFolderPath();
-    fs::path target = folder / (assetName + ".starasset");
+    fs::path target = folder / (assetName + extension);
     int suffix = 1;
     while (fs::exists(target)) {
-        target = folder / (assetName + "_" + std::to_string(suffix++) + ".starasset");
+        target = folder / (assetName + "_" + std::to_string(suffix++) + extension);
     }
 
     StarAsset asset;
-    asset.assetType = "StaticMesh";
+    asset.assetType = assetType;
     asset.sourcePath = absoluteSrc.string();
 
     if (asset.SaveToFile(target.string())) {
@@ -185,6 +186,102 @@ void ContentBrowserPanel::ImportStaticMesh() {
         importStatus = "Imported " + target.stem().string();
     } else {
         importStatus = "Import failed: could not write " + target.string();
+    }
+}
+
+void ContentBrowserPanel::ImportStaticMesh() {
+    ImportAsset("Import Static Mesh", "Static Mesh (obj, gltf, glb, iqm)", "*.obj;*.gltf;*.glb;*.iqm",
+                "StaticMesh", ".starasset");
+}
+
+void ContentBrowserPanel::ImportTexture() {
+    ImportAsset("Import Texture", "Texture (png, jpg, bmp)", "*.png;*.jpg;*.jpeg;*.bmp",
+                "Texture", ".startex");
+}
+
+void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
+    materialEditorPath = fullPath;
+    materialEditorData = StarMaterial{};
+    StarMaterial::LoadFromFile(fullPath, materialEditorData);
+
+    snprintf(materialColorBuf[0], 8, "%d", materialEditorData.baseColor.r);
+    snprintf(materialColorBuf[1], 8, "%d", materialEditorData.baseColor.g);
+    snprintf(materialColorBuf[2], 8, "%d", materialEditorData.baseColor.b);
+    snprintf(materialColorBuf[3], 8, "%d", materialEditorData.baseColor.a);
+    materialActiveField = 0;
+    materialTexturePicker.Close();
+    materialEditorOpen = true;
+}
+
+void ContentBrowserPanel::RenderMaterialEditor() {
+    if (!materialEditorOpen) return;
+
+    Vector2 mp = GetMousePosition();
+    Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 100, 220, 200};
+
+    DrawRectangleRec({bounds.x, bounds.y, bounds.width, bounds.height}, {0, 0, 0, 120});
+    DrawRectangleRec(box, {45, 45, 50, 255});
+    DrawRectangleLinesEx(box, 1, {90, 90, 98, 255});
+
+    std::string title = fs::path(materialEditorPath).stem().string();
+    DrawText(title.c_str(), (int)box.x + 8, (int)box.y + 6, 13, WHITE);
+
+    float y = box.y + 28;
+    DrawText("Base Color", (int)box.x + 8, (int)y, 11, {160, 160, 170, 255});
+    y += 16;
+
+    const char* channelLabels[4] = {"R", "G", "B", "A"};
+    unsigned char* channels[4] = {&materialEditorData.baseColor.r, &materialEditorData.baseColor.g,
+                                   &materialEditorData.baseColor.b, &materialEditorData.baseColor.a};
+    float chW = (box.width - 16 - 3 * 6) / 4;
+    for (int i = 0; i < 4; i++) {
+        float cx = box.x + 8 + i * (chW + 6);
+        DrawText(channelLabels[i], (int)cx, (int)y, 10, {140, 140, 150, 255});
+        Rectangle r = {cx, y + 12, chW, 18};
+        if (materialActiveField == i + 1) {
+            GuiTextBox(r, materialColorBuf[i], 8, true);
+            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
+                int v = atoi(materialColorBuf[i]);
+                *channels[i] = (unsigned char)(v < 0 ? 0 : (v > 255 ? 255 : v));
+                materialActiveField = 0;
+            }
+        } else {
+            DrawRectangleRec(r, {30, 30, 32, 255});
+            DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
+            DrawText(materialColorBuf[i], (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r))
+                materialActiveField = i + 1;
+        }
+    }
+    y += 38;
+
+    DrawRectangleRec({box.x + box.width - 34, y - 34, 24, 24}, materialEditorData.baseColor);
+    DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, {90, 90, 98, 255});
+
+    DrawText("Texture", (int)box.x + 8, (int)y, 11, {160, 160, 170, 255});
+    y += 14;
+    Rectangle texRow = {box.x + 8, y, box.width - 16, 18};
+    DrawRectangleRec(texRow, {30, 30, 32, 255});
+    DrawRectangleLinesEx(texRow, 1, {65, 65, 75, 255});
+    std::string texLabel = materialEditorData.textureAssetPath.empty()
+                                ? "None"
+                                : fs::path(materialEditorData.textureAssetPath).stem().string();
+    DrawText(texLabel.c_str(), (int)texRow.x + 4, (int)texRow.y + 3, 11, WHITE);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, texRow)) {
+        materialTexturePicker.Open({texRow.x, texRow.y + texRow.height}, ".startex");
+    }
+    y += 26;
+    std::string pickedTex;
+    if (materialTexturePicker.Render(pickedTex)) materialEditorData.textureAssetPath = pickedTex;
+
+    Rectangle saveBtn = {box.x + 8, box.y + box.height - 28, (box.width - 20) / 2, 22};
+    Rectangle closeBtn = {saveBtn.x + saveBtn.width + 4, saveBtn.y, saveBtn.width, 22};
+    if (GuiButton(saveBtn, "Save")) {
+        materialEditorData.SaveToFile(materialEditorPath);
+        materialEditorOpen = false;
+    }
+    if (GuiButton(closeBtn, "Cancel")) {
+        materialEditorOpen = false;
     }
 }
 
@@ -202,7 +299,7 @@ void ContentBrowserPanel::Render() {
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
     const bool meshImportEnabled = ModuleManager::Get().IsModuleEnabled("Meshes");
-    const float importBarHeight = meshImportEnabled ? 30.0f : 0.0f;
+    const float importBarHeight = meshImportEnabled ? 58.0f : 0.0f;
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
@@ -271,6 +368,9 @@ void ContentBrowserPanel::Render() {
             if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
                 if (entries[i].isFolder) {
                     NavigateInto(entries[i].displayName);
+                } else if (entries[i].extension == ".starmat") {
+                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
+                    OpenMaterialEditor(fullPath.string());
                 } else if (onAssetOpened) {
                     fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
                     onAssetOpened(fullPath.string(), entries[i].extension);
@@ -374,10 +474,16 @@ void ContentBrowserPanel::Render() {
 
     // Import bar (bottom strip, always visible regardless of scroll/context menu)
     if (meshImportEnabled) {
-        Rectangle importBar = {client.x + 8, client.y + client.height - importBarHeight + 4, client.width - 16, 22};
-        if (GuiButton(importBar, "Import Static Mesh...")) ImportStaticMesh();
+        Rectangle meshBar = {client.x + 8, client.y + client.height - importBarHeight + 4, client.width - 16, 22};
+        if (GuiButton(meshBar, "Import Static Mesh...")) ImportStaticMesh();
+
+        Rectangle texBar = {client.x + 8, meshBar.y + 26, client.width - 16, 22};
+        if (GuiButton(texBar, "Import Texture...")) ImportTexture();
+
         if (!importStatus.empty()) {
-            DrawText(importStatus.c_str(), (int)importBar.x, (int)(importBar.y - 14), 11, {150, 200, 150, 255});
+            DrawText(importStatus.c_str(), (int)meshBar.x, (int)(meshBar.y - 14), 11, {150, 200, 150, 255});
         }
     }
+
+    RenderMaterialEditor();
 }

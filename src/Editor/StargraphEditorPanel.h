@@ -2,6 +2,7 @@
 #include "Core/Panel.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
+#include "AssetPickerPopup.h"
 #include <string>
 #include <vector>
 
@@ -18,6 +19,7 @@ public:
 private:
     void RenderToolbar();
     void RenderComponentOutliner(Rectangle area);
+    void RenderComponentDetails(Rectangle panel, float& y);
     void RenderLeftPanel();
     void RenderGraph();
     void RenderRightPanel();
@@ -97,4 +99,17 @@ private:
     bool addComponentMenuOpen = false;
     Vector2 addComponentMenuPos{0, 0};
     static const float componentOutlinerHeight;
+
+    AssetPickerPopup componentMeshPicker;
+    AssetPickerPopup componentMaterialPicker;
+    int lastComponentDetailIndex = -1;
+    int componentActiveField = 0;
+    char compNameBuf[128] = "";
+    char compPosBuf[3][32] = {"", "", ""};
+    char compRotBuf[3][32] = {"", "", ""};
+    char compScaleBuf[3][32] = {"", "", ""};
+    char compRadiusBuf[32] = "";
+    char compHeightBuf[32] = "";
+    char compSoundBuf[256] = "";
+    char compVolumeBuf[32] = "";
 };

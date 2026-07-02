@@ -33,6 +33,9 @@ void LevelEditorTab::Initialize() {
     // Wire viewport -> details and outliner selection pointers.
     detailsPanel->starMap            = viewportPanel->GetStarMap();
     detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+    detailsPanel->onOpenAsset = [this](const std::string& path, const std::string& ext) {
+        if (onAssetOpened) onAssetOpened(path, ext);
+    };
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
 

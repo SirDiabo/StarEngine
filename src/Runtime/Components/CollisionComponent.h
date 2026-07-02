@@ -8,6 +8,7 @@ public:
     float radius = 50.0f;
     float height = 100.0f;
 
+    const char* GetClassName() const override { return "CollisionComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
 };

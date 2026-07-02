@@ -2,6 +2,8 @@
 #include "Object.h"
 #include "GraphBehavior.h"
 #include "Components/MeshComponent.h"
+#include "Components/CollisionComponent.h"
+#include "Components/AudioComponent.h"
 #include "raylib.h"
 #include <vector>
 
@@ -31,7 +33,10 @@ public:
     void AddComponent(Component* component);
     void RemoveComponent(Component* component);
     Component* GetRootComponent();
+    const std::vector<Component*>& GetComponents() const { return components; }
     MeshComponent* GetMeshComponent() const { return meshComponent; }
+    CollisionComponent* GetCollisionComponent() const { return collisionComponent; }
+    AudioComponent* GetAudioComponent() const { return audioComponent; }
 
 protected:
     virtual void OnBeginPlay() {}
@@ -43,4 +48,6 @@ private:
     std::vector<Component*> components;
     Component* rootComponent = nullptr;
     MeshComponent* meshComponent = nullptr;
+    CollisionComponent* collisionComponent = nullptr;
+    AudioComponent* audioComponent = nullptr;
 };

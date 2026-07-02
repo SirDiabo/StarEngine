@@ -44,9 +44,31 @@ struct Variable {
     std::string value;
 };
 
+// Design-time declaration of a component owned by a StarActor class (.staractor asset).
+// Instantiated into a real runtime Component when the class is spawned into the World.
 struct ComponentDecl {
-    std::string componentType;
+    std::string componentType = "SceneComponent";
     std::string name;
+
+    // Transform relative to the actor's root component.
+    float posX = 0, posY = 0, posZ = 0;
+    float rotX = 0, rotY = 0, rotZ = 0;
+    float scaleX = 1, scaleY = 1, scaleZ = 1;
+
+    // MeshComponent
+    std::string meshAssetPath;
+    std::string materialAssetPath;
+
+    // CollisionComponent
+    std::string collisionShape = "Box";
+    float collisionRadius = 50.0f;
+    float collisionHeight = 100.0f;
+
+    // AudioComponent
+    std::string soundAssetPath;
+    bool autoPlay = false;
+    bool looping = false;
+    float volume = 1.0f;
 };
 
 class Stargraph {

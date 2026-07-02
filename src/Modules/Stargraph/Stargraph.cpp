@@ -147,9 +147,28 @@ bool Stargraph::SaveToFile(const std::string& path) const {
     out << "Count=" << components.size() << "\n";
     out << "\n";
     for (size_t i = 0; i < components.size(); i++) {
+        const ComponentDecl& comp = components[i];
         out << "[Component" << i << "]\n";
-        out << "Type=" << components[i].componentType << "\n";
-        out << "Name=" << components[i].name << "\n";
+        out << "Type=" << comp.componentType << "\n";
+        out << "Name=" << comp.name << "\n";
+        out << "PosX=" << comp.posX << "\n";
+        out << "PosY=" << comp.posY << "\n";
+        out << "PosZ=" << comp.posZ << "\n";
+        out << "RotX=" << comp.rotX << "\n";
+        out << "RotY=" << comp.rotY << "\n";
+        out << "RotZ=" << comp.rotZ << "\n";
+        out << "ScaleX=" << comp.scaleX << "\n";
+        out << "ScaleY=" << comp.scaleY << "\n";
+        out << "ScaleZ=" << comp.scaleZ << "\n";
+        out << "Mesh=" << comp.meshAssetPath << "\n";
+        out << "Material=" << comp.materialAssetPath << "\n";
+        out << "CollisionShape=" << comp.collisionShape << "\n";
+        out << "CollisionRadius=" << comp.collisionRadius << "\n";
+        out << "CollisionHeight=" << comp.collisionHeight << "\n";
+        out << "Sound=" << comp.soundAssetPath << "\n";
+        out << "AutoPlay=" << (comp.autoPlay ? "true" : "false") << "\n";
+        out << "Looping=" << (comp.looping ? "true" : "false") << "\n";
+        out << "Volume=" << comp.volume << "\n";
         out << "\n";
     }
 
@@ -268,6 +287,24 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             ComponentDecl comp;
             if (const std::string* v = FindEntry(section, "Type")) comp.componentType = *v;
             if (const std::string* v = FindEntry(section, "Name")) comp.name = *v;
+            if (const std::string* v = FindEntry(section, "PosX")) comp.posX = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "PosY")) comp.posY = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "PosZ")) comp.posZ = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "RotX")) comp.rotX = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "RotY")) comp.rotY = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "RotZ")) comp.rotZ = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "Mesh")) comp.meshAssetPath = *v;
+            if (const std::string* v = FindEntry(section, "Material")) comp.materialAssetPath = *v;
+            if (const std::string* v = FindEntry(section, "CollisionShape")) comp.collisionShape = *v;
+            if (const std::string* v = FindEntry(section, "CollisionRadius")) comp.collisionRadius = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "CollisionHeight")) comp.collisionHeight = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "Sound")) comp.soundAssetPath = *v;
+            if (const std::string* v = FindEntry(section, "AutoPlay")) comp.autoPlay = (*v == "true");
+            if (const std::string* v = FindEntry(section, "Looping")) comp.looping = (*v == "true");
+            if (const std::string* v = FindEntry(section, "Volume")) comp.volume = std::stof(*v);
             components.push_back(comp);
         } else if (section.name != "Nodes" && section.name.rfind("Node", 0) == 0) {
             const std::string* typeValue = FindEntry(section, "Type");

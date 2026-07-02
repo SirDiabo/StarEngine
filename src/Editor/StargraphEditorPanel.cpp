@@ -4,6 +4,7 @@
 #include "raymath.h"
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 
 const float StargraphEditorPanel::nodeWidth      = 190.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
@@ -267,6 +268,9 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 
         if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             selectedComponentIndex = (int)i;
+            selectedNodeId = -1;
+            selectedNodeIds.clear();
+            selectedVariableIndex = -1;
         }
 
         if (isSelected && IsKeyPressed(KEY_DELETE)) {
@@ -306,6 +310,9 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
                 comp.name          = typeName;
                 graph.AddComponent(comp);
                 selectedComponentIndex = (int)graph.GetComponents().size() - 1;
+                selectedNodeId = -1;
+                selectedNodeIds.clear();
+                selectedVariableIndex = -1;
                 isDirty = true;
                 addComponentMenuOpen = false;
             }
@@ -314,6 +321,145 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, menu) && !CheckCollisionPointRec(mousePos, addBtn))
             addComponentMenuOpen = false;
+    }
+}
+
+void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
+    ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
+    Vector2 mp = GetMousePosition();
+
+    if (lastComponentDetailIndex != selectedComponentIndex) {
+        snprintf(compNameBuf, sizeof(compNameBuf), "%s", comp.name.c_str());
+        snprintf(compPosBuf[0], 32, "%.2f", comp.posX);
+        snprintf(compPosBuf[1], 32, "%.2f", comp.posY);
+        snprintf(compPosBuf[2], 32, "%.2f", comp.posZ);
+        snprintf(compRotBuf[0], 32, "%.2f", comp.rotX);
+        snprintf(compRotBuf[1], 32, "%.2f", comp.rotY);
+        snprintf(compRotBuf[2], 32, "%.2f", comp.rotZ);
+        snprintf(compScaleBuf[0], 32, "%.2f", comp.scaleX);
+        snprintf(compScaleBuf[1], 32, "%.2f", comp.scaleY);
+        snprintf(compScaleBuf[2], 32, "%.2f", comp.scaleZ);
+        snprintf(compRadiusBuf, sizeof(compRadiusBuf), "%.2f", comp.collisionRadius);
+        snprintf(compHeightBuf, sizeof(compHeightBuf), "%.2f", comp.collisionHeight);
+        snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
+        snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
+        lastComponentDetailIndex = selectedComponentIndex;
+        componentActiveField = 0;
+        componentMeshPicker.Close();
+        componentMaterialPicker.Close();
+    }
+
+    auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal) {
+        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        if (componentActiveField == fieldId) {
+            GuiTextBox(r, buf, (int)bufSize, true);
+            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
+                outVal = buf;
+                isDirty = true;
+                componentActiveField = 0;
+            }
+        } else {
+            DrawRectangleRec(r, {38, 38, 42, 255});
+            DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r))
+                componentActiveField = fieldId;
+        }
+        y += 22;
+    };
+
+    auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal) {
+        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        if (componentActiveField == fieldId) {
+            GuiTextBox(r, buf, (int)bufSize, true);
+            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
+                outVal = (float)atof(buf);
+                isDirty = true;
+                componentActiveField = 0;
+            }
+        } else {
+            DrawRectangleRec(r, {38, 38, 42, 255});
+            DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+                componentActiveField = fieldId;
+                snprintf(buf, bufSize, "%.2f", outVal);
+            }
+        }
+        y += 22;
+    };
+
+    auto vec3Row = [&](const char* label, char bufs[3][32], int fieldBase, float& vx, float& vy, float& vz) {
+        DrawText(label, (int)panel.x + 8, (int)y, 11, {180, 200, 230, 255});
+        y += 16;
+        floatField("X", bufs[0], 32, fieldBase + 0, vx);
+        floatField("Y", bufs[1], 32, fieldBase + 1, vy);
+        floatField("Z", bufs[2], 32, fieldBase + 2, vz);
+    };
+
+    auto assetField = [&](const char* label, const std::string& current, AssetPickerPopup& picker,
+                           const char* extension, std::string& outVal) {
+        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        DrawRectangleRec(r, {38, 38, 42, 255});
+        DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+        std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
+        DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+            picker.Open({r.x, r.y + r.height}, extension);
+        }
+        y += 22;
+        std::string picked;
+        if (picker.Render(picked)) {
+            outVal = picked;
+            isDirty = true;
+        }
+    };
+
+    DrawText(comp.componentType.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+    y += 20;
+
+    textField("Name", compNameBuf, sizeof(compNameBuf), 1, comp.name);
+    y += 4;
+
+    vec3Row("Position", compPosBuf, 2, comp.posX, comp.posY, comp.posZ);
+    y += 2;
+    vec3Row("Rotation", compRotBuf, 5, comp.rotX, comp.rotY, comp.rotZ);
+    y += 2;
+    vec3Row("Scale", compScaleBuf, 8, comp.scaleX, comp.scaleY, comp.scaleZ);
+    y += 6;
+
+    if (comp.componentType == "MeshComponent") {
+        assetField("Static Mesh", comp.meshAssetPath, componentMeshPicker, ".starasset", comp.meshAssetPath);
+        assetField("Material", comp.materialAssetPath, componentMaterialPicker, ".starmat", comp.materialAssetPath);
+    } else if (comp.componentType == "CollisionComponent") {
+        DrawText("Shape", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, comp.collisionShape.c_str())) {
+            if (comp.collisionShape == "Box") comp.collisionShape = "Sphere";
+            else if (comp.collisionShape == "Sphere") comp.collisionShape = "Capsule";
+            else comp.collisionShape = "Box";
+            isDirty = true;
+        }
+        y += 24;
+        if (comp.collisionShape != "Box") {
+            floatField("Radius", compRadiusBuf, sizeof(compRadiusBuf), 11, comp.collisionRadius);
+        }
+        if (comp.collisionShape == "Capsule") {
+            floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight);
+        }
+    } else if (comp.componentType == "AudioComponent") {
+        textField("Sound Path", compSoundBuf, sizeof(compSoundBuf), 13, comp.soundAssetPath);
+        floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume);
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Auto Play", &comp.autoPlay)) isDirty = true;
+        y += 24;
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Looping", &comp.looping)) isDirty = true;
+        y += 24;
     }
 }
 
@@ -370,6 +516,9 @@ void StargraphEditorPanel::RenderLeftPanel() {
             if (CheckCollisionPointRec(mousePos, row)) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     selectedVariableIndex = (int)i;
+                    selectedComponentIndex = -1;
+                    selectedNodeId = -1;
+                    selectedNodeIds.clear();
                     varContextMenuOpen = false;
                     variableDragIndex = (int)i;
                     variableDragActive = false;
@@ -377,6 +526,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
                 }
                 if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
                     selectedVariableIndex = (int)i;
+                    selectedComponentIndex = -1;
                     varContextMenuOpen = true;
                     varContextMenuIndex = (int)i;
                 }
@@ -465,6 +615,12 @@ void StargraphEditorPanel::RenderRightPanel() {
     DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
 
     float y = panel.y + 8;
+
+    std::vector<ComponentDecl>& comps = graph.GetComponents();
+    if (selectedComponentIndex >= 0 && selectedComponentIndex < (int)comps.size()) {
+        RenderComponentDetails(panel, y);
+        return;
+    }
 
     std::vector<Variable>& vars = graph.GetVariables();
     if (selectedVariableIndex >= 0 && selectedVariableIndex < (int)vars.size()) {
@@ -887,6 +1043,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     selectedNodeId = nodeIdInt;
                 }
                 selectedVariableIndex = -1;
+                selectedComponentIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
                 break;
