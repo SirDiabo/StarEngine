@@ -27,6 +27,7 @@ StargraphEditorTab::~StargraphEditorTab() {
 void StargraphEditorTab::Initialize() {
     panel = new StargraphEditorPanel();
     panel->Initialize();
+    panel->SetViewportPanel(viewportPanel);
     panel->Open(assetPath);
 }
 

@@ -25,6 +25,8 @@ public:
 
     bool IsPlaying() const { return playing; }
 
+    void InvalidateClassGraph(const std::string& graphAssetPath);
+
 private:
     void EnsureRenderTarget(int width, int height);
     void UpdateCamera(Rectangle client);

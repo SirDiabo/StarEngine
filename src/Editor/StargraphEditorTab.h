@@ -5,6 +5,7 @@
 class StargraphEditorPanel;
 class LogPanel;
 class MenuBar;
+class ViewportPanel;
 
 class StargraphEditorTab : public EditorTab {
 public:
@@ -13,6 +14,7 @@ public:
 
     void Initialize() override;
     void SetSharedLogPanel(LogPanel* shared) { logPanel = shared; }
+    void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
     void Render(float x, float y, float width, float height) override;
     void BuildMenus(MenuBar* menuBar) override;
     bool IsOpen() const override;
@@ -23,6 +25,7 @@ private:
     std::string assetPath;
     StargraphEditorPanel* panel = nullptr;
     LogPanel* logPanel = nullptr;
+    ViewportPanel* viewportPanel = nullptr;
     float logSplitRatio = 0.75f;
 
     bool resizingSplitter = false;

@@ -1,5 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/NodeRegistry.h"
+#include "ViewportPanel.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -177,6 +178,12 @@ Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
     return nullptr;
 }
 
+void StargraphEditorPanel::SaveGraph() {
+    graph.SaveToFile(filePath);
+    isDirty = false;
+    if (viewportPanel) viewportPanel->InvalidateClassGraph(filePath);
+}
+
 void StargraphEditorPanel::RenderToolbar() {
     Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     DrawRectangleRec(toolbar, {32, 32, 36, 255});
@@ -191,7 +198,7 @@ void StargraphEditorPanel::RenderToolbar() {
 
     Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
     if (GuiButton(closeBtn, "X")) {
-        if (isDirty) graph.SaveToFile(filePath);
+        if (isDirty) SaveGraph();
         Close();
         return;
     }
@@ -199,8 +206,7 @@ void StargraphEditorPanel::RenderToolbar() {
 
     Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
     if (GuiButton(saveBtn, "Save")) {
-        graph.SaveToFile(filePath);
-        isDirty = false;
+        SaveGraph();
     }
     btnRight -= 54;
 
@@ -226,8 +232,7 @@ void StargraphEditorPanel::RenderToolbar() {
             for (const Variable& v : graph.GetVariables()) {
                 varValueSnapshot.push_back(v.value);
             }
-            graph.SaveToFile(filePath);
-            isDirty = false;
+            SaveGraph();
             GraphExecutor::Run(graph, "Event_BeginPlay");
         }
     }
@@ -411,6 +416,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
         DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+            componentMeshPicker.Close();
+            componentMaterialPicker.Close();
             picker.Open({r.x, r.y + r.height}, extension);
         }
         y += 22;
@@ -1236,8 +1243,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     if (IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
 
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
-        graph.SaveToFile(filePath);
-        isDirty = false;
+        SaveGraph();
     }
 }
 

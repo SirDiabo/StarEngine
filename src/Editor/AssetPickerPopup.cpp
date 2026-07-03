@@ -6,6 +6,8 @@
 
 namespace fs = std::filesystem;
 
+std::vector<std::function<void()>> AssetPickerPopup::deferredDraws;
+
 void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
     open = true;
     justOpened = true;
@@ -38,15 +40,20 @@ bool AssetPickerPopup::Render(std::string& outPath) {
 
     Vector2 mousePos = GetMousePosition();
 
-    DrawRectangleRec(area, {45, 45, 50, 255});
-    DrawRectangleLinesEx(area, 1, {80, 80, 88, 255});
+    Rectangle areaCopy = area;
+    deferredDraws.push_back([areaCopy]() {
+        DrawRectangleRec(areaCopy, {45, 45, 50, 255});
+        DrawRectangleLinesEx(areaCopy, 1, {80, 80, 88, 255});
+    });
 
     float y = area.y + 2;
 
     Rectangle noneItem = {area.x + 1, y, area.width - 2, 18};
     bool noneHovered = CheckCollisionPointRec(mousePos, noneItem);
-    if (noneHovered) DrawRectangleRec(noneItem, {70, 70, 80, 255});
-    DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, {180, 180, 190, 255});
+    deferredDraws.push_back([noneItem, noneHovered]() {
+        if (noneHovered) DrawRectangleRec(noneItem, {70, 70, 80, 255});
+        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, {180, 180, 190, 255});
+    });
     if (noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         outPath.clear();
         Close();
@@ -57,8 +64,11 @@ bool AssetPickerPopup::Render(std::string& outPath) {
     for (size_t i = 0; i < displayNames.size(); i++) {
         Rectangle item = {area.x + 1, y, area.width - 2, 18};
         bool hovered = CheckCollisionPointRec(mousePos, item);
-        if (hovered) DrawRectangleRec(item, {70, 70, 80, 255});
-        DrawText(displayNames[i].c_str(), (int)item.x + 6, (int)item.y + 3, 11, WHITE);
+        std::string name = displayNames[i];
+        deferredDraws.push_back([item, hovered, name]() {
+            if (hovered) DrawRectangleRec(item, {70, 70, 80, 255});
+            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, WHITE);
+        });
 
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             outPath = fullPaths[i];
@@ -69,7 +79,11 @@ bool AssetPickerPopup::Render(std::string& outPath) {
     }
 
     if (displayNames.empty()) {
-        DrawText("(no matching assets)", (int)area.x + 6, (int)y, 10, {110, 110, 118, 255});
+        float emptyY = y;
+        float emptyX = area.x;
+        deferredDraws.push_back([emptyX, emptyY]() {
+            DrawText("(no matching assets)", (int)emptyX + 6, (int)emptyY, 10, {110, 110, 118, 255});
+        });
     }
 
     if (justOpened) {
@@ -79,4 +93,9 @@ bool AssetPickerPopup::Render(std::string& outPath) {
     }
 
     return false;
+}
+
+void AssetPickerPopup::FlushDeferredDraws() {
+    for (const auto& draw : deferredDraws) draw();
+    deferredDraws.clear();
 }

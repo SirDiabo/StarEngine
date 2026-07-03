@@ -6,6 +6,7 @@
 #include "ProjectBrowser.h"
 #include "LogPanel.h"
 #include "ViewportPanel.h"
+#include "AssetPickerPopup.h"
 #include "LayoutSerializer.h"
 #include "raygui.h"
 #include "raylib.h"
@@ -98,6 +99,9 @@ void Editor::Render() {
 
     // Layer 5: menu popup (above everything).
     menuBar->RenderPopup();
+
+    // Layer 6: asset picker popups (always topmost).
+    AssetPickerPopup::FlushDeferredDraws();
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {
@@ -173,6 +177,7 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
         }
         auto* sgTab = new StargraphEditorTab(fullPath);
         sgTab->SetSharedLogPanel(levelTab->GetLogPanel());
+        sgTab->SetViewportPanel(levelTab->GetViewport());
         sgTab->Initialize();
         editorTabs.emplace_back(sgTab);
         editorTabs[activeEditorTab]->OnDeactivated();

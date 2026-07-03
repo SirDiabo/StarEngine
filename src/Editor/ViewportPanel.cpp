@@ -94,6 +94,10 @@ const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAsse
     return &inserted.first->second;
 }
 
+void ViewportPanel::InvalidateClassGraph(const std::string& graphAssetPath) {
+    classGraphCache.erase(graphAssetPath);
+}
+
 void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
                                         Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor) {
     Model* model = nullptr;

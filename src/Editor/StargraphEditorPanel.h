@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+class ViewportPanel;
+
 class StargraphEditorPanel : public Panel {
 public:
     void Initialize() override;
@@ -15,8 +17,10 @@ public:
     void Close();
     bool IsOpen() const { return isOpen; }
     const std::string& GetFilePath() const { return filePath; }
+    void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
 
 private:
+    void SaveGraph();
     void RenderToolbar();
     void RenderComponentOutliner(Rectangle area);
     void RenderComponentDetails(Rectangle panel, float& y);
@@ -102,6 +106,7 @@ private:
 
     AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;
+    ViewportPanel* viewportPanel = nullptr;
     int lastComponentDetailIndex = -1;
     int componentActiveField = 0;
     char compNameBuf[128] = "";
