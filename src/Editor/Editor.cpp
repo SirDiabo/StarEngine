@@ -7,6 +7,7 @@
 #include "LogPanel.h"
 #include "ViewportPanel.h"
 #include "AssetPickerPopup.h"
+#include "ImportDetailsPanel.h"
 #include "LayoutSerializer.h"
 #include "raygui.h"
 #include "raylib.h"
@@ -100,7 +101,10 @@ void Editor::Render() {
     // Layer 5: menu popup (above everything).
     menuBar->RenderPopup();
 
-    // Layer 6: asset picker popups (always topmost).
+    // Layer 6: import details popup (above everything but asset picker dropdowns).
+    ImportDetailsPanel::Get().Render();
+
+    // Layer 7: asset picker popups (always topmost).
     AssetPickerPopup::FlushDeferredDraws();
 }
 

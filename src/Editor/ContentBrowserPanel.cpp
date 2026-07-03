@@ -4,6 +4,7 @@
 #include "Core/StarAsset.h"
 #include "Core/Module.h"
 #include "NativeFileDialog.h"
+#include "ImportDetailsPanel.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -176,10 +177,14 @@ void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const st
     StarAsset asset;
     asset.assetType = assetType;
     asset.sourcePath = absoluteSrc.string();
+    if (assetType == "StaticMesh") {
+        asset.importScaleX = asset.importScaleY = asset.importScaleZ = 100.0f;
+    }
 
     if (asset.SaveToFile(target.string())) {
         AssetRegistry::Get().RegisterAsset(target.string(), asset.sourcePath, target.string());
         importStatus = "Imported " + target.stem().string();
+        ImportDetailsPanel::Get().Open(target.string(), assetType);
     } else {
         importStatus = "Import failed: could not write " + target.string();
     }

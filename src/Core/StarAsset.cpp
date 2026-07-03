@@ -8,6 +8,16 @@ bool StarAsset::SaveToFile(const std::string& path) const {
     out << "[StarAsset]\n";
     out << "Type=" << assetType << "\n";
     out << "Source=" << sourcePath << "\n";
+    out << "PosX=" << importPosX << "\n";
+    out << "PosY=" << importPosY << "\n";
+    out << "PosZ=" << importPosZ << "\n";
+    out << "RotX=" << importRotX << "\n";
+    out << "RotY=" << importRotY << "\n";
+    out << "RotZ=" << importRotZ << "\n";
+    out << "ScaleX=" << importScaleX << "\n";
+    out << "ScaleY=" << importScaleY << "\n";
+    out << "ScaleZ=" << importScaleZ << "\n";
+    out << "DefaultMaterial=" << defaultMaterialPath << "\n";
 
     return true;
 }
@@ -29,6 +39,16 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
 
         if (key == "Type") outAsset.assetType = value;
         else if (key == "Source") outAsset.sourcePath = value;
+        else if (key == "PosX") outAsset.importPosX = std::stof(value);
+        else if (key == "PosY") outAsset.importPosY = std::stof(value);
+        else if (key == "PosZ") outAsset.importPosZ = std::stof(value);
+        else if (key == "RotX") outAsset.importRotX = std::stof(value);
+        else if (key == "RotY") outAsset.importRotY = std::stof(value);
+        else if (key == "RotZ") outAsset.importRotZ = std::stof(value);
+        else if (key == "ScaleX") outAsset.importScaleX = std::stof(value);
+        else if (key == "ScaleY") outAsset.importScaleY = std::stof(value);
+        else if (key == "ScaleZ") outAsset.importScaleZ = std::stof(value);
+        else if (key == "DefaultMaterial") outAsset.defaultMaterialPath = value;
     }
 
     return true;

@@ -248,12 +248,19 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     inst.name = baseName + "_" + std::to_string(starMap.GetInstances().size() + 1);
     inst.className = "StaticMeshActor";
     inst.meshAssetPath = assetPath;
-    inst.posX = worldX;
-    inst.posY = 0;
-    inst.posZ = worldZ;
+    inst.posX = worldX + asset.importPosX;
+    inst.posY = asset.importPosY;
+    inst.posZ = worldZ + asset.importPosZ;
+    inst.rotX = asset.importRotX;
+    inst.rotY = asset.importRotY;
+    inst.rotZ = asset.importRotZ;
     // Mesh scale is a 1.0 = original-size multiplier, unlike the placeholder
     // box scale (which is an absolute box dimension) used by graph actors.
-    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
+    // Starts from the asset's stored import scale rather than always 1.0.
+    inst.scaleX = asset.importScaleX;
+    inst.scaleY = asset.importScaleY;
+    inst.scaleZ = asset.importScaleZ;
+    if (!asset.defaultMaterialPath.empty()) inst.materialAssetPath = asset.defaultMaterialPath;
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
