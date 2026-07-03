@@ -8,6 +8,7 @@ namespace fs = std::filesystem;
 
 void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
     open = true;
+    justOpened = true;
     extension = ext;
     displayNames.clear();
     fullPaths.clear();
@@ -71,7 +72,9 @@ bool AssetPickerPopup::Render(std::string& outPath) {
         DrawText("(no matching assets)", (int)area.x + 6, (int)y, 10, {110, 110, 118, 255});
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, area)) {
+    if (justOpened) {
+        justOpened = false;
+    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, area)) {
         Close();
     }
 
