@@ -158,13 +158,9 @@ void ContentBrowserPanel::CancelPendingCreate() {
     isCreatingNewItem = false;
 }
 
-void ContentBrowserPanel::ImportAsset(const std::string& dialogTitle, const std::string& filterDesc,
-                                       const std::string& filterExt, const std::string& assetType,
-                                       const std::string& extension) {
-    std::string path = NativeFileDialog::OpenFile(dialogTitle, "", filterDesc, filterExt);
-    if (path.empty()) return;
-
-    fs::path src(path);
+void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const std::string& assetType,
+                                             const std::string& extension) {
+    fs::path src(srcPath);
     std::error_code ec;
     fs::path absoluteSrc = fs::absolute(src, ec);
     if (ec) absoluteSrc = src;
@@ -189,14 +185,26 @@ void ContentBrowserPanel::ImportAsset(const std::string& dialogTitle, const std:
     }
 }
 
-void ContentBrowserPanel::ImportStaticMesh() {
-    ImportAsset("Import Static Mesh", "Static Mesh (obj, gltf, glb, iqm)", "*.obj;*.gltf;*.glb;*.iqm",
-                "StaticMesh", ".starasset");
-}
+void ContentBrowserPanel::ImportAssetAuto() {
+    static const std::vector<std::string> meshExts = {".obj", ".gltf", ".glb", ".iqm"};
+    static const std::vector<std::string> texExts   = {".png", ".jpg", ".jpeg", ".bmp"};
 
-void ContentBrowserPanel::ImportTexture() {
-    ImportAsset("Import Texture", "Texture (png, jpg, bmp)", "*.png;*.jpg;*.jpeg;*.bmp",
-                "Texture", ".startex");
+    std::string path = NativeFileDialog::OpenFile(
+        "Import Asset", "",
+        "Mesh or Texture (obj, gltf, glb, iqm, png, jpg, bmp)",
+        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp");
+    if (path.empty()) return;
+
+    std::string ext = fs::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    if (std::find(meshExts.begin(), meshExts.end(), ext) != meshExts.end()) {
+        CookImportedAsset(path, "StaticMesh", ".starasset");
+    } else if (std::find(texExts.begin(), texExts.end(), ext) != texExts.end()) {
+        CookImportedAsset(path, "Texture", ".startex");
+    } else {
+        importStatus = "Import failed: unrecognized file type " + ext;
+    }
 }
 
 void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
@@ -299,13 +307,20 @@ void ContentBrowserPanel::Render() {
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
     const bool meshImportEnabled = ModuleManager::Get().IsModuleEnabled("Meshes");
-    const float importBarHeight = meshImportEnabled ? 58.0f : 0.0f;
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
     DrawRectangleRec(pathBar, {30, 30, 34, 255});
+
+    float pathLabelX = pathBar.x + 6;
+    if (meshImportEnabled) {
+        Rectangle importBtn = {pathBar.x + 2, pathBar.y + 2, 18, 18};
+        if (GuiButton(importBtn, "+")) ImportAssetAuto();
+        pathLabelX = importBtn.x + importBtn.width + 6;
+    }
+
     std::string pathLabel = "Content" + (currentRelativeFolder.empty() ? "" : "/" + currentRelativeFolder);
-    DrawText(pathLabel.c_str(), (int)pathBar.x + 6, (int)pathBar.y + 4, 12, LIGHTGRAY);
+    DrawText(pathLabel.c_str(), (int)pathLabelX, (int)pathBar.y + 4, 12, LIGHTGRAY);
 
     if (!currentRelativeFolder.empty()) {
         int backW = MeasureText("< Back", 12) + 12;
@@ -313,7 +328,7 @@ void ContentBrowserPanel::Render() {
         if (GuiButton(backBtn, "< Back")) NavigateUp();
     }
 
-    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22 - importBarHeight};
+    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
     std::vector<ContentEntry> entries = ScanCurrentFolder();
 
     float padding = 8.0f;
@@ -472,17 +487,10 @@ void ContentBrowserPanel::Render() {
         }
     }
 
-    // Import bar (bottom strip, always visible regardless of scroll/context menu)
-    if (meshImportEnabled) {
-        Rectangle meshBar = {client.x + 8, client.y + client.height - importBarHeight + 4, client.width - 16, 22};
-        if (GuiButton(meshBar, "Import Static Mesh...")) ImportStaticMesh();
-
-        Rectangle texBar = {client.x + 8, meshBar.y + 26, client.width - 16, 22};
-        if (GuiButton(texBar, "Import Texture...")) ImportTexture();
-
-        if (!importStatus.empty()) {
-            DrawText(importStatus.c_str(), (int)meshBar.x, (int)(meshBar.y - 14), 11, {150, 200, 150, 255});
-        }
+    // Import status
+    if (!importStatus.empty()) {
+        DrawText(importStatus.c_str(), (int)client.x + 8, (int)(client.y + client.height - 16), 11,
+                  {150, 200, 150, 255});
     }
 
     RenderMaterialEditor();

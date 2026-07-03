@@ -36,11 +36,9 @@ private:
     void BeginCreateAsset(const AssetTypeInfo& info);
     void ConfirmPendingCreate();
     void CancelPendingCreate();
-    void ImportAsset(const std::string& dialogTitle, const std::string& filterDesc,
-                      const std::string& filterExt, const std::string& assetType,
-                      const std::string& extension);
-    void ImportStaticMesh();
-    void ImportTexture();
+    void CookImportedAsset(const std::string& srcPath, const std::string& assetType,
+                            const std::string& extension);
+    void ImportAssetAuto();
 
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
     void LoadIcons();
