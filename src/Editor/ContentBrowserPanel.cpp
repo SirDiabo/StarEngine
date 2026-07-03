@@ -225,6 +225,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     if (!materialEditorOpen) return;
 
     Vector2 mp = GetMousePosition();
+    bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp);
     Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 100, 220, 200};
 
     DrawRectangleRec({bounds.x, bounds.y, bounds.width, bounds.height}, {0, 0, 0, 120});
@@ -254,11 +255,12 @@ void ContentBrowserPanel::RenderMaterialEditor() {
                 materialActiveField = 0;
             }
         } else {
+            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
+            if (clicked) GuiTextBox(r, materialColorBuf[i], 8, false);
             DrawRectangleRec(r, {30, 30, 32, 255});
             DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
             DrawText(materialColorBuf[i], (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r))
-                materialActiveField = i + 1;
+            if (clicked) materialActiveField = i + 1;
         }
     }
     y += 38;
@@ -275,7 +277,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
                                 ? "None"
                                 : fs::path(materialEditorData.textureAssetPath).stem().string();
     DrawText(texLabel.c_str(), (int)texRow.x + 4, (int)texRow.y + 3, 11, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, texRow)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, texRow) && !pickerBlocksInput) {
         materialTexturePicker.Open({texRow.x, texRow.y + texRow.height}, ".startex");
     }
     y += 26;
@@ -284,11 +286,11 @@ void ContentBrowserPanel::RenderMaterialEditor() {
 
     Rectangle saveBtn = {box.x + 8, box.y + box.height - 28, (box.width - 20) / 2, 22};
     Rectangle closeBtn = {saveBtn.x + saveBtn.width + 4, saveBtn.y, saveBtn.width, 22};
-    if (GuiButton(saveBtn, "Save")) {
+    if (GuiButton(saveBtn, "Save") && !pickerBlocksInput) {
         materialEditorData.SaveToFile(materialEditorPath);
         materialEditorOpen = false;
     }
-    if (GuiButton(closeBtn, "Cancel")) {
+    if (GuiButton(closeBtn, "Cancel") && !pickerBlocksInput) {
         materialEditorOpen = false;
     }
 }

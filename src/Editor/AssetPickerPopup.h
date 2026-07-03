@@ -9,6 +9,7 @@ public:
     void Open(Vector2 anchorPos, const std::string& extension);
     void Close();
     bool IsOpen() const { return open; }
+    bool ContainsPoint(Vector2 point) const { return open && CheckCollisionPointRec(point, area); }
     bool Render(std::string& outPath);
 
     static void FlushDeferredDraws();

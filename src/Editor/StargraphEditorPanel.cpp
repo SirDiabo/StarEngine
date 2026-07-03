@@ -332,6 +332,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
+    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp);
 
     if (lastComponentDetailIndex != selectedComponentIndex) {
         snprintf(compNameBuf, sizeof(compNameBuf), "%s", comp.name.c_str());
@@ -366,11 +367,12 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 componentActiveField = 0;
             }
         } else {
+            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput;
+            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
             DrawRectangleRec(r, {38, 38, 42, 255});
             DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
             DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r))
-                componentActiveField = fieldId;
+            if (clicked) componentActiveField = fieldId;
         }
         y += 22;
     };
@@ -387,10 +389,12 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 componentActiveField = 0;
             }
         } else {
+            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput;
+            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
             DrawRectangleRec(r, {38, 38, 42, 255});
             DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
             DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+            if (clicked) {
                 componentActiveField = fieldId;
                 snprintf(buf, bufSize, "%.2f", outVal);
             }
@@ -415,7 +419,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
         std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
         DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
             componentMeshPicker.Close();
             componentMaterialPicker.Close();
             picker.Open({r.x, r.y + r.height}, extension);
@@ -657,11 +661,12 @@ void StargraphEditorPanel::RenderRightPanel() {
                 activeField = 0;
             }
         } else {
+            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), nameRect);
+            if (clicked) GuiTextBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), false);
             DrawRectangleRec(nameRect, {38, 38, 42, 255});
             DrawRectangleLinesEx(nameRect, 1, {70, 70, 80, 255});
             DrawText(varNameEditBuf, (int)nameRect.x + 4, (int)nameRect.y + 3, 11, WHITE);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), nameRect))
-                activeField = 1;
+            if (clicked) activeField = 1;
         }
         y += 24;
 
@@ -700,11 +705,12 @@ void StargraphEditorPanel::RenderRightPanel() {
                     activeField = 0;
                 }
             } else {
+                bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), valRect);
+                if (clicked) GuiTextBox(valRect, varValBuffer, sizeof(varValBuffer), false);
                 DrawRectangleRec(valRect, {38, 38, 42, 255});
                 DrawRectangleLinesEx(valRect, 1, {70, 70, 80, 255});
                 DrawText(varValBuffer[0] ? varValBuffer : "(empty)", (int)valRect.x + 4, (int)valRect.y + 3, 11, varValBuffer[0] ? WHITE : Color{80,80,90,255});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), valRect))
-                    activeField = 2;
+                if (clicked) activeField = 2;
             }
         }
         return;

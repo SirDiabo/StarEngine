@@ -66,10 +66,12 @@ void DetailsPanel::Render() {
                 activeField = 0;
             }
         } else {
+            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
+            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
             DrawRectangleRec(r, {30, 30, 32, 255});
             DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
             DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+            if (clicked) {
                 activeField = fieldId;
                 snprintf(buf, bufSize, "%.2f", outVal);
             }
@@ -90,11 +92,12 @@ void DetailsPanel::Render() {
             activeField = 0;
         }
     } else {
+        bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, nameRect);
+        if (clicked) GuiTextBox(nameRect, nameEditBuf, sizeof(nameEditBuf), false);
         DrawRectangleRec(nameRect, {30, 30, 32, 255});
         DrawRectangleLinesEx(nameRect, 1, {65, 65, 75, 255});
         DrawText(nameEditBuf, (int)nameRect.x + 4, (int)nameRect.y + 3, 11, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, nameRect))
-            activeField = 1;
+        if (clicked) activeField = 1;
     }
     y += 26;
 
@@ -129,6 +132,7 @@ void DetailsPanel::Render() {
 
 void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& y, float w) {
     Vector2 mp = GetMousePosition();
+    bool pickerBlocksInput = meshPicker.ContainsPoint(mp) || materialPicker.ContainsPoint(mp);
 
     DrawText("Mesh Component", (int)x + 8, (int)y, 12, {180, 200, 230, 255});
     y += 18;
@@ -139,7 +143,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     DrawRectangleRec(meshRow, {30, 30, 32, 255});
     DrawRectangleLinesEx(meshRow, 1, {65, 65, 75, 255});
     DrawText(AssetDisplayName(inst.meshAssetPath).c_str(), (int)meshRow.x + 4, (int)meshRow.y + 3, 11, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, meshRow)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, meshRow) && !pickerBlocksInput) {
         materialPicker.Close();
         meshPicker.Open({meshRow.x, meshRow.y + meshRow.height}, ".starasset");
     }
@@ -153,7 +157,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     DrawRectangleRec(matRow, {30, 30, 32, 255});
     DrawRectangleLinesEx(matRow, 1, {65, 65, 75, 255});
     DrawText(AssetDisplayName(inst.materialAssetPath).c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 11, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow)) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !pickerBlocksInput) {
         meshPicker.Close();
         materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
     }
