@@ -1,5 +1,6 @@
 #include "ImportDetailsPanel.h"
 #include "Core/StarAsset.h"
+#include "PropertyFields.h"
 #include "raygui.h"
 #include <cstdio>
 #include <cstdlib>
@@ -82,33 +83,13 @@ void ImportDetailsPanel::Render() {
     bool pickerBlocksInput = materialPicker.ContainsPoint(mp);
     float y = box.y + 30;
 
-    auto floatField = [&](const char* label, float labelX, float fieldX, float fieldW, char* buf, int fieldId) {
-        DrawText(label, (int)labelX, (int)y + 3, 11, {150, 150, 160, 255});
-        Rectangle r = {fieldX, y, fieldW, 18};
-
-        if (activeField == fieldId) {
-            GuiTextBox(r, buf, 32, true);
-            if (IsKeyPressed(KEY_ENTER) ||
-                (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
-                activeField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput;
-            if (clicked) GuiTextBox(r, buf, 32, false);
-            DrawRectangleRec(r, {30, 30, 32, 255});
-            DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
-            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (clicked) activeField = fieldId;
-        }
-    };
-
     auto vec3Row = [&](const char* label, char bufs[3][32], int firstFieldId) {
         DrawText(label, (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
         y += 16;
-        float fieldW = (boxWidth - 30) / 3.0f;
-        floatField("X", box.x + 10, box.x + 24, fieldW - 14, bufs[0], firstFieldId);
-        floatField("Y", box.x + 10 + fieldW, box.x + 24 + fieldW, fieldW - 14, bufs[1], firstFieldId + 1);
-        floatField("Z", box.x + 10 + fieldW * 2, box.x + 24 + fieldW * 2, fieldW - 14, bufs[2], firstFieldId + 2);
+        Rectangle row = {box.x + 10, y, boxWidth - 20, 18};
+        float vx = (float)atof(bufs[0]), vy = (float)atof(bufs[1]), vz = (float)atof(bufs[2]);
+        PropertyField::Vec3Row(row, bufs[0], bufs[1], bufs[2], firstFieldId, activeField, vx, vy, vz,
+                                !pickerBlocksInput);
         y += 24;
     };
 

@@ -1,6 +1,7 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "ViewportPanel.h"
+#include "PropertyFields.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -30,7 +31,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     boxSelecting = false;
     linkFromPin = -1;
     nodeMenuOpen = false;
-    editingPinId = -1;
+    editingPinId = 0;
     scroll = {0, 0};
     didPan = false;
     variableDragActive = false;
@@ -359,21 +360,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
         Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
-        if (componentActiveField == fieldId) {
-            GuiTextBox(r, buf, (int)bufSize, true);
-            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
-                outVal = buf;
-                isDirty = true;
-                componentActiveField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput;
-            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
-            DrawRectangleRec(r, {38, 38, 42, 255});
-            DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
-            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (clicked) componentActiveField = fieldId;
-        }
+        if (PropertyField::StringBox(r, buf, bufSize, fieldId, componentActiveField, outVal, !pickerBlocksInput))
+            isDirty = true;
         y += 22;
     };
 
@@ -381,33 +369,19 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
         Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
-        if (componentActiveField == fieldId) {
-            GuiTextBox(r, buf, (int)bufSize, true);
-            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
-                outVal = (float)atof(buf);
-                isDirty = true;
-                componentActiveField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput;
-            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
-            DrawRectangleRec(r, {38, 38, 42, 255});
-            DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
-            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (clicked) {
-                componentActiveField = fieldId;
-                snprintf(buf, bufSize, "%.2f", outVal);
-            }
-        }
+        if (PropertyField::FloatBox(r, buf, bufSize, fieldId, componentActiveField, outVal, !pickerBlocksInput))
+            isDirty = true;
         y += 22;
     };
 
     auto vec3Row = [&](const char* label, char bufs[3][32], int fieldBase, float& vx, float& vy, float& vz) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {180, 200, 230, 255});
         y += 16;
-        floatField("X", bufs[0], 32, fieldBase + 0, vx);
-        floatField("Y", bufs[1], 32, fieldBase + 1, vy);
-        floatField("Z", bufs[2], 32, fieldBase + 2, vz);
+        Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
+        if (PropertyField::Vec3Row(row, bufs[0], bufs[1], bufs[2], fieldBase, componentActiveField,
+                                    vx, vy, vz, !pickerBlocksInput))
+            isDirty = true;
+        y += 22;
     };
 
     auto assetField = [&](const char* label, const std::string& current, AssetPickerPopup& picker,
@@ -584,9 +558,9 @@ void StargraphEditorPanel::RenderLeftPanel() {
 
     Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
     if (GuiButton(addBtn, "+ Variable")) {
-        addingVariable = true;
-        varNameBuffer[0] = '\0';
         snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
+        PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
+        addingVariable = true;
     }
 
     if (varContextMenuOpen) {
@@ -602,8 +576,9 @@ void StargraphEditorPanel::RenderLeftPanel() {
         DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
 
         if (GuiButton({popup.x + 4, popup.y + 4, popup.width - 8, 18}, "Rename")) {
-            renamingVariableIndex = varContextMenuIndex;
             snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
+            PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
+            renamingVariableIndex = varContextMenuIndex;
             varContextMenuOpen = false;
         }
         if (GuiButton({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
@@ -653,20 +628,10 @@ void StargraphEditorPanel::RenderRightPanel() {
         }
 
         Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
-        if (activeField == 1) {
-            GuiTextBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), true);
-            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), nameRect))) {
-                var.name = varNameEditBuf;
-                isDirty = true;
-                activeField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), nameRect);
-            if (clicked) GuiTextBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), false);
-            DrawRectangleRec(nameRect, {38, 38, 42, 255});
-            DrawRectangleLinesEx(nameRect, 1, {70, 70, 80, 255});
-            DrawText(varNameEditBuf, (int)nameRect.x + 4, (int)nameRect.y + 3, 11, WHITE);
-            if (clicked) activeField = 1;
+        std::string varName = var.name;
+        if (PropertyField::StringBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), 1, activeField, varName)) {
+            var.name = varName;
+            isDirty = true;
         }
         y += 24;
 
@@ -692,25 +657,19 @@ void StargraphEditorPanel::RenderRightPanel() {
 
         if (var.type == PinType::Boolean) {
             bool bval = (var.value == "true" || var.value == "1");
-            bool prev = bval;
-            GuiCheckBox({panel.x + 8, y, 18, 18}, bval ? "true" : "false", &bval);
-            if (bval != prev) { var.value = bval ? "true" : "false"; isDirty = true; }
+            Rectangle boolRect = {panel.x + 8, y, 18, 18};
+            if (PropertyField::BoolBox(boolRect, bval)) {
+                var.value = bval ? "true" : "false";
+                isDirty = true;
+            }
+            DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 12, WHITE);
         } else {
             Rectangle valRect = {panel.x + 8, y, panel.width - 16, 18};
-            if (activeField == 2) {
-                GuiTextBox(valRect, varValBuffer, sizeof(varValBuffer), true);
-                if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(GetMousePosition(), valRect))) {
-                    var.value = varValBuffer;
-                    isDirty = true;
-                    activeField = 0;
-                }
-            } else {
-                bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), valRect);
-                if (clicked) GuiTextBox(valRect, varValBuffer, sizeof(varValBuffer), false);
-                DrawRectangleRec(valRect, {38, 38, 42, 255});
-                DrawRectangleLinesEx(valRect, 1, {70, 70, 80, 255});
-                DrawText(varValBuffer[0] ? varValBuffer : "(empty)", (int)valRect.x + 4, (int)valRect.y + 3, 11, varValBuffer[0] ? WHITE : Color{80,80,90,255});
-                if (clicked) activeField = 2;
+            std::string varValue = var.value;
+            if (PropertyField::StringBox(valRect, varValBuffer, sizeof(varValBuffer), 2, activeField, varValue,
+                                          true, "(empty)")) {
+                var.value = varValue;
+                isDirty = true;
             }
         }
         return;
@@ -926,30 +885,21 @@ void StargraphEditorPanel::RenderGraph() {
 
                 if (pin.type == PinType::Boolean) {
                     bool bval = (pin.defaultValue == "true" || pin.defaultValue == "1");
-                    if (GuiCheckBox({fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2}, "", &bval)) {
-                        for (Pin& mp : node.inputs) {
-                            if (mp.id == pin.id) { mp.defaultValue = bval ? "true" : "false"; isDirty = true; break; }
-                        }
-                    }
-                } else if (editingPinId == pin.id) {
-                    GuiTextBox(fieldRect, editBuffer, sizeof(editBuffer), true);
-                    if (IsKeyPressed(KEY_ENTER) ||
-                        (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, fieldRect))) {
-                        for (Pin& mp : node.inputs) {
-                            if (mp.id == pin.id) { mp.defaultValue = editBuffer; break; }
-                        }
-                        editingPinId = -1;
+                    if (PropertyField::BoolBox({fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2}, bval)) {
+                        pin.defaultValue = bval ? "true" : "false";
                         isDirty = true;
                     }
                 } else {
-                    DrawRectangleRec(fieldRect, {30, 30, 32, 255});
-                    DrawRectangleLinesEx(fieldRect, 1, {70, 70, 80, 255});
-                    const char* displayText = pin.defaultValue.empty() ? pin.name.c_str() : pin.defaultValue.c_str();
-                    Color textColor = pin.defaultValue.empty() ? Color{80, 80, 90, 255} : WHITE;
-                    DrawText(displayText, (int)fieldRect.x + 4, (int)fieldRect.y + 3, 11, textColor);
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && linkFromPin == -1) {
-                        editingPinId = pin.id;
-                        snprintf(editBuffer, sizeof(editBuffer), "%s", pin.defaultValue.c_str());
+                    char inactiveBuf[256];
+                    char* activeBuf = editBuffer;
+                    if (editingPinId != pin.id) {
+                        snprintf(inactiveBuf, sizeof(inactiveBuf), "%s", pin.defaultValue.c_str());
+                        activeBuf = inactiveBuf;
+                    }
+                    bool allowActivate = (linkFromPin == -1);
+                    if (PropertyField::StringBox(fieldRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
+                                                  pin.defaultValue, allowActivate, pin.name.c_str())) {
+                        isDirty = true;
                     }
                 }
                 inputY += scaledPinHeight;
@@ -1195,7 +1145,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         } else panning = false;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == -1) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0) {
         if (!GetNodeAtPos(mousePos)) {
             if (!IsKeyDown(KEY_LEFT_CONTROL)) {
                 selectedNodeId = -1;

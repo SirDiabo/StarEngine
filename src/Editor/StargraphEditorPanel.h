@@ -75,7 +75,7 @@ private:
     char nodeMenuSearch[64] = "";
     bool didPan = false;
 
-    int editingPinId = -1;
+    int editingPinId = 0;
     char editBuffer[256] = "";
 
     std::vector<std::string> varValueSnapshot;

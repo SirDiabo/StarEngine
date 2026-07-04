@@ -5,6 +5,7 @@
 #include "Core/Module.h"
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
+#include "PropertyFields.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -122,6 +123,7 @@ void ContentBrowserPanel::BeginCreateFolder() {
     isCreatingFolder = true;
     pendingExtension.clear();
     snprintf(nameBuffer, sizeof(nameBuffer), "NewFolder");
+    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
     contextMenuOpen = false;
 }
 
@@ -130,6 +132,7 @@ void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
     isCreatingFolder = false;
     pendingExtension = info.extension;
     snprintf(nameBuffer, sizeof(nameBuffer), "New%s", info.typeName.c_str());
+    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
     contextMenuOpen = false;
 }
 
@@ -252,20 +255,9 @@ void ContentBrowserPanel::RenderMaterialEditor() {
         float cx = box.x + 8 + i * (chW + 6);
         DrawText(channelLabels[i], (int)cx, (int)y, 10, {140, 140, 150, 255});
         Rectangle r = {cx, y + 12, chW, 18};
-        if (materialActiveField == i + 1) {
-            GuiTextBox(r, materialColorBuf[i], 8, true);
-            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
-                int v = atoi(materialColorBuf[i]);
-                *channels[i] = (unsigned char)(v < 0 ? 0 : (v > 255 ? 255 : v));
-                materialActiveField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
-            if (clicked) GuiTextBox(r, materialColorBuf[i], 8, false);
-            DrawRectangleRec(r, {30, 30, 32, 255});
-            DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
-            DrawText(materialColorBuf[i], (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (clicked) materialActiveField = i + 1;
+        int channelVal = *channels[i];
+        if (PropertyField::IntBox(r, materialColorBuf[i], 8, i + 1, materialActiveField, channelVal)) {
+            *channels[i] = (unsigned char)(channelVal < 0 ? 0 : (channelVal > 255 ? 255 : channelVal));
         }
     }
     y += 38;

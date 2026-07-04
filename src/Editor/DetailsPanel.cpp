@@ -1,5 +1,6 @@
 #include "DetailsPanel.h"
 #include "Core/StarAsset.h"
+#include "PropertyFields.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -55,27 +56,10 @@ void DetailsPanel::Render() {
         lastActorIndex = *selectedActorIndex;
     }
 
-    auto labeledField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal) {
-        DrawText(label, (int)x + 8, (int)y, 11, {140, 140, 150, 255});
-        y += 14;
-        Rectangle r = {x + 8, y, w - 16, 18};
-        if (activeField == fieldId) {
-            GuiTextBox(r, buf, (int)bufSize, true);
-            if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
-                outVal = (float)atof(buf);
-                activeField = 0;
-            }
-        } else {
-            bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
-            if (clicked) GuiTextBox(r, buf, (int)bufSize, false);
-            DrawRectangleRec(r, {30, 30, 32, 255});
-            DrawRectangleLinesEx(r, 1, {65, 65, 75, 255});
-            DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, WHITE);
-            if (clicked) {
-                activeField = fieldId;
-                snprintf(buf, bufSize, "%.2f", outVal);
-            }
-        }
+    auto vec3Row = [&](char bufX[32], char bufY[32], char bufZ[32], int fieldBase,
+                        float& vx, float& vy, float& vz) {
+        Rectangle row = {x + 8, y, w - 16, 18};
+        PropertyField::Vec3Row(row, bufX, bufY, bufZ, fieldBase, activeField, vx, vy, vz);
         y += 22;
     };
 
@@ -85,41 +69,25 @@ void DetailsPanel::Render() {
     DrawText("Name", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
     y += 14;
     Rectangle nameRect = {x + 8, y, w - 16, 18};
-    if (activeField == 1) {
-        GuiTextBox(nameRect, nameEditBuf, sizeof(nameEditBuf), true);
-        if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, nameRect))) {
-            inst.name = nameEditBuf;
-            activeField = 0;
-        }
-    } else {
-        bool clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, nameRect);
-        if (clicked) GuiTextBox(nameRect, nameEditBuf, sizeof(nameEditBuf), false);
-        DrawRectangleRec(nameRect, {30, 30, 32, 255});
-        DrawRectangleLinesEx(nameRect, 1, {65, 65, 75, 255});
-        DrawText(nameEditBuf, (int)nameRect.x + 4, (int)nameRect.y + 3, 11, WHITE);
-        if (clicked) activeField = 1;
+    std::string instName = inst.name;
+    if (PropertyField::StringBox(nameRect, nameEditBuf, sizeof(nameEditBuf), 1, activeField, instName)) {
+        inst.name = instName;
     }
     y += 26;
 
     DrawText("Position", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
     y += 14;
-    labeledField("X", posXBuf, sizeof(posXBuf), 2, inst.posX);
-    labeledField("Y", posYBuf, sizeof(posYBuf), 3, inst.posY);
-    labeledField("Z", posZBuf, sizeof(posZBuf), 4, inst.posZ);
+    vec3Row(posXBuf, posYBuf, posZBuf, 2, inst.posX, inst.posY, inst.posZ);
 
     y += 4;
     DrawText("Rotation", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
     y += 14;
-    labeledField("X", rotXBuf, sizeof(rotXBuf), 5, inst.rotX);
-    labeledField("Y", rotYBuf, sizeof(rotYBuf), 6, inst.rotY);
-    labeledField("Z", rotZBuf, sizeof(rotZBuf), 7, inst.rotZ);
+    vec3Row(rotXBuf, rotYBuf, rotZBuf, 5, inst.rotX, inst.rotY, inst.rotZ);
 
     y += 4;
     DrawText("Scale", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
     y += 14;
-    labeledField("X", scaleXBuf, sizeof(scaleXBuf), 8, inst.scaleX);
-    labeledField("Y", scaleYBuf, sizeof(scaleYBuf), 9, inst.scaleY);
-    labeledField("Z", scaleZBuf, sizeof(scaleZBuf), 10, inst.scaleZ);
+    vec3Row(scaleXBuf, scaleYBuf, scaleZBuf, 8, inst.scaleX, inst.scaleY, inst.scaleZ);
 
     y += 6;
 
