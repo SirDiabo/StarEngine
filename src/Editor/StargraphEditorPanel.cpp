@@ -52,7 +52,7 @@ Color StargraphEditorPanel::GetPinColor(PinType type) const {
         case PinType::Integer: return {  0, 189, 189, 255};
         case PinType::Float:   return { 90, 195,  90, 255};
         case PinType::String:  return {200,   0, 200, 255};
-        case PinType::Vec3:    return {255, 165,   0, 255};
+        case PinType::Vec3:    return {231, 191,  18, 255};
         case PinType::Object:  return {  0, 140, 255, 255};
         case PinType::Wildcard: return {180, 180, 180, 255};
         default:               return {120, 120, 120, 255};
@@ -211,18 +211,24 @@ void StargraphEditorPanel::RenderToolbar() {
     }
     btnRight -= 54;
 
+    Vector2 mp = GetMousePosition();
+    bool canStop = !varValueSnapshot.empty();
+
     Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
-    DrawRectangleRec(stopBtn, {130, 30, 30, 255});
-    DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
+    bool stopHovered = canStop && CheckCollisionPointRec(mp, stopBtn);
+    Color stopColor = canStop ? (stopHovered ? Color{160, 40, 40, 255} : Color{130, 30, 30, 255})
+                               : Color{70, 45, 45, 255};
+    DrawRectangleRec(stopBtn, stopColor);
+    DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, canStop ? WHITE : Color{150, 130, 130, 255});
     btnRight -= 26;
 
     Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
-    DrawRectangleRec(playBtn, {30, 130, 60, 255});
+    bool playHovered = CheckCollisionPointRec(mp, playBtn);
+    DrawRectangleRec(playBtn, playHovered ? Color{40, 160, 75, 255} : Color{30, 130, 60, 255});
     DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        Vector2 mp = GetMousePosition();
-        if (CheckCollisionPointRec(mp, stopBtn)) {
+        if (canStop && CheckCollisionPointRec(mp, stopBtn)) {
             for (size_t i = 0; i < graph.GetVariables().size() && i < varValueSnapshot.size(); i++) {
                 graph.GetVariables()[i].value = varValueSnapshot[i];
             }
@@ -1248,8 +1254,18 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     float menuW   = 200;
     float itemH   = 22;
     float searchH = 26;
+    float categoryHeaderH = 18;
     float maxVisibleH = 300.0f;
-    float totalItemsH = (float)entries.size() * itemH + 30;
+
+    int categoryCount = 0;
+    {
+        std::string prev;
+        for (const auto& entry : entries) {
+            if (entry.first != prev) { categoryCount++; prev = entry.first; }
+        }
+    }
+
+    float totalItemsH = (float)entries.size() * itemH + (float)categoryCount * categoryHeaderH + 10;
     float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
     float menuH   = searchH + listH;
 
@@ -1292,13 +1308,16 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
 
     std::string lastCategory;
-    float y = popup.y + searchH + 6 - nodeMenuScrollOffset;
+    float y = popup.y + searchH + 4 - nodeMenuScrollOffset;
     for (const auto& entry : entries) {
-        if (entry.first != lastCategory && !lastCategory.empty()) {
-            DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {70, 70, 80, 255});
-            y += 5;
+        if (entry.first != lastCategory) {
+            if (!lastCategory.empty()) {
+                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {70, 70, 80, 255});
+            }
+            lastCategory = entry.first;
+            DrawText(entry.first.c_str(), (int)popup.x + 8, (int)y + 4, 11, {150, 165, 195, 255});
+            y += categoryHeaderH;
         }
-        lastCategory = entry.first;
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
         if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {

@@ -75,6 +75,10 @@ bool BoolBox(Rectangle r, bool& outVal) {
     return outVal != before;
 }
 
+static const Color AxisColorX = {220, 65, 65, 255};
+static const Color AxisColorY = {95, 200, 95, 255};
+static const Color AxisColorZ = {70, 140, 230, 255};
+
 bool Vec3Row(Rectangle rowRect, char bufX[32], char bufY[32], char bufZ[32], int fieldIdBase,
              int& activeField, float& outX, float& outY, float& outZ, bool allowActivate,
              const Style& style) {
@@ -82,15 +86,15 @@ bool Vec3Row(Rectangle rowRect, char bufX[32], char bufY[32], char bufZ[32], int
     float boxW = colW - 14;
     bool changed = false;
 
-    DrawText("X", (int)rowRect.x, (int)rowRect.y + 3, 11, style.label);
+    DrawText("X", (int)rowRect.x, (int)rowRect.y + 3, 11, AxisColorX);
     changed |= FloatBox({rowRect.x + 14, rowRect.y, boxW, rowRect.height}, bufX, 32,
                          fieldIdBase + 0, activeField, outX, allowActivate, style);
 
-    DrawText("Y", (int)(rowRect.x + colW), (int)rowRect.y + 3, 11, style.label);
+    DrawText("Y", (int)(rowRect.x + colW), (int)rowRect.y + 3, 11, AxisColorY);
     changed |= FloatBox({rowRect.x + colW + 14, rowRect.y, boxW, rowRect.height}, bufY, 32,
                          fieldIdBase + 1, activeField, outY, allowActivate, style);
 
-    DrawText("Z", (int)(rowRect.x + colW * 2), (int)rowRect.y + 3, 11, style.label);
+    DrawText("Z", (int)(rowRect.x + colW * 2), (int)rowRect.y + 3, 11, AxisColorZ);
     changed |= FloatBox({rowRect.x + colW * 2 + 14, rowRect.y, boxW, rowRect.height}, bufZ, 32,
                          fieldIdBase + 2, activeField, outZ, allowActivate, style);
 
