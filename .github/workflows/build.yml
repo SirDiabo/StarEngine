@@ -143,19 +143,20 @@ jobs:
           retention-days: 30
           compression-level: 9
 
-  release:
+  check-version:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      version-changed: ${{ steps.compare-version.outputs.changed }}
+      current-version: ${{ steps.extract-version.outputs.VERSION }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Extract Version
-        id: version
+      - name: Extract Current Version
+        id: extract-version
         run: |
           VERSION=$(grep -oP 'project\(\w+\s+VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
           if [ -z "$VERSION" ]; then
@@ -165,6 +166,49 @@ jobs:
             echo "❌ Could not extract version from CMakeLists.txt"
             exit 1
           fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get Last Released Version
+        id: last-version
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "LAST_VERSION=none" >> $GITHUB_OUTPUT
+          else
+            # Extract version from tag (assuming format v1.0.0-build.123)
+            LAST_VERSION=$(echo "$LAST_TAG" | sed -E 's/v([0-9.]+).*/\1/')
+            echo "LAST_VERSION=$LAST_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compare Versions
+        id: compare-version
+        run: |
+          CURRENT="${{ steps.extract-version.outputs.VERSION }}"
+          LAST="${{ steps.last-version.outputs.LAST_VERSION }}"
+          
+          if [ "$LAST" = "none" ] || [ "$CURRENT" != "$LAST" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Version changed: $LAST → $CURRENT"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Version unchanged: $CURRENT"
+          fi
+
+  release:
+    needs: [build, check-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-version.outputs.version-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Version
+        id: version
+        run: |
+          VERSION=${{ needs.check-version.outputs.current-version }}
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG=v${VERSION}-build.${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "DATE=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
@@ -218,8 +262,6 @@ jobs:
           rm -rf staging
           ls -lh release/
 
-
-
       - name: Verify Release Artifacts
         run: |
           expected_files=3
@@ -264,7 +306,8 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-version.outputs.version-changed == 'true'
+    needs: check-version
     permissions:
       contents: write
     steps:
