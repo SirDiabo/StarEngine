@@ -70,3 +70,14 @@ The main editor window consists of tabbed panels:
 - Content Browser - Asset management
 - Logs - Output console
 - Stargraph Editor - Visual script editing
+
+## Ownership
+
+Games and other content created with StarEngine are the sole property of their respective creators.
+StarEngine is a tool, the output you create with it is not a derivative work of the engine, and you retain full ownership and rights over your games.
+
+## License
+
+StarEngine is released under the [MIT License](./LICENSE).
+
+See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for licenses of included third-party components (raylib, raygui).
