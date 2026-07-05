@@ -76,6 +76,10 @@ The main editor window consists of tabbed panels:
 Games and other content created with StarEngine are the sole property of their respective creators.
 StarEngine is a tool, the output you create with it is not a derivative work of the engine, and you retain full ownership and rights over your games.
 
+## Support
+
+If you find StarEngine useful, consider [supporting me on Ko-fi](https://ko-fi.com/sirdiabo).
+
 ## License
 
 StarEngine is released under the [MIT License](./LICENSE).
