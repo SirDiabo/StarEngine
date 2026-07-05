@@ -9,6 +9,7 @@
 #include "ViewportPanel.h"
 #include "AssetPickerPopup.h"
 #include "ImportDetailsPanel.h"
+#include "AboutPanel.h"
 #include "LayoutSerializer.h"
 #include "Core/Project.h"
 #include "raygui.h"
@@ -53,6 +54,7 @@ void Editor::Initialize() {
     menuBar->SetActionCallback([this](const std::string& menu, const std::string& item) {
         if (menu == "Window") HandleWindowMenuAction(item);
         if (menu == "Edit")   HandleEditMenuAction(item);
+        if (menu == "Help")   HandleHelpMenuAction(item);
     });
 
     // Build initial menu from the first (level) tab.
@@ -107,7 +109,10 @@ void Editor::Render() {
     // Layer 6: import details popup (above everything but asset picker dropdowns).
     ImportDetailsPanel::Get().Render();
 
-    // Layer 7: asset picker popups (always topmost).
+    // Layer 7: about panel (floating modal).
+    AboutPanel::Get().Render();
+
+    // Layer 8: asset picker popups (always topmost).
     AssetPickerPopup::FlushDeferredDraws();
 }
 
@@ -234,6 +239,12 @@ void Editor::OpenDefaultMapIfSet() {
 
 void Editor::HandleEditMenuAction(const std::string& item) {
     if (item == "Project Settings") OpenProjectSettingsTab();
+}
+
+void Editor::HandleHelpMenuAction(const std::string& item) {
+    if (item == "Support") OpenURL("https://ko-fi.com/sirdiabo");
+    if (item == "GitHub")  OpenURL("https://github.com/SirDiabo/StarEngine");
+    if (item == "About")   AboutPanel::Get().Open();
 }
 
 void Editor::HandleWindowMenuAction(const std::string& item) {

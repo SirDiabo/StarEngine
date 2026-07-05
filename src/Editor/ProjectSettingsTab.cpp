@@ -92,6 +92,6 @@ void ProjectSettingsTab::BuildMenus(MenuBar* menuBar) {
         { "File",   { "Save Project" } },
         { "Edit",   { } },
         { "Window", { } },
-        { "Help",   { } },
+        { "Help",   { "Support", "GitHub", "About" } },
     });
 }

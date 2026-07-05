@@ -82,7 +82,7 @@ void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
         { "Asset",  { "Find in Content Browser" } },
         { "Debug",  { "Play Graph", "Stop" } },
         { "Window", { } },
-        { "Help",   { } },
+        { "Help",   { "Support", "GitHub", "About" } },
     });
 }
 

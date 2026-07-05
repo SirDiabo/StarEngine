@@ -8,6 +8,7 @@ class LevelEditorTab;
 class MenuBar;
 class ProjectBrowser;
 class LogPanel;
+class AboutPanel;
 
 class Editor {
 public:
@@ -38,6 +39,7 @@ private:
     void OpenProjectSettingsTab();
     void HandleWindowMenuAction(const std::string& item);
     void HandleEditMenuAction(const std::string& item);
+    void HandleHelpMenuAction(const std::string& item);
 
     std::string GetLayoutPath() const;
 

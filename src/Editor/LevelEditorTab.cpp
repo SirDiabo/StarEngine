@@ -127,7 +127,7 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { "Project Settings" } },
         { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
-        { "Help",   { } },
+        { "Help",   { "Support", "GitHub", "About" } },
     });
 }
 
