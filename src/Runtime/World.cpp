@@ -1,7 +1,5 @@
 #include "World.h"
 #include "Actor.h"
-#include "Pawn.h"
-#include "Character.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -11,11 +9,7 @@ World& World::Get() {
 }
 
 Actor* World::SpawnActor(const std::string& className, const std::string& name) {
-    std::unique_ptr<Actor> actor;
-
-    if (className == "Character") actor = std::make_unique<Character>();
-    else if (className == "Pawn")  actor = std::make_unique<Pawn>();
-    else                           actor = std::make_unique<Actor>();
+    std::unique_ptr<Actor> actor = std::make_unique<Actor>();
 
     if (!name.empty()) actor->SetName(name);
 

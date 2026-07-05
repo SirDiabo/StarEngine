@@ -425,8 +425,6 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 }
 
 static Color ClassColor(const std::string& className) {
-    if (className == "Character") return {100, 180, 100, 255};
-    if (className == "Pawn")      return {100, 140, 200, 255};
     return {200, 160, 80, 255};
 }
 
