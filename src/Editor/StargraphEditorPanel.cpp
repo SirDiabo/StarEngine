@@ -151,8 +151,68 @@ void StargraphEditorPanel::CancelLink() {
 }
 
 void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
+    int otherPinId = -1;
+    for (const Link& lk : graph.GetLinks()) {
+        if (lk.inputPinId == pinId)  { otherPinId = lk.outputPinId; break; }
+        if (lk.outputPinId == pinId) { otherPinId = lk.inputPinId;  break; }
+    }
     graph.RemoveLink(pinId);
     isDirty = true;
+    RefreshWildcardPins(graph.FindNodeByPinId(pinId));
+    if (otherPinId != -1) RefreshWildcardPins(graph.FindNodeByPinId(otherPinId));
+}
+
+void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
+    if (!node) return;
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
+    if (!tmpl || !tmpl->createPins) return;
+
+    Node blank;
+    tmpl->createPins(&blank);
+
+    auto isWildcardInTemplate = [](const std::vector<Pin>& templatePins, const std::string& name) {
+        for (const Pin& p : templatePins) if (p.name == name) return p.type == PinType::Wildcard;
+        return false;
+    };
+
+    bool anyWildcard = false;
+    for (Pin& pin : node->inputs) {
+        if (isWildcardInTemplate(blank.inputs, pin.name)) { pin.type = PinType::Wildcard; anyWildcard = true; }
+    }
+    for (Pin& pin : node->outputs) {
+        if (isWildcardInTemplate(blank.outputs, pin.name)) { pin.type = PinType::Wildcard; anyWildcard = true; }
+    }
+    if (!anyWildcard) return;
+
+    PinType resolved = PinType::None;
+    for (const Pin& pin : node->inputs) {
+        if (pin.type != PinType::Wildcard) continue;
+        for (const Link& lk : graph.GetLinks()) {
+            if (lk.inputPinId != pin.id) continue;
+            if (const Node* fromNode = graph.FindNodeByPinId(lk.outputPinId)) {
+                for (const Pin& p : fromNode->outputs) {
+                    if (p.id == lk.outputPinId && p.type != PinType::Wildcard) resolved = p.type;
+                }
+            }
+        }
+    }
+    if (resolved == PinType::None) {
+        for (const Pin& pin : node->outputs) {
+            if (pin.type != PinType::Wildcard) continue;
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId != pin.id) continue;
+                if (const Node* toNode = graph.FindNodeByPinId(lk.inputPinId)) {
+                    for (const Pin& p : toNode->inputs) {
+                        if (p.id == lk.inputPinId && p.type != PinType::Wildcard) resolved = p.type;
+                    }
+                }
+            }
+        }
+    }
+    if (resolved == PinType::None) return;
+
+    for (Pin& pin : node->inputs)  if (pin.type == PinType::Wildcard) pin.type = resolved;
+    for (Pin& pin : node->outputs) if (pin.type == PinType::Wildcard) pin.type = resolved;
 }
 
 void StargraphEditorPanel::DeleteSelected() {
@@ -642,7 +702,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         static char varFloatBuf[32] = "";
         static char varVecBuf[3][32] = {"", "", ""};
         static int lastDetailIndex = -1;
-        static int activeField = 0;
+        static int activeField = 0; // 0=none 1=name 2..4=value
 
         auto refreshValueBuffers = [&]() {
             switch (var.type) {
@@ -878,8 +938,7 @@ void StargraphEditorPanel::RenderGraph() {
         if (hovered) {
             DrawLineBezier(from, to, 3.0f, {255, 80, 80, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                graph.RemoveLink(link.outputPinId);
-                isDirty = true;
+                RemoveLinkFromPin(link.outputPinId);
                 break;
             }
         } else {
@@ -1295,6 +1354,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     const auto& templates = NodeRegistry::Get().GetFilteredTemplates();
     std::string searchLower = nodeMenuSearch;
     for (char& c : searchLower) c = (char)tolower(c);
+    for (char& c : searchLower) if (c == ' ') c = '_';
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& t : templates) {
@@ -1409,6 +1469,35 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 const float gridSnap = 16.0f;
                 node->posX = roundf(rawNX / gridSnap) * gridSnap;
                 node->posY = roundf(rawNY / gridSnap) * gridSnap;
+
+                if (filterCompatibleWithPin != -1) {
+                    const Pin* fromPin = nullptr;
+                    bool fromIsOutput = false;
+                    for (const Node& n : graph.GetNodes()) {
+                        for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; }
+                        for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; }
+                    }
+                    if (fromPin) {
+                        if (fromIsOutput) {
+                            for (const Pin& p : node->inputs) {
+                                if (p.type == fromPin->type || p.type == PinType::Wildcard) {
+                                    graph.AddLink({filterCompatibleWithPin, p.id});
+                                    break;
+                                }
+                            }
+                        } else {
+                            for (const Pin& p : node->outputs) {
+                                if (p.type == fromPin->type || p.type == PinType::Wildcard) {
+                                    graph.AddLink({p.id, filterCompatibleWithPin});
+                                    break;
+                                }
+                            }
+                        }
+                        RefreshWildcardPins(node);
+                        RefreshWildcardPins(graph.FindNodeByPinId(filterCompatibleWithPin));
+                    }
+                }
+
                 isDirty = true;
                 nodeMenuOpen = false;
                 filterCompatibleWithPin = -1;
