@@ -88,6 +88,7 @@ private:
     char varNameBuffer[128] = "";
     bool addingVariable = false;
     int variableNameActiveField = 0;
+    int listeningForKeyPinId = 0;
 
     static const float nodeWidth;
     static const float pinHeight;

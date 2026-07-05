@@ -2,6 +2,7 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "ViewportPanel.h"
 #include "PropertyFields.h"
+#include "Modules/Stargraph/InputKeyNames.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -873,6 +874,27 @@ void StargraphEditorPanel::RenderGraph() {
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     Vector2 mousePos = GetMousePosition();
 
+    if (listeningForKeyPinId != 0) {
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            listeningForKeyPinId = 0;
+        } else {
+            int keyCode = GetKeyPressed();
+            if (keyCode != 0) {
+                std::string keyName = InputKeyCodeToName(keyCode);
+                if (!keyName.empty()) {
+                    for (Node& n : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                        for (Pin& p : n.inputs) {
+                            if (p.id == listeningForKeyPinId) { p.defaultValue = keyName; isDirty = true; }
+                        }
+                    }
+                }
+                listeningForKeyPinId = 0;
+            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                listeningForKeyPinId = 0;
+            }
+        }
+    }
+
     float wheel = GetMouseWheelMove();
     if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea) && !nodeMenuOpen) {
         float newZoom = zoom + wheel * 0.1f;
@@ -1025,7 +1047,9 @@ void StargraphEditorPanel::RenderGraph() {
 
             if (!linked) {
                 float fieldX = nx + pinRadius * zoom + 18;
-                float fieldW = scaledNodeWidth - pinRadius * zoom - 26;
+                float fieldRightMax = nx + scaledNodeWidth * 0.62f;
+                float fieldW = fieldRightMax - fieldX;
+                if (fieldW < 40 * zoom) fieldW = 40 * zoom;
                 Rectangle fieldRect = {fieldX, inputY - scaledPinHeight * 0.5f, fieldW, scaledPinHeight - 2};
 
                 if (pin.type == PinType::Boolean) {
@@ -1033,6 +1057,32 @@ void StargraphEditorPanel::RenderGraph() {
                     if (PropertyField::BoolBox({fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2}, bval)) {
                         pin.defaultValue = bval ? "true" : "false";
                         isDirty = true;
+                    }
+                } else if (node.type == "Input_Key" && pin.name == "Key") {
+                    float listenBtnW = 22;
+                    Rectangle textRect = {fieldRect.x, fieldRect.y, fieldRect.width - listenBtnW - 4, fieldRect.height};
+                    Rectangle listenBtn = {fieldRect.x + fieldRect.width - listenBtnW, fieldRect.y, listenBtnW, fieldRect.height};
+                    bool listening = (listeningForKeyPinId == pin.id);
+
+                    char inactiveBuf[256];
+                    char* activeBuf = editBuffer;
+                    if (editingPinId != pin.id) {
+                        snprintf(inactiveBuf, sizeof(inactiveBuf), "%s", pin.defaultValue.c_str());
+                        activeBuf = inactiveBuf;
+                    }
+                    bool allowActivate = (linkFromPin == -1) && !listening;
+                    if (PropertyField::StringBox(textRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
+                                                  pin.defaultValue, allowActivate, pin.name.c_str())) {
+                        isDirty = true;
+                    }
+
+                    DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : Color{50, 50, 56, 255});
+                    DrawRectangleLinesEx(listenBtn, 1, {80, 80, 90, 255});
+                    DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 11,
+                             listening ? WHITE : LIGHTGRAY);
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, listenBtn)) {
+                        listeningForKeyPinId = pin.id;
+                        editingPinId = 0;
                     }
                 } else {
                     char inactiveBuf[256];

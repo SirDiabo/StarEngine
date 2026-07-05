@@ -4,6 +4,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Stargraph.h"
+#include "InputKeyNames.h"
 #include "Core/AssetTypeRegistry.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -579,33 +580,26 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(setActorScale);
 
-    // Input nodes (read keyboard state at execution time)
-
-    auto makeKeyNode = [this](const std::string& nodeType, int key) {
-        NodeTemplate t;
-        t.type = nodeType;
-        t.category = "Input";
-        t.moduleName = "Stargraph";
-        t.isEvent = true;
-        t.createPins = [](Node* node) {
-            node->outputs.push_back({"Out",      PinType::Exec,    false, true});
-            node->outputs.push_back({"Is Held",  PinType::Boolean, false, true});
-        };
-        t.execute = [key](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-            bool held = IsKeyDown(key);
-            for (Pin& p : node.outputs) {
-                if (p.name == "Is Held") p.defaultValue = held ? "true" : "false";
-            }
-        };
-        return t;
+    NodeTemplate inputKey;
+    inputKey.type = "Input_Key";
+    inputKey.category = "Input";
+    inputKey.moduleName = "Stargraph";
+    inputKey.isEvent = true;
+    inputKey.createPins = [](Node* node) {
+        node->inputs.push_back({"Key", PinType::String, true, false, 0, "W"});
+        node->outputs.push_back({"Out",     PinType::Exec,    false, true});
+        node->outputs.push_back({"Is Held", PinType::Boolean, false, true});
     };
-
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_W",     KEY_W));
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_A",     KEY_A));
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_S",     KEY_S));
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_D",     KEY_D));
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_Space", KEY_SPACE));
-    NodeRegistry::Get().RegisterNode(makeKeyNode("Input_Key_Shift", KEY_LEFT_SHIFT));
+    inputKey.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string keyName;
+        for (const Pin& p : node.inputs) if (p.name == "Key") keyName = p.defaultValue;
+        int key = InputKeyNameToCode(keyName);
+        bool held = key != 0 && IsKeyDown(key);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Is Held") p.defaultValue = held ? "true" : "false";
+        }
+    };
+    NodeRegistry::Get().RegisterNode(inputKey);
 
     NodeTemplate getAxisH;
     getAxisH.type = "Get_Axis_Horizontal";

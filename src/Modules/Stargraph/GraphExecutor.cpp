@@ -102,8 +102,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
             for (Node& node : nodes) {
                 const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
                 if (!tmpl) continue;
-                if (node.type == "Input_Key_W" || node.type == "Input_Key_A" || node.type == "Input_Key_S" || 
-                    node.type == "Input_Key_D" || node.type == "Input_Key_Space" || node.type == "Input_Key_Shift") {
+                if (node.type == "Input_Key") {
                     tmpl->execute(node, graph, ctx);
                     bool keyHeld = false;
                     for (const Pin& p : node.outputs) {
@@ -156,8 +155,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
         for (Node& node : nodes) {
             const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
             if (!tmpl) continue;
-            if (node.type == "Input_Key_W" || node.type == "Input_Key_A" || node.type == "Input_Key_S" || 
-                node.type == "Input_Key_D" || node.type == "Input_Key_Space" || node.type == "Input_Key_Shift") {
+            if (node.type == "Input_Key") {
                 tmpl->execute(node, graph, ctx);
                 bool keyHeld = false;
                 for (const Pin& p : node.outputs) {
