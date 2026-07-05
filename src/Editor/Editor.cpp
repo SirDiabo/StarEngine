@@ -2,6 +2,7 @@
 #include "EditorTab.h"
 #include "LevelEditorTab.h"
 #include "StargraphEditorTab.h"
+#include "ProjectSettingsTab.h"
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
 #include "LogPanel.h"
@@ -9,6 +10,7 @@
 #include "AssetPickerPopup.h"
 #include "ImportDetailsPanel.h"
 #include "LayoutSerializer.h"
+#include "Core/Project.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -50,6 +52,7 @@ void Editor::Initialize() {
 
     menuBar->SetActionCallback([this](const std::string& menu, const std::string& item) {
         if (menu == "Window") HandleWindowMenuAction(item);
+        if (menu == "Edit")   HandleEditMenuAction(item);
     });
 
     // Build initial menu from the first (level) tab.
@@ -202,6 +205,35 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
             }
         }
     }
+}
+
+void Editor::OpenProjectSettingsTab() {
+    for (int i = 0; i < (int)editorTabs.size(); i++) {
+        if (dynamic_cast<ProjectSettingsTab*>(editorTabs[i].get())) {
+            editorTabs[activeEditorTab]->OnDeactivated();
+            activeEditorTab = i;
+            editorTabs[activeEditorTab]->OnActivated();
+            editorTabs[activeEditorTab]->BuildMenus(menuBar);
+            return;
+        }
+    }
+    auto* tab = new ProjectSettingsTab();
+    tab->Initialize();
+    editorTabs.emplace_back(tab);
+    editorTabs[activeEditorTab]->OnDeactivated();
+    activeEditorTab = (int)editorTabs.size() - 1;
+    editorTabs[activeEditorTab]->OnActivated();
+    editorTabs[activeEditorTab]->BuildMenus(menuBar);
+}
+
+void Editor::OpenDefaultMapIfSet() {
+    const std::string& mapPath = Project::Get().GetSettings().defaultMapPath;
+    if (mapPath.empty() || !fs::exists(mapPath)) return;
+    OpenAssetInTab(mapPath, ".starmap");
+}
+
+void Editor::HandleEditMenuAction(const std::string& item) {
+    if (item == "Project Settings") OpenProjectSettingsTab();
 }
 
 void Editor::HandleWindowMenuAction(const std::string& item) {

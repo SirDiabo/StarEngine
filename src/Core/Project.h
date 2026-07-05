@@ -6,7 +6,7 @@ struct ProjectSettings {
     std::string name;
     int targetWidth = 640;
     int targetHeight = 480;
-    std::string startupModule;
+    std::string defaultMapPath;
     std::vector<std::string> disabledModules;
 };
 
@@ -18,6 +18,7 @@ public:
     bool Load(const std::string& projectFilePath);
     void Save();
 
+    ProjectSettings& GetSettings() { return settings; }
     const ProjectSettings& GetSettings() const { return settings; }
     const std::string& GetRootPath() const { return rootPath; }
     const std::string& GetProjectFilePath() const { return projectFilePath; }

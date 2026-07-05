@@ -43,7 +43,7 @@ bool Project::Load(const std::string& path) {
         if (key == "name") settings.name = value;
         else if (key == "targetWidth") settings.targetWidth = std::stoi(value);
         else if (key == "targetHeight") settings.targetHeight = std::stoi(value);
-        else if (key == "startupModule") settings.startupModule = value;
+        else if (key == "defaultMap") settings.defaultMapPath = value;
         else if (key == "disabledModules") {
             settings.disabledModules.clear();
             std::stringstream ss(value);
@@ -70,7 +70,7 @@ void Project::Save() {
     out << "name=" << settings.name << "\n";
     out << "targetWidth=" << settings.targetWidth << "\n";
     out << "targetHeight=" << settings.targetHeight << "\n";
-    out << "startupModule=" << settings.startupModule << "\n";
+    out << "defaultMap=" << settings.defaultMapPath << "\n";
 
     out << "disabledModules=";
     for (size_t i = 0; i < settings.disabledModules.size(); i++) {

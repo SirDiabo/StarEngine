@@ -125,7 +125,7 @@ void LevelEditorTab::RenderOverlays() {
 void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
-        { "Edit",   { } },
+        { "Edit",   { "Project Settings" } },
         { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
         { "Help",   { } },
     });

@@ -30,10 +30,14 @@ public:
     void SaveLayout() const;
     void LoadLayout();
 
+    void OpenDefaultMapIfSet();
+
 private:
     void RenderEditorTabBar(float x, float y, float width);
     void OpenAssetInTab(const std::string& fullPath, const std::string& extension);
+    void OpenProjectSettingsTab();
     void HandleWindowMenuAction(const std::string& item);
+    void HandleEditMenuAction(const std::string& item);
 
     std::string GetLayoutPath() const;
 
