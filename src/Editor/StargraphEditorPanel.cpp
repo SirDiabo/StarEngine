@@ -5,6 +5,7 @@
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
@@ -493,13 +494,16 @@ void StargraphEditorPanel::RenderLeftPanel() {
         DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(vars[i].type));
 
         if (renamingVariableIndex == (int)i) {
-            GuiTextBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer, sizeof(varNameBuffer), true);
-            if (IsKeyPressed(KEY_ENTER)) {
-                vars[i].name = varNameBuffer;
+            std::string nameOut = vars[i].name;
+            if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
+                                          sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
+                vars[i].name = nameOut;
                 renamingVariableIndex = -1;
+                variableNameActiveField = 0;
                 isDirty = true;
             } else if (IsKeyPressed(KEY_ESCAPE)) {
                 renamingVariableIndex = -1;
+                variableNameActiveField = 0;
             }
         } else {
             DrawText(vars[i].name.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
@@ -546,27 +550,35 @@ void StargraphEditorPanel::RenderLeftPanel() {
         Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
         DrawRectangleRec(row, {42, 42, 48, 255});
         DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
-        GuiTextBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer, sizeof(varNameBuffer), true);
 
-        if (IsKeyPressed(KEY_ENTER) && varNameBuffer[0] != '\0') {
-            Variable v;
-            v.name = varNameBuffer;
-            v.type = PinType::Boolean;
-            graph.AddVariable(v);
-            selectedVariableIndex = (int)graph.GetVariables().size() - 1;
+        std::string nameOut = varNameBuffer;
+        if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
+                                      sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
+            if (!nameOut.empty()) {
+                Variable v;
+                v.name = nameOut;
+                v.type = PinType::Boolean;
+                graph.AddVariable(v);
+                selectedVariableIndex = (int)graph.GetVariables().size() - 1;
+                isDirty = true;
+            }
             addingVariable = false;
-            isDirty = true;
+            variableNameActiveField = 0;
         } else if (IsKeyPressed(KEY_ESCAPE)) {
             addingVariable = false;
+            variableNameActiveField = 0;
         }
         y += 22;
     }
 
     Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
-    if (GuiButton(addBtn, "+ Variable")) {
+    GuiButton(addBtn, "+ Variable");
+    
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
         snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
         PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
         addingVariable = true;
+        variableNameActiveField = 1;
     }
 
     if (varContextMenuOpen) {
@@ -581,10 +593,13 @@ void StargraphEditorPanel::RenderLeftPanel() {
         DrawRectangleRec(popup, {55, 55, 60, 255});
         DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
 
-        if (GuiButton({popup.x + 4, popup.y + 4, popup.width - 8, 18}, "Rename")) {
+        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
+        GuiButton(renameBtn, "Rename");
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, renameBtn)) {
             snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
             PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
             renamingVariableIndex = varContextMenuIndex;
+            variableNameActiveField = 1;
             varContextMenuOpen = false;
         }
         if (GuiButton({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
@@ -623,12 +638,37 @@ void StargraphEditorPanel::RenderRightPanel() {
 
         static char varNameEditBuf[128] = "";
         static char varValBuffer[128] = "";
+        static char varIntBuf[32] = "";
+        static char varFloatBuf[32] = "";
+        static char varVecBuf[3][32] = {"", "", ""};
         static int lastDetailIndex = -1;
-        static int activeField = 0; // 0=none 1=name 2=value
+        static int activeField = 0;
+
+        auto refreshValueBuffers = [&]() {
+            switch (var.type) {
+                case PinType::Integer:
+                    snprintf(varIntBuf, sizeof(varIntBuf), "%d", atoi(var.value.c_str()));
+                    break;
+                case PinType::Float:
+                    snprintf(varFloatBuf, sizeof(varFloatBuf), "%.2f", atof(var.value.c_str()));
+                    break;
+                case PinType::Vec3: {
+                    float vx = 0, vy = 0, vz = 0;
+                    sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                    snprintf(varVecBuf[0], 32, "%.2f", vx);
+                    snprintf(varVecBuf[1], 32, "%.2f", vy);
+                    snprintf(varVecBuf[2], 32, "%.2f", vz);
+                    break;
+                }
+                default:
+                    snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+                    break;
+            }
+        };
 
         if (lastDetailIndex != selectedVariableIndex) {
             snprintf(varNameEditBuf, sizeof(varNameEditBuf), "%s", var.name.c_str());
-            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+            refreshValueBuffers();
             lastDetailIndex = selectedVariableIndex;
             activeField = 0;
         }
@@ -646,13 +686,26 @@ void StargraphEditorPanel::RenderRightPanel() {
 
         static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object","Wildcard"};
         int typeIndex = (int)var.type;
-        if (typeIndex < 0 || typeIndex > 8) typeIndex = 0;
+        if (typeIndex < 0 || typeIndex > 8) typeIndex = 2;
 
-        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, typeNames[typeIndex])) {
-            int next = (typeIndex + 1) % 9;
-            if (next == 0 || next == 1) next = 2;
+        Rectangle typeRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style typeStyle;
+        DrawRectangleRec(typeRect, typeStyle.box);
+        DrawRectangleLinesEx(typeRect, 1, typeStyle.border);
+        DrawText(typeNames[typeIndex], (int)typeRect.x + 4, (int)typeRect.y + 3, 11, typeStyle.text);
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), typeRect)) {
+            int next = typeIndex + 1;
+            if (next < 2 || next > 7) next = 2;
             var.type = (PinType)next;
-            snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+            switch (var.type) {
+                case PinType::Boolean: var.value = "false"; break;
+                case PinType::Integer: var.value = "0"; break;
+                case PinType::Float:   var.value = "0.00"; break;
+                case PinType::Vec3:    var.value = "0.00,0.00,0.00"; break;
+                default:               var.value = ""; break;
+            }
+            refreshValueBuffers();
             isDirty = true;
             activeField = 0;
         }
@@ -669,6 +722,33 @@ void StargraphEditorPanel::RenderRightPanel() {
                 isDirty = true;
             }
             DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 12, WHITE);
+        } else if (var.type == PinType::Integer) {
+            Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+            int ival = atoi(var.value.c_str());
+            if (PropertyField::IntBox(r, varIntBuf, sizeof(varIntBuf), 2, activeField, ival)) {
+                var.value = std::to_string(ival);
+                isDirty = true;
+            }
+        } else if (var.type == PinType::Float) {
+            Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+            float fval = (float)atof(var.value.c_str());
+            if (PropertyField::FloatBox(r, varFloatBuf, sizeof(varFloatBuf), 2, activeField, fval)) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.2f", fval);
+                var.value = buf;
+                isDirty = true;
+            }
+        } else if (var.type == PinType::Vec3) {
+            Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
+            float vx = 0, vy = 0, vz = 0;
+            sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+            if (PropertyField::Vec3Row(row, varVecBuf[0], varVecBuf[1], varVecBuf[2], 2, activeField,
+                                        vx, vy, vz)) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+                var.value = buf;
+                isDirty = true;
+            }
         } else {
             Rectangle valRect = {panel.x + 8, y, panel.width - 16, 18};
             std::string varValue = var.value;
