@@ -10,6 +10,7 @@ static const Color COLOR_MENU_TEXT  = { 210, 210, 210, 255 };
 static const float MENU_ITEM_H      = 22.0f;
 static const float MENU_POPUP_W     = 160.0f;
 static const float MENU_BTN_PAD     = 10.0f;
+static const float MENU_CHECK_W     = 16.0f;
 
 void MenuBar::Initialize() {}
 
@@ -92,7 +93,8 @@ void MenuBar::RenderPopup() {
     DrawRectangleLinesEx(popup, 1, { 80, 80, 88, 255 });
 
     float iy = popupY + 2;
-    for (const std::string& item : entry.items) {
+    for (int index = 0; index < (int)entry.items.size(); index++) {
+        const std::string& item = entry.items[index];
         if (item == "---") {
             DrawLine((int)(popupX + 4), (int)(iy + MENU_ITEM_H / 2),
                      (int)(popupX + MENU_POPUP_W - 4), (int)(iy + MENU_ITEM_H / 2),
@@ -103,7 +105,13 @@ void MenuBar::RenderPopup() {
         Rectangle row = { popupX + 1, iy, MENU_POPUP_W - 2, MENU_ITEM_H };
         bool rowHov = CheckCollisionPointRec(mouse, row);
         if (rowHov) DrawRectangleRec(row, COLOR_MENU_HOVER);
-        DrawText(item.c_str(), (int)(popupX + 8), (int)(iy + 5), 11, COLOR_MENU_TEXT);
+
+        float textX = popupX + 8;
+        if (!entry.checked.empty() && index < (int)entry.checked.size() && entry.checked[index]) {
+            DrawText("x", (int)(popupX + 8), (int)(iy + 5), 11, COLOR_MENU_TEXT);
+            textX = popupX + 8 + MENU_CHECK_W;
+        }
+        DrawText(item.c_str(), (int)textX, (int)(iy + 5), 11, COLOR_MENU_TEXT);
 
         if (rowHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (entry.label == "File") {

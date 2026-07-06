@@ -123,11 +123,21 @@ void LevelEditorTab::RenderOverlays() {
 }
 
 void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
+    std::vector<bool> windowChecked = {
+        dockArea.IsPanelVisible("Viewport"),
+        dockArea.IsPanelVisible("Details"),
+        dockArea.IsPanelVisible("Outliner"),
+        dockArea.IsPanelVisible("Content Browser"),
+        dockArea.IsPanelVisible("Logs"),
+        dockArea.IsPanelVisible("Modules"),
+        false, false, false, false,
+    };
+
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { "Project Settings" } },
         { "Package", { "Package Project" } },
-        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
+        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -145,6 +155,8 @@ void LevelEditorTab::LoadLayout(const std::string& filePath) {
 }
 
 void LevelEditorTab::ResetLayout() {
+    for (const std::string& name : { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules" })
+        dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
 }
 

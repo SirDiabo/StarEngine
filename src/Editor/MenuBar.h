@@ -6,6 +6,8 @@
 struct MenuEntry {
     std::string label;
     std::vector<std::string> items;
+    
+    std::vector<bool> checked;
 };
 
 // A menu action callback: receives the menu label and item label that was clicked.

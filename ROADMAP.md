@@ -56,7 +56,7 @@ x Window menu in MenuBar lists all panels
 x Click to toggle panel visibility
 x Restored hidden panels attach to root leaf or float if tree is complex
 x Reset Layout option restores UE5-style default arrangement
-o Checked state indicator next to visible panels in the menu
+x Checked state indicator next to visible panels in the menu
 
 ### 1.7 Layout Persistence
 x Save layout to ~/.starengine/layout.cfg on editor shutdown

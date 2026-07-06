@@ -79,6 +79,12 @@ void Editor::Render() {
     int w = GetScreenWidth();
     int h = GetScreenHeight();
 
+    if (menuBar->activeMenu < 0 && !projectBrowser->IsVisible()) {
+        EditorTab* tab = (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size())
+                         ? editorTabs[activeEditorTab].get() : nullptr;
+        if (tab) tab->BuildMenus(menuBar);
+    }
+
     // Layer 1: menu bar background and buttons.
     menuBar->RenderBar();
 
@@ -275,7 +281,7 @@ void Editor::HandleHelpMenuAction(const std::string& item) {
 }
 
 void Editor::HandleWindowMenuAction(const std::string& item) {
-    if (item == "Reset Layout")      { levelTab->ResetLayout();          return; }
+    if (item == "Reset Layout")      { levelTab->ResetLayout();          levelTab->BuildMenus(menuBar); return; }
     if (item == "Save Layout As")    { levelTab->SaveLayoutAs();         return; }
     if (item == "Load Layout")       { levelTab->LoadLayoutFromDialog();  return; }
     // Toggle named panels in the level editor's dock area.
@@ -285,6 +291,7 @@ void Editor::HandleWindowMenuAction(const std::string& item) {
     for (const auto& name : panelNames) {
         if (item == name) {
             levelTab->TogglePanelVisible(name);
+            levelTab->BuildMenus(menuBar);
             return;
         }
     }
