@@ -1,4 +1,5 @@
 #include "StarMaterial.h"
+#include "CookedFile.h"
 #include <fstream>
 
 bool StarMaterial::SaveToFile(const std::string& path) const {
@@ -16,7 +17,7 @@ bool StarMaterial::SaveToFile(const std::string& path) const {
 }
 
 bool StarMaterial::LoadFromFile(const std::string& path, StarMaterial& outMaterial) {
-    std::ifstream in(path);
+    std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
 
     std::string line;

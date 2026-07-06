@@ -33,14 +33,10 @@ private:
     void RenderScene();
     void RenderToolbar();
     void HandleMapInteraction(Rectangle client);
-    Model* GetOrLoadModel(const std::string& sourceMeshPath);
-    Texture2D* GetOrLoadTexture(const std::string& textureAssetPath);
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
                              Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
     void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
-    void SpawnActorFromInstance(const ActorInstance& inst);
-    void UnloadMeshCache();
 
     Camera3D camera{};
     RenderTexture2D renderTarget{};
@@ -74,8 +70,6 @@ private:
     float savedOrbitRadius = 800.0f;
     Vector3 savedCameraTarget{0, 0, 0};
 
-    std::unordered_map<std::string, Model> meshCache;
-    std::unordered_map<std::string, Texture2D> textureCache;
     std::unordered_map<std::string, Stargraph> classGraphCache;
 
     static const float toolbarHeight;

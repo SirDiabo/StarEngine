@@ -3,14 +3,16 @@
 #include "LevelEditorTab.h"
 #include "StargraphEditorTab.h"
 #include "ProjectSettingsTab.h"
+#include "PackageTab.h"
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
 #include "LogPanel.h"
 #include "ViewportPanel.h"
 #include "AssetPickerPopup.h"
+#include "ChoicePopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
-#include "LayoutSerializer.h"
+#include "Core/LayoutSerializer.h"
 #include "Core/Project.h"
 #include "raygui.h"
 #include "raylib.h"
@@ -52,9 +54,10 @@ void Editor::Initialize() {
     projectBrowser = new ProjectBrowser();
 
     menuBar->SetActionCallback([this](const std::string& menu, const std::string& item) {
-        if (menu == "Window") HandleWindowMenuAction(item);
-        if (menu == "Edit")   HandleEditMenuAction(item);
         if (menu == "Help")   HandleHelpMenuAction(item);
+        if (menu == "Window")  HandleWindowMenuAction(item);
+        if (menu == "Edit")    HandleEditMenuAction(item);
+        if (menu == "Package") HandlePackageMenuAction(item);
     });
 
     // Build initial menu from the first (level) tab.
@@ -114,6 +117,7 @@ void Editor::Render() {
 
     // Layer 8: asset picker popups (always topmost).
     AssetPickerPopup::FlushDeferredDraws();
+    ChoicePopup::FlushDeferredDraws();
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {
@@ -229,6 +233,29 @@ void Editor::OpenProjectSettingsTab() {
     activeEditorTab = (int)editorTabs.size() - 1;
     editorTabs[activeEditorTab]->OnActivated();
     editorTabs[activeEditorTab]->BuildMenus(menuBar);
+}
+
+void Editor::OpenPackageTab() {
+    for (int i = 0; i < (int)editorTabs.size(); i++) {
+        if (dynamic_cast<PackageTab*>(editorTabs[i].get())) {
+            editorTabs[activeEditorTab]->OnDeactivated();
+            activeEditorTab = i;
+            editorTabs[activeEditorTab]->OnActivated();
+            editorTabs[activeEditorTab]->BuildMenus(menuBar);
+            return;
+        }
+    }
+    auto* tab = new PackageTab();
+    tab->Initialize();
+    editorTabs.emplace_back(tab);
+    editorTabs[activeEditorTab]->OnDeactivated();
+    activeEditorTab = (int)editorTabs.size() - 1;
+    editorTabs[activeEditorTab]->OnActivated();
+    editorTabs[activeEditorTab]->BuildMenus(menuBar);
+}
+
+void Editor::HandlePackageMenuAction(const std::string& item) {
+    if (item == "Package Project") OpenPackageTab();
 }
 
 void Editor::OpenDefaultMapIfSet() {

@@ -1,10 +1,9 @@
 #include "ViewportPanel.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
-#include "Runtime/Components/MeshComponent.h"
-#include "Runtime/Components/CollisionComponent.h"
-#include "Runtime/Components/AudioComponent.h"
-#include "Modules/Stargraph/StargraphBehavior.h"
+#include "Runtime/AssetCache.h"
+#include "Runtime/SceneRenderer.h"
+#include "Runtime/WorldSpawner.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
@@ -40,45 +39,6 @@ void ViewportPanel::Initialize() {
 
 ViewportPanel::~ViewportPanel() {
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
-    UnloadMeshCache();
-}
-
-void ViewportPanel::UnloadMeshCache() {
-    for (auto& kv : meshCache) UnloadModel(kv.second);
-    meshCache.clear();
-    for (auto& kv : textureCache) UnloadTexture(kv.second);
-    textureCache.clear();
-}
-
-Model* ViewportPanel::GetOrLoadModel(const std::string& sourceMeshPath) {
-    auto it = meshCache.find(sourceMeshPath);
-    if (it != meshCache.end()) return &it->second;
-
-    if (sourceMeshPath.empty() || !FileExists(sourceMeshPath.c_str())) return nullptr;
-
-    Model model = LoadModel(sourceMeshPath.c_str());
-    if (model.meshCount == 0) {
-        UnloadModel(model);
-        return nullptr;
-    }
-
-    auto inserted = meshCache.emplace(sourceMeshPath, model);
-    return &inserted.first->second;
-}
-
-Texture2D* ViewportPanel::GetOrLoadTexture(const std::string& textureAssetPath) {
-    auto it = textureCache.find(textureAssetPath);
-    if (it != textureCache.end()) return &it->second;
-
-    StarAsset asset;
-    if (!StarAsset::LoadFromFile(textureAssetPath, asset) || asset.assetType != "Texture") return nullptr;
-    if (asset.sourcePath.empty() || !FileExists(asset.sourcePath.c_str())) return nullptr;
-
-    Texture2D tex = LoadTexture(asset.sourcePath.c_str());
-    if (tex.id == 0) return nullptr;
-
-    auto inserted = textureCache.emplace(textureAssetPath, tex);
-    return &inserted.first->second;
 }
 
 const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
@@ -104,7 +64,7 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
     if (!meshAssetPath.empty()) {
         StarAsset asset;
         if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
-            model = GetOrLoadModel(asset.sourcePath);
+            model = AssetCache::Get().GetOrLoadModel(asset.sourcePath);
         }
     }
 
@@ -119,7 +79,7 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
             if (StarMaterial::LoadFromFile(materialAssetPath, material)) {
                 tint = material.baseColor;
                 if (!material.textureAssetPath.empty()) {
-                    if (Texture2D* tex = GetOrLoadTexture(material.textureAssetPath)) {
+                    if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material.textureAssetPath)) {
                         for (int i = 0; i < model->materialCount; i++) {
                             model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
                         }
@@ -267,58 +227,6 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     mapDirty = true;
 }
 
-void ViewportPanel::SpawnActorFromInstance(const ActorInstance& inst) {
-    Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
-    actor->position = {inst.posX, inst.posY, inst.posZ};
-    actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
-    actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
-
-    if (!inst.graphAssetPath.empty() && fs::exists(inst.graphAssetPath)) {
-        auto* behavior = new StargraphBehavior(Stargraph{});
-        behavior->GetGraph().LoadFromFile(inst.graphAssetPath);
-        actor->SetGraphBehavior(behavior);
-
-        for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
-            Component* comp = nullptr;
-            if (decl.componentType == "MeshComponent") {
-                auto* mesh = new MeshComponent();
-                mesh->SetMeshPath(decl.meshAssetPath);
-                mesh->SetMaterialPath(decl.materialAssetPath);
-                comp = mesh;
-            } else if (decl.componentType == "CollisionComponent") {
-                auto* collision = new CollisionComponent();
-                collision->shapeType = decl.collisionShape == "Sphere" ? CollisionComponent::Sphere
-                                     : decl.collisionShape == "Capsule" ? CollisionComponent::Capsule
-                                     : CollisionComponent::Box;
-                collision->radius = decl.collisionRadius;
-                collision->height = decl.collisionHeight;
-                comp = collision;
-            } else if (decl.componentType == "AudioComponent") {
-                auto* audio = new AudioComponent();
-                audio->soundPath = decl.soundAssetPath;
-                audio->autoPlay = decl.autoPlay;
-                audio->looping = decl.looping;
-                audio->volume = decl.volume;
-                comp = audio;
-            } else {
-                comp = new SceneComponent();
-            }
-
-            comp->position = {decl.posX, decl.posY, decl.posZ};
-            comp->rotation = {decl.rotX, decl.rotY, decl.rotZ};
-            comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
-            actor->AddComponent(comp);
-        }
-    }
-
-    if (!inst.meshAssetPath.empty()) {
-        auto* meshComp = new MeshComponent();
-        meshComp->SetMeshPath(inst.meshAssetPath);
-        meshComp->SetMaterialPath(inst.materialAssetPath);
-        actor->AddComponent(meshComp);
-    }
-}
-
 void ViewportPanel::SaveMap() {
     if (!mapPath.empty()) {
         starMap.SaveToFile(mapPath);
@@ -435,26 +343,7 @@ void ViewportPanel::RenderScene() {
     DrawGrid(40, 100.0f);
 
     if (playing) {
-        for (const auto& actor : World::Get().GetActors()) {
-            Vector3 basePos = actor->position;
-            Vector3 baseRot = actor->rotation;
-            Vector3 baseScale = actor->scale;
-
-            bool drewAnyMesh = false;
-            for (Component* comp : actor->GetComponents()) {
-                if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
-                    Vector3 pos = Vector3Add(basePos, comp->position);
-                    Vector3 rot = Vector3Add(baseRot, comp->rotation);
-                    Vector3 scl = Vector3Multiply(baseScale, comp->scale);
-                    DrawInstanceOrMesh(mc->meshPath, mc->materialPath, pos, rot, scl, false, WHITE);
-                    drewAnyMesh = true;
-                }
-            }
-            if (!drewAnyMesh) {
-                Vector3 boxSize = {placeholderSize * baseScale.x, placeholderSize * baseScale.y, placeholderSize * baseScale.z};
-                DrawInstanceOrMesh("", "", basePos, baseRot, boxSize, false, {100, 200, 100, 255});
-            }
-        }
+        SceneRenderer::DrawWorldActors(true);
     } else {
         const auto& instances = starMap.GetInstances();
         for (size_t i = 0; i < instances.size(); i++) {
@@ -574,9 +463,7 @@ Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
              savedOrbitRadius = orbitRadius;
              savedCameraTarget = cameraTarget;
              if (flying) { flying = false; ShowCursor(); }
-             for (const ActorInstance& inst : starMap.GetInstances()) {
-                 SpawnActorFromInstance(inst);
-             }
+             WorldSpawner::SpawnMapActors(starMap);
              World::Get().BeginPlay();
          }
          btnRight -= 26;

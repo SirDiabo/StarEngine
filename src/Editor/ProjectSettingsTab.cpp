@@ -21,6 +21,7 @@ void ProjectSettingsTab::RefreshFromProject() {
     snprintf(heightBuf, sizeof(heightBuf), "%d", settings.targetHeight);
     activeField = 0;
     mapPicker.Close();
+    rendererPopup.Close();
 }
 
 static std::string MapDisplayName(const std::string& path) {
@@ -70,6 +71,29 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
 
     DrawText("Rendering", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 24;
+
+    DrawText("Renderer", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    fy += 14;
+    Rectangle rendererRow = {fx, fy, fw, 20};
+    DrawRectangleRec(rendererRow, {26, 26, 28, 255});
+    DrawRectangleLinesEx(rendererRow, 1, {55, 55, 60, 255});
+    std::string rendererLabel = settings.renderer == GameRenderer::Software
+        ? "Software (CPU, no GPU required)" : "Hardware (OpenGL)";
+    DrawText(rendererLabel.c_str(), (int)rendererRow.x + 6, (int)rendererRow.y + 4, 12, WHITE);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !rendererPopup.IsOpen()) {
+        rendererPopup.Open({rendererRow.x, rendererRow.y + rendererRow.height}, fw, {
+            {"Hardware (OpenGL)", true, ""},
+            {"Software (CPU, no GPU required)", true, ""},
+        });
+    }
+    fy += 20;
+    DrawText("Only affects packaged games; the editor always uses Hardware.",
+              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+    fy += 24;
+    int rendererChoice = 0;
+    if (rendererPopup.Render(rendererChoice)) {
+        settings.renderer = rendererChoice == 1 ? GameRenderer::Software : GameRenderer::Hardware;
+    }
 
     DrawText("Target Resolution", (int)fx, (int)fy, 11, {140, 140, 150, 255});
     fy += 14;

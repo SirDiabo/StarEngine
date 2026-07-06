@@ -1,4 +1,5 @@
 #include "StarAsset.h"
+#include "CookedFile.h"
 #include <fstream>
 
 bool StarAsset::SaveToFile(const std::string& path) const {
@@ -23,7 +24,7 @@ bool StarAsset::SaveToFile(const std::string& path) const {
 }
 
 bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
-    std::ifstream in(path);
+    std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
 
     std::string line;

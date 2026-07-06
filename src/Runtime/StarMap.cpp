@@ -1,4 +1,5 @@
 #include "StarMap.h"
+#include "Core/CookedFile.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -70,7 +71,7 @@ namespace {
 }
 
 bool StarMap::LoadFromFile(const std::string& path) {
-    std::ifstream in(path);
+    std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
 
     instances.clear();

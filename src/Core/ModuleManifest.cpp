@@ -1,5 +1,5 @@
 #include "ModuleManifest.h"
-#include "Editor/LayoutSerializer.h"
+#include "LayoutSerializer.h"
 #include <filesystem>
 #include <sstream>
 

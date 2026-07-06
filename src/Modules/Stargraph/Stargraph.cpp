@@ -1,5 +1,6 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
+#include "Core/CookedFile.h"
 #include <fstream>
 
 Node* Stargraph::CreateNode(const std::string& type) {
@@ -266,7 +267,7 @@ namespace {
 }
 
 bool Stargraph::LoadFromFile(const std::string& path) {
-    std::ifstream in(path);
+    std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
 
     nodes.clear();

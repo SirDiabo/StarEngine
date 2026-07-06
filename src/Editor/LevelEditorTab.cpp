@@ -6,7 +6,7 @@
 #include "LogPanel.h"
 #include "ModuleBrowserPanel.h"
 #include "MenuBar.h"
-#include "LayoutSerializer.h"
+#include "Core/LayoutSerializer.h"
 #include "NativeFileDialog.h"
 #include <filesystem>
 
@@ -126,6 +126,7 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { "Project Settings" } },
+        { "Package", { "Package Project" } },
         { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" } },
         { "Help",   { "Support", "GitHub", "About" } },
     });

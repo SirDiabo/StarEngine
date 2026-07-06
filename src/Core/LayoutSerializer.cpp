@@ -6,7 +6,7 @@ bool LayoutSerializer::Save(const std::string& filePath,
                              const std::unordered_map<std::string, std::string>& data) {
     std::ofstream f(filePath);
     if (!f.is_open()) return false;
-    f << "# StarEngine editor layout\n";
+    f << "# StarEngine key-value config\n";
     for (const auto& kv : data) {
         f << kv.first << "=" << kv.second << "\n";
     }

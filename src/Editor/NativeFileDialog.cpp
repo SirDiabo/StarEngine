@@ -6,6 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commdlg.h>
+#include <shlobj.h>
 
 static std::string WinOpenDialog(const std::string& title, const std::string& defaultDir,
                                   const std::string& filterDesc, const std::string& filterExt,
@@ -34,6 +35,20 @@ static std::string WinOpenDialog(const std::string& title, const std::string& de
 
     BOOL ok = save ? GetSaveFileNameA(&ofn) : GetOpenFileNameA(&ofn);
     return ok ? std::string(path) : std::string();
+}
+
+static std::string WinBrowseFolder(const std::string& title, const std::string& defaultDir) {
+    char path[MAX_PATH] = {};
+    BROWSEINFOA bi = {};
+    bi.lpszTitle = title.c_str();
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+    (void)defaultDir; // BROWSEINFOA has no direct initial-directory field to set here.
+
+    LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);
+    if (!pidl) return {};
+    SHGetPathFromIDListA(pidl, path);
+    CoTaskMemFree(pidl);
+    return std::string(path);
 }
 
 #elif defined(__linux__)
@@ -108,6 +123,23 @@ std::string NativeFileDialog::SaveFile(const std::string& title,
 #elif defined(__APPLE__)
     std::string dir = defaultDir.empty() ? "~" : defaultDir;
     std::string script = "POSIX path of (choose file name with prompt \"" + title + "\" default name \"" + defaultName + "\" default location POSIX file \"" + dir + "\")";
+    return RunOsascript(script);
+#else
+    return {};
+#endif
+}
+
+std::string NativeFileDialog::OpenFolder(const std::string& title, const std::string& defaultDir) {
+#ifdef _WIN32
+    return WinBrowseFolder(title, defaultDir);
+#elif defined(__linux__)
+    std::string args = "--file-selection --directory";
+    args += " --title=\"" + title + "\"";
+    if (!defaultDir.empty()) args += " --filename=\"" + defaultDir + "/\"";
+    return RunZenity(args);
+#elif defined(__APPLE__)
+    std::string dir = defaultDir.empty() ? "~" : defaultDir;
+    std::string script = "POSIX path of (choose folder with prompt \"" + title + "\" default location POSIX file \"" + dir + "\")";
     return RunOsascript(script);
 #else
     return {};

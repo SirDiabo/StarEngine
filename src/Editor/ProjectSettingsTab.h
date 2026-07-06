@@ -1,6 +1,7 @@
 #pragma once
 #include "EditorTab.h"
 #include "AssetPickerPopup.h"
+#include "ChoicePopup.h"
 
 class MenuBar;
 
@@ -14,6 +15,7 @@ private:
     void RefreshFromProject();
 
     AssetPickerPopup mapPicker;
+    ChoicePopup rendererPopup;
 
     char widthBuf[16]  = "";
     char heightBuf[16] = "";

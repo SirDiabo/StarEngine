@@ -7,6 +7,14 @@
 
 namespace fs = std::filesystem;
 
+std::string GameRendererName(GameRenderer renderer) {
+    return renderer == GameRenderer::Software ? "Software" : "Hardware";
+}
+
+GameRenderer GameRendererFromName(const std::string& name) {
+    return name == "Software" ? GameRenderer::Software : GameRenderer::Hardware;
+}
+
 Project& Project::Get() {
     static Project instance;
     return instance;
@@ -44,6 +52,7 @@ bool Project::Load(const std::string& path) {
         else if (key == "targetWidth") settings.targetWidth = std::stoi(value);
         else if (key == "targetHeight") settings.targetHeight = std::stoi(value);
         else if (key == "defaultMap") settings.defaultMapPath = value;
+        else if (key == "renderer") settings.renderer = GameRendererFromName(value);
         else if (key == "disabledModules") {
             settings.disabledModules.clear();
             std::stringstream ss(value);
@@ -71,6 +80,7 @@ void Project::Save() {
     out << "targetWidth=" << settings.targetWidth << "\n";
     out << "targetHeight=" << settings.targetHeight << "\n";
     out << "defaultMap=" << settings.defaultMapPath << "\n";
+    out << "renderer=" << GameRendererName(settings.renderer) << "\n";
 
     out << "disabledModules=";
     for (size_t i = 0; i < settings.disabledModules.size(); i++) {

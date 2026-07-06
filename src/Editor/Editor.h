@@ -37,9 +37,11 @@ private:
     void RenderEditorTabBar(float x, float y, float width);
     void OpenAssetInTab(const std::string& fullPath, const std::string& extension);
     void OpenProjectSettingsTab();
+    void OpenPackageTab();
     void HandleWindowMenuAction(const std::string& item);
     void HandleEditMenuAction(const std::string& item);
     void HandleHelpMenuAction(const std::string& item);
+    void HandlePackageMenuAction(const std::string& item);
 
     std::string GetLayoutPath() const;
 
