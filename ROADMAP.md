@@ -120,11 +120,11 @@ o Rebuild failure surfaces the compiler error in the Log panel instead of silent
 
 ### 2.6 Component editing at runtime
 x Add references of components nodes in the graph editor, similar to variable get and set. To get a reference of a component.
-o Add certain nodes to all components, like "Set Relative Location" and such. Also World location using actor scale as offset.
-o Add "Target" to existing nodes: "Get Actor Location" and similar take "Target" Object input pin, with self as default.
-o Add a new camera component with a couple simple properties like float-FOV, and whatever else raylib 3d Cameras expose.
+x Add certain nodes to all components, like "Set Relative Location" and such. Also World location using actor scale as offset.
+x Add "Target" to existing nodes: "Get Actor Location" and similar take "Target" Object input pin, with self as default.
+x Add a new camera component with a couple simple properties like float-FOV, and whatever else raylib 3d Cameras expose.
 x Actors with camera components automatically view the first camera, but are able to change view target through nodes.
-o Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
+x Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
 
 ---
 

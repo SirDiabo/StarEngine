@@ -12,3 +12,5 @@ public:
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
 };
+
+void RegisterCollisionComponentNodes();

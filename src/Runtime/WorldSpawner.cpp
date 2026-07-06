@@ -48,6 +48,7 @@ void WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
             } else if (decl.componentType == "CameraComponent") {
                 auto* camera = new CameraComponent();
                 camera->fov = decl.cameraFov;
+                camera->orthographic = decl.cameraOrthographic;
                 comp = camera;
             } else {
                 comp = new SceneComponent();

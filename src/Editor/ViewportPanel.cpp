@@ -342,7 +342,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
                 camera.target = Vector3Add(compPos, forward);
                 camera.up = {0, 1, 0};
                 camera.fovy = cc->fov;
-                camera.projection = CAMERA_PERSPECTIVE;
+                camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
             } else {
                 Actor* first = actors.front().get();
                 cameraTarget = first->position;

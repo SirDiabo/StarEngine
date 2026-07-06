@@ -13,3 +13,5 @@ public:
     void SetMeshPath(const std::string& path);
     void SetMaterialPath(const std::string& path);
 };
+
+void RegisterMeshComponentNodes();

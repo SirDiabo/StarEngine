@@ -6,6 +6,7 @@
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
+#include <cfloat>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -730,6 +731,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         y += 24;
     } else if (comp.componentType == "CameraComponent") {
         floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov);
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
+        y += 24;
     }
 }
 
@@ -1315,7 +1318,11 @@ void StargraphEditorPanel::RenderGraph() {
                         activeBuf = inactiveBuf;
                     }
                     bool allowActivate = (linkFromPin == -1);
-                    const char* targetPlaceholder = (pin.name == "Target" && pin.defaultValue.empty()) ? "self" : nullptr;
+                    const char* targetPlaceholder = nullptr;
+                    if (pin.name == "Target" && pin.defaultValue.empty()) {
+                        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+                        if (tmpl && tmpl->category == "Actor") targetPlaceholder = "self";
+                    }
                     if (PropertyField::StringBox(fieldRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
                                                   pin.defaultValue, allowActivate, targetPlaceholder)) {
                         isDirty = true;

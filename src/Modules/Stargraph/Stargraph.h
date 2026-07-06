@@ -72,6 +72,7 @@ struct ComponentDecl {
 
     // CameraComponent
     float cameraFov = 50.0f;
+    bool cameraOrthographic = false;
 };
 
 class Stargraph {

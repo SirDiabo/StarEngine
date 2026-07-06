@@ -4,6 +4,7 @@
 class CameraComponent : public SceneComponent {
 public:
     float fov = 50.0f;
+    bool orthographic = false;
 
     CameraComponent();
     const char* GetClassName() const override { return "CameraComponent"; }

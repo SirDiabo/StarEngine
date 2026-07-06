@@ -4,6 +4,9 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Runtime/Components/MeshComponent.h"
+#include "Runtime/Components/CollisionComponent.h"
+#include "Runtime/Components/AudioComponent.h"
 #include "Stargraph.h"
 #include "InputKeyNames.h"
 #include "Core/AssetTypeRegistry.h"
@@ -857,7 +860,105 @@ void StargraphModule::RegisterDefaultNodes() {
     };
     NodeRegistry::Get().RegisterNode(setCompScale);
 
+    NodeTemplate getCompLocation;
+    getCompLocation.type = "Get_Relative_Location";
+    getCompLocation.category = "Components";
+    getCompLocation.moduleName = "Stargraph";
+    getCompLocation.hideFromContextMenu = true;
+    getCompLocation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Location", PinType::Vec3, false, true});
+    };
+    getCompLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", target->position.x, target->position.y, target->position.z);
+        for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompLocation);
+
+    NodeTemplate getCompRotation;
+    getCompRotation.type = "Get_Relative_Rotation";
+    getCompRotation.category = "Components";
+    getCompRotation.moduleName = "Stargraph";
+    getCompRotation.hideFromContextMenu = true;
+    getCompRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+    };
+    getCompRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", target->rotation.x, target->rotation.y, target->rotation.z);
+        for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompRotation);
+
+    NodeTemplate getCompScale;
+    getCompScale.type = "Get_Relative_Scale";
+    getCompScale.category = "Components";
+    getCompScale.moduleName = "Stargraph";
+    getCompScale.hideFromContextMenu = true;
+    getCompScale.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Scale", PinType::Vec3, false, true});
+    };
+    getCompScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", target->scale.x, target->scale.y, target->scale.z);
+        for (Pin& p : node.outputs) if (p.name == "Scale") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompScale);
+
+    // World location, actor scale used as offset multiplier since components have no rotation composition yet
+    NodeTemplate getCompWorldLocation;
+    getCompWorldLocation.type = "Get_World_Location";
+    getCompWorldLocation.category = "Components";
+    getCompWorldLocation.moduleName = "Stargraph";
+    getCompWorldLocation.hideFromContextMenu = true;
+    getCompWorldLocation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Location", PinType::Vec3, false, true});
+    };
+    getCompWorldLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+        }
+        if (!target) return;
+        Vector3 worldLoc = Vector3Add(ctx.actor->position, Vector3Multiply(target->position, ctx.actor->scale));
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", worldLoc.x, worldLoc.y, worldLoc.z);
+        for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompWorldLocation);
+
     RegisterCameraComponentNodes();
+    RegisterMeshComponentNodes();
+    RegisterCollisionComponentNodes();
+    RegisterAudioComponentNodes();
 }
 
 void StargraphModule::RegisterAssetType() {
