@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <sstream>
 
 const float StargraphEditorPanel::nodeWidth      = 190.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
@@ -214,6 +215,199 @@ void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
 
     for (Pin& pin : node->inputs)  if (pin.type == PinType::Wildcard) pin.type = resolved;
     for (Pin& pin : node->outputs) if (pin.type == PinType::Wildcard) pin.type = resolved;
+}
+
+struct ClipLink {
+    int fromNode;
+    std::string fromPin;
+    int toNode;
+    std::string toPin;
+};
+
+void StargraphEditorPanel::CopySelectedNodes() {
+    std::vector<int> nodesToCopy = selectedNodeIds;
+    if (selectedNodeId != -1 && std::find(selectedNodeIds.begin(), selectedNodeIds.end(), selectedNodeId) == selectedNodeIds.end()) {
+        nodesToCopy.push_back(selectedNodeId);
+    }
+    if (nodesToCopy.empty()) return;
+
+    float minX = FLT_MAX, minY = FLT_MAX;
+    for (int nodeId : nodesToCopy) {
+        for (const Node& node : graph.GetNodes()) {
+            if (std::stoi(node.id) == nodeId) {
+                if (node.posX < minX) minX = node.posX;
+                if (node.posY < minY) minY = node.posY;
+                break;
+            }
+        }
+    }
+
+    std::string clipText = "[StargraphCopy]\n";
+
+    for (int nodeId : nodesToCopy) {
+        for (const Node& node : graph.GetNodes()) {
+            if (std::stoi(node.id) != nodeId) continue;
+
+            clipText += "[Node]\n";
+            clipText += "Type=" + node.type + "\n";
+            clipText += "Title=" + node.title + "\n";
+            clipText += "PosX=" + std::to_string(node.posX - minX) + "\n";
+            clipText += "PosY=" + std::to_string(node.posY - minY) + "\n";
+            for (const Pin& pin : node.inputs) {
+                if (pin.type == PinType::Exec) continue;
+                clipText += "Pin." + pin.name + "=" + pin.defaultValue + "\n";
+                clipText += "PinType." + pin.name + "=" + PinTypeToString(pin.type) + "\n";
+            }
+            for (const Pin& pin : node.outputs) {
+                clipText += "OutPinType." + pin.name + "=" + PinTypeToString(pin.type) + "\n";
+            }
+            clipText += "\n";
+            break;
+        }
+    }
+
+    for (const Link& link : graph.GetLinks()) {
+        int fromNodeId = -1, toNodeId = -1;
+        std::string fromPinName, toPinName;
+        for (const Node& node : graph.GetNodes()) {
+            for (const Pin& pin : node.outputs) {
+                if (pin.id == link.outputPinId) { fromNodeId = std::stoi(node.id); fromPinName = pin.name; }
+            }
+            for (const Pin& pin : node.inputs) {
+                if (pin.id == link.inputPinId) { toNodeId = std::stoi(node.id); toPinName = pin.name; }
+            }
+        }
+        bool fromSelected = std::find(nodesToCopy.begin(), nodesToCopy.end(), fromNodeId) != nodesToCopy.end();
+        bool toSelected = std::find(nodesToCopy.begin(), nodesToCopy.end(), toNodeId) != nodesToCopy.end();
+        if (fromSelected && toSelected) {
+            int fromCopyIdx = (int)(std::find(nodesToCopy.begin(), nodesToCopy.end(), fromNodeId) - nodesToCopy.begin());
+            int toCopyIdx = (int)(std::find(nodesToCopy.begin(), nodesToCopy.end(), toNodeId) - nodesToCopy.begin());
+            clipText += "[Link]\n";
+            clipText += "FromNode=" + std::to_string(fromCopyIdx) + "\n";
+            clipText += "FromPin=" + fromPinName + "\n";
+            clipText += "ToNode=" + std::to_string(toCopyIdx) + "\n";
+            clipText += "ToPin=" + toPinName + "\n";
+            clipText += "\n";
+        }
+    }
+
+    SetClipboardText(clipText.c_str());
+}
+
+void StargraphEditorPanel::PasteNodes() {
+    const char* clipText = GetClipboardText();
+    if (!clipText || clipText[0] == '\0') return;
+
+    std::string clipboard = clipText;
+    if (clipboard.find("[StargraphCopy]\n") == std::string::npos) return;
+
+    Vector2 mousePos = GetMousePosition();
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
+
+    float rawX = (mousePos.x - graphArea.x - scroll.x) / zoom;
+    float rawY = (mousePos.y - graphArea.y - scroll.y) / zoom;
+    const float gridSnap = 16.0f;
+
+    struct ClipNode {
+        std::string type;
+        std::string title;
+        float posX = 0, posY = 0;
+        std::vector<std::pair<std::string, std::string>> inputPins;
+        std::vector<std::pair<std::string, std::string>> inputPinTypes;
+        std::vector<std::pair<std::string, std::string>> outputPinTypes;
+    };
+
+    std::vector<ClipNode> parsedNodes;
+    std::vector<ClipLink> parsedLinks;
+
+    std::istringstream stream(clipboard);
+    std::string line;
+    ClipNode currentNode;
+    bool inNode = false;
+    int linkFromNode = -1;
+    std::string linkFromPin, linkToPin;
+
+    while (std::getline(stream, line)) {
+        if (line.empty()) {
+            if (inNode) { parsedNodes.push_back(currentNode); currentNode = ClipNode(); }
+            inNode = false;
+            continue;
+        }
+        if (line == "[Node]") { inNode = true; currentNode = ClipNode(); continue; }
+        if (line == "[Link]") { inNode = false; linkFromNode = -1; linkFromPin.clear(); linkToPin.clear(); continue; }
+
+        size_t eqPos = line.find('=');
+        if (eqPos == std::string::npos) continue;
+        std::string key = line.substr(0, eqPos);
+        std::string value = line.substr(eqPos + 1);
+
+        if (inNode) {
+            if (key == "Type") currentNode.type = value;
+            else if (key == "Title") currentNode.title = value;
+            else if (key == "PosX") currentNode.posX = std::stof(value);
+            else if (key == "PosY") currentNode.posY = std::stof(value);
+            else if (key.rfind("Pin.", 0) == 0) currentNode.inputPins.emplace_back(key.substr(4), value);
+            else if (key.rfind("PinType.", 0) == 0) currentNode.inputPinTypes.emplace_back(key.substr(8), value);
+            else if (key.rfind("OutPinType.", 0) == 0) currentNode.outputPinTypes.emplace_back(key.substr(11), value);
+        } else {
+            if (key == "FromNode") linkFromNode = std::stoi(value);
+            else if (key == "FromPin") linkFromPin = value;
+            else if (key == "ToNode") {
+                ClipLink l;
+                l.fromNode = linkFromNode;
+                l.fromPin = linkFromPin;
+                l.toNode = std::stoi(value);
+                l.toPin = linkToPin;
+                parsedLinks.push_back(l);
+            }
+            else if (key == "ToPin") linkToPin = value;
+        }
+    }
+
+    std::vector<Node*> createdNodes;
+    for (const ClipNode& cn : parsedNodes) {
+        Node* node = graph.CreateNode(cn.type);
+        if (!node) continue;
+        node->title = cn.title;
+        node->posX = roundf((rawX + cn.posX) / gridSnap) * gridSnap;
+        node->posY = roundf((rawY + cn.posY) / gridSnap) * gridSnap;
+
+        for (const auto& pin : cn.inputPins) {
+            for (Pin& p : node->inputs) {
+                if (p.name == pin.first) p.defaultValue = pin.second;
+            }
+        }
+        for (const auto& pt : cn.inputPinTypes) {
+            for (Pin& p : node->inputs) {
+                if (p.name == pt.first && p.type == PinType::Wildcard) p.type = PinTypeFromString(pt.second);
+            }
+        }
+        for (const auto& op : cn.outputPinTypes) {
+            for (Pin& p : node->outputs) {
+                if (p.name == op.first && p.type == PinType::Wildcard) p.type = PinTypeFromString(op.second);
+            }
+        }
+        createdNodes.push_back(node);
+    }
+
+    for (const ClipLink& l : parsedLinks) {
+        if (l.fromNode < 0 || l.fromNode >= (int)createdNodes.size()) continue;
+        if (l.toNode < 0 || l.toNode >= (int)createdNodes.size()) continue;
+        Node* fromNode = createdNodes[l.fromNode];
+        Node* toNode = createdNodes[l.toNode];
+        int outPinId = -1, inPinId = -1;
+        for (const Pin& p : fromNode->outputs) if (p.name == l.fromPin) { outPinId = p.id; break; }
+        for (const Pin& p : toNode->inputs) if (p.name == l.toPin) { inPinId = p.id; break; }
+        if (outPinId != -1 && inPinId != -1) graph.AddLink({outPinId, inPinId});
+    }
+
+    for (Node* node : createdNodes) {
+        for (Pin& p : node->inputs) if (p.type == PinType::Wildcard) p.type = PinType::None;
+        for (Pin& p : node->outputs) if (p.type == PinType::Wildcard) p.type = PinType::None;
+    }
+
+    isDirty = true;
 }
 
 void StargraphEditorPanel::DeleteSelected() {
@@ -1392,6 +1586,11 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     }
 
     if (IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
+
+    if (IsKeyDown(KEY_LEFT_CONTROL) && editingPinId == 0) {
+        if (IsKeyPressed(KEY_C)) CopySelectedNodes();
+        else if (IsKeyPressed(KEY_V)) PasteNodes();
+    }
 
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
         SaveGraph();

@@ -35,6 +35,8 @@ private:
     void RemoveLinkFromPin(int pinId);
     void RefreshWildcardPins(Node* node);
     void DeleteSelected();
+    void CopySelectedNodes();
+    void PasteNodes();
 
     bool PinsCompatible(int outputPinId, int inputPinId) const;
     Vector2 GetPinPos(const Node& node, const Pin& pin) const;
@@ -59,8 +61,6 @@ private:
     bool boxSelecting = false;
     Vector2 boxSelectStart{0, 0};
     Vector2 boxSelectEnd{0, 0};
-    bool draggingMulti = false;
-    Vector2 multiDragAnchor{0, 0};
     std::vector<Vector2> multiDragStartPositions;
     bool draggingNode = false;
     Vector2 nodeDragOffset{0, 0};
