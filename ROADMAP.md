@@ -75,7 +75,7 @@ x Asset editors that are already open are focused rather than reopened
 ### 1.9 Shared Property Field Widgets
 x PropertyFields slots (src/Editor/PropertyFields.h/.cpp): FloatBox, IntBox, StringBox, BoolBox, Vec3Row
 x Fix raygui quirk where global cursor-index shared across text boxes; force-activates fields so cursor appears at text end
-o Click-drag-to-scrub on FloatBox/IntBox
+x Click-drag-to-scrub on FloatBox/IntBox
 o Array-of-fields wrapper - deferred until array-typed variables exist; just loops existing fields with an incrementing id
 
 ---

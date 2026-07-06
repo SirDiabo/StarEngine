@@ -3,8 +3,21 @@
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
+#include <cmath>
 
 namespace PropertyField {
+
+static DragState g_drag;
+
+static float ApplyDrag(float currentVal, float startVal) {
+    if (!g_drag.active) return currentVal;
+    int dx = GetMouseX() - g_drag.startMouseX;
+    float delta = dx * 0.1f;
+    float scale = 1.0f;
+    if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) scale = 0.1f;
+    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) scale = 10.0f;
+    return startVal + delta * scale;
+}
 
 static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
                          bool allowActivate, const char* placeholder, const Style& style,
@@ -40,10 +53,34 @@ bool FloatBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFi
               float& outVal, bool allowActivate, const Style& style) {
     bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, style,
                                   [&]() { snprintf(buf, bufSize, "%.2f", outVal); });
+
+    if (g_drag.active && g_drag.fieldId == fieldId) {
+        if (activeField != fieldId) {
+            g_drag.active = false;
+            g_drag.fieldId = -1;
+        } else {
+            outVal = ApplyDrag(outVal, g_drag.startVal);
+            snprintf(buf, bufSize, "%.2f", outVal);
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                g_drag.active = false;
+                g_drag.fieldId = -1;
+            }
+        }
+    }
+
     if (committed) {
         outVal = (float)atof(buf);
         return true;
     }
+
+    if (!g_drag.active && activeField == fieldId && allowActivate &&
+        IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
+        g_drag.active = true;
+        g_drag.fieldId = fieldId;
+        g_drag.startVal = outVal;
+        g_drag.startMouseX = GetMouseX();
+    }
+
     return false;
 }
 
@@ -51,10 +88,34 @@ bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFiel
             int& outVal, bool allowActivate, const Style& style) {
     bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, style,
                                   [&]() { snprintf(buf, bufSize, "%d", outVal); });
+
+    if (g_drag.active && g_drag.fieldId == fieldId) {
+        if (activeField != fieldId) {
+            g_drag.active = false;
+            g_drag.fieldId = -1;
+        } else {
+            outVal = (int)roundf(ApplyDrag((float)outVal, g_drag.startVal));
+            snprintf(buf, bufSize, "%d", outVal);
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                g_drag.active = false;
+                g_drag.fieldId = -1;
+            }
+        }
+    }
+
     if (committed) {
         outVal = atoi(buf);
         return true;
     }
+
+    if (!g_drag.active && activeField == fieldId && allowActivate &&
+        IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
+        g_drag.active = true;
+        g_drag.fieldId = fieldId;
+        g_drag.startVal = (float)outVal;
+        g_drag.startMouseX = GetMouseX();
+    }
+
     return false;
 }
 
