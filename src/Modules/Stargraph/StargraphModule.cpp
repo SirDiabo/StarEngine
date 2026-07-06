@@ -3,6 +3,7 @@
 #include "ExecutionContext.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
+#include "Runtime/Components/CameraComponent.h"
 #include "Stargraph.h"
 #include "InputKeyNames.h"
 #include "Core/AssetTypeRegistry.h"
@@ -389,12 +390,21 @@ void StargraphModule::RegisterDefaultNodes() {
     getActorLocation.category = "Actor";
     getActorLocation.moduleName = "Stargraph";
     getActorLocation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
         node->outputs.push_back({"Location", PinType::Vec3, false, true});
     };
     getActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", ctx.actor->position.x, ctx.actor->position.y, ctx.actor->position.z);
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", target->position.x, target->position.y, target->position.z);
         for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorLocation);
@@ -405,15 +415,24 @@ void StargraphModule::RegisterDefaultNodes() {
     setActorLocation.moduleName = "Stargraph";
     setActorLocation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
+        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
         node->inputs.push_back({"Location", PinType::Vec3, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
     setActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Location") {
                 sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &ctx.actor->position.x, &ctx.actor->position.y, &ctx.actor->position.z);
+                    &target->position.x, &target->position.y, &target->position.z);
                 break;
             }
         }
@@ -425,12 +444,21 @@ void StargraphModule::RegisterDefaultNodes() {
     getActorForward.category = "Actor";
     getActorForward.moduleName = "Stargraph";
     getActorForward.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
         node->outputs.push_back({"Forward", PinType::Vec3, false, true});
     };
     getActorForward.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        float yr = ctx.actor->rotation.y * DEG2RAD;
-        float pr = ctx.actor->rotation.x * DEG2RAD;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        float yr = target->rotation.y * DEG2RAD;
+        float pr = target->rotation.x * DEG2RAD;
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
             cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr));
@@ -511,13 +539,22 @@ void StargraphModule::RegisterDefaultNodes() {
     getActorRotation.category = "Actor";
     getActorRotation.moduleName = "Stargraph";
     getActorRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
         node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
     };
     getActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            ctx.actor->rotation.x, ctx.actor->rotation.y, ctx.actor->rotation.z);
+            target->rotation.x, target->rotation.y, target->rotation.z);
         for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorRotation);
@@ -528,15 +565,24 @@ void StargraphModule::RegisterDefaultNodes() {
     setActorRotation.moduleName = "Stargraph";
     setActorRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
+        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
         node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
     setActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Rotation") {
                 sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &ctx.actor->rotation.x, &ctx.actor->rotation.y, &ctx.actor->rotation.z);
+                    &target->rotation.x, &target->rotation.y, &target->rotation.z);
                 break;
             }
         }
@@ -548,13 +594,22 @@ void StargraphModule::RegisterDefaultNodes() {
     getActorScale.category = "Actor";
     getActorScale.moduleName = "Stargraph";
     getActorScale.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
         node->outputs.push_back({"Scale", PinType::Vec3, false, true});
     };
     getActorScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            ctx.actor->scale.x, ctx.actor->scale.y, ctx.actor->scale.z);
+            target->scale.x, target->scale.y, target->scale.z);
         for (Pin& p : node.outputs) if (p.name == "Scale") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorScale);
@@ -565,15 +620,24 @@ void StargraphModule::RegisterDefaultNodes() {
     setActorScale.moduleName = "Stargraph";
     setActorScale.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
+        node->inputs.push_back({"Target", PinType::Object, true,  false, 0, ""});
         node->inputs.push_back({"Scale", PinType::Vec3, true,  false, 0, "1,1,1"});
         node->outputs.push_back({"Out",  PinType::Exec, false, true});
     };
     setActorScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Scale") {
                 sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &ctx.actor->scale.x, &ctx.actor->scale.y, &ctx.actor->scale.z);
+                    &target->scale.x, &target->scale.y, &target->scale.z);
                 break;
             }
         }
@@ -676,15 +740,17 @@ void StargraphModule::RegisterDefaultNodes() {
     destroyActor.moduleName = "Stargraph";
     destroyActor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
     };
     destroyActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Target") {
-                Actor* target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
-                if (target) World::Get().DestroyActor(target);
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
             }
         }
+        if (target) World::Get().DestroyActor(target);
     };
     NodeRegistry::Get().RegisterNode(destroyActor);
 
@@ -692,6 +758,7 @@ void StargraphModule::RegisterDefaultNodes() {
     getComponent.type = "Get_Component";
     getComponent.category = "Components";
     getComponent.moduleName = "Stargraph";
+    getComponent.hideFromContextMenu = true;
     getComponent.createPins = [](Node* node) {
         node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Component", PinType::Object, false, true});
@@ -713,106 +780,84 @@ void StargraphModule::RegisterDefaultNodes() {
     NodeRegistry::Get().RegisterNode(getComponent);
 
     NodeTemplate setCompLocation;
-    setCompLocation.type = "Set_Component_Relative_Location";
+    setCompLocation.type = "Set_Relative_Location";
     setCompLocation.category = "Components";
     setCompLocation.moduleName = "Stargraph";
+    setCompLocation.hideFromContextMenu = true;
     setCompLocation.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
         node->inputs.push_back({"Location", PinType::Vec3, true, false, 0, "0,0,0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setCompLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        std::string compName;
+        Component* target = nullptr;
         Vector3 loc = {0, 0, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Component_Name") compName = p.defaultValue;
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
             if (p.name == "Location") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &loc.x, &loc.y, &loc.z);
         }
-        if (compName.empty()) return;
-        Component* comp = ctx.actor->FindComponentByName(compName);
-        if (!comp) return;
-        comp->position = loc;
+        if (!target) return;
+        target->position = loc;
     };
     NodeRegistry::Get().RegisterNode(setCompLocation);
 
     NodeTemplate setCompRotation;
-    setCompRotation.type = "Set_Component_Relative_Rotation";
+    setCompRotation.type = "Set_Relative_Rotation";
     setCompRotation.category = "Components";
     setCompRotation.moduleName = "Stargraph";
+    setCompRotation.hideFromContextMenu = true;
     setCompRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
         node->inputs.push_back({"Rotation", PinType::Vec3, true, false, 0, "0,0,0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setCompRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        std::string compName;
+        Component* target = nullptr;
         Vector3 rot = {0, 0, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Component_Name") compName = p.defaultValue;
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
             if (p.name == "Rotation") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &rot.x, &rot.y, &rot.z);
         }
-        if (compName.empty()) return;
-        Component* comp = ctx.actor->FindComponentByName(compName);
-        if (!comp) return;
-        comp->rotation = rot;
+        if (!target) return;
+        target->rotation = rot;
     };
     NodeRegistry::Get().RegisterNode(setCompRotation);
 
     NodeTemplate setCompScale;
-    setCompScale.type = "Set_Component_Relative_Scale";
+    setCompScale.type = "Set_Relative_Scale";
     setCompScale.category = "Components";
     setCompScale.moduleName = "Stargraph";
+    setCompScale.hideFromContextMenu = true;
     setCompScale.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
         node->inputs.push_back({"Scale", PinType::Vec3, true, false, 0, "1,1,1"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setCompScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        std::string compName;
+        Component* target = nullptr;
         Vector3 scl = {1, 1, 1};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Component_Name") compName = p.defaultValue;
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
             if (p.name == "Scale") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &scl.x, &scl.y, &scl.z);
         }
-        if (compName.empty()) return;
-        Component* comp = ctx.actor->FindComponentByName(compName);
-        if (!comp) return;
-        comp->scale = scl;
+        if (!target) return;
+        target->scale = scl;
     };
     NodeRegistry::Get().RegisterNode(setCompScale);
 
-    NodeTemplate setCameraFov;
-    setCameraFov.type = "Set_Camera_FOV";
-    setCameraFov.category = "Camera";
-    setCameraFov.moduleName = "Stargraph";
-    setCameraFov.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
-        node->inputs.push_back({"FOV", PinType::Float, true, false, 0, "50.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setCameraFov.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (!ctx.actor) return;
-        std::string compName;
-        float fov = 50.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Component_Name") compName = p.defaultValue;
-            if (p.name == "FOV" && !p.defaultValue.empty()) fov = (float)atof(p.defaultValue.c_str());
-        }
-        if (compName.empty()) return;
-        Component* comp = ctx.actor->FindComponentByName(compName);
-        if (!comp) return;
-        if (CameraComponent* cc = dynamic_cast<CameraComponent*>(comp)) {
-            cc->fov = fov;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setCameraFov);
+    RegisterCameraComponentNodes();
 }
 
 void StargraphModule::RegisterAssetType() {

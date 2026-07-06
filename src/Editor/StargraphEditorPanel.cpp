@@ -1315,8 +1315,9 @@ void StargraphEditorPanel::RenderGraph() {
                         activeBuf = inactiveBuf;
                     }
                     bool allowActivate = (linkFromPin == -1);
+                    const char* targetPlaceholder = (pin.name == "Target" && pin.defaultValue.empty()) ? "self" : nullptr;
                     if (PropertyField::StringBox(fieldRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
-                                                  pin.defaultValue, allowActivate, pin.name.c_str())) {
+                                                  pin.defaultValue, allowActivate, targetPlaceholder)) {
                         isDirty = true;
                     }
                 }
@@ -1564,6 +1565,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = graph.CreateNode("Get_Component");
                 node->title = "Get: " + comp.name;
+                node->componentClass = comp.componentType;
                 for (Pin& p : node->inputs) {
                     if (p.name == "Component_Name") p.defaultValue = comp.name;
                 }
@@ -1662,14 +1664,14 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
 
-    const auto& templates = NodeRegistry::Get().GetFilteredTemplates();
+    const auto& templates = NodeRegistry::Get().GetFilteredTemplates(filterCompatibleWithPin == -1);
     std::string searchLower = nodeMenuSearch;
     for (char& c : searchLower) c = (char)tolower(c);
     for (char& c : searchLower) if (c == ' ') c = '_';
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& t : templates) {
-        if (t.type == "Get_Variable" || t.type == "Set_Variable" || t.type == "Get_Component") continue;
+        if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = t.type;
@@ -1680,9 +1682,10 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (filterCompatibleWithPin != -1) {
             const Pin* fromPin = nullptr;
             bool fromIsOutput = false;
-            for (const Node& node : graph.GetNodes()) {
-                for (const Pin& pin : node.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; }
-                for (const Pin& pin : node.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; }
+            Node* sourceNode = nullptr;
+            for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                for (Pin& pin : node.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; sourceNode = &node; break; }
+                for (Pin& pin : node.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; sourceNode = &node; break; }
             }
             if (fromPin) {
                 bool hasCompatible = false;
@@ -1693,6 +1696,11 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                     for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
                         if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 }
+
+                if (hasCompatible && sourceNode && !sourceNode->componentClass.empty() && !t.requiresComponentClass.empty()) {
+                    hasCompatible = (t.requiresComponentClass == sourceNode->componentClass);
+                }
+
                 if (!hasCompatible) continue;
             }
         }

@@ -9,6 +9,8 @@ struct NodeTemplate {
     std::string category;
     std::string moduleName;
     bool isEvent = false;
+    bool hideFromContextMenu = false;
+    std::string requiresComponentClass;
     std::function<void(Node*)> createPins;
     std::function<void(Node&, Stargraph&, ExecutionContext&)> execute;
 };
@@ -19,7 +21,7 @@ public:
 
     void RegisterNode(const NodeTemplate& nodeTemplate);
     const NodeTemplate* GetTemplate(const std::string& type);
-    std::vector<NodeTemplate> GetFilteredTemplates() const;
+    std::vector<NodeTemplate> GetFilteredTemplates(bool includeContextMenuHidden = true, const std::string& componentClass = "") const;
     const std::unordered_map<std::string, NodeTemplate>& GetAllTemplates() const { return templates; }
 
 private:

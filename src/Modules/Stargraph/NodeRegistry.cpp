@@ -15,9 +15,10 @@ const NodeTemplate* NodeRegistry::GetTemplate(const std::string& type) {
     return it != templates.end() ? &it->second : nullptr;
 }
 
-std::vector<NodeTemplate> NodeRegistry::GetFilteredTemplates() const {
+std::vector<NodeTemplate> NodeRegistry::GetFilteredTemplates(bool includeContextMenuHidden, const std::string& componentClass) const {
     std::vector<NodeTemplate> result;
     for (const auto& kv : templates) {
+        if (!componentClass.empty() && !kv.second.requiresComponentClass.empty() && kv.second.requiresComponentClass != componentClass) continue;
         if (kv.second.moduleName.empty()) {
             result.push_back(kv.second);
             continue;
@@ -25,6 +26,10 @@ std::vector<NodeTemplate> NodeRegistry::GetFilteredTemplates() const {
         if (ModuleManager::Get().IsModuleEnabled(kv.second.moduleName)) {
             result.push_back(kv.second);
         }
+    }
+    if (!includeContextMenuHidden) {
+        result.erase(std::remove_if(result.begin(), result.end(),
+            [](const NodeTemplate& t) { return t.hideFromContextMenu; }), result.end());
     }
     return result;
 }

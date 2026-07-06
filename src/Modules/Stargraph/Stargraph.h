@@ -31,6 +31,7 @@ struct Node {
     float posX = 0, posY = 0;
     std::vector<Pin> inputs;
     std::vector<Pin> outputs;
+    std::string componentClass;
 };
 
 struct Link {

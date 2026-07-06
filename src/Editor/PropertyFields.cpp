@@ -36,7 +36,6 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
     bool clicked = allowActivate && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
     if (clicked) {
         if (onActivate) onActivate();
-        GuiTextBox(r, buf, (int)bufSize, false);
     }
     DrawRectangleRec(r, style.box);
     DrawRectangleLinesEx(r, 1, style.border);
