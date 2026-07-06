@@ -587,16 +587,23 @@ void StargraphModule::RegisterDefaultNodes() {
     inputKey.isEvent = true;
     inputKey.createPins = [](Node* node) {
         node->inputs.push_back({"Key", PinType::String, true, false, 0, "W"});
-        node->outputs.push_back({"Out",     PinType::Exec,    false, true});
-        node->outputs.push_back({"Is Held", PinType::Boolean, false, true});
+        node->outputs.push_back({"Triggered",  PinType::Exec,    false, true});
+        node->outputs.push_back({"Started",    PinType::Exec,    false, true});
+        node->outputs.push_back({"Completed",  PinType::Exec,    false, true});
+        node->outputs.push_back({"Is Held",    PinType::Boolean, false, true});
+        node->outputs.push_back({"Input Time", PinType::Float,   false, true});
     };
     inputKey.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string keyName;
         for (const Pin& p : node.inputs) if (p.name == "Key") keyName = p.defaultValue;
         int key = InputKeyNameToCode(keyName);
         bool held = key != 0 && IsKeyDown(key);
+        float inputTime = held ? (ctx.deltaTime * 120.0f) : 0.0f;
+        char timeBuf[32];
+        snprintf(timeBuf, sizeof(timeBuf), "%g", inputTime);
         for (Pin& p : node.outputs) {
-            if (p.name == "Is Held") p.defaultValue = held ? "true" : "false";
+            if (p.name == "Is Held")    p.defaultValue = held ? "true" : "false";
+            if (p.name == "Input Time") p.defaultValue = timeBuf;
         }
     };
     NodeRegistry::Get().RegisterNode(inputKey);

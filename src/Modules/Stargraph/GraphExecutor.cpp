@@ -3,6 +3,7 @@
 #include "NodeRegistry.h"
 #include <cstdlib>
 #include <vector>
+#include <unordered_map>
 
 static void ResolveWildcardPins(Stargraph& graph, Node* node) {
     bool hasWildcard = false;
@@ -94,6 +95,88 @@ void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionCon
     }
 }
 
+static void ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionContext& ctx) {
+    if (!startNode) return;
+    Node* current = startNode;
+    int limit = 1000;
+    while (limit-- > 0) {
+        GraphExecutor::PropagateDataPins(graph, current, ctx);
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(current->type);
+        if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
+        Node* next = nullptr;
+        for (const Pin& pin : current->outputs) {
+            if (pin.type != PinType::Exec) continue;
+            if (pin.name != "Out") continue;
+            for (const Link& link : graph.GetLinks()) {
+                if (link.outputPinId == pin.id) {
+                    next = graph.FindNodeByPinId(link.inputPinId);
+                    break;
+                }
+            }
+            if (next) break;
+        }
+        if (!next) break;
+        current = next;
+    }
+}
+
+static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || !tmpl->execute) return;
+
+    tmpl->execute(node, graph, ctx);
+
+    bool held = false;
+    for (const Pin& p : node.outputs) {
+        if (p.type == PinType::Boolean && p.name == "Is Held") {
+            held = (p.defaultValue == "true");
+            break;
+        }
+    }
+
+    static std::unordered_map<std::string, bool> prevHeld;
+    bool wasHeld = false;
+    auto it = prevHeld.find(node.id);
+    if (it != prevHeld.end()) wasHeld = it->second;
+    prevHeld[node.id] = held;
+
+    if (!held && wasHeld) {
+        for (const Pin& outPin : node.outputs) {
+            if (outPin.type == PinType::Exec && outPin.name == "Completed") {
+                for (const Link& link : graph.GetLinks()) {
+                    if (link.outputPinId == outPin.id) {
+                        ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                    }
+                }
+            }
+        }
+    }
+
+    if (held) {
+        if (!wasHeld) {
+            for (const Pin& outPin : node.outputs) {
+                if (outPin.type == PinType::Exec && outPin.name == "Started") {
+                    for (const Link& link : graph.GetLinks()) {
+                        if (link.outputPinId == outPin.id) {
+                            ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const Pin& outPin : node.outputs) {
+            if (outPin.type == PinType::Exec && outPin.name == "Triggered") {
+                for (const Link& link : graph.GetLinks()) {
+                    if (link.outputPinId == outPin.id) {
+                        ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                    }
+                }
+            }
+        }
+    }
+}
+
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
     Node* current = graph.FindNodeByType(eventType);
     if (!current) {
@@ -103,37 +186,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
                 if (!tmpl) continue;
                 if (node.type == "Input_Key") {
-                    tmpl->execute(node, graph, ctx);
-                    bool keyHeld = false;
-                    for (const Pin& p : node.outputs) {
-                        if (p.type == PinType::Boolean && p.name == "Is Held") {
-                            keyHeld = (p.defaultValue == "true");
-                            break;
-                        }
-                    }
-                    if (keyHeld) {
-                        for (const Pin& outPin : node.outputs) {
-                            if (outPin.type == PinType::Exec && outPin.name == "Out") {
-                                for (const Link& link : graph.GetLinks()) {
-                                    if (link.outputPinId == outPin.id) {
-                                        Node* nextNode = graph.FindNodeByPinId(link.inputPinId);
-                                        if (nextNode) {
-                                            Node* inputCurrent = nextNode;
-                                            int inputLimit = 1000;
-                                            while (inputLimit-- > 0) {
-                                                PropagateDataPins(graph, inputCurrent, ctx);
-                                                const NodeTemplate* inputTmpl = NodeRegistry::Get().GetTemplate(inputCurrent->type);
-                                                if (inputTmpl && inputTmpl->execute) inputTmpl->execute(*inputCurrent, graph, ctx);
-                                                Node* inputNext = FollowExecLink(graph, inputCurrent);
-                                                if (!inputNext) break;
-                                                inputCurrent = inputNext;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    ProcessInputKey(node, graph, ctx);
                 }
                 else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
                     tmpl->execute(node, graph, ctx);
@@ -156,37 +209,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
             const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
             if (!tmpl) continue;
             if (node.type == "Input_Key") {
-                tmpl->execute(node, graph, ctx);
-                bool keyHeld = false;
-                for (const Pin& p : node.outputs) {
-                    if (p.type == PinType::Boolean && p.name == "Is Held") {
-                        keyHeld = (p.defaultValue == "true");
-                        break;
-                    }
-                }
-                if (keyHeld) {
-                    for (const Pin& outPin : node.outputs) {
-                        if (outPin.type == PinType::Exec && outPin.name == "Out") {
-                            for (const Link& link : graph.GetLinks()) {
-                                if (link.outputPinId == outPin.id) {
-                                    Node* nextNode = graph.FindNodeByPinId(link.inputPinId);
-                                    if (nextNode) {
-                                        Node* inputCurrent = nextNode;
-                                        int inputLimit = 1000;
-                                        while (inputLimit-- > 0) {
-                                            PropagateDataPins(graph, inputCurrent, ctx);
-                                            const NodeTemplate* inputTmpl = NodeRegistry::Get().GetTemplate(inputCurrent->type);
-                                            if (inputTmpl && inputTmpl->execute) inputTmpl->execute(*inputCurrent, graph, ctx);
-                                            Node* inputNext = FollowExecLink(graph, inputCurrent);
-                                            if (!inputNext) break;
-                                            inputCurrent = inputNext;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                ProcessInputKey(node, graph, ctx);
             }
             else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
                 tmpl->execute(node, graph, ctx);
