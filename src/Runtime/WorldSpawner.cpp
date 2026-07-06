@@ -4,6 +4,7 @@
 #include "Components/MeshComponent.h"
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
@@ -44,6 +45,10 @@ void WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 audio->looping = decl.looping;
                 audio->volume = decl.volume;
                 comp = audio;
+            } else if (decl.componentType == "CameraComponent") {
+                auto* camera = new CameraComponent();
+                camera->fov = decl.cameraFov;
+                comp = camera;
             } else {
                 comp = new SceneComponent();
             }
@@ -51,6 +56,7 @@ void WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
             comp->position = {decl.posX, decl.posY, decl.posZ};
             comp->rotation = {decl.rotX, decl.rotY, decl.rotZ};
             comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
+            comp->SetName(decl.name);
             actor->AddComponent(comp);
         }
     }

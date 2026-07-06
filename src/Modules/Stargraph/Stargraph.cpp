@@ -170,6 +170,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "AutoPlay=" << (comp.autoPlay ? "true" : "false") << "\n";
         out << "Looping=" << (comp.looping ? "true" : "false") << "\n";
         out << "Volume=" << comp.volume << "\n";
+        out << "CameraFOV=" << comp.cameraFov << "\n";
         out << "\n";
     }
 
@@ -306,6 +307,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "AutoPlay")) comp.autoPlay = (*v == "true");
             if (const std::string* v = FindEntry(section, "Looping")) comp.looping = (*v == "true");
             if (const std::string* v = FindEntry(section, "Volume")) comp.volume = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = std::stof(*v);
             components.push_back(comp);
         } else if (section.name != "Nodes" && section.name.rfind("Node", 0) == 0) {
             const std::string* typeValue = FindEntry(section, "Type");

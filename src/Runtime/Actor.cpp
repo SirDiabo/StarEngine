@@ -62,6 +62,8 @@ void Actor::AddComponent(Component* component) {
         collisionComponent = cc;
     } else if (AudioComponent* ac = dynamic_cast<AudioComponent*>(component)) {
         audioComponent = ac;
+    } else if (CameraComponent* cc = dynamic_cast<CameraComponent*>(component)) {
+        cameraComponent = cc;
     }
 }
 
@@ -71,6 +73,7 @@ void Actor::RemoveComponent(Component* component) {
         if (meshComponent == component) meshComponent = nullptr;
         if (collisionComponent == component) collisionComponent = nullptr;
         if (audioComponent == component) audioComponent = nullptr;
+        if (cameraComponent == component) cameraComponent = nullptr;
         components.erase(it);
         delete component;
     }
@@ -83,4 +86,11 @@ Component* Actor::GetRootComponent() {
         components.push_back(rootComponent);
     }
     return rootComponent;
+}
+
+Component* Actor::FindComponentByName(const std::string& name) const {
+    for (Component* c : components) {
+        if (c->GetName() == name) return c;
+    }
+    return nullptr;
 }

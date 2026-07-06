@@ -4,10 +4,12 @@
 #include "Core/PackageCipher.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "Runtime/World.h"
+#include "Runtime/Actor.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/SceneRenderer.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/Components/CameraComponent.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
 #include <filesystem>
@@ -56,9 +58,39 @@ int main(int argc, char* argv[]) {
     camera.fovy = 50.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
+    for (const auto& actor : World::Get().GetActors()) {
+        if (actor->GetCameraComponent()) {
+            CameraComponent* cc = actor->GetCameraComponent();
+            Vector3 compPos = Vector3Add(actor->position, cc->position);
+            Vector3 compRot = Vector3Add(actor->rotation, cc->rotation);
+            float yr = (actor->rotation.y + cc->rotation.y) * DEG2RAD;
+            float pr = (actor->rotation.x + cc->rotation.x) * DEG2RAD;
+            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            camera.position = compPos;
+            camera.target = Vector3Add(compPos, forward);
+            camera.fovy = cc->fov;
+            break;
+        }
+    }
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         World::Get().Tick(deltaTime);
+
+        for (const auto& actor : World::Get().GetActors()) {
+            if (actor->GetCameraComponent()) {
+                CameraComponent* cc = actor->GetCameraComponent();
+                Vector3 compPos = Vector3Add(actor->position, cc->position);
+                Vector3 compRot = Vector3Add(actor->rotation, cc->rotation);
+                float yr = (actor->rotation.y + cc->rotation.y) * DEG2RAD;
+                float pr = (actor->rotation.x + cc->rotation.x) * DEG2RAD;
+                Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+                camera.position = compPos;
+                camera.target = Vector3Add(compPos, forward);
+                camera.fovy = cc->fov;
+                break;
+            }
+        }
 
         BeginDrawing();
         ClearBackground({20, 20, 20, 255});

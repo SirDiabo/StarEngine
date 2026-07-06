@@ -102,6 +102,10 @@ private:
     Vector2 variableDragPos{0, 0};
     bool variableDragActive = false;
 
+    int componentDragIndex = -1;
+    Vector2 componentDragPos{0, 0};
+    bool componentDragActive = false;
+
     int selectedComponentIndex = -1;
     bool addComponentMenuOpen = false;
     Vector2 addComponentMenuPos{0, 0};
@@ -120,4 +124,5 @@ private:
     char compHeightBuf[32] = "";
     char compSoundBuf[256] = "";
     char compVolumeBuf[32] = "";
+    char compFovBuf[32] = "";
 };

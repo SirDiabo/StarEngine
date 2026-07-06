@@ -1,6 +1,7 @@
 #include "ViewportPanel.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
+#include "Runtime/Components/CameraComponent.h"
 #include "Runtime/AssetCache.h"
 #include "Runtime/SceneRenderer.h"
 #include "Runtime/WorldSpawner.h"
@@ -324,12 +325,34 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     if (playing) {
         const auto& actors = World::Get().GetActors();
         if (!actors.empty()) {
-            Actor* first = actors.front().get();
-            cameraTarget = first->position;
+            Actor* camActor = nullptr;
+            for (const auto& actor : actors) {
+                if (actor->GetCameraComponent()) {
+                    camActor = actor.get();
+                    break;
+                }
+            }
+            if (camActor) {
+                CameraComponent* cc = camActor->GetCameraComponent();
+                Vector3 compPos = Vector3Add(camActor->position, cc->position);
+                float yr = (camActor->rotation.y + cc->rotation.y) * DEG2RAD;
+                float pr = (camActor->rotation.x + cc->rotation.x) * DEG2RAD;
+                Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+                camera.position = compPos;
+                camera.target = Vector3Add(compPos, forward);
+                camera.up = {0, 1, 0};
+                camera.fovy = cc->fov;
+                camera.projection = CAMERA_PERSPECTIVE;
+            } else {
+                Actor* first = actors.front().get();
+                cameraTarget = first->position;
+            }
         }
     }
 
-    UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
+    if (!playing || World::Get().GetActors().empty() || !World::Get().GetActors().front()->GetCameraComponent()) {
+        UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
+    }
 }
 
 static Color ClassColor(const std::string& className) {

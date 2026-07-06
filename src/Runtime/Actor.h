@@ -4,6 +4,7 @@
 #include "Components/MeshComponent.h"
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/CameraComponent.h"
 #include "raylib.h"
 #include <vector>
 
@@ -34,9 +35,11 @@ public:
     void RemoveComponent(Component* component);
     Component* GetRootComponent();
     const std::vector<Component*>& GetComponents() const { return components; }
+    Component* FindComponentByName(const std::string& name) const;
     MeshComponent* GetMeshComponent() const { return meshComponent; }
     CollisionComponent* GetCollisionComponent() const { return collisionComponent; }
     AudioComponent* GetAudioComponent() const { return audioComponent; }
+    CameraComponent* GetCameraComponent() const { return cameraComponent; }
 
 protected:
     virtual void OnBeginPlay() {}
@@ -50,4 +53,5 @@ private:
     MeshComponent* meshComponent = nullptr;
     CollisionComponent* collisionComponent = nullptr;
     AudioComponent* audioComponent = nullptr;
+    CameraComponent* cameraComponent = nullptr;
 };

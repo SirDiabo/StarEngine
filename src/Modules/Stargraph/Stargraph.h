@@ -45,7 +45,6 @@ struct Variable {
 };
 
 // Design-time declaration of a component owned by a StarActor class (.staractor asset).
-// Instantiated into a real runtime Component when the class is spawned into the World.
 struct ComponentDecl {
     std::string componentType = "SceneComponent";
     std::string name;
@@ -69,6 +68,9 @@ struct ComponentDecl {
     bool autoPlay = false;
     bool looping = false;
     float volume = 1.0f;
+
+    // CameraComponent
+    float cameraFov = 50.0f;
 };
 
 class Stargraph {

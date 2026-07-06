@@ -39,6 +39,8 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     didPan = false;
     variableDragActive = false;
     variableDragIndex = -1;
+    componentDragActive = false;
+    componentDragIndex = -1;
     return true;
 }
 
@@ -46,6 +48,10 @@ void StargraphEditorPanel::Close() {
     isOpen = false;
     filePath.clear();
     isDirty = false;
+    variableDragActive = false;
+    variableDragIndex = -1;
+    componentDragActive = false;
+    componentDragIndex = -1;
 }
 
 Color StargraphEditorPanel::GetPinColor(PinType type) const {
@@ -72,11 +78,13 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
     size_t visibleInputs = 0;
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
+        if (pin.name == "Component_Name") continue;
         visibleInputs++;
     }
     size_t rows = std::max(visibleInputs, node.outputs.size());
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
+        if (pin.name == "Component_Name") continue;
         if (pin.type != PinType::Exec && editingPinId != pin.id) {
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) {
@@ -99,6 +107,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     float y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.inputs) {
         if (p.name == "Variable_Name") continue;
+        if (p.name == "Component_Name") continue;
         if (p.id == pin.id) return {nodeX + pinRadius * zoom + 2, y};
         y += scaledPinHeight;
         if (p.type != PinType::Exec) {
@@ -539,6 +548,17 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             selectedNodeId = -1;
             selectedNodeIds.clear();
             selectedVariableIndex = -1;
+            componentDragIndex = (int)i;
+            componentDragActive = false;
+            componentDragPos = mousePos;
+        }
+
+        if (componentDragIndex >= 0 && componentDragIndex < (int)comps.size() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float dx = mousePos.x - componentDragPos.x;
+            float dy = mousePos.y - componentDragPos.y;
+            if (!componentDragActive && (dx*dx + dy*dy > 25)) {
+                componentDragActive = true;
+            }
         }
 
         if (isSelected && IsKeyPressed(KEY_DELETE)) {
@@ -557,7 +577,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 
     // Add Component dropdown menu, listing the known component types.
     if (addComponentMenuOpen) {
-        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent" };
+        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent" };
         float menuW = 150.0f;
         float menuH = (float)(sizeof(componentTypes) / sizeof(componentTypes[0])) * 20.0f + 4.0f;
         Rectangle menu = {addComponentMenuPos.x - menuW + 44, addComponentMenuPos.y, menuW, menuH};
@@ -612,6 +632,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compHeightBuf, sizeof(compHeightBuf), "%.2f", comp.collisionHeight);
         snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
         snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
+        snprintf(compFovBuf, sizeof(compFovBuf), "%.2f", comp.cameraFov);
         lastComponentDetailIndex = selectedComponentIndex;
         componentActiveField = 0;
         componentMeshPicker.Close();
@@ -707,6 +728,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         y += 24;
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Looping", &comp.looping)) isDirty = true;
         y += 24;
+    } else if (comp.componentType == "CameraComponent") {
+        floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov);
     }
 }
 
@@ -1032,6 +1055,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
             if (pin.name == "Variable_Name") continue;
+            if (pin.name == "Component_Name") continue;
             DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
             y += 14;
             DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
@@ -1188,6 +1212,7 @@ void StargraphEditorPanel::RenderGraph() {
         for (size_t i = 0; i < node.inputs.size(); i++) {
             Pin& pin = node.inputs[i];
             if (pin.name == "Variable_Name") continue;
+            if (pin.name == "Component_Name") continue;
             Vector2 pinPos = {nx + pinRadius * zoom + 2, inputY};
             Color pinColor = GetPinColor(pin.type);
 
@@ -1200,6 +1225,10 @@ void StargraphEditorPanel::RenderGraph() {
             else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
 
             if (pin.name == "Variable_Name") {
+                inputY += scaledPinHeight;
+                continue;
+            }
+            if (pin.name == "Component_Name") {
                 inputY += scaledPinHeight;
                 continue;
             }
@@ -1520,6 +1549,39 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         variableDragIndex = -1;
     }
 
+    if (componentDragActive && componentDragIndex >= 0 && componentDragIndex < (int)graph.GetComponents().size()) {
+        Vector2 mp = GetMousePosition();
+        const ComponentDecl& comp = graph.GetComponents()[componentDragIndex];
+        std::string label = "Get: " + comp.name;
+        int w = (int)MeasureText(label.c_str(), 12) + 12;
+        DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
+        DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
+        DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
+
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
+            if (CheckCollisionPointRec(mp, graphArea)) {
+                Node* node = graph.CreateNode("Get_Component");
+                node->title = "Get: " + comp.name;
+                for (Pin& p : node->inputs) {
+                    if (p.name == "Component_Name") p.defaultValue = comp.name;
+                }
+                float rawVX = (mp.x - graphArea.x - scroll.x) / zoom;
+                float rawVY = (mp.y - graphArea.y - scroll.y) / zoom;
+                const float gridSnap = 16.0f;
+                node->posX = roundf(rawVX / gridSnap) * gridSnap;
+                node->posY = roundf(rawVY / gridSnap) * gridSnap;
+                isDirty = true;
+            }
+            componentDragActive = false;
+            componentDragIndex = -1;
+        }
+    } else if (componentDragIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        componentDragActive = false;
+        componentDragIndex = -1;
+    }
+
     // Pan Graph
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea)) {
         panning = true; panStart = mousePos; scrollAtPanStart = scroll; didPan = false;
@@ -1607,7 +1669,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& t : templates) {
-        if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
+        if (t.type == "Get_Variable" || t.type == "Set_Variable" || t.type == "Get_Component") continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = t.type;
