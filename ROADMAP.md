@@ -335,9 +335,31 @@ x Packaged executable loads a StarMap directly, runs the world
 x Asset path resolution relative to packaged executable
 x All .staractor and .starmap files included in package output
 x Platform targets: Windows, Linux (Windows via mingw-w64 cross toolchain, verified; macOS needs osxcross, wired but unverified; Web wired via emcmake, unverified, no single-executable output; Android not implemented, needs a full APK project template)
-o option for single-file packaging (embed assets into binary)
 x Content encryption at cook time (XOR, extensible to AES-128/256 later)
 x Renderer choice per project (Hardware/OpenGL or Software/CPU via raylib's rlsw backend, packaged games only)
+o move packaging out of the top menu and next to the play button on the viewport top bar thing
+
+### 10.1 Packaging into a single executable (blob)
+o Ship one .exe with no loose Content folder alongside it
+o Define a pak archive format: index of [relative path, offset, size] plus concatenated cooked bytes, written by the cooker instead of a loose output folder
+o Cooker writes a single .starpak file (index + blob) in place of current per-file Content/ tree
+o Embed the .starpak into the compiled executable, appended after the linked binary, with a footer (magic + offset + size) found via argv[0]
+o Runtime virtual filesystem: CookedFile reads directly from the embedded pak's byte range in memory
+o Extract file-API-only formats (.obj, non-binary .gltf) to a per-run temp file sourced from the in-memory pak
+o Resolve sibling files (mtl textures, gltf buffers) from the pak index by shared parent path instead of scanning a disk directory
+o PackageRunner produces the single exe (with appended pak) as the only required output artifact
+o Keep loose-folder packaging as a project setting for fast iteration/patching without a full rebuild
+o Verify appended trailing data survives code signing/packaging tools on Windows and macOS before relying on this approach
+
+### 10.2 Shipping prebuilt engine libraries per platform
+o Package a game without the engine source tree on disk (mirrors UE's precompiled engine, compiles only project game code)
+o Split engine into an internal library target (Core/Runtime/Modules, no GameMain.cpp) vs a thin per-platform entry point that links against it
+o CI matrix builds the library for every platform/renderer combo and publishes the artifacts alongside each editor release
+o Editor bundles prebuilt libs for locally-targetable platforms; missing ones fetched on demand, versioned to the running editor build
+o PackageRunner compiles only GameMain.cpp plus generated module glue, then links against the matching prebuilt engine lib
+o Restrict prebuilt-lib packaging to projects using only built-in modules; custom modules stay on the source-build path
+o Version-tag prebuilt libs to the exact editor build/commit; refuse to link a mismatched header/lib pair to avoid silent ABI breakage
+o Fall back to build-from-source packaging with a clear message when no matching prebuilt lib is available, keeping it additive not breaking
 
 ---
 
