@@ -53,6 +53,25 @@ Matrix Actor::GetWorldMatrix() const {
     return MatrixMultiply(MatrixMultiply(scaleMatrix, rotationMatrix), translationMatrix);
 }
 
+Vector3 Actor::ComputeWorldPosition(Vector3 localPos, Vector3 parentPos, Vector3 parentRot, Vector3 parentScale) {
+    Vector3 scaledLocalPos = {
+        localPos.x * parentScale.x,
+        localPos.y * parentScale.y,
+        localPos.z * parentScale.z
+    };
+    Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * parentRot.x, DEG2RAD * parentRot.y, DEG2RAD * parentRot.z });
+    Vector3 rotatedLocalPos = Vector3Transform(scaledLocalPos, rotationMatrix);
+    return Vector3Add(parentPos, rotatedLocalPos);
+}
+
+Vector3 Actor::ComputeWorldRotation(Vector3 localRot, Vector3 parentRot) {
+    return Vector3Add(parentRot, localRot);
+}
+
+Vector3 Actor::ComputeWorldScale(Vector3 localScale, Vector3 parentScale) {
+    return Vector3Multiply(localScale, parentScale);
+}
+
 void Actor::AddComponent(Component* component) {
     components.push_back(component);
     component->parent = GetRootComponent();

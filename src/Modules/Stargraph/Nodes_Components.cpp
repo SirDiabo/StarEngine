@@ -196,7 +196,7 @@ void RegisterComponentNodes() {
             }
         }
         if (!target) return;
-        Vector3 worldLoc = Vector3Add(ctx.actor->position, Vector3Multiply(target->position, ctx.actor->scale));
+        Vector3 worldLoc = Actor::ComputeWorldPosition(target->position, ctx.actor->position, ctx.actor->rotation, ctx.actor->scale);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", worldLoc.x, worldLoc.y, worldLoc.z);
         for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;

@@ -291,7 +291,6 @@ x Get_Actor_Forward_Vector (pure, derived from actor rotation)
 x Get/Set Actor Rotation
 x Get/Set Actor Scale
 x Get Actor Right Vector, Get Actor Up Vector
-o Destroy Self
 x Spawn Actor (class, graph path -> actor reference)
 
 ### 7.5 Utility

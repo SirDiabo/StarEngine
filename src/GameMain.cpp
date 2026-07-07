@@ -61,10 +61,10 @@ int main(int argc, char* argv[]) {
     for (const auto& actor : World::Get().GetActors()) {
         if (actor->GetCameraComponent()) {
             CameraComponent* cc = actor->GetCameraComponent();
-            Vector3 compPos = Vector3Add(actor->position, cc->position);
-            Vector3 compRot = Vector3Add(actor->rotation, cc->rotation);
-            float yr = (actor->rotation.y + cc->rotation.y) * DEG2RAD;
-            float pr = (actor->rotation.x + cc->rotation.x) * DEG2RAD;
+            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, actor->position, actor->rotation, actor->scale);
+            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, actor->rotation);
+            float yr = compRot.y * DEG2RAD;
+            float pr = compRot.x * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
             camera.position = compPos;
             camera.target = Vector3Add(compPos, forward);
@@ -81,10 +81,10 @@ int main(int argc, char* argv[]) {
         for (const auto& actor : World::Get().GetActors()) {
             if (actor->GetCameraComponent()) {
                 CameraComponent* cc = actor->GetCameraComponent();
-                Vector3 compPos = Vector3Add(actor->position, cc->position);
-                Vector3 compRot = Vector3Add(actor->rotation, cc->rotation);
-                float yr = (actor->rotation.y + cc->rotation.y) * DEG2RAD;
-                float pr = (actor->rotation.x + cc->rotation.x) * DEG2RAD;
+                Vector3 compPos = Actor::ComputeWorldPosition(cc->position, actor->position, actor->rotation, actor->scale);
+                Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, actor->rotation);
+                float yr = compRot.y * DEG2RAD;
+                float pr = compRot.x * DEG2RAD;
                 Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
                 camera.position = compPos;
                 camera.target = Vector3Add(compPos, forward);

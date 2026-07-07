@@ -334,9 +334,10 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
             }
             if (camActor) {
                 CameraComponent* cc = camActor->GetCameraComponent();
-                Vector3 compPos = Vector3Add(camActor->position, cc->position);
-                float yr = (camActor->rotation.y + cc->rotation.y) * DEG2RAD;
-                float pr = (camActor->rotation.x + cc->rotation.x) * DEG2RAD;
+                Vector3 compPos = Actor::ComputeWorldPosition(cc->position, camActor->position, camActor->rotation, camActor->scale);
+                Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, camActor->rotation);
+                float yr = compRot.y * DEG2RAD;
+                float pr = compRot.x * DEG2RAD;
                 Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
                 camera.position = compPos;
                 camera.target = Vector3Add(compPos, forward);
@@ -383,9 +384,9 @@ void ViewportPanel::RenderScene() {
 
                 if (classGraph) {
                     for (const ComponentDecl& comp : classGraph->GetComponents()) {
-                        Vector3 compPos = {pos.x + comp.posX, pos.y + comp.posY, pos.z + comp.posZ};
-                        Vector3 compRot = {rot.x + comp.rotX, rot.y + comp.rotY, rot.z + comp.rotZ};
-                        Vector3 compScale = {scl.x * comp.scaleX, scl.y * comp.scaleY, scl.z * comp.scaleZ};
+                        Vector3 compPos = Actor::ComputeWorldPosition({comp.posX, comp.posY, comp.posZ}, pos, rot, scl);
+                        Vector3 compRot = Actor::ComputeWorldRotation({comp.rotX, comp.rotY, comp.rotZ}, rot);
+                        Vector3 compScale = Actor::ComputeWorldScale({comp.scaleX, comp.scaleY, comp.scaleZ}, scl);
 
                         if (comp.componentType == "MeshComponent") {
                             DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPath, compPos, compRot,
