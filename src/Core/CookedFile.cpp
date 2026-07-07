@@ -4,6 +4,7 @@
 #include <fstream>
 #include <functional>
 #include <unordered_map>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -26,24 +27,33 @@ std::string CookedFile::Open(const std::string& path) {
     auto cached = decipheredPaths.find(resolved);
     if (cached != decipheredPaths.end()) return cached->second;
 
-    std::ifstream in(resolved, std::ios::binary);
-    if (!in.is_open()) return resolved;
-    std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    in.close();
-
-    CreateCookCipher(activeCipher)->Transform(data, activeKey);
+    fs::path resolvedPath(resolved);
+    fs::path sourceDir = resolvedPath.parent_path();
+    std::error_code ec;
+    if (!fs::exists(sourceDir, ec)) return resolved;
 
     fs::path tempDir = fs::temp_directory_path() / "StarEngineGameCache";
-    std::error_code ec;
-    fs::create_directories(tempDir, ec);
+    size_t dirHash = std::hash<std::string>{}(sourceDir.string());
+    fs::path mirroredDir = tempDir / std::to_string(dirHash);
 
-    size_t hash = std::hash<std::string>{}(resolved);
-    fs::path tempPath = tempDir / (std::to_string(hash) + fs::path(resolved).extension().string());
+    if (!fs::exists(mirroredDir, ec)) {
+        fs::create_directories(mirroredDir, ec);
+        for (const auto& entry : fs::directory_iterator(sourceDir, ec)) {
+            if (!entry.is_regular_file()) continue;
 
-    std::ofstream out(tempPath, std::ios::binary);
-    out.write(reinterpret_cast<const char*>(data.data()), (std::streamsize)data.size());
-    out.close();
+            std::ifstream in(entry.path(), std::ios::binary);
+            if (!in.is_open()) continue;
+            std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            in.close();
 
+            CreateCookCipher(activeCipher)->Transform(data, activeKey);
+
+            std::ofstream out(mirroredDir / entry.path().filename(), std::ios::binary);
+            out.write(reinterpret_cast<const char*>(data.data()), (std::streamsize)data.size());
+        }
+    }
+
+    fs::path tempPath = mirroredDir / resolvedPath.filename();
     decipheredPaths.emplace(resolved, tempPath.string());
     return tempPath.string();
 }

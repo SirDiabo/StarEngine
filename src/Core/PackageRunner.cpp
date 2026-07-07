@@ -12,6 +12,9 @@ namespace fs = std::filesystem;
 namespace {
 
 std::string GetEngineRoot() {
+    if (const char* override = std::getenv("STARENGINE_ENGINE_ROOT")) {
+        if (override[0] != '\0') return override;
+    }
 #ifdef STARENGINE_SOURCE_ROOT
     return fs::path(STARENGINE_SOURCE_ROOT).parent_path().string();
 #else
@@ -120,7 +123,10 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
 
     fs::path engineRoot = GetEngineRoot();
     if (!fs::exists(engineRoot / "CMakeLists.txt")) {
-        result.error = "Could not locate the engine source tree to build from.";
+        result.error = "Could not locate the engine source tree to build from (looked in \"" + engineRoot.string() +
+            "\"). Packaging compiles your game against the engine source, so it must be present on disk. "
+            "If you built the editor yourself this should be automatic; if you downloaded a prebuilt editor, "
+            "grab the matching engine source and point to it with the STARENGINE_ENGINE_ROOT environment variable.";
         return result;
     }
 

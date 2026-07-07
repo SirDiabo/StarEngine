@@ -1671,7 +1671,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
 
-    const auto& templates = NodeRegistry::Get().GetFilteredTemplates(filterCompatibleWithPin == -1);
+    const auto& templates = NodeRegistry::Get().GetFilteredTemplates(filterCompatibleWithPin != -1);
     std::string searchLower = nodeMenuSearch;
     for (char& c : searchLower) c = (char)tolower(c);
     for (char& c : searchLower) if (c == ' ') c = '_';
@@ -1704,8 +1704,12 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                         if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
                 }
 
-                if (hasCompatible && sourceNode && !sourceNode->componentClass.empty() && !t.requiresComponentClass.empty()) {
-                    hasCompatible = (t.requiresComponentClass == sourceNode->componentClass);
+                if (hasCompatible && sourceNode && !sourceNode->componentClass.empty()) {
+                    if (t.category == "Actor") {
+                        hasCompatible = false;
+                    } else if (!t.requiresComponentClass.empty()) {
+                        hasCompatible = (t.requiresComponentClass == sourceNode->componentClass);
+                    }
                 }
 
                 if (!hasCompatible) continue;

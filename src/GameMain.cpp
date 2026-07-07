@@ -89,7 +89,6 @@ int main(int argc, char* argv[]) {
                 camera.position = compPos;
                 camera.target = Vector3Add(compPos, forward);
                 camera.fovy = cc->fov;
-                camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
                 break;
             }
         }
