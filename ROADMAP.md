@@ -233,12 +233,6 @@ x Variable values snapshot before play, restored after stop
 o Compile button (validate graph, report errors to log)
 o Graph breadcrumb trail for sub-graphs
 
-### 5.8 Text Input Quality of Life
-o All inline text fields open with text pre-selected
-o Typing immediately replaces pre-selected text
-o Ctrl+A selects all in active field
-o Ctrl+C/V/X in text fields
-
 ---
 
 ## 6. Variables and Pin Types
