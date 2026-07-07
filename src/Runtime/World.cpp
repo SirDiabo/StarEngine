@@ -27,23 +27,23 @@ void World::DestroyActor(Actor* actor) {
 
 void World::BeginPlay() {
     playing = true;
-    for (auto& actor : actors) {
-        actor->BeginPlay();
+    for (size_t i = 0; i < actors.size(); i++) {
+        actors[i]->BeginPlay();
     }
 }
 
 void World::Tick(float deltaTime) {
     if (!playing) return;
-    for (auto& actor : actors) {
-        actor->Tick(deltaTime);
+    for (size_t i = 0; i < actors.size(); i++) {
+        actors[i]->Tick(deltaTime);
     }
     FlushDestroyQueue();
 }
 
 void World::EndPlay() {
-    for (auto& actor : actors) {
-        actor->EndPlay();
-        DestroyActor(actor.get());
+    for (size_t i = 0; i < actors.size(); i++) {
+        actors[i]->EndPlay();
+        DestroyActor(actors[i].get());
     }
     FlushDestroyQueue();
     playing = false;
