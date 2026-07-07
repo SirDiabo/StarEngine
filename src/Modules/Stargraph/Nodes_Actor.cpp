@@ -195,7 +195,9 @@ void RegisterActorNodes() {
         float pr = target->rotation.x * DEG2RAD;
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr));
+            sinf(yr) * cosf(pr),
+            -sinf(pr),
+            cosf(yr) * cosf(pr));
         for (Pin& p : node.outputs) if (p.name == "Forward") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorForward);
@@ -219,10 +221,11 @@ void RegisterActorNodes() {
         }
         if (!target) return;
         float yr = target->rotation.y * DEG2RAD;
-        float pr = target->rotation.x * DEG2RAD;
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            cosf(pr) * cosf(yr), sinf(pr), -cosf(pr) * sinf(yr));
+            -cosf(yr),
+            0.0f,
+            sinf(yr));
         for (Pin& p : node.outputs) if (p.name == "Right") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorRight);
@@ -245,8 +248,13 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
+        float yr = target->rotation.y * DEG2RAD;
+        float pr = target->rotation.x * DEG2RAD;
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", 0.0f, 1.0f, 0.0f);
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
+            sinf(yr) * sinf(pr),
+            cosf(pr),
+            cosf(yr) * sinf(pr));
         for (Pin& p : node.outputs) if (p.name == "Up") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorUp);
