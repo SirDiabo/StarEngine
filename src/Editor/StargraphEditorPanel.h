@@ -29,6 +29,7 @@ private:
     void RenderRightPanel();
     void RenderNodeContextMenu();
     void RenderWireInProgress();
+    void RenderKeyPickerPopup();
 
     void TryCompleteLink(int pinId, bool onInput);
     void CancelLink();
@@ -89,6 +90,14 @@ private:
     bool addingVariable = false;
     int variableNameActiveField = 0;
     int listeningForKeyPinId = 0;
+
+    bool keyPickerOpen = false;
+    int keyPickerPinId = 0;
+    Vector2 keyPickerPos{0, 0};
+    float keyPickerWidth = 0;
+    char keyPickerSearch[64] = "";
+    float keyPickerScroll = 0;
+    bool keyPickerJustOpened = false;
 
     static const float nodeWidth;
     static const float pinHeight;

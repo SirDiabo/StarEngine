@@ -263,9 +263,13 @@ x Replace Float/Int/Vec3 math nodes with single wildcard Add/Subtract/Multiply/D
 ### 7.1 Events
 x Event_BeginPlay, Event_Tick (Delta Seconds), Event_EndPlay
 o Custom Event nodes (user-named, callable from other graphs)
-x Input events: Event_Key_W/A/S/D/Space/etc. (fired while key held or on press/release)
+x Input_Key node supporting keyboard keys via searchable key dropdown
+x Mouse buttons (Left, Right, Middle) exposed through Input_Key node as boolean held
+x Mouse wheel exposed through Input_Key node as axis float (-1..1)
+x Mouse X and Mouse Y exposed through Input_Key node as axis floats (-1..1)
 x Get_Axis_Horizontal, Get_Axis_Vertical (returns -1..1 float, WASD + arrows)
-o Input events: Event_Mouse_Button (left, right, middle)
+x Key input field renders searchable dropdown with all input names, matching Add Node menu UX
+o Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence

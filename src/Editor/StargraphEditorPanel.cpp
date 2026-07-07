@@ -36,6 +36,10 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     linkFromPin = -1;
     nodeMenuOpen = false;
     editingPinId = 0;
+    listeningForKeyPinId = 0;
+    keyPickerOpen = false;
+    keyPickerPinId = 0;
+    keyPickerSearch[0] = '\0';
     scroll = {0, 0};
     didPan = false;
     variableDragActive = false;
@@ -53,6 +57,9 @@ void StargraphEditorPanel::Close() {
     variableDragIndex = -1;
     componentDragActive = false;
     componentDragIndex = -1;
+    keyPickerOpen = false;
+    keyPickerPinId = 0;
+    listeningForKeyPinId = 0;
 }
 
 Color StargraphEditorPanel::GetPinColor(PinType type) const {
@@ -1095,7 +1102,12 @@ void StargraphEditorPanel::RenderGraph() {
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     Vector2 mousePos = GetMousePosition();
 
-    if (listeningForKeyPinId != 0) {
+    if (keyPickerOpen) {
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+        }
+    } else if (listeningForKeyPinId != 0) {
         if (IsKeyPressed(KEY_ESCAPE)) {
             listeningForKeyPinId = 0;
         } else {
@@ -1117,7 +1129,7 @@ void StargraphEditorPanel::RenderGraph() {
     }
 
     float wheel = GetMouseWheelMove();
-    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea) && !nodeMenuOpen) {
+    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea) && !nodeMenuOpen && !keyPickerOpen) {
         float newZoom = zoom + wheel * 0.1f;
         newZoom = fmax(0.1f, fmin(3.0f, newZoom));
         
@@ -1241,7 +1253,7 @@ void StargraphEditorPanel::RenderGraph() {
                 bool isDraggingLink = linkFromPin != -1;
                 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                     DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen) {
                         if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                             RemoveLinkFromPin(pin.id);
                         } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1290,25 +1302,36 @@ void StargraphEditorPanel::RenderGraph() {
                     Rectangle listenBtn = {fieldRect.x + fieldRect.width - listenBtnW, fieldRect.y, listenBtnW, fieldRect.height};
                     bool listening = (listeningForKeyPinId == pin.id);
 
-                    char inactiveBuf[256];
-                    char* activeBuf = editBuffer;
-                    if (editingPinId != pin.id) {
-                        snprintf(inactiveBuf, sizeof(inactiveBuf), "%s", pin.defaultValue.c_str());
-                        activeBuf = inactiveBuf;
-                    }
-                    bool allowActivate = (linkFromPin == -1) && !listening;
-                    if (PropertyField::StringBox(textRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
-                                                  pin.defaultValue, allowActivate, pin.name.c_str())) {
-                        isDirty = true;
+                    if (!keyPickerOpen || keyPickerPinId != pin.id) {
+                        std::string display = pin.defaultValue;
+                        for (char& c : display) if (c == '_') c = ' ';
+                        DrawRectangleRec(textRect, {35, 35, 40, 255});
+                        DrawRectangleLinesEx(textRect, 1, {60, 60, 70, 255});
+                        DrawText(display.c_str(), (int)textRect.x + 6, (int)textRect.y + 5, 11, WHITE);
                     }
 
                     DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : Color{50, 50, 56, 255});
                     DrawRectangleLinesEx(listenBtn, 1, {80, 80, 90, 255});
                     DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 11,
                              listening ? WHITE : LIGHTGRAY);
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, listenBtn)) {
-                        listeningForKeyPinId = pin.id;
-                        editingPinId = 0;
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        if (CheckCollisionPointRec(mousePos, listenBtn)) {
+                            listeningForKeyPinId = pin.id;
+                            editingPinId = 0;
+                            keyPickerOpen = false;
+                            keyPickerPinId = 0;
+                        } else if (CheckCollisionPointRec(mousePos, textRect)) {
+                            keyPickerPinId = pin.id;
+                            keyPickerPos = {textRect.x, textRect.y + textRect.height};
+                            keyPickerWidth = fieldRect.width;
+                            snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
+                            keyPickerScroll = 0;
+                            keyPickerJustOpened = true;
+                            keyPickerOpen = true;
+                            editingPinId = 0;
+                            listeningForKeyPinId = 0;
+                        }
                     }
                 } else {
                     char inactiveBuf[256];
@@ -1381,7 +1404,7 @@ void StargraphEditorPanel::RenderGraph() {
 
 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1408,7 +1431,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
 
         if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen) {
                 if (IsKeyDown(KEY_LEFT_CONTROL)) {
                     bool found = false;
                     for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
@@ -1499,6 +1522,10 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             }
             CancelLink();
         }
+    }
+
+    if (keyPickerOpen) {
+        RenderKeyPickerPopup();
     }
 
     EndScissorMode();
@@ -1605,7 +1632,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         } else panning = false;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen) {
         if (!GetNodeAtPos(mousePos)) {
             if (!IsKeyDown(KEY_LEFT_CONTROL)) {
                 selectedNodeId = -1;
@@ -1645,7 +1672,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen) {
         if (!didPan) {
         filterCompatibleWithPin = -1;
         nodeMenuOpen = true;
@@ -1846,6 +1873,115 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         float barH = (listH / totalItemsH) * listH;
         float barY = listArea.y + scrollRatio * (listH - barH);
         DrawRectangleRec({popup.x + popup.width - 4, barY, 3, barH}, {100, 100, 120, 200});
+    }
+}
+
+void StargraphEditorPanel::RenderKeyPickerPopup() {
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
+
+    Pin* targetPin = nullptr;
+    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+        for (Pin& pin : node.inputs) {
+            if (pin.id == keyPickerPinId) { targetPin = &pin; break; }
+        }
+        if (targetPin) break;
+    }
+    if (!targetPin) { keyPickerOpen = false; keyPickerPinId = 0; return; }
+
+    std::vector<std::string> allKeys = GetInputKeyNames();
+
+    std::vector<int> filtered;
+    std::string searchLower = keyPickerSearch;
+    for (char& c : searchLower) c = (char)tolower(c);
+    for (size_t i = 0; i < allKeys.size(); i++) {
+        std::string display;
+        for (char c : allKeys[i]) {
+            display += (c == '_') ? ' ' : (char)tolower(c);
+        }
+        if (searchLower.empty() || display.find(searchLower) != std::string::npos) {
+            filtered.push_back((int)i);
+        }
+    }
+
+    float menuW = keyPickerWidth;
+    float itemH = 20.0f;
+    float searchH = 26.0f;
+    float maxVisibleH = 220.0f;
+    float listH = std::min((float)filtered.size() * itemH + 4.0f, maxVisibleH);
+    float menuH = searchH + listH;
+
+    float popupX = keyPickerPos.x;
+    float popupY = keyPickerPos.y;
+    if (popupX + menuW > graphArea.x + graphArea.width) popupX = graphArea.x + graphArea.width - menuW;
+    if (popupY + menuH > graphArea.y + graphArea.height) popupY = graphArea.y + graphArea.height - menuH;
+    if (popupX < graphArea.x) popupX = graphArea.x;
+    if (popupY < graphArea.y) popupY = graphArea.y;
+
+    Rectangle popup = {popupX, popupY, menuW, menuH};
+    Vector2 mp = GetMousePosition();
+
+    if (keyPickerJustOpened) {
+        keyPickerJustOpened = false;
+    } else {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, popup)) {
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            return;
+        }
+        if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            return;
+        }
+    }
+
+    DrawRectangleRec(popup, {44, 44, 50, 255});
+    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+
+    Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
+    GuiTextBox(searchRect, keyPickerSearch, sizeof(keyPickerSearch), true);
+
+    Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
+    if (CheckCollisionPointRec(mp, listArea)) {
+        float wheel = GetMouseWheelMove();
+        keyPickerScroll -= wheel * itemH * 2;
+    }
+    float maxScroll = (float)filtered.size() * itemH + 4.0f - listH;
+    if (maxScroll < 0) maxScroll = 0;
+    if (keyPickerScroll < 0) keyPickerScroll = 0;
+    if (keyPickerScroll > maxScroll) keyPickerScroll = maxScroll;
+
+    float y = popup.y + searchH + 4 - keyPickerScroll;
+    BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
+    for (int idx : filtered) {
+        Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
+        bool hover = CheckCollisionPointRec(mp, btn);
+        if (hover) DrawRectangleRec(btn, {65, 65, 85, 255});
+
+        std::string display;
+        for (char c : allKeys[idx]) {
+            if (c == '_') display += ' ';
+            else display += c;
+        }
+        DrawText(display.c_str(), (int)btn.x + 6, (int)btn.y + 4, 11, WHITE);
+
+        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            targetPin->defaultValue = allKeys[idx];
+            isDirty = true;
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            break;
+        }
+        y += itemH;
+    }
+    EndScissorMode();
+
+    if ((float)filtered.size() * itemH + 4.0f > listH) {
+        float scrollRatio = (maxScroll > 0) ? keyPickerScroll / maxScroll : 0;
+        float barH = (listH / ((float)filtered.size() * itemH + 4.0f)) * listH;
+        float barY = listArea.y + scrollRatio * (listH - barH);
+        DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
     }
 }
 

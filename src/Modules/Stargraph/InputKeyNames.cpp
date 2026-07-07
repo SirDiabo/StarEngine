@@ -25,6 +25,8 @@ const std::vector<std::pair<std::string, int>>& Table() {
         {"F1", KEY_F1}, {"F2", KEY_F2}, {"F3", KEY_F3}, {"F4", KEY_F4},
         {"F5", KEY_F5}, {"F6", KEY_F6}, {"F7", KEY_F7}, {"F8", KEY_F8},
         {"F9", KEY_F9}, {"F10", KEY_F10}, {"F11", KEY_F11}, {"F12", KEY_F12},
+        {"LEFT_MOUSE", -1}, {"RIGHT_MOUSE", -2}, {"MIDDLE_MOUSE", -3},
+        {"MOUSE_WHEEL", -4}, {"MOUSE_X", -5}, {"MOUSE_Y", -6},
     };
     return table;
 }}
@@ -33,7 +35,7 @@ int InputKeyNameToCode(const std::string& name) {
     for (const auto& entry : Table()) {
         if (entry.first == name) return entry.second;
     }
-    return 0;
+    return -1;
 }
 
 std::string InputKeyCodeToName(int code) {
@@ -41,4 +43,10 @@ std::string InputKeyCodeToName(int code) {
         if (entry.second == code) return entry.first;
     }
     return "";
+}
+
+std::vector<std::string> GetInputKeyNames() {
+    std::vector<std::string> names;
+    for (const auto& entry : Table()) names.push_back(entry.first);
+    return names;
 }
