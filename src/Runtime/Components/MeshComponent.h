@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "SceneComponent.h"
+#include <string>
 
 class MeshComponent : public SceneComponent {
 public:

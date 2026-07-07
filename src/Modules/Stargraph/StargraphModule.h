@@ -13,3 +13,11 @@ private:
     void RegisterDefaultNodes();
     void RegisterAssetType();
 };
+
+void RegisterEventNodes();
+void RegisterFlowNodes();
+void RegisterMathNodes();
+void RegisterActorNodes();
+void RegisterComponentNodes();
+void RegisterVariableNodes();
+void RegisterUtilityNodes();

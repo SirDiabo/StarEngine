@@ -267,16 +267,22 @@ o Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Tr
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence
-o Do_Once, Gate, Flip_Flop
+x Do_Once, Gate, Flip_Flop
 o Delay (requires timer system)
 
 ### 7.3 Math
 x Float/Int/Vec3 Add/Subtract/Multiply/Divide
 x Conversions: Float/Int/Bool to String, Float to Int, Int to Float
-o Float: Clamp, Lerp, Abs, Min, Max, Round, Floor, Ceil
-o Int: Clamp, Abs, Min, Max, Modulo
-o Vec3: Length, Normalize, Dot, Cross, Distance, Scale
-o Vec3: Make (X, Y, Z -> Vec3), Break (Vec3 -> X, Y, Z)
+x Bool: Random Bool, Not, And, Or
+x Float: Lerp, Truncate, Floor, Ceil, Round, Random Float, Random Float in Range
+x Int: Random Int, Random Int in Range
+x Wildcard: Abs, Min, Max, Clamp, Modulo
+x Vec3: Length, Normalize, Dot, Cross, Distance, Scale
+x Vec3: Make (X, Y, Z -> Vec3), Break (Vec3 -> X, Y, Z)
+o Vec3: Normalized Distance, Reflect
+o String: Concat, Length, Substring, Find, Replace, Contains
+o Conversions: Vec3 to String, String to Vec3, Bool to Float, Bool to Int
+o Comparisons: Wildcard_Equals
 
 ### 7.4 Actor Self-Reference Nodes
 x Get_Actor_Location (pure, reads ctx.actor->position)
@@ -284,19 +290,19 @@ x Set_Actor_Location (exec, writes to ctx.actor->position)
 x Get_Actor_Forward_Vector (pure, derived from actor rotation)
 x Get/Set Actor Rotation
 x Get/Set Actor Scale
-o Get Actor Right Vector, Get Actor Up Vector
+x Get Actor Right Vector, Get Actor Up Vector
 o Destroy Self
-o Spawn Actor (class, location, rotation -> actor reference)
+x Spawn Actor (class, graph path -> actor reference)
 
 ### 7.5 Utility
 x Print_String (inline text field, outputs to log panel)
-o Print_Warning, Print_Error (yellow/red in log)
-o Get_Game_Time (returns elapsed seconds as float)
-o Get_Delta_Time (returns last frame delta, usable outside Event_Tick)
+x Print_Warning, Print_Error (yellow/red in log)
+x Get_Game_Time (returns elapsed seconds as float)
+x Get_Delta_Time (returns last frame delta, usable outside Event_Tick)
 
 ### 7.6 Variables
 x Get_Variable / Set_Variable via left panel drag
-/ Get/Set functional at runtime (needs actor context integration)
+x Get/Set functional at runtime (needs actor context integration)
 x Variable_Name internal pin hidden from node face
 
 ---
