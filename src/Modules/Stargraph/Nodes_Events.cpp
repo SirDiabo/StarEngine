@@ -94,36 +94,4 @@ void RegisterEventNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(inputKey);
-
-    NodeTemplate getAxisH;
-    getAxisH.type = "Get_Axis_Horizontal";
-    getAxisH.category = "Input";
-    getAxisH.moduleName = "Stargraph";
-    getAxisH.createPins = [](Node* node) {
-        node->outputs.push_back({"Axis", PinType::Float, false, true});
-    };
-    getAxisH.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        float axis = 0;
-        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) axis += 1.0f;
-        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))  axis -= 1.0f;
-        char buf[32]; snprintf(buf, sizeof(buf), "%g", axis);
-        for (Pin& p : node.outputs) if (p.name == "Axis") p.defaultValue = buf;
-    };
-    NodeRegistry::Get().RegisterNode(getAxisH);
-
-    NodeTemplate getAxisV;
-    getAxisV.type = "Get_Axis_Vertical";
-    getAxisV.category = "Input";
-    getAxisV.moduleName = "Stargraph";
-    getAxisV.createPins = [](Node* node) {
-        node->outputs.push_back({"Axis", PinType::Float, false, true});
-    };
-    getAxisV.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        float axis = 0;
-        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))   axis += 1.0f;
-        if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))  axis -= 1.0f;
-        char buf[32]; snprintf(buf, sizeof(buf), "%g", axis);
-        for (Pin& p : node.outputs) if (p.name == "Axis") p.defaultValue = buf;
-    };
-    NodeRegistry::Get().RegisterNode(getAxisV);
 }

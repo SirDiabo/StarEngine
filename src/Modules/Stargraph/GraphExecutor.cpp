@@ -188,9 +188,6 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 if (node.type == "Input_Key") {
                     ProcessInputKey(node, graph, ctx);
                 }
-                else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
-                    tmpl->execute(node, graph, ctx);
-                }
             }
         }
         return;
@@ -210,9 +207,6 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
             if (!tmpl) continue;
             if (node.type == "Input_Key") {
                 ProcessInputKey(node, graph, ctx);
-            }
-            else if (node.type == "Get_Axis_Horizontal" || node.type == "Get_Axis_Vertical") {
-                tmpl->execute(node, graph, ctx);
             }
         }
     }
