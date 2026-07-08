@@ -1000,4 +1000,37 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
     };
     NodeRegistry::Get().RegisterNode(wildcardEquals);
+
+    auto RegisterWildcardCompare = [](const std::string& nodeType, char op) {
+        NodeTemplate t;
+        t.type = nodeType;
+        t.category = "Comparisons";
+        t.moduleName = "Stargraph";
+        t.createPins = [](Node* node) {
+            node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
+            node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
+            node->outputs.push_back({"Result", PinType::Boolean, false, true});
+        };
+        t.execute = [op](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            float a = 0, b = 0;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "A") a = GetScalarValue(p);
+                if (p.name == "B") b = GetScalarValue(p);
+            }
+            bool result = false;
+            switch (op) {
+                case '>': result = a > b; break;
+                case '<': result = a < b; break;
+                case 'g': result = a >= b; break;
+                case 'l': result = a <= b; break;
+            }
+            for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    };
+
+    RegisterWildcardCompare("Greater_Than",    '>');
+    RegisterWildcardCompare("Less_Than",       '<');
+    RegisterWildcardCompare("Greater_Or_Equal", 'g');
+    RegisterWildcardCompare("Less_Or_Equal",    'l');
 }
