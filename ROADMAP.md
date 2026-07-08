@@ -126,6 +126,27 @@ x Add a new camera component with a couple simple properties like float-FOV, and
 x Actors with camera components automatically view the first camera, but are able to change view target through nodes.
 x Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
 
+### 2.7 Input Focus and View Target
+o Get/Set Input Focus nodes. Actor receives input events when focused
+o Input Focus is per-machine and unreplicated; it decides which actor reads local input, independent of Has Authority
+o Get/Set View Target node. Actor's CameraComponent becomes the active render camera
+o Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
+
+### 2.8 Replication Core
+o ReplicationMode enum on variables and custom events: Local (default) / Replicated / Server Only
+o Local = never leaves the machine, Replicated = client-authoritative, syncs up then out, Server Only = write-gated to host, syncs out
+o Server-Only writes gated by physical interaction (e.g. pickup) depend on CollisionComponent overlap events (13.5)
+o Property-diff snapshot path for variables, separate fire-once event queue for custom events
+o Has Authority node (Host / Client branches). Always-true when no networking module is active
+o Abstract NetworkBackend interface a networking module registers against, module-gated same as 2.5
+
+### 2.9 Player Component and Camera Control Nodes
+o PlayerComponent ships as default component (like Mesh/Collision/Audio/Camera)
+o Add Movement Input nodes - accumulate, normalize, move actor directly
+o Add Camera Yaw / Add Camera Pitch / Add Camera Roll accumulate into normalized rotation delta
+o Get Camera Yaw / Pitch / Roll to be used with camera or actor rotation
+o Pitch clamp to prevent flip 89°
+
 ---
 
 ## 3. Asset Architecture
@@ -152,6 +173,9 @@ x Instance records: name, class path, transform
 x Save/load round-trip
 x StarMap set as project default map in ProjectSettings
 o Load/unload levels at runtime via graph nodes
+
+### 3.4 Character Convenience (Editor Template, not a class)
+o "Create Character" content-browser template. Plain Actor subclass pre-wired with Player, Collision and Mesh Components
 
 ---
 
@@ -394,31 +418,43 @@ Place all in `StarEngine/Assets/`.
 x Load and display icons in content browser tiles
 o Display logo on top left of the editor
 o Display logo on project browser screen
+o Application Icon
+o Packaged Game Default Icon
 
 ---
 
-## 13. Future Modules
+## 13. Modules
 
 ### 13.1 Audio Module
-o WAV playback, MIDI parsing, SoundFont (SF2) synthesis
-o Adaptive music layer system (N64 style)
+o WAV playback
+o MIDI parsing with Instrument Selection (SoundFont or Sample)
+o SoundFont (SF2) synthesis
 o Audio graph nodes: Play Sound, Stop Sound, Set Volume, Set Pitch
+o Adaptive music layer system
 
 ### 13.2 Networking / Replication Module
-o Replicated variable annotation, automatic variable sync
-o Movement prediction
-o RPC graph nodes, simple lobby/session system
+o Host Lobby node (password input, max player slots)
+o Join Lobby node (password input)
+o Lightweight signaling relay: ephemeral room codes, rate-limited, stateless, no PII stored, sits behind standard DDoS protection
+o Transport: libjuice (MPL 2.0) for STUN/ICE/TURN NAT traversal; custom thin message-framing layer written on top
+o Direct P2P preferred, TURN fallback automatic when hole-punching fails
+o Lobby/project setting: "Direct (P2P + fallback)" and "Always Relay" (hides player IPs from each other, costs relay bandwidth for full session)
+o dev-supplied TURN relay (no StarEngine provided TURN Relay, at least not planned)
+o Listen-host authority model: host is authoritative, snapshot interpolation for remote actors, local prediction only for locally-controlled actor
+o Run on Server / Multicast-equivalent nodes kept as an escape hatch for one-off cases, not the default path
+o Implements the 2.8 NetworkBackend interface; third-party networking modules can implement their own against the same interface
+o Runtime-spawned actor existence replication - separate problem from 2.8 property/event sync
 
 ### 13.3 Physics Module
-o collision shapes, physics graph nodes
+o collision shapes component for overlap events
+o PhysicsComponent: Velocity, gravity scale, mass, drag, linear/angular dampening, etc.
 
-### 13.4 Rendering / Visual Style
-o Simple light sources
-o Generating shadow maps
+### 13.4 Rendering Module 
+o Simple light sources (Point, Rectangle, Spot, Sun, Global)
+o Generating shadow maps option
 o Runtime shadow maps (stencil, no tracing)
-o PSX vertex snapping, affine texture mapping
-o Render scale / pixel art mode, color palette post-process, vhs pixel smear and scan lines
-o Skeletal mesh and animation import
+o PSX vertex snapping, affine texture mapping options
+o Render scale, color palette post-process, vhs pixel smear and scan lines
 
 ### 13.5 Meshes Module
 x Meshes module (src/Modules/Meshes) registers module-gated StaticMesh (.starasset),
@@ -450,6 +486,18 @@ o Content-browser drag-and-drop target inside StargraphEditorPanel
 o Multiple components of same type on one actor; convenience accessors for most recently added
 o Physics/collision response (CollisionComponent is authorable/visual but no movement/overlap)
 
+### 13.6 Skeletal Mesh and Animations
+o Skeletal mesh import with .StarRig
+o Animation import with .StarAnim
+o Animation Preview Tab
+o Animation Graph File to be assigned to Skeletal Meshes inside actors
+
+### 13.7 UI / Widget Module (StarWidget)
+o Create Widget in Content Browser
+o Widget Editor Tab
+o Default Widget Components Buttons, Text, Vertical Box, Horizontal Box, Progress Bar, etc.
+o Create/Add/Remove widgets from viewport at runtime via graph nodes
+
 ---
 
 ## 14. CI / Build
@@ -474,4 +522,3 @@ o Wire double-click on .starasset to open in AssetPreviewTab
 o Center panel: single-mesh viewport using extracted camera/model code
 o Right panel: reuse existing ImportDetailsPanel
 o Top bar: Reimport button re-cooks from stored SourcePath without file browser
-o No-scope: skeletal mesh/animation preview (depends on 13.4)
