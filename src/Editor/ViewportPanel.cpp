@@ -366,7 +366,10 @@ void ViewportPanel::RenderScene() {
     const float placeholderSize = 50.0f;
 
     BeginMode3D(camera);
-    DrawGrid(40, 100.0f);
+
+    if (!playing) {
+        DrawGrid(40, 100.0f);
+    }
 
     if (playing) {
         SceneRenderer::DrawWorldActors(true);
