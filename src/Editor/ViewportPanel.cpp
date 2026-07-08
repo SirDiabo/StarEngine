@@ -477,35 +477,50 @@ void ViewportPanel::RenderToolbar() {
     float btnY = toolbar.y + 3;
 
     if (!playing) {
-Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
-         DrawRectangleRec(playBtn, {30, 130, 60, 255});
-         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
-         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
-             playing = true;
-             savedYaw = yaw;
-             savedPitch = pitch;
-             savedOrbitRadius = orbitRadius;
-             savedCameraTarget = cameraTarget;
-             if (flying) { flying = false; ShowCursor(); }
-             WorldSpawner::SpawnMapActors(starMap);
-             World::Get().BeginPlay();
-         }
-         btnRight -= 26;
-    } else {
-Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
-         DrawRectangleRec(stopBtn, {160, 40, 40, 255});
-         DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
-if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
-              World::Get().EndPlay();
-              yaw = savedYaw;
-              pitch = savedPitch;
-              orbitRadius = savedOrbitRadius;
-              cameraTarget = savedCameraTarget;
-              UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
-              if (flying) { flying = false; ShowCursor(); }
-              playing = false;
-          }
-          btnRight -= 26;
+    Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
+        DrawRectangleRec(playBtn, {30, 130, 60, 255});
+        DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
+            playing = true;
+            savedYaw = yaw;
+            savedPitch = pitch;
+            savedOrbitRadius = orbitRadius;
+            savedCameraTarget = cameraTarget;
+            if (flying) { flying = false; ShowCursor(); }
+            WorldSpawner::SpawnMapActors(starMap);
+            World::Get().BeginPlay();
+            }
+        btnRight -= 26;
+        }
+
+        else {
+        Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
+            DrawRectangleRec(stopBtn, {160, 40, 40, 255});
+            DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
+            World::Get().EndPlay();
+            yaw = savedYaw;
+            pitch = savedPitch;
+            orbitRadius = savedOrbitRadius;
+            cameraTarget = savedCameraTarget;
+            UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
+            if (flying) { flying = false; ShowCursor(); }
+            playing = false;
+            }
+
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            World::Get().EndPlay();
+            yaw = savedYaw;
+            pitch = savedPitch;
+            orbitRadius = savedOrbitRadius;
+            cameraTarget = savedCameraTarget;
+            UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
+            if (flying) { flying = false; ShowCursor(); }
+            playing = false;
+        }
+        btnRight -= 26;
     }
 
     if (mapLoaded) {
@@ -540,10 +555,6 @@ void ViewportPanel::Render() {
 
     if (playing) {
         DrawRectangleLinesEx(bounds, 3, {60, 180, 60, 255});
-        const char* pieLabel = "PLAYING - Press S to Stop";
-        int tw = MeasureText(pieLabel, 12);
-        DrawText(pieLabel, (int)(bounds.x + bounds.width / 2 - tw / 2),
-                 (int)(bounds.y + toolbarHeight + 4), 12, {60, 200, 60, 255});
     }
     RenderToolbar();
 
