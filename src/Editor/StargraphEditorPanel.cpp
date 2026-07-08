@@ -161,6 +161,8 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
 
     graph.AddLink({outputPinId, inputPinId});
     isDirty = true;
+    RefreshWildcardPins(graph.FindNodeByPinId(outputPinId));
+    RefreshWildcardPins(graph.FindNodeByPinId(inputPinId));
     CancelLink();
 }
 

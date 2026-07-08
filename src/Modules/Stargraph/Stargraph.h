@@ -22,6 +22,7 @@ struct Pin {
     bool isOutput = false;
     int id = 0;
     std::string defaultValue;
+    bool isWildcard = false;
 };
 
 struct Node {

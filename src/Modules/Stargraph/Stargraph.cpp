@@ -15,6 +15,9 @@ Node* Stargraph::CreateNode(const std::string& type) {
         nodeTemplate->createPins(node);
     }
 
+    for (Pin& pin : node->inputs)  pin.isWildcard = (pin.type == PinType::Wildcard);
+    for (Pin& pin : node->outputs) pin.isWildcard = (pin.type == PinType::Wildcard);
+
     for (Pin& pin : node->inputs) pin.id = nextPinId++;
     for (Pin& pin : node->outputs) pin.id = nextPinId++;
 
