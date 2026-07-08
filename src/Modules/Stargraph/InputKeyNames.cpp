@@ -27,6 +27,16 @@ const std::vector<std::pair<std::string, int>>& Table() {
         {"F9", KEY_F9}, {"F10", KEY_F10}, {"F11", KEY_F11}, {"F12", KEY_F12},
         {"LEFT_MOUSE", -1}, {"RIGHT_MOUSE", -2}, {"MIDDLE_MOUSE", -3},
         {"MOUSE_WHEEL", -4}, {"MOUSE_X", -5}, {"MOUSE_Y", -6},
+        {"GAMEPAD_FACE_UP", -7}, {"GAMEPAD_FACE_DOWN", -8},
+        {"GAMEPAD_FACE_LEFT", -9}, {"GAMEPAD_FACE_RIGHT", -10},
+        {"GAMEPAD_DPAD_UP", -11}, {"GAMEPAD_DPAD_DOWN", -12},
+        {"GAMEPAD_DPAD_LEFT", -13}, {"GAMEPAD_DPAD_RIGHT", -14},
+        {"GAMEPAD_SHOULDER_L", -15}, {"GAMEPAD_SHOULDER_R", -16},
+        {"GAMEPAD_TRIGGER_L", -17}, {"GAMEPAD_TRIGGER_R", -18},
+        {"GAMEPAD_SPECIAL_L", -19}, {"GAMEPAD_SPECIAL_R", -20},
+        {"GAMEPAD_LEFT_THUMB", -21}, {"GAMEPAD_RIGHT_THUMB", -22},
+        {"GAMEPAD_LEFT_STICK_X", -23}, {"GAMEPAD_LEFT_STICK_Y", -24},
+        {"GAMEPAD_RIGHT_STICK_X", -25}, {"GAMEPAD_RIGHT_STICK_Y", -26},
     };
     return table;
 }}

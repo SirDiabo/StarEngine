@@ -314,8 +314,7 @@ x Mouse buttons (Left, Right, Middle) exposed through Input_Key node as boolean 
 x Mouse wheel exposed through Input_Key node as axis float (-1..1)
 x Mouse X and Mouse Y exposed through Input_Key node as axis floats (-1..1)
 x Key input field renders searchable dropdown with all input names, matching Add Node menu UX
-o Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
-o Make input node Is Held and Axis only appear one at a time (Is Held if input is a button e.g. WASD, Axis if input is an axis e.g. Mouse X or Left Trigger)
+x Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
 
 o Functions with inputs and outputs. Have their own graph with input and return node. (user-named, callable from other graphs)
 o Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
