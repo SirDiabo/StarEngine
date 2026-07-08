@@ -316,6 +316,54 @@ void RegisterMathNodes() {
     };
     NodeRegistry::Get().RegisterNode(vec3Scale);
 
+    NodeTemplate vec3NormalizedDistance;
+    vec3NormalizedDistance.type = "Vec3_Normalized_Distance";
+    vec3NormalizedDistance.category = "Math";
+    vec3NormalizedDistance.moduleName = "Stargraph";
+    vec3NormalizedDistance.createPins = [](Node* node) {
+        node->inputs.push_back({"A", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"B", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Direction", PinType::Vec3, false, true});
+        node->outputs.push_back({"Distance", PinType::Float, false, true});
+    };
+    vec3NormalizedDistance.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 a = {0, 0, 0}, b = {0, 0, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
+            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
+        }
+        Vector3 delta = Vector3Subtract(b, a);
+        float dist = Vector3Length(delta);
+        Vector3 dir = (dist > 0) ? Vector3Scale(delta, 1.0f / dist) : Vector3{0, 0, 0};
+        char buf[64];
+        for (Pin& p : node.outputs) {
+            if (p.name == "Direction") { snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", dir.x, dir.y, dir.z); p.defaultValue = buf; }
+            if (p.name == "Distance")  { snprintf(buf, sizeof(buf), "%g", dist); p.defaultValue = buf; }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(vec3NormalizedDistance);
+
+    NodeTemplate vec3Reflect;
+    vec3Reflect.type = "Vec3_Reflect";
+    vec3Reflect.category = "Math";
+    vec3Reflect.moduleName = "Stargraph";
+    vec3Reflect.createPins = [](Node* node) {
+        node->inputs.push_back({"Vector", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Normal", PinType::Vec3, true, false, 0, "0,1,0"});
+        node->outputs.push_back({"Result", PinType::Vec3, false, true});
+    };
+    vec3Reflect.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 v = {0, 0, 0}, n = {0, 1, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
+            if (p.name == "Normal") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &n.x, &n.y, &n.z);
+        }
+        Vector3 r = Vector3Reflect(v, n);
+        char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(vec3Reflect);
+
     NodeTemplate floatToStr;
     floatToStr.type = "Float_To_String";
     floatToStr.category = "Conversions";
@@ -392,6 +440,73 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(intToFloat);
+
+    NodeTemplate vec3ToStr;
+    vec3ToStr.type = "Vec3_To_String";
+    vec3ToStr.category = "Conversions";
+    vec3ToStr.moduleName = "Stargraph";
+    vec3ToStr.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    vec3ToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+        char buf[64]; snprintf(buf, sizeof(buf), "(%g, %g, %g)", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(vec3ToStr);
+
+    NodeTemplate strToVec3;
+    strToVec3.type = "String_To_Vec3";
+    strToVec3.category = "Conversions";
+    strToVec3.moduleName = "Stargraph";
+    strToVec3.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::String, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Result", PinType::Vec3, false, true});
+    };
+    strToVec3.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name != "Value") continue;
+            std::string s = p.defaultValue;
+            for (char& c : s) if (c == '(' || c == ')') c = ' ';
+            sscanf(s.c_str(), "%f , %f , %f", &x, &y, &z);
+        }
+        char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(strToVec3);
+
+    NodeTemplate boolToFloat;
+    boolToFloat.type = "Bool_To_Float";
+    boolToFloat.category = "Conversions";
+    boolToFloat.moduleName = "Stargraph";
+    boolToFloat.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Boolean, true, false, 0, "false"});
+        node->outputs.push_back({"Result", PinType::Float, false, true});
+    };
+    boolToFloat.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        bool v = false;
+        for (const Pin& p : node.inputs) if (p.name == "Value") v = (p.defaultValue == "true" || p.defaultValue == "1");
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = v ? "1" : "0";
+    };
+    NodeRegistry::Get().RegisterNode(boolToFloat);
+
+    NodeTemplate boolToInt;
+    boolToInt.type = "Bool_To_Int";
+    boolToInt.category = "Conversions";
+    boolToInt.moduleName = "Stargraph";
+    boolToInt.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Boolean, true, false, 0, "false"});
+        node->outputs.push_back({"Result", PinType::Integer, false, true});
+    };
+    boolToInt.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        bool v = false;
+        for (const Pin& p : node.inputs) if (p.name == "Value") v = (p.defaultValue == "true" || p.defaultValue == "1");
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = v ? "1" : "0";
+    };
+    NodeRegistry::Get().RegisterNode(boolToInt);
 
     auto RegisterWildcardFloatUnary = [](const std::string& nodeType, char op) {
         NodeTemplate t;
@@ -822,4 +937,67 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = (a || b) ? "true" : "false";
     };
     NodeRegistry::Get().RegisterNode(boolOr);
+
+    NodeTemplate wildcardEquals;
+    wildcardEquals.type = "Wildcard_Equals";
+    wildcardEquals.category = "Comparisons";
+    wildcardEquals.moduleName = "Stargraph";
+    wildcardEquals.createPins = [](Node* node) {
+        node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
+        node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
+        node->outputs.push_back({"Result", PinType::Boolean, false, true});
+    };
+    wildcardEquals.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        PinType typeA = PinType::Float, typeB = PinType::Float;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "A") {
+                for (const Link& lk : graph.GetLinks()) {
+                    if (lk.inputPinId == p.id) {
+                        for (const Node& n : graph.GetNodes()) {
+                            for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeA = opPin.type; break; }
+                        }
+                        break;
+                    }
+                }
+            }
+            if (p.name == "B") {
+                for (const Link& lk : graph.GetLinks()) {
+                    if (lk.inputPinId == p.id) {
+                        for (const Node& n : graph.GetNodes()) {
+                            for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeB = opPin.type; break; }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        PinType cmpType = (typeA != PinType::Float) ? typeA : typeB;
+        bool result = false;
+        std::string aStr, bStr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "A") aStr = p.defaultValue;
+            if (p.name == "B") bStr = p.defaultValue;
+        }
+
+        if (cmpType == PinType::Vec3) {
+            Vector3 a = {0,0,0}, b = {0,0,0};
+            sscanf(aStr.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
+            sscanf(bStr.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
+            result = fabsf(a.x-b.x) < 0.0001f && fabsf(a.y-b.y) < 0.0001f && fabsf(a.z-b.z) < 0.0001f;
+        } else if (cmpType == PinType::String || cmpType == PinType::Object) {
+            result = aStr == bStr;
+        } else if (cmpType == PinType::Boolean) {
+            bool a = (aStr == "true" || aStr == "1");
+            bool b = (bStr == "true" || bStr == "1");
+            result = a == b;
+        } else if (cmpType == PinType::Integer) {
+            result = atoi(aStr.c_str()) == atoi(bStr.c_str());
+        } else {
+            result = fabsf((float)atof(aStr.c_str()) - (float)atof(bStr.c_str())) < 0.0001f;
+        }
+
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(wildcardEquals);
 }

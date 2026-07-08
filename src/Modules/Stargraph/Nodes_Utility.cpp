@@ -93,4 +93,134 @@ void RegisterUtilityNodes() {
         for (Pin& p : node.outputs) if (p.name == "Delta Time") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getDeltaTime);
+
+    NodeTemplate strConcat;
+    strConcat.type = "String_Concat";
+    strConcat.category = "String";
+    strConcat.moduleName = "Stargraph";
+    strConcat.createPins = [](Node* node) {
+        node->inputs.push_back({"A", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"B", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    strConcat.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string a, b;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "A") a = p.defaultValue;
+            if (p.name == "B") b = p.defaultValue;
+        }
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = a + b;
+    };
+    NodeRegistry::Get().RegisterNode(strConcat);
+
+    NodeTemplate strLength;
+    strLength.type = "String_Length";
+    strLength.category = "String";
+    strLength.moduleName = "Stargraph";
+    strLength.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Length", PinType::Integer, false, true});
+    };
+    strLength.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string in;
+        for (const Pin& p : node.inputs) if (p.name == "In") in = p.defaultValue;
+        for (Pin& p : node.outputs) if (p.name == "Length") p.defaultValue = std::to_string((int)in.size());
+    };
+    NodeRegistry::Get().RegisterNode(strLength);
+
+    NodeTemplate strSubstring;
+    strSubstring.type = "String_Substring";
+    strSubstring.category = "String";
+    strSubstring.moduleName = "Stargraph";
+    strSubstring.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Start", PinType::Integer, true, false, 0, "0"});
+        node->inputs.push_back({"Length", PinType::Integer, true, false, 0, "0"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    strSubstring.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string in;
+        int start = 0, length = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "In") in = p.defaultValue;
+            if (p.name == "Start") start = atoi(p.defaultValue.c_str());
+            if (p.name == "Length") length = atoi(p.defaultValue.c_str());
+        }
+        std::string result;
+        if (start >= 0 && start < (int)in.size() && length > 0) {
+            result = in.substr(start, length);
+        }
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result;
+    };
+    NodeRegistry::Get().RegisterNode(strSubstring);
+
+    NodeTemplate strFind;
+    strFind.type = "String_Find";
+    strFind.category = "String";
+    strFind.moduleName = "Stargraph";
+    strFind.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Search", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Index", PinType::Integer, false, true});
+    };
+    strFind.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string in, search;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "In") in = p.defaultValue;
+            if (p.name == "Search") search = p.defaultValue;
+        }
+        size_t pos = in.find(search);
+        int result = (pos == std::string::npos) ? -1 : (int)pos;
+        for (Pin& p : node.outputs) if (p.name == "Index") p.defaultValue = std::to_string(result);
+    };
+    NodeRegistry::Get().RegisterNode(strFind);
+
+    NodeTemplate strReplace;
+    strReplace.type = "String_Replace";
+    strReplace.category = "String";
+    strReplace.moduleName = "Stargraph";
+    strReplace.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Find", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Replace_With", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    strReplace.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string in, find, replaceWith;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "In") in = p.defaultValue;
+            if (p.name == "Find") find = p.defaultValue;
+            if (p.name == "Replace_With") replaceWith = p.defaultValue;
+        }
+        std::string result = in;
+        if (!find.empty()) {
+            size_t pos = 0;
+            while ((pos = result.find(find, pos)) != std::string::npos) {
+                result.replace(pos, find.size(), replaceWith);
+                pos += replaceWith.size();
+            }
+        }
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result;
+    };
+    NodeRegistry::Get().RegisterNode(strReplace);
+
+    NodeTemplate strContains;
+    strContains.type = "String_Contains";
+    strContains.category = "String";
+    strContains.moduleName = "Stargraph";
+    strContains.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Search", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Result", PinType::Boolean, false, true});
+    };
+    strContains.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string in, search;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "In") in = p.defaultValue;
+            if (p.name == "Search") search = p.defaultValue;
+        }
+        bool result = in.find(search) != std::string::npos;
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(strContains);
 }

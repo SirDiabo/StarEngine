@@ -236,8 +236,8 @@ x Delete selected node(s) with Delete key
 x Box/drag selection with visual rectangle
 x Multi-node move together
 x Ctrl+click node to add/remove from selection
-o Ctrl+D to duplicate selected node(s)
-o Ctrl+C and Ctrl+V to copy selected nodes and paste to cursor position
+x Ctrl+D to duplicate selected node(s)
+x Ctrl+C and Ctrl+V to copy selected nodes and paste to cursor position
 
 ### 5.3 Pin and Wire Interaction
 x Click pin to start wire, release on compatible pin to connect
@@ -331,10 +331,10 @@ x Int: Random Int, Random Int in Range
 x Wildcard: Abs, Min, Max, Clamp, Modulo
 x Vec3: Length, Normalize, Dot, Cross, Distance, Scale
 x Vec3: Make (X, Y, Z -> Vec3), Break (Vec3 -> X, Y, Z)
-o Vec3: Normalized Distance, Reflect
-o String: Concat, Length, Substring, Find, Replace, Contains
-o Conversions: Vec3 to String, String to Vec3, Bool to Float, Bool to Int
-o Comparisons: Wildcard_Equals
+x Vec3: Normalized Distance, Reflect
+x String: Concat, Length, Substring, Find, Replace, Contains
+x Conversions: Vec3 to String, String to Vec3, Bool to Float, Bool to Int
+/ Comparisons: Wildcard_Equals, Greater Than, Less Than, Greater or Equal, Less or Equal
 
 ### 7.4 Actor Self-Reference Nodes
 x Get_Actor_Location (pure, reads ctx.actor->position)
@@ -429,7 +429,7 @@ o Fall back to build-from-source packaging with a clear message when no matching
 | Middle-click drag | Orbit | [x] |
 | Scroll wheel | Dolly zoom | [x] |
 | F | Focus on selected actor | [x] |
-| Alt + Left drag | Orbit (alternative) | [ ] |
+| Alt + Left drag | Orbit (alternative) | [x] |
 
 ---
 
