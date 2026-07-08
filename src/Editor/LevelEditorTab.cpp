@@ -29,6 +29,7 @@ void LevelEditorTab::Initialize() {
     modulePanel->Initialize();
 
     modulePanel->SetLogPanel(logPanel);
+    viewportPanel->SetLogPanel(logPanel);
 
     // Wire viewport -> details and outliner selection pointers.
     detailsPanel->starMap            = viewportPanel->GetStarMap();

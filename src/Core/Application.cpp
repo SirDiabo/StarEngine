@@ -21,7 +21,13 @@ static LogPanel* activeLogPanel = nullptr;
 static void ForwardTraceLogToPanel(int logLevel, const char* text, va_list args) {
     char buffer[512];
     vsnprintf(buffer, sizeof(buffer), text, args);
-    if (activeLogPanel) activeLogPanel->AddLog(buffer);
+    if (!activeLogPanel) return;
+
+    LogLevel level = LogLevel::Info;
+    if (logLevel == LOG_WARNING) level = LogLevel::Warning;
+    else if (logLevel == LOG_ERROR || logLevel == LOG_FATAL) level = LogLevel::Error;
+
+    activeLogPanel->AddLog(buffer, level);
 }
 
 static bool CreateProject(const std::string& name) {

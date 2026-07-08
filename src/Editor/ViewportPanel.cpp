@@ -8,6 +8,7 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
+#include "LogPanel.h"
 #include "raygui.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -495,6 +496,7 @@ void ViewportPanel::RenderToolbar() {
             if (flying) { flying = false; ShowCursor(); }
             WorldSpawner::SpawnMapActors(starMap);
             World::Get().BeginPlay();
+            if (logPanel) playLogStart = logPanel->GetTotalLogCount();
             }
         btnRight -= 26;
         }
@@ -536,6 +538,26 @@ void ViewportPanel::RenderToolbar() {
     }
 }
 
+void ViewportPanel::RenderPlayLogOverlay(Rectangle client) {
+    if (!logPanel) return;
+    std::vector<LogEntry> entries = logPanel->GetLogsSince(playLogStart);
+    if (entries.empty()) return;
+
+    const int maxLines = 8;
+    int start = (int)entries.size() > maxLines ? (int)entries.size() - maxLines : 0;
+
+    float x = client.x + 8;
+    float y = client.y + 6;
+    for (int i = start; i < (int)entries.size(); i++) {
+        const LogEntry& e = entries[i];
+        Color color = { 210, 210, 210, 230 };
+        if (e.level == LogLevel::Warning) color = { 240, 200, 60, 230 };
+        else if (e.level == LogLevel::Error) color = { 230, 80, 80, 230 };
+        DrawText(e.message.c_str(), (int)x, (int)y, 11, color);
+        y += 14;
+    }
+}
+
 void ViewportPanel::Render() {
     Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
@@ -560,10 +582,11 @@ void ViewportPanel::Render() {
 
     if (playing) {
         DrawRectangleLinesEx(bounds, 3, {60, 180, 60, 255});
+        RenderPlayLogOverlay(client);
     }
     RenderToolbar();
 
-    if (mapLoaded && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
+    if (!playing && mapLoaded && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
         char info[128];
         snprintf(info, sizeof(info), "%s (%s)", inst.name.c_str(), inst.className.c_str());

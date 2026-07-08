@@ -148,7 +148,7 @@ void ModuleBrowserPanel::ImportModule() {
     } else {
         statusMessage = "Build failed. See log for details.";
         if (logPanel) {
-            logPanel->AddLog("[Build Error] " + result.error);
+            logPanel->AddLog("[Build Error] " + result.error, LogLevel::Error);
             logPanel->AddLog(result.output);
         }
     }

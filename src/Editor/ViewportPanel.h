@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 class Actor;
+class LogPanel;
 
 class ViewportPanel : public Panel {
 public:
@@ -25,6 +26,8 @@ public:
 
     bool IsPlaying() const { return playing; }
 
+    void SetLogPanel(LogPanel* panel) { logPanel = panel; }
+
     void InvalidateClassGraph(const std::string& graphAssetPath);
 
 private:
@@ -32,6 +35,7 @@ private:
     void UpdateCamera(Rectangle client);
     void RenderScene();
     void RenderToolbar();
+    void RenderPlayLogOverlay(Rectangle client);
     void HandleMapInteraction(Rectangle client);
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
@@ -51,6 +55,8 @@ private:
     int selectedActorIndex = -1;
 
     bool playing = false;
+    LogPanel* logPanel = nullptr;
+    int playLogStart = 0;
 
     bool flying = false;
     bool orbiting = false;

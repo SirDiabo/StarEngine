@@ -384,7 +384,7 @@ x Input nodes read from raylib keyboard state during tick
 x Stop button cleanly destroys all runtime actors and restores editor state
 x Camera returns to editor view on stop
 x Log panel shows runtime output during play
-o Editor only box that shows warnings, errors and prints on the top left of the viewport 
+x Editor only box that shows warnings, errors and prints on the top left of the viewport 
 
 ---
 
