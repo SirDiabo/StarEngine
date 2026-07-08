@@ -300,12 +300,14 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         if (orbitRadius < 100.0f) orbitRadius = 100.0f;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) && CheckCollisionPointRec(mp, client) && !playing) {
+    bool altOrbitHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+    if ((IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) || (altOrbitHeld && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)))
+        && CheckCollisionPointRec(mp, client) && !playing) {
         orbiting = true;
         orbitStart = mp;
     }
     if (orbiting) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) || (altOrbitHeld && IsMouseButtonDown(MOUSE_BUTTON_LEFT))) {
             Vector2 delta = {mp.x - orbitStart.x, mp.y - orbitStart.y};
             yaw   -= delta.x * 0.4f;
             pitch += delta.y * 0.4f;
@@ -412,7 +414,7 @@ void ViewportPanel::RenderScene() {
 }
 
 void ViewportPanel::HandleMapInteraction(Rectangle client) {
-    if (!mapLoaded || flying) return;
+    if (!mapLoaded || flying || orbiting) return;
     Vector2 mp = GetMousePosition();
     if (!CheckCollisionPointRec(mp, client)) return;
 
