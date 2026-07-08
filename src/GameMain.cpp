@@ -46,6 +46,15 @@ int main(int argc, char* argv[]) {
     InitWindow(config.targetWidth, config.targetHeight, config.name.c_str());
     SetTargetFPS(60);
 
+    fs::path iconPath = exeDir / "icon.png";
+    if (fs::exists(iconPath)) {
+        Image icon = LoadImage(iconPath.string().c_str());
+        if (icon.data) {
+            SetWindowIcon(icon);
+            UnloadImage(icon);
+        }
+    }
+
     StarMap map;
     if (!config.defaultMap.empty()) map.LoadFromFile(config.defaultMap);
     WorldSpawner::SpawnMapActors(map);

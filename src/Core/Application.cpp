@@ -46,6 +46,24 @@ bool Application::Initialize(int argc, char* argv[]) {
     SetExitKey(0);
     SetTargetFPS(60);
 
+    {
+        fs::path candidates[] = {
+            fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
+            fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
+            fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
+        };
+        for (const auto& p : candidates) {
+            if (fs::exists(p)) {
+                Image icon = LoadImage(p.string().c_str());
+                if (icon.data) {
+                    SetWindowIcon(icon);
+                    UnloadImage(icon);
+                }
+                break;
+            }
+        }
+    }
+
     editor = new Editor();
     editor->Initialize();
 

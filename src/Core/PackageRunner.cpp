@@ -185,6 +185,13 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
         return result;
     }
 
+    fs::path defaultIcon = engineRoot / "Assets" / "logo.png";
+    if (fs::exists(defaultIcon)) {
+        fs::copy_file(defaultIcon, fs::path(options.outputDir) / "icon.png",
+                       fs::copy_options::overwrite_existing, ec);
+        ec.clear();
+    }
+
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
     fs::path outputContentDir = fs::path(options.outputDir) / "Content";
     std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();

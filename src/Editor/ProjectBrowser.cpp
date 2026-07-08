@@ -50,8 +50,29 @@ bool ProjectBrowser::IsNameUnique(const std::string& name) const {
     return true;
 }
 
+void ProjectBrowser::LoadLogoIfNeeded() {
+    if (logoLoadAttempted) return;
+    logoLoadAttempted = true;
+
+    fs::path candidates[] = {
+        fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
+        fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
+        fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
+    };
+    for (const auto& p : candidates) {
+        if (fs::exists(p)) {
+            logo = LoadTexture(p.string().c_str());
+            if (logo.id != 0) {
+                logoLoaded = true;
+                break;
+            }
+        }
+    }
+}
+
 void ProjectBrowser::Render() {
     if (!visible) return;
+    LoadLogoIfNeeded();
 
     int width = GetScreenWidth();
     int height = GetScreenHeight();
@@ -61,7 +82,14 @@ void ProjectBrowser::Render() {
     DrawRectangleRec(modal, {40, 40, 40, 255});
     DrawRectangleLinesEx(modal, 1, GRAY);
 
-    DrawText("Project Browser", (int)modal.x + 10, (int)modal.y + 10, 20, WHITE);
+    float titleX = modal.x + 10;
+    if (logoLoaded && logo.id != 0) {
+        float iconSize = 24.0f;
+        DrawTexturePro(logo, {0, 0, (float)logo.width, (float)logo.height},
+                       {modal.x + 10, modal.y + 8, iconSize, iconSize}, {0, 0}, 0.0f, WHITE);
+        titleX += iconSize + 8;
+    }
+    DrawText("Project Browser", (int)titleX, (int)modal.y + 10, 20, WHITE);
 
     Rectangle newBtn = { (float)(int)modal.x + 10, (float)(int)modal.y + 40, 120, 25 };
     if (GuiButton(newBtn, "New Project")) {

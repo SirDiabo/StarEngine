@@ -1,6 +1,9 @@
 #include "MenuBar.h"
 #include "raygui.h"
 #include "raylib.h"
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 static const Color COLOR_MENUBAR_BG = { 45, 45, 48, 255 };
 static const Color COLOR_MENU_POPUP = { 55, 55, 60, 255 };
@@ -12,7 +15,23 @@ static const float MENU_POPUP_W     = 160.0f;
 static const float MENU_BTN_PAD     = 10.0f;
 static const float MENU_CHECK_W     = 16.0f;
 
-void MenuBar::Initialize() {}
+void MenuBar::Initialize() {
+    fs::path candidates[] = {
+        fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
+        fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
+        fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
+    };
+    for (const auto& p : candidates) {
+        if (fs::exists(p)) {
+            logo = LoadTexture(p.string().c_str());
+            if (logo.id != 0) {
+                logoLoaded = true;
+                logoOffsetX = menuBarHeight - 4.0f + 6.0f;
+                break;
+            }
+        }
+    }
+}
 
 void MenuBar::SetMenus(const std::vector<MenuEntry>& entries) {
     menus    = entries;
@@ -25,7 +44,7 @@ void MenuBar::SetActionCallback(MenuActionFn fn) {
 
 // Returns the screen-space X position of the left edge of menu button i.
 float MenuBar::GetMenuButtonX(int index) const {
-    float x = 4.0f;
+    float x = logoOffsetX;
     for (int i = 0; i < index; i++) {
         float textW = (float)MeasureText(menus[i].label.c_str(), 11);
         x += textW + MENU_BTN_PAD * 2 + 2;
@@ -38,8 +57,14 @@ void MenuBar::RenderBar() {
     int screenW = GetScreenWidth();
     DrawRectangleRec({ 0, 0, (float)screenW, menuBarHeight }, COLOR_MENUBAR_BG);
 
+    if (logoLoaded && logo.id != 0) {
+        float iconSize = menuBarHeight - 4.0f;
+        DrawTexturePro(logo, {0, 0, (float)logo.width, (float)logo.height},
+                       {2, 2, iconSize, iconSize}, {0, 0}, 0.0f, WHITE);
+    }
+
     Vector2 mouse = GetMousePosition();
-    float offsetX = 4.0f;
+    float offsetX = logoOffsetX;
 
     for (int i = 0; i < (int)menus.size(); i++) {
         const std::string& label = menus[i].label;
@@ -74,7 +99,7 @@ void MenuBar::RenderPopup() {
     // Dismiss when clicking outside the popup and outside the bar buttons.
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         bool onBarBtn = false;
-        float ox = 4.0f;
+        float ox = logoOffsetX;
         for (int i = 0; i < (int)menus.size(); i++) {
             float textW = (float)MeasureText(menus[i].label.c_str(), 11);
             float btnW  = textW + MENU_BTN_PAD * 2;

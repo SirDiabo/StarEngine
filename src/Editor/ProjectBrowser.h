@@ -1,4 +1,5 @@
 #pragma once
+#include "raylib.h"
 #include <string>
 #include <vector>
 
@@ -35,5 +36,10 @@ private:
     std::vector<ProjectInfo> projects;
     char newProjectName[256] = "";
 
+    Texture2D logo{};
+    bool logoLoaded = false;
+    bool logoLoadAttempted = false;
+
     void ScanProjects();
+    void LoadLogoIfNeeded();
 };

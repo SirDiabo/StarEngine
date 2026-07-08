@@ -1,4 +1,5 @@
 #pragma once
+#include "raylib.h"
 #include <string>
 #include <vector>
 #include <functional>
@@ -39,4 +40,8 @@ private:
     std::vector<MenuEntry> menus;
     MenuActionFn onAction;
     float menuBarHeight = 20.0f;
+
+    Texture2D logo{};
+    bool logoLoaded = false;
+    float logoOffsetX = 4.0f;
 };
