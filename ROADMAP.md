@@ -309,13 +309,16 @@ x Replace Float/Int/Vec3 math nodes with single wildcard Add/Subtract/Multiply/D
 
 ### 7.1 Events
 x Event_BeginPlay, Event_Tick (Delta Seconds), Event_EndPlay
-o Custom Event nodes (user-named, callable from other graphs)
 x Input_Key node supporting keyboard keys via searchable key dropdown
 x Mouse buttons (Left, Right, Middle) exposed through Input_Key node as boolean held
 x Mouse wheel exposed through Input_Key node as axis float (-1..1)
 x Mouse X and Mouse Y exposed through Input_Key node as axis floats (-1..1)
 x Key input field renders searchable dropdown with all input names, matching Add Node menu UX
 o Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
+o Make input node Is Held and Axis only appear one at a time (Is Held if input is a button e.g. WASD, Axis if input is an axis e.g. Mouse X or Left Trigger)
+
+o Functions with inputs and outputs. Have their own graph with input and return node. (user-named, callable from other graphs)
+o Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence
@@ -455,11 +458,12 @@ o Packaged Game Default Icon
 ## 13. Modules
 
 ### 13.1 Audio Module
-o WAV playback
-o MIDI parsing with Instrument Selection (SoundFont or Sample)
-o SoundFont (SF2) synthesis
+o Move existing Audio Component to Module
+o WAV import and playback
+o MIDI import and parsing with Instrument Selection (SoundFont or Sample)
+o SoundFont (SF2) import and synthesis
 o Audio graph nodes: Play Sound, Stop Sound, Set Volume, Set Pitch
-o Adaptive music layer system
+o Adaptive music layer system that allows you to play multiple tracks to be controlled individually, add loop regions and exit events for easy transitioning
 
 ### 13.2 Networking / Replication Module
 o Host Lobby node (password input, max player slots)

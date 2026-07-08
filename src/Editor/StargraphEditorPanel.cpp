@@ -834,9 +834,6 @@ void StargraphEditorPanel::RenderLeftPanel() {
     sectionHeader("Functions");
 
     y += 8;
-    sectionHeader("Macros");
-
-    y += 8;
     sectionHeader("Variables");
 
     std::vector<Variable>& vars = graph.GetVariables();
