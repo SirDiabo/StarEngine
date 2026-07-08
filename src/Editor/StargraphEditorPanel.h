@@ -38,6 +38,7 @@ private:
     void DeleteSelected();
     void CopySelectedNodes();
     void PasteNodes();
+    void DuplicateSelected();
 
     bool PinsCompatible(int outputPinId, int inputPinId) const;
     Vector2 GetPinPos(const Node& node, const Pin& pin) const;

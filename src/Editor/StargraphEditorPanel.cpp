@@ -427,6 +427,72 @@ void StargraphEditorPanel::PasteNodes() {
     isDirty = true;
 }
 
+void StargraphEditorPanel::DuplicateSelected() {
+    std::vector<int> nodesToDup = selectedNodeIds;
+    if (selectedNodeId != -1 && std::find(selectedNodeIds.begin(), selectedNodeIds.end(), selectedNodeId) == selectedNodeIds.end()) {
+        nodesToDup.push_back(selectedNodeId);
+    }
+    if (nodesToDup.empty()) return;
+
+    const float offset = 32.0f;
+    std::vector<int> oldIds;
+    std::vector<Node*> newNodes;
+
+    for (int nodeId : nodesToDup) {
+        const Node* src = nullptr;
+        for (const Node& n : graph.GetNodes()) if (std::stoi(n.id) == nodeId) { src = &n; break; }
+        if (!src) continue;
+
+        Node* node = graph.CreateNode(src->type);
+        if (!node) continue;
+        node->title = src->title;
+        node->posX = src->posX + offset;
+        node->posY = src->posY + offset;
+
+        for (const Pin& sp : src->inputs) {
+            for (Pin& p : node->inputs) {
+                if (p.name != sp.name) continue;
+                p.defaultValue = sp.defaultValue;
+                if (p.type == PinType::Wildcard) p.type = sp.type;
+            }
+        }
+        for (const Pin& sp : src->outputs) {
+            for (Pin& p : node->outputs) {
+                if (p.name == sp.name && p.type == PinType::Wildcard) p.type = sp.type;
+            }
+        }
+
+        oldIds.push_back(nodeId);
+        newNodes.push_back(node);
+    }
+
+    for (const Link& link : graph.GetLinks()) {
+        int fromNodeId = -1, toNodeId = -1;
+        std::string fromPinName, toPinName;
+        for (const Node& node : graph.GetNodes()) {
+            for (const Pin& pin : node.outputs) if (pin.id == link.outputPinId) { fromNodeId = std::stoi(node.id); fromPinName = pin.name; }
+            for (const Pin& pin : node.inputs) if (pin.id == link.inputPinId) { toNodeId = std::stoi(node.id); toPinName = pin.name; }
+        }
+
+        int fromIdx = (int)(std::find(oldIds.begin(), oldIds.end(), fromNodeId) - oldIds.begin());
+        int toIdx = (int)(std::find(oldIds.begin(), oldIds.end(), toNodeId) - oldIds.begin());
+        if (fromIdx >= (int)oldIds.size() || toIdx >= (int)oldIds.size()) continue;
+
+        Node* fromDup = newNodes[fromIdx];
+        Node* toDup = newNodes[toIdx];
+        int outPinId = -1, inPinId = -1;
+        for (const Pin& p : fromDup->outputs) if (p.name == fromPinName) { outPinId = p.id; break; }
+        for (const Pin& p : toDup->inputs) if (p.name == toPinName) { inPinId = p.id; break; }
+        if (outPinId != -1 && inPinId != -1) graph.AddLink({outPinId, inPinId});
+    }
+
+    selectedNodeIds.clear();
+    for (Node* n : newNodes) selectedNodeIds.push_back(std::stoi(n->id));
+    selectedNodeId = newNodes.empty() ? -1 : std::stoi(newNodes.back()->id);
+
+    isDirty = true;
+}
+
 void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1 && selectedNodeIds.empty()) return;
 
@@ -1688,6 +1754,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     if (IsKeyDown(KEY_LEFT_CONTROL) && editingPinId == 0) {
         if (IsKeyPressed(KEY_C)) CopySelectedNodes();
         else if (IsKeyPressed(KEY_V)) PasteNodes();
+        else if (IsKeyPressed(KEY_D)) DuplicateSelected();
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
