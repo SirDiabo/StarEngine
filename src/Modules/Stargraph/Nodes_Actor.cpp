@@ -317,4 +317,58 @@ void RegisterActorNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(spawnActor);
+
+    NodeTemplate getShowMouseCursor;
+    getShowMouseCursor.type = "Get_Show_Mouse_Cursor";
+    getShowMouseCursor.category = "Actor";
+    getShowMouseCursor.moduleName = "Stargraph";
+    getShowMouseCursor.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Show", PinType::Boolean, false, true});
+    };
+    getShowMouseCursor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        for (Pin& p : node.outputs) if (p.name == "Show") {
+            p.defaultValue = target->showMouseCursor ? "1" : "0";
+            break;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getShowMouseCursor);
+
+    NodeTemplate setShowMouseCursor;
+    setShowMouseCursor.type = "Set_Show_Mouse_Cursor";
+    setShowMouseCursor.category = "Actor";
+    setShowMouseCursor.moduleName = "Stargraph";
+    setShowMouseCursor.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Show", PinType::Boolean, true, false, 0, "1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setShowMouseCursor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Show") {
+                target->showMouseCursor = (p.defaultValue == "1" || p.defaultValue == "true");
+                break;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setShowMouseCursor);
 }

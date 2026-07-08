@@ -21,6 +21,7 @@ void Actor::GetProperties(PropertyList& outProperties) {
     outProperties.AddVector3("Position", &position.x);
     outProperties.AddVector3("Rotation", &rotation.x);
     outProperties.AddVector3("Scale", &scale.x);
+    outProperties.AddBool("Show Mouse Cursor", &showMouseCursor);
 }
 
 void Actor::SetGraphBehavior(GraphBehavior* behavior) {

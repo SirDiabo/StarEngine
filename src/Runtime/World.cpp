@@ -37,6 +37,21 @@ void World::Tick(float deltaTime) {
     for (size_t i = 0; i < actors.size(); i++) {
         actors[i]->Tick(deltaTime);
     }
+
+    bool shouldLockMouse = false;
+    for (const auto& actor : actors) {
+        if (!actor->showMouseCursor) {
+            shouldLockMouse = true;
+            break;
+        }
+    }
+    if (shouldLockMouse) {
+        HideCursor();
+        SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
+    } else {
+        ShowCursor();
+    }
+
     FlushDestroyQueue();
 }
 
@@ -47,6 +62,7 @@ void World::EndPlay() {
     }
     FlushDestroyQueue();
     playing = false;
+    ShowCursor();
 }
 
 void World::FlushDestroyQueue() {
