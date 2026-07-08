@@ -296,8 +296,8 @@ x Exec, Boolean, Integer, Float, String, Vec3, Object
 ### 6.2 Wildcard Type
 x PinType::Wildcard - hollow diamond, light gray unresolved
 x Adopts color/type of first connected typed pin
-o All wildcard pins on same node resolve together
-o Disconnecting resets to unresolved
+x All wildcard pins on same node resolve together
+x Disconnecting resets to unresolved
 x Executor resolves wildcards before evaluating
 
 ### 6.3 Node Consolidation (post-wildcard)
@@ -337,7 +337,7 @@ x Vec3: Make (X, Y, Z -> Vec3), Break (Vec3 -> X, Y, Z)
 x Vec3: Normalized Distance, Reflect
 x String: Concat, Length, Substring, Find, Replace, Contains
 x Conversions: Vec3 to String, String to Vec3, Bool to Float, Bool to Int
-/ Comparisons: Wildcard_Equals, Greater Than, Less Than, Greater or Equal, Less or Equal
+x Comparisons: Wildcard_Equals, Greater Than, Less Than, Greater or Equal, Less or Equal
 
 ### 7.4 Actor Self-Reference Nodes
 x Get_Actor_Location (pure, reads ctx.actor->position)
@@ -448,10 +448,10 @@ Place all in `StarEngine/Assets/`.
 | `icon_asset.png` | 32x32 RGBA | [x] |
 
 x Load and display icons in content browser tiles
-o Display logo on top left of the editor
-o Display logo on project browser screen
-o Application Icon
-o Packaged Game Default Icon
+x Display logo on top left of the editor
+x Display logo on project browser screen
+x Application Icon
+x Packaged Game Default Icon
 
 ---
 
