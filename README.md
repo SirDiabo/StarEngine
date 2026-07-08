@@ -37,7 +37,7 @@ Core functionality is separated into loadable modules. Each module extends the e
 
 - Core - Application framework, module system
 - Audio - Sound and music handling
-- Particles - Particle system (separate module)
+- Particles - Particle system
 - Renderer - Rendering utilities
 - Input - Input mapping and handling
 - Stargraph - Visual scripting system
@@ -51,6 +51,11 @@ src/
   Modules/                      - Loadable engine modules
   Runtime/                      - Runtime components
 ```
+
+## Design Principles
+
+- All asset formats are plain text, git-diffable and mergeable, unless there's a hard technical reason otherwise.
+- Project-level named registries (Input Mappings, Save Files, Languages) share one pattern: configured once at the project level, referenced by dropdown wherever needed. New systems needing this shape should reuse it.
 
 ## Stargraph System
 

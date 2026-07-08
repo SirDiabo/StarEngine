@@ -77,6 +77,7 @@ x PropertyFields slots (src/Editor/PropertyFields.h/.cpp): FloatBox, IntBox, Str
 x Fix raygui quirk where global cursor-index shared across text boxes; force-activates fields so cursor appears at text end
 x Click-drag-to-scrub on FloatBox/IntBox
 o Array-of-fields wrapper - deferred until array-typed variables exist; just loops existing fields with an incrementing id
+o Registry-reference dropdown field (project-level named lists: Save Files, Languages, etc.), with inline create-new
 
 ---
 
@@ -147,6 +148,21 @@ o Add Camera Yaw / Add Camera Pitch / Add Camera Roll accumulate into normalized
 o Get Camera Yaw / Pitch / Roll to be used with camera or actor rotation
 o Pitch clamp to prevent flip 89°
 
+### 2.10 Save / Load System
+o Save flag on variables and component fields (similar to 2.8)
+o Project-level Save Files registry (name, encrypted, portable) - per-variable field picks a name, doesn't restate file settings
+o PIE Save files live in the project's existing Saved/ directory, Packaged in common OS save directories (AppData, .local, etc.)
+o Save All / Save Variable (dropdown-picked) nodes (Self Scoped. Each Actor saves its own stuff)
+o Load File / Load All nodes
+
+### 2.11 Input Component and Mapping
+o InputComponent: authored list of named mappings (name, default key) in Details panel
+o Mapping types: Bool (button), Axis (scalar), Axis2D (reuses Vec3, Z unused)
+o Auto-generates graph nodes per mapping (e.g. "Key Jump"), built on existing Input_Key polling
+o Generated nodes scoped to graphs of actor classes that own the relevant InputComponent (extends 5.4 Add Node filtering)
+o Get InputComponent + Override Input node for runtime rebinding
+o Rebind overrides are Save-flaggable (2.10) for persistence across sessions
+
 ---
 
 ## 3. Asset Architecture
@@ -174,8 +190,16 @@ x Save/load round-trip
 x StarMap set as project default map in ProjectSettings
 o Load/unload levels at runtime via graph nodes
 
-### 3.4 Character Convenience (Editor Template, not a class)
-o "Create Character" content-browser template. Plain Actor subclass pre-wired with Player, Collision and Mesh Components
+### 3.4 Actor Composition (Child Actor Component)
+o ChildActorComponent: references a StarActor class, spawns as a real child Actor via existing World lifecycle
+o Positioned via existing relative-transform hierarchy (Component parent/position/rotation/scale)
+o No per-instance property overrides 'yet' (deferred, not forgotten)
+o Cycle detection (prevent child actor to spawn infinite child actor loop)
+
+### 3.5 Actor SubClasses
+o Right clicking a .staractor in Content Browser lets you create a Sub Class
+o Subclass Actors retain all of Parents logic, letting you build on top of it.
+o "Create Character" content-browser template. Actor subclass pre-wired with Player, Collision and Mesh Components.
 
 ---
 
@@ -257,6 +281,11 @@ x Variable values snapshot before play, restored after stop
 o Compile button (validate graph, report errors to log)
 o Graph breadcrumb trail for sub-graphs
 
+### 5.8 Undo / Redo
+o Generic command/undo-stack abstraction, not Stargraph-specific internally
+o First application: node move/create/delete, wire connect/disconnect
+o Viewport and Details panel edits register against the same stack later, not a separate system
+
 ---
 
 ## 6. Variables and Pin Types
@@ -285,7 +314,6 @@ x Input_Key node supporting keyboard keys via searchable key dropdown
 x Mouse buttons (Left, Right, Middle) exposed through Input_Key node as boolean held
 x Mouse wheel exposed through Input_Key node as axis float (-1..1)
 x Mouse X and Mouse Y exposed through Input_Key node as axis floats (-1..1)
-x Get_Axis_Horizontal, Get_Axis_Vertical (returns -1..1 float, WASD + arrows)
 x Key input field renders searchable dropdown with all input names, matching Add Node menu UX
 o Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
 
@@ -340,6 +368,7 @@ x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
 o Wildcard type resolution at runtime
 o Async nodes (Delay, latent actions)
+o Bytecode compilation as a lower-risk option if profiling shows Stargraph is an actual bottleneck
 
 ---
 
@@ -497,6 +526,15 @@ o Create Widget in Content Browser
 o Widget Editor Tab
 o Default Widget Components Buttons, Text, Vertical Box, Horizontal Box, Progress Bar, etc.
 o Create/Add/Remove widgets from viewport at runtime via graph nodes
+
+### 13.8 Localization Module
+o Project-level Languages registry
+o String Table asset (Key -> text per language), text fields reference a key rather than storing translations inline
+o JSON/CSV export/import of the String Table for translators
+o Runtime Set Language node listing registered language options
+
+### 13.9 StarScript Module
+o Simplified text-based scripting language, alternative to Stargraph
 
 ---
 
