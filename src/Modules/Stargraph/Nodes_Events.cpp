@@ -70,13 +70,9 @@ void RegisterEventNodes() {
             held = axis != 0.0f;
         } else if (keyName == "MOUSE_X") {
             axis = GetMouseDelta().x * -1.0f;
-            if (axis > 1.0f) axis = 1.0f;
-            if (axis < -1.0f) axis = -1.0f;
             held = axis != 0.0f;
         } else if (keyName == "MOUSE_Y") {
             axis = GetMouseDelta().y * -1.0f;
-            if (axis > 1.0f) axis = 1.0f;
-            if (axis < -1.0f) axis = -1.0f;
             held = axis != 0.0f;
         } else if (keyName.rfind("GAMEPAD_", 0) == 0) {
             const int pad = 0;

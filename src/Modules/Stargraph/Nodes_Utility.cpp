@@ -1,5 +1,8 @@
 #include "Nodes_Utility.h"
 #include "NodeRegistry.h"
+#include "Runtime/World.h"
+#include "Runtime/Actor.h"
+#include "Runtime/Components/CameraComponent.h"
 #include "raylib.h"
 #include <cstdlib>
 #include <filesystem>
@@ -261,6 +264,24 @@ void RegisterUtilityNodes() {
         for (Pin& p : node.outputs) if (p.name == "Y") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getMousePos);
+
+    NodeTemplate getMouseDelta;
+    getMouseDelta.type = "Get_Mouse_Delta";
+    getMouseDelta.category = "Input";
+    getMouseDelta.moduleName = "Stargraph";
+    getMouseDelta.createPins = [](Node* node) {
+        node->outputs.push_back({"X", PinType::Float, false, true});
+        node->outputs.push_back({"Y", PinType::Float, false, true});
+    };
+    getMouseDelta.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector2 delta = GetMouseDelta();
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%g", delta.x);
+        for (Pin& p : node.outputs) if (p.name == "X") p.defaultValue = buf;
+        snprintf(buf, sizeof(buf), "%g", delta.y);
+        for (Pin& p : node.outputs) if (p.name == "Y") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getMouseDelta);
 
     NodeTemplate getFPS;
     getFPS.type = "Get_FPS";
@@ -716,4 +737,162 @@ void RegisterUtilityNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(changeDir);
+
+    NodeTemplate drawPrimitive;
+    drawPrimitive.type = "Draw_Primitive";
+    drawPrimitive.category = "Drawing";
+    drawPrimitive.moduleName = "Stargraph";
+    drawPrimitive.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Type", PinType::String, true, false, 0, "Rectangle"});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Size", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"Color", PinType::Vec3, true, false, 0, "1,1,1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    drawPrimitive.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string type = "Rectangle";
+        Vector3 pos = {0, 0, 0};
+        Vector3 size = {100, 100, 0};
+        Color color = WHITE;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Type") type = p.defaultValue;
+            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Size") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &size.x, &size.y, &size.z);
+            if (p.name == "Color") {
+                float r = 1, g = 1, b = 1;
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
+            }
+        }
+        if (type == "Rectangle") DrawRectangle((int)pos.x, (int)pos.y, (int)size.x, (int)size.y, color);
+        else if (type == "Circle") DrawCircle((int)pos.x, (int)pos.y, size.x, color);
+        else if (type == "Line") DrawLine((int)pos.x, (int)pos.y, (int)(pos.x + size.x), (int)(pos.y + size.y), color);
+        else if (type == "Triangle") {
+            Vector2 v1 = {pos.x, pos.y};
+            Vector2 v2 = {pos.x + size.x, pos.y};
+            Vector2 v3 = {pos.x + size.x * 0.5f, pos.y + size.y};
+            DrawTriangle(v1, v2, v3, color);
+        }
+    };
+    NodeRegistry::Get().RegisterNode(drawPrimitive);
+
+    NodeTemplate clearBackground;
+    clearBackground.type = "Clear_Background";
+    clearBackground.category = "Drawing";
+    clearBackground.moduleName = "Stargraph";
+    clearBackground.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Color", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    clearBackground.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Color color = BLACK;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Color") {
+                float r = 0, g = 0, b = 0;
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
+            }
+        }
+        ClearBackground(color);
+    };
+    NodeRegistry::Get().RegisterNode(clearBackground);
+
+    NodeTemplate drawBillboard;
+    drawBillboard.type = "Draw_Billboard";
+    drawBillboard.category = "Drawing";
+    drawBillboard.moduleName = "Stargraph";
+    drawBillboard.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Size", PinType::Float, true, false, 0, "100.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    drawBillboard.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 pos = {0, 0, 0};
+        float size = 100.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Size") size = (float)atof(p.defaultValue.c_str());
+        }
+        Camera3D cam = {0};
+        cam.up = {0, 1, 0};
+        Actor* viewTarget = World::Get().GetViewTarget();
+        if (viewTarget && viewTarget->GetCameraComponent()) {
+            CameraComponent* cc = viewTarget->GetCameraComponent();
+            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, viewTarget->position, viewTarget->rotation, viewTarget->scale);
+            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, viewTarget->rotation);
+            float yr = compRot.y * DEG2RAD;
+            float pr = compRot.x * DEG2RAD;
+            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            cam.position = compPos;
+            cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
+            cam.fovy = cc->fov;
+            cam.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
+        } else if (ctx.actor) {
+            Vector3 forward = {cosf(ctx.actor->rotation.y * DEG2RAD), 0, sinf(ctx.actor->rotation.y * DEG2RAD)};
+            cam.position = ctx.actor->position;
+            cam.target = {ctx.actor->position.x + forward.x, ctx.actor->position.y + forward.y, ctx.actor->position.z + forward.z};
+            cam.fovy = 50.0f;
+            cam.projection = CAMERA_PERSPECTIVE;
+        }
+        DrawBillboard(cam, Texture2D{}, pos, size, WHITE);
+    };
+    NodeRegistry::Get().RegisterNode(drawBillboard);
+
+    NodeTemplate drawBillboardPro;
+    drawBillboardPro.type = "Draw_Billboard_Pro";
+    drawBillboardPro.category = "Drawing";
+    drawBillboardPro.moduleName = "Stargraph";
+    drawBillboardPro.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Size", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"Rotation", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Tint", PinType::Vec3, true, false, 0, "1,1,1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    drawBillboardPro.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 pos = {0, 0, 0};
+        Vector3 size = {100, 100, 0};
+        float rot = 0.0f;
+        Color tint = WHITE;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Size") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &size.x, &size.y, &size.z);
+            if (p.name == "Rotation") rot = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Tint") {
+                float r = 1, g = 1, b = 1;
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
+            }
+        }
+        Camera3D cam = {0};
+        cam.up = {0, 1, 0};
+        Actor* viewTarget = World::Get().GetViewTarget();
+        if (viewTarget && viewTarget->GetCameraComponent()) {
+            CameraComponent* cc = viewTarget->GetCameraComponent();
+            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, viewTarget->position, viewTarget->rotation, viewTarget->scale);
+            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, viewTarget->rotation);
+            float yr = compRot.y * DEG2RAD;
+            float pr = compRot.x * DEG2RAD;
+            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            cam.position = compPos;
+            cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
+            cam.fovy = cc->fov;
+            cam.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
+        } else if (ctx.actor) {
+            Vector3 forward = {cosf(ctx.actor->rotation.y * DEG2RAD), 0, sinf(ctx.actor->rotation.y * DEG2RAD)};
+            cam.position = ctx.actor->position;
+            cam.target = {ctx.actor->position.x + forward.x, ctx.actor->position.y + forward.y, ctx.actor->position.z + forward.z};
+            cam.fovy = 50.0f;
+            cam.projection = CAMERA_PERSPECTIVE;
+        }
+        Rectangle rec = {0, 0, 0, 0};
+        Vector2 billboardSize = {size.x, size.y};
+        Vector2 origin = {billboardSize.x * 0.5f, billboardSize.y * 0.5f};
+        DrawBillboardPro(cam, Texture2D{}, rec, pos, {0, 1, 0}, billboardSize, origin, rot, tint);
+    };
+    NodeRegistry::Get().RegisterNode(drawBillboardPro);
 }

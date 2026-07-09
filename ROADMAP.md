@@ -359,10 +359,10 @@ x Get/Set functional at runtime (needs actor context integration)
 x Variable_Name internal pin hidden from node face
 
 ### 7.7 Drawing/Rendering Nodes
-o Draw_Primitive (Rectangle, Circle, Line, Triangle) - Debug drawing in PIE (Don't show up in packaged games)
-o Draw_Billboard - Sprite that always faces camera
-o Draw_Billboard_Pro - Billboard with rotation
-o Clear_Background - Change background color at runtime
+x Draw_Primitive (Rectangle, Circle, Line, Triangle) - Debug drawing in PIE (Don't show up in packaged games)
+x Draw_Billboard - Sprite that always faces camera
+x Draw_Billboard_Pro - Billboard with rotation
+x Clear_Background - Change background color at runtime
 o Draw_Texture - Draw texture at position with tint
 o Draw_Texture_Pro - Draw textured rectangle with rotation/scale
 
@@ -420,8 +420,8 @@ o Get_Collision_Rec - Get collision rectangle
 
 ### 7.15 Input State Nodes
 o Get_Key_Pressed - Get first queued key press
-o Get_Char_Pressed - Get Unicode character pressed
-o Get_Mouse_Delta - Mouse movement since last frame
+o Get_Char_Pressed - Unicode character pressed
+x Get_Mouse_Delta - Mouse movement since last frame
 o Get_Touch_Position - Multi-touch support
 
 ### 7.16 Gesture Nodes

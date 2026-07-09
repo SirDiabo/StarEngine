@@ -2,6 +2,7 @@
 #include "NodeRegistry.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/Component.h"
+#include "Runtime/Components/MeshComponent.h"
 #include "raymath.h"
 #include <cstdlib>
 
