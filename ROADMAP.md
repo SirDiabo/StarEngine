@@ -385,33 +385,32 @@ o Set_Music_Volume - Music volume control
 o Seek_Music - Seek to position in seconds
 
 ### 7.10 Camera Control Nodes
-o Get_Camera_Matrix - Get view matrix for custom rendering
-o Update_Camera - Manual camera mode updates
-o Camera_To_Target - Set camera to look at actor
+x Get_Camera_Matrix - Get view matrix for custom rendering
+x Update_Camera - Manual camera mode updates
+x Camera_To_Target - Set camera to look at actor
 
 ### 7.11 File I/O Nodes
-o File_Exists - Check if file exists
-o Directory_Exists - Check if directory exists
-o Load_Text_File - Load text content from file
-o Save_Text_File - Write text to file
-o Get_Working_Directory - Get current directory
-o Change_Directory - Change working directory
+x File_Exists - Check if file exists
+x Directory_Exists - Check if directory exists
+x Load_Text_File - Load text content from file
+x Save_Text_File - Write text to file
+x Get_Working_Directory - Get current directory
+x Change_Directory - Change working directory
 
 ### 7.12 Utility Nodes
 o Take_Screenshot - Capture screen to input file path
 o Open_URL - Open URL in default browser
-o Set_Window_Title - Change window title
-o Get_Screen_Size - Get screen width/height
-o Get_Mouse_Position - Get mouse X/Y as Vec2
-o Set_Mouse_Position - Set cursor position
-o Get_FPS - Get current frames per second (1 / Deltatime)
+x Set_Window_Title - Change window title
+x Get_Screen_Size - Get screen width/height
+x Get_Mouse_Position - Get mouse X/Y as Vec2
+x Get_FPS - Get current frames per second (1 / Deltatime)
 
 ### 7.13 Color Nodes
-o Color_From_Hex - Create Color from hex value
-o Color_To_Hex - Get hex value from Color
-o Color_Lerp - Interpolate between two colors
-o Color_Tint - Multiply color with tint
-o Color_Alpha - Set color alpha
+x Color_From_Hex - Create Color from hex value
+x Color_To_Hex - Get hex value from Color
+x Color_Lerp - Interpolate between two colors
+x Color_Tint - Multiply color with tint
+x Color_Alpha - Set color alpha
 
 ### 7.14 Collision Detection Nodes (For basic collision tracing. Not Part of any component or module.)
 o Check_Collision_Point_Rec - Point in rectangle
@@ -432,8 +431,8 @@ o Get_Gesture_Pinch_Angle - Pinch rotation
 o Get_Gesture_Hold_Duration - Long press time
 
 ### 7.17 Window Management Nodes
-o Toggle_Fullscreen - Switch fullscreen/windowed
-o Maximize_Window / Minimize_Window
+x Toggle_Fullscreen - Switch fullscreen/windowed
+x Maximize_Window / Minimize_Window
 o Set_Window_Opacity - Window transparency
 o Set_Window_Position - Move window on screen
 
@@ -453,11 +452,11 @@ o Compute_MD5 / SHA256 - File hashing
 o Compress_Data / Decompress_Data
 
 ### 7.21 Debug Drawing Nodes
-o Draw_Grid - Draw reference grid (debug visualization)
-o Draw_Axes - Draw XYZ axes at position (debug transform visualization)
-o Draw_Ray - Visualize raycasts
-o Draw_Cube - Debug cube visualization
-o Draw_Circle_3D - Debug sphere visualization
+x Draw_Grid - Draw reference grid (debug visualization)
+x Draw_Axes - Draw XYZ axes at position (debug transform visualization)
+x Draw_Ray - Visualize raycasts
+x Draw_Cube - Debug cube visualization
+x Draw_Circle_3D - Debug sphere visualization
 
 ---
 

@@ -12,6 +12,7 @@
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
+#include "raymath.h"
 #include <filesystem>
 #include <string>
 
