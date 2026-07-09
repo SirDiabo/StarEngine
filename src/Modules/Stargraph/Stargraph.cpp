@@ -89,6 +89,20 @@ Node* Stargraph::FindNodeByType(const std::string& type) {
     return nullptr;
 }
 
+Variable* Stargraph::FindVariable(const std::string& name) {
+    for (Variable& v : variables) {
+        if (v.name == name) return &v;
+    }
+    return nullptr;
+}
+
+const Variable* Stargraph::FindVariable(const std::string& name) const {
+    for (const Variable& v : variables) {
+        if (v.name == name) return &v;
+    }
+    return nullptr;
+}
+
 bool Stargraph::RemoveNode(int nodeId) {
     for (auto it = nodes.begin(); it != nodes.end(); ++it) {
         if (std::stoi(it->id) == nodeId) {

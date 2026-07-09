@@ -99,6 +99,9 @@ public:
     Node* FindNodeByType(const std::string& type);
     bool RemoveNode(int nodeId);
 
+    Variable* FindVariable(const std::string& name);
+    const Variable* FindVariable(const std::string& name) const;
+
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
 

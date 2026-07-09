@@ -20,6 +20,7 @@ const float StargraphEditorPanel::leftPanelWidth = 200.0f;
 const float StargraphEditorPanel::rightPanelWidth= 210.0f;
 const float StargraphEditorPanel::toolbarHeight  = 30.0f;
 const float StargraphEditorPanel::componentOutlinerHeight = 130.0f;
+const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
 
 void StargraphEditorPanel::Initialize() {
     name = "Stargraph";
@@ -83,6 +84,7 @@ Color StargraphEditorPanel::GetNodeHeaderColor(const Node& node) const {
 }
 
 float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
+    if (IsPrimitiveNode(node)) return GetPrimitiveNodeHeight();
     size_t visibleInputs = 0;
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
@@ -104,12 +106,30 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
     return headerHeight + rows * pinHeight + 6;
 }
 
+bool StargraphEditorPanel::IsPrimitiveNode(const Node& node) const {
+    return node.type == "Get_Variable" || node.type == "Get_Component";
+}
+
+float StargraphEditorPanel::GetPrimitiveNodeHeight() const {
+    return primitiveNodeHeight;
+}
+
 Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const {
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     float nodeX = graphArea.x + node.posX * zoom + scroll.x;
     float nodeY = graphArea.y + node.posY * zoom + scroll.y;
+    float nodeH = GetNodeHeight(node) * zoom;
+
+    if (IsPrimitiveNode(node)) {
+        float scaledRadius = pinRadius * zoom;
+        if (pin.isInput) {
+            return {nodeX + scaledRadius + 2, nodeY + nodeH * 0.5f};
+        } else {
+            return {nodeX + nodeWidth * zoom - scaledRadius - 6, nodeY + nodeH * 0.5f};
+        }
+    }
 
     float scaledPinHeight = pinHeight * zoom;
     float y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
@@ -1279,6 +1299,132 @@ void StargraphEditorPanel::RenderGraph() {
         bool inMulti = false;
         for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
         bool isSelected = (selectedNodeId == nodeIdInt) || inMulti;
+
+        Rectangle nodeBounds = {nx, ny, scaledNodeWidth, nh};
+        Rectangle headerBounds = {nx, ny, scaledNodeWidth, scaledHeaderHeight};
+        
+        if (IsPrimitiveNode(node)) {
+            float scaledHeight = GetPrimitiveNodeHeight() * zoom;
+            nodeBounds = {nx, ny, scaledNodeWidth, scaledHeight};
+            headerBounds = nodeBounds;
+            
+            float scaledRadius = pinRadius * zoom;
+            const Pin* outputPin = nullptr;
+            for (const Pin& p : node.outputs) {
+                if (p.name == "Value" || p.name == "Component") { outputPin = &p; break; }
+            }
+            
+            if (outputPin && CheckCollisionPointCircle(mousePos, {nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+                bool linked = false;
+                for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
+                DrawCircleV({nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen) {
+                    if (linked && IsKeyDown(KEY_LEFT_ALT)) {
+                        RemoveLinkFromPin(outputPin->id);
+                    } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
+                        int otherPinId = -1;
+                        for (const Link& lk : graph.GetLinks()) {
+                            if (lk.inputPinId == outputPin->id) { otherPinId = lk.outputPinId; break; }
+                            if (lk.outputPinId == outputPin->id) { otherPinId = lk.inputPinId; break; }
+                        }
+                        if (otherPinId != -1) {
+                            RemoveLinkFromPin(outputPin->id);
+                            linkFromPin = otherPinId;
+                            for (const Node& n : graph.GetNodes()) {
+                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
+                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
+                            }
+                        }
+                    } else if (linkFromPin == -1) {
+                        linkFromPin = outputPin->id; linkFromIsOutput = true;
+                    }
+                } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
+                    TryCompleteLink(outputPin->id, false);
+                }
+            }
+            
+            DrawRectangleRec(nodeBounds, {38, 40, 45, 255});
+            DrawRectangleLinesEx(nodeBounds, isSelected ? 2.0f : 1.0f,
+                                 isSelected ? Color{100, 160, 230, 255} : GetPinColor(outputPin ? outputPin->type : PinType::Object));
+            
+            if (outputPin) {
+                Vector2 pinPos = {nx + scaledNodeWidth - scaledRadius - 6, ny + scaledHeight * 0.5f};
+                Color pinColor = GetPinColor(outputPin->type);
+                bool linked = false;
+                for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
+                if (linked) {
+                    DrawCircleV(pinPos, scaledRadius, pinColor);
+                } else {
+                    DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255});
+                    DrawCircleLinesV(pinPos, scaledRadius, pinColor);
+                }
+            }
+            
+            std::string displayTitle = node.title;
+            for (char& c : displayTitle) if (c == '_') c = ' ';
+            DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
+            
+            if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen) {
+                    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+                        bool found = false;
+                        for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
+                        if (found) {
+                            selectedNodeIds.erase(std::remove(selectedNodeIds.begin(), selectedNodeIds.end(), nodeIdInt), selectedNodeIds.end());
+                        } else {
+                            if (selectedNodeId != -1 && selectedNodeId != nodeIdInt) {
+                                bool already = false;
+                                for (int sid : selectedNodeIds) if (sid == selectedNodeId) { already = true; break; }
+                                if (!already) selectedNodeIds.push_back(selectedNodeId);
+                            }
+                            selectedNodeIds.push_back(nodeIdInt);
+                            selectedNodeId = nodeIdInt;
+                        }
+                    } else {
+                        bool inMulti = false;
+                        for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
+                        if (!inMulti) {
+                            selectedNodeIds.clear();
+                        }
+                        selectedNodeId = nodeIdInt;
+                    }
+                    selectedVariableIndex = -1;
+                    selectedComponentIndex = -1;
+                    draggingNode = true;
+                    nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
+                    break;
+                }
+            }
+            
+            if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                float rawX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
+                float rawY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
+                const float gridSnap = 16.0f;
+                float snappedX = roundf(rawX / gridSnap) * gridSnap;
+                float snappedY = roundf(rawY / gridSnap) * gridSnap;
+                float deltaX = snappedX - node.posX;
+                float deltaY = snappedY - node.posY;
+                node.posX = snappedX;
+                node.posY = snappedY;
+                
+                if (!selectedNodeIds.empty()) {
+                    for (Node& other : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                        int oid = std::stoi(other.id);
+                        if (oid == nodeIdInt) continue;
+                        for (int sid : selectedNodeIds) {
+                            if (sid == oid) {
+                                other.posX = roundf((other.posX + deltaX) / gridSnap) * gridSnap;
+                                other.posY = roundf((other.posY + deltaY) / gridSnap) * gridSnap;
+                                break;
+                            }
+                        }
+                    }
+                }
+                isDirty = true;
+            }
+            
+            continue;
+        }
 
         DrawRectangleRec({nx, ny, scaledNodeWidth, scaledHeaderHeight}, GetNodeHeaderColor(node));
         DrawRectangleRec({nx, ny + scaledHeaderHeight, scaledNodeWidth, nh - scaledHeaderHeight}, {38, 40, 45, 255});

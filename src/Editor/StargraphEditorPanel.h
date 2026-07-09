@@ -47,6 +47,9 @@ private:
     float GetNodeHeight(const Node& node) const;
     Node* GetNodeAtPos(Vector2 pos);
 
+    bool IsPrimitiveNode(const Node& node) const;
+    float GetPrimitiveNodeHeight() const;
+
     Stargraph graph;
     std::string filePath;
     bool isOpen = false;
@@ -107,6 +110,8 @@ private:
     static const float leftPanelWidth;
     static const float rightPanelWidth;
     static const float toolbarHeight;
+    static const float componentOutlinerHeight;
+    static const float primitiveNodeHeight;
 
     int variableDragIndex = -1;
     Vector2 variableDragPos{0, 0};
@@ -119,7 +124,6 @@ private:
     int selectedComponentIndex = -1;
     bool addComponentMenuOpen = false;
     Vector2 addComponentMenuPos{0, 0};
-    static const float componentOutlinerHeight;
 
     AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;
