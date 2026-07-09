@@ -141,12 +141,12 @@ o Property-diff snapshot path for variables, separate fire-once event queue for 
 o Has Authority node (Host / Client branches). Always-true when no networking module is active
 o Abstract NetworkBackend interface a networking module registers against, module-gated same as 2.5
 
-### 2.9 Player Component and Camera Control Nodes
-o PlayerComponent ships as default component (like Mesh/Collision/Audio/Camera)
+### 2.9 Player Actor Nodes
 o Add Movement Input nodes - accumulate, normalize, move actor directly
-o Add Camera Yaw / Add Camera Pitch / Add Camera Roll accumulate into normalized rotation delta
-o Get Camera Yaw / Pitch / Roll to be used with camera or actor rotation
+o Add Control Yaw / Add Control Pitch / Add Control Roll accumulate into normalized rotation delta
+o Get/Set Control Rotation - to be used with camera rotation or actor yaw
 o Pitch clamp to prevent flip 89°
+o Add Use Control Control Yaw/Pitch/Roll (seperate) to both Actor and Camera Component. Actor Yaw true by default, Camera Pitch true by default.
 
 ### 2.10 Save / Load System
 o Save flag on variables and component fields (similar to 2.8)
