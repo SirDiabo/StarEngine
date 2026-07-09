@@ -33,6 +33,11 @@ public:
 
     void OpenDefaultMapIfSet();
 
+    void SaveState() const;
+    void RestoreState();
+
+    std::string GetActiveMapPath() const;
+
 private:
     void RenderEditorTabBar(float x, float y, float width);
     void OpenAssetInTab(const std::string& fullPath, const std::string& extension);

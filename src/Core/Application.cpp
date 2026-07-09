@@ -73,8 +73,6 @@ bool Application::Initialize(int argc, char* argv[]) {
     editor = new Editor();
     editor->Initialize();
 
-    ModuleManager::Get().InitializeAll();
-
     AssetTypeInfo mapType;
     mapType.typeName = "StarMap";
     mapType.extension = ".starmap";
@@ -93,6 +91,13 @@ bool Application::Initialize(int argc, char* argv[]) {
     if (argc > 1) {
         Project::Get().Load(argv[1]);
         projectPath = argv[1];
+    }
+
+    ModuleManager::Get().InitializeAll();
+
+    editor->RestoreState();
+
+    if (argc > 1) {
         editor->OpenDefaultMapIfSet();
     } else {
         editor->ShowProjectBrowser();
@@ -112,6 +117,7 @@ void Application::Run() {
         if (pendingRelaunch) {
             projectPath = Project::Get().GetProjectFilePath();
             editor->SaveLayout();
+            editor->SaveState();
             Shutdown();
             Relaunch();
             running = false;
@@ -130,7 +136,9 @@ void Application::Run() {
             std::string path = editor->GetOpenProjectPath();
             if (!path.empty()) {
                 Project::Get().Load(path);
-                editor->OpenDefaultMapIfSet();
+                ModuleManager::Get().ShutdownAll();
+                ModuleManager::Get().InitializeAll();
+                editor->RestoreState();
                 editor->ResetNewProjectFlag();
             }
         }

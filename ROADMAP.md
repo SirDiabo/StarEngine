@@ -112,12 +112,12 @@ x Module manifest format (.starmodule)
 ### 2.5 Module-Gated Registration and Rebuild-on-Import
 x NodeRegistry entries tagged with their owning module, filtered by IsEnabled() when populating the Add Node menu
 x AssetTypeRegistry entries tagged with their owning module, filtered by IsEnabled() in content browser create menu and double-click-to-open
-x ModuleManager::InitializeAll skips Initialize() for modules disabled at startup (currently runs regardless of enabled state)
+x ModuleManager::InitializeAll skips Initialize() for modules disabled at startup
 x Disabling a module hides/blocks its asset types and nodes everywhere in the editor, not just its Update() tick
 x Trigger an engine rebuild (cmake --build) from the Module Browser after an import, instead of requiring a manual rebuild
-o On successful rebuild, relaunch the new editor binary with the current project path so the freshly imported module is live without the user manually restarting
-o Project/layout state preserved across the relaunch (open editor tabs, active map, dock layout)
-o Rebuild failure surfaces the compiler error in the Log panel instead of silently leaving the old binary running
+x On successful rebuild, relaunch the new editor binary with the current project path so the freshly imported module is live without the user manually restarting
+x Project/layout state preserved across the relaunch (open editor tabs, active map, dock layout)
+x Rebuild failure surfaces the compiler error in the Log panel instead of silently leaving the old binary running
 
 ### 2.6 Component editing at runtime
 x Add references of components nodes in the graph editor, similar to variable get and set. To get a reference of a component.
@@ -128,10 +128,10 @@ x Actors with camera components automatically view the first camera, but are abl
 x Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
 
 ### 2.7 Input Focus and View Target
-o Get/Set Input Focus nodes. Actor receives input events when focused
-o Input Focus is per-machine and unreplicated; it decides which actor reads local input, independent of Has Authority
-o Get/Set View Target node. Actor's CameraComponent becomes the active render camera
-o Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
+x Get/Set Input Focus nodes. Actor receives input events when focused
+x Input Focus is per-machine and unreplicated; it decides which actor reads local input, independent of Has Authority
+x Get/Set View Target node. Actor's CameraComponent becomes the active render camera
+x Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
 
 ### 2.8 Replication Core
 o ReplicationMode enum on variables and custom events: Local (default) / Replicated / Server Only

@@ -328,11 +328,14 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     if (playing) {
         const auto& actors = World::Get().GetActors();
         if (!actors.empty()) {
-            Actor* camActor = nullptr;
-            for (const auto& actor : actors) {
-                if (actor->GetCameraComponent()) {
-                    camActor = actor.get();
-                    break;
+            Actor* camActor = World::Get().GetViewTarget();
+            if (!camActor) {
+                for (const auto& actor : actors) {
+                    if (actor->GetCameraComponent()) {
+                        camActor = actor.get();
+                        World::Get().SetViewTarget(camActor);
+                        break;
+                    }
                 }
             }
             if (camActor) {

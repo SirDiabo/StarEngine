@@ -371,4 +371,98 @@ void RegisterActorNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(setShowMouseCursor);
+
+    NodeTemplate getViewTarget;
+    getViewTarget.type = "Get_View_Target";
+    getViewTarget.category = "Actor";
+    getViewTarget.moduleName = "Stargraph";
+    getViewTarget.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Object, false, true});
+    };
+    getViewTarget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) {
+            target = World::Get().GetViewTarget();
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%p", (void*)target);
+        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getViewTarget);
+
+    NodeTemplate getInputFocus;
+    getInputFocus.type = "Get_Input_Focus";
+    getInputFocus.category = "Actor";
+    getInputFocus.moduleName = "Stargraph";
+    getInputFocus.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Object, false, true});
+    };
+    getInputFocus.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) {
+            target = World::Get().GetInputFocus();
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%p", (void*)target);
+        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getInputFocus);
+
+    NodeTemplate setInputFocus;
+    setInputFocus.type = "Set_Input_Focus";
+    setInputFocus.category = "Actor";
+    setInputFocus.moduleName = "Stargraph";
+    setInputFocus.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setInputFocus.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (target) World::Get().SetInputFocus(target);
+    };
+    NodeRegistry::Get().RegisterNode(setInputFocus);
+
+    NodeTemplate setViewTarget;
+    setViewTarget.type = "Set_View_Target";
+    setViewTarget.category = "Actor";
+    setViewTarget.moduleName = "Stargraph";
+    setViewTarget.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setViewTarget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (target) World::Get().SetViewTarget(target);
+    };
+    NodeRegistry::Get().RegisterNode(setViewTarget);
 }

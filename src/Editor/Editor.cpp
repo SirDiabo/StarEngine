@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -372,4 +373,52 @@ void Editor::ResetNewProjectFlag() {
 
 void Editor::ResetSaveProjectFlag() {
     if (menuBar) menuBar->wantsSaveProject = false;
+}
+
+void Editor::SaveState() const {
+    fs::path dir = fs::path(GetLayoutPath()).parent_path();
+    fs::create_directories(dir);
+    fs::path statePath = dir / "state.cfg";
+
+    std::ofstream out(statePath);
+    if (!out.is_open()) return;
+
+    out << "activeMap=" << GetActiveMapPath() << "\n";
+
+    for (size_t i = 0; i < editorTabs.size(); i++) {
+        if (editorTabs[i]->IsPermanent()) continue;
+        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[i].get());
+        if (sgTab) {
+            out << "openStargraph=" << sgTab->GetAssetPath() << "\n";
+        }
+    }
+}
+
+void Editor::RestoreState() {
+    fs::path dir = fs::path(GetLayoutPath()).parent_path();
+    fs::path statePath = dir / "state.cfg";
+
+    std::ifstream in(statePath);
+    if (!in.is_open()) return;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string value = line.substr(eq + 1);
+
+        if (key == "activeMap" && !value.empty()) {
+            OpenAssetInTab(value, ".starmap");
+        } else if (key == "openStargraph" && !value.empty()) {
+            OpenAssetInTab(value, ".stargraph");
+        }
+    }
+}
+
+std::string Editor::GetActiveMapPath() const {
+    if (levelTab && levelTab->GetViewport()) {
+        return levelTab->GetViewport()->GetMapPath();
+    }
+    return "";
 }

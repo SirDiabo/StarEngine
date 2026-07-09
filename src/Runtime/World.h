@@ -20,10 +20,18 @@ public:
 
     const std::vector<std::unique_ptr<Actor>>& GetActors() const { return actors; }
 
+    Actor* GetViewTarget() const { return viewTarget; }
+    void SetViewTarget(Actor* actor);
+
+    Actor* GetInputFocus() const { return inputFocus; }
+    void SetInputFocus(Actor* actor);
+
 private:
     std::vector<std::unique_ptr<Actor>> actors;
     std::vector<Actor*> pendingDestroy;
     bool playing = false;
+    Actor* viewTarget = nullptr;
+    Actor* inputFocus = nullptr;
 
     void FlushDestroyQueue();
 };

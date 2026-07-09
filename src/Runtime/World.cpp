@@ -25,6 +25,22 @@ void World::DestroyActor(Actor* actor) {
     pendingDestroy.push_back(actor);
 }
 
+void World::SetViewTarget(Actor* actor) {
+    if (actor) {
+        viewTarget = actor;
+    } else {
+        viewTarget = nullptr;
+    }
+}
+
+void World::SetInputFocus(Actor* actor) {
+    if (actor) {
+        inputFocus = actor;
+    } else {
+        inputFocus = nullptr;
+    }
+}
+
 void World::BeginPlay() {
     playing = true;
     for (size_t i = 0; i < actors.size(); i++) {
@@ -62,6 +78,7 @@ void World::EndPlay() {
     }
     FlushDestroyQueue();
     playing = false;
+    viewTarget = nullptr;
     ShowCursor();
 }
 
