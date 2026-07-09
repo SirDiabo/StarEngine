@@ -358,6 +358,107 @@ x Get_Variable / Set_Variable via left panel drag
 x Get/Set functional at runtime (needs actor context integration)
 x Variable_Name internal pin hidden from node face
 
+### 7.7 Drawing/Rendering Nodes
+o Draw_Primitive (Rectangle, Circle, Line, Triangle) - Debug drawing in PIE (Don't show up in packaged games)
+o Draw_Billboard - Sprite that always faces camera
+o Draw_Billboard_Pro - Billboard with rotation
+o Clear_Background - Change background color at runtime
+o Draw_Texture - Draw texture at position with tint
+o Draw_Texture_Pro - Draw textured rectangle with rotation/scale
+
+### 7.8 Texture/Image Manipulation Nodes
+o Load_Texture - Load texture from file path
+o Unload_Texture - Free texture from memory
+o Get_Texture_Size - Returns texture width/height
+o Image_To_Texture - Create texture from image data
+o Gen_Texture_Mipmaps - Generate mipmaps for texture
+
+### 7.9 Audio Control Nodes Core (Not part of audio module)
+o Play_Sound - Play a sound selectable in a drop down list. Returns Audio object property.
+o Stop_Sound - Stop playing sound.
+o Pause_Sound / Resume_Sound - Sound control
+o Is_Sound_Playing - Check playback state
+o Set_Master_Volume - Global volume control
+o Load_Music - Load music stream
+o Play_Music - Play music
+o Set_Music_Volume - Music volume control
+o Seek_Music - Seek to position in seconds
+
+### 7.10 Camera Control Nodes
+o Get_Camera_Matrix - Get view matrix for custom rendering
+o Update_Camera - Manual camera mode updates
+o Camera_To_Target - Set camera to look at actor
+
+### 7.11 File I/O Nodes
+o File_Exists - Check if file exists
+o Directory_Exists - Check if directory exists
+o Load_Text_File - Load text content from file
+o Save_Text_File - Write text to file
+o Get_Working_Directory - Get current directory
+o Change_Directory - Change working directory
+
+### 7.12 Utility Nodes
+o Take_Screenshot - Capture screen to input file path
+o Open_URL - Open URL in default browser
+o Set_Window_Title - Change window title
+o Get_Screen_Size - Get screen width/height
+o Get_Mouse_Position - Get mouse X/Y as Vec2
+o Set_Mouse_Position - Set cursor position
+o Get_FPS - Get current frames per second (1 / Deltatime)
+
+### 7.13 Color Nodes
+o Color_From_Hex - Create Color from hex value
+o Color_To_Hex - Get hex value from Color
+o Color_Lerp - Interpolate between two colors
+o Color_Tint - Multiply color with tint
+o Color_Alpha - Set color alpha
+
+### 7.14 Collision Detection Nodes (For basic collision tracing. Not Part of any component or module.)
+o Check_Collision_Point_Rec - Point in rectangle
+o Check_Collision_Recs - Rectangle collision
+o Check_Collision_Circles - Circle collision
+o Get_Collision_Rec - Get collision rectangle
+
+### 7.15 Input State Nodes
+o Get_Key_Pressed - Get first queued key press
+o Get_Char_Pressed - Get Unicode character pressed
+o Get_Mouse_Delta - Mouse movement since last frame
+o Get_Touch_Position - Multi-touch support
+
+### 7.16 Gesture Nodes
+o Is_Gesture_Detected - Check for tap/drag/swipe/pinch
+o Get_Gesture_Drag_Vector - Drag direction
+o Get_Gesture_Pinch_Angle - Pinch rotation
+o Get_Gesture_Hold_Duration - Long press time
+
+### 7.17 Window Management Nodes
+o Toggle_Fullscreen - Switch fullscreen/windowed
+o Maximize_Window / Minimize_Window
+o Set_Window_Opacity - Window transparency
+o Set_Window_Position - Move window on screen
+
+### 7.18 Clipboard Nodes
+o Get_Clipboard_Text - Read clipboard content
+o Set_Clipboard_Text - Write to clipboard
+
+### 7.19 Image Processing Nodes
+o Image_Load - Load image from file
+o Image_Resize - Resize with different algorithms
+o Image_Flip_Vertical/Horizontal
+o Image_Alpha_Crop - Remove transparent borders
+o Image_Color_Tint / Invert / Grayscale
+
+### 7.20 Compression/Hash Nodes
+o Compute_MD5 / SHA256 - File hashing
+o Compress_Data / Decompress_Data
+
+### 7.21 Debug Drawing Nodes
+o Draw_Grid - Draw reference grid (debug visualization)
+o Draw_Axes - Draw XYZ axes at position (debug transform visualization)
+o Draw_Ray - Visualize raycasts
+o Draw_Cube - Debug cube visualization
+o Draw_Circle_3D - Debug sphere visualization
+
 ---
 
 ## 8. Graph Executor
@@ -538,6 +639,11 @@ o Runtime Set Language node listing registered language options
 
 ### 13.9 StarScript Module
 o Simplified text-based scripting language, alternative to Stargraph
+
+### 13.10 VR Module (Mostly adds nodes)
+o Begin_VR_Mode / End_VR_Mode - VR rendering
+o Load_VR_Stereo_Config - VR configuration
+o Update_VR_Config - VR device parameters
 
 ---
 
