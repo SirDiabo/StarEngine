@@ -367,6 +367,24 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(getFPS);
 
+    NodeTemplate setTargetFPS;
+    setTargetFPS.type = "Set_Target_FPS";
+    setTargetFPS.category = "Utility";
+    setTargetFPS.moduleName = "Stargraph";
+    setTargetFPS.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"FPS", PinType::Integer, true, false, 0, "60"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setTargetFPS.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int fps = 60;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "FPS") fps = atoi(p.defaultValue.c_str());
+        }
+        SetTargetFPS(fps);
+    };
+    NodeRegistry::Get().RegisterNode(setTargetFPS);
+
     NodeTemplate setWindowTitle;
     setWindowTitle.type = "Set_Window_Title";
     setWindowTitle.category = "Utility";
