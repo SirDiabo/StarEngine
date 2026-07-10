@@ -8,12 +8,13 @@
 #include "ProjectBrowser.h"
 #include "LogPanel.h"
 #include "ViewportPanel.h"
+#include "Core/ContentPathResolver.h"
+#include "Core/Project.h"
 #include "AssetPickerPopup.h"
 #include "ChoicePopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
 #include "Core/LayoutSerializer.h"
-#include "Core/Project.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -267,8 +268,12 @@ void Editor::HandlePackageMenuAction(const std::string& item) {
 
 void Editor::OpenDefaultMapIfSet() {
     const std::string& mapPath = Project::Get().GetSettings().defaultMapPath;
-    if (mapPath.empty() || !fs::exists(mapPath)) return;
-    OpenAssetInTab(mapPath, ".starmap");
+    if (mapPath.empty()) return;
+    std::string contentRoot = Project::Get().GetRootPath() + "/Content";
+    ContentPathResolver::SetContentRoot(contentRoot);
+    std::string resolvedPath = ContentPathResolver::Resolve(mapPath);
+    if (!fs::exists(resolvedPath)) return;
+    OpenAssetInTab(resolvedPath, ".starmap");
 }
 
 void Editor::HandleEditMenuAction(const std::string& item) {

@@ -140,6 +140,7 @@ void Application::Run() {
                 ModuleManager::Get().InitializeAll();
                 editor->RestoreState();
                 editor->ResetNewProjectFlag();
+                editor->OpenDefaultMapIfSet();
             }
         }
 
