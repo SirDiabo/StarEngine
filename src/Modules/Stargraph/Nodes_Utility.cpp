@@ -986,6 +986,153 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(drawBillboardPro);
 
+    NodeTemplate loadTexture;
+    loadTexture.type = "Load_Texture";
+    loadTexture.category = "Texture";
+    loadTexture.moduleName = "Stargraph";
+    loadTexture.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Texture", PinType::Object, false, true});
+    };
+    loadTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string path;
+        for (const Pin& p : node.inputs) if (p.name == "Path") path = p.defaultValue;
+        if (path.empty() || !FileExists(path.c_str())) return;
+        Texture2D loaded = LoadTexture(path.c_str());
+        if (loaded.id == 0) return;
+        Texture2D* tex = new Texture2D(loaded);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Texture") {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%p", (void*)tex);
+                p.defaultValue = buf;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(loadTexture);
+
+    NodeTemplate unloadTexture;
+    unloadTexture.type = "Unload_Texture";
+    unloadTexture.category = "Texture";
+    unloadTexture.moduleName = "Stargraph";
+    unloadTexture.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    unloadTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) {
+                Texture2D* tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                if (tex) {
+                    UnloadTexture(*tex);
+                    delete tex;
+                }
+                break;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(unloadTexture);
+
+    NodeTemplate getTextureSize;
+    getTextureSize.type = "Get_Texture_Size";
+    getTextureSize.category = "Texture";
+    getTextureSize.moduleName = "Stargraph";
+    getTextureSize.createPins = [](Node* node) {
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Width", PinType::Integer, false, true});
+        node->outputs.push_back({"Height", PinType::Integer, false, true});
+    };
+    getTextureSize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Texture2D* tex = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) {
+                tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+        }
+        int w = tex ? tex->width : 0;
+        int h = tex ? tex->height : 0;
+        for (Pin& p : node.outputs) {
+            if (p.name == "Width") p.defaultValue = std::to_string(w);
+            if (p.name == "Height") p.defaultValue = std::to_string(h);
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getTextureSize);
+
+    NodeTemplate drawTexture;
+    drawTexture.type = "Draw_Texture";
+    drawTexture.category = "Drawing";
+    drawTexture.moduleName = "Stargraph";
+    drawTexture.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Tint", PinType::Vec3, true, false, 0, "1,1,1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    drawTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Texture2D* tex = nullptr;
+        Vector3 pos = {0, 0, 0};
+        Color tint = WHITE;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Tint") {
+                float r = 1, g = 1, b = 1;
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
+            }
+        }
+        if (!tex) return;
+        DrawTexture(*tex, (int)pos.x, (int)pos.y, tint);
+    };
+    NodeRegistry::Get().RegisterNode(drawTexture);
+
+    NodeTemplate drawTexturePro;
+    drawTexturePro.type = "Draw_Texture_Pro";
+    drawTexturePro.category = "Drawing";
+    drawTexturePro.moduleName = "Stargraph";
+    drawTexturePro.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"SourcePosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"SourceSize", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"DestPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"DestSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"Rotation", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Tint", PinType::Vec3, true, false, 0, "1,1,1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    drawTexturePro.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Texture2D* tex = nullptr;
+        Vector3 srcPos = {0, 0, 0}, srcSize = {0, 0, 0}, dstPos = {0, 0, 0}, dstSize = {100, 100, 0};
+        float rot = 0.0f;
+        Color tint = WHITE;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "SourcePosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &srcPos.x, &srcPos.y, &srcPos.z);
+            if (p.name == "SourceSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &srcSize.x, &srcSize.y, &srcSize.z);
+            if (p.name == "DestPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dstPos.x, &dstPos.y, &dstPos.z);
+            if (p.name == "DestSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dstSize.x, &dstSize.y, &dstSize.z);
+            if (p.name == "Rotation") rot = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Tint") {
+                float r = 1, g = 1, b = 1;
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
+            }
+        }
+        if (!tex) return;
+        Rectangle src = srcSize.x == 0 && srcSize.y == 0
+            ? Rectangle{0, 0, (float)tex->width, (float)tex->height}
+            : Rectangle{srcPos.x, srcPos.y, srcSize.x, srcSize.y};
+        Rectangle dst = {dstPos.x, dstPos.y, dstSize.x, dstSize.y};
+        Vector2 origin = {dstSize.x * 0.5f, dstSize.y * 0.5f};
+        DrawTexturePro(*tex, src, dst, origin, rot, tint);
+    };
+    NodeRegistry::Get().RegisterNode(drawTexturePro);
+
     NodeTemplate takeScreenshot;
     takeScreenshot.type = "Take_Screenshot";
     takeScreenshot.category = "Utility";

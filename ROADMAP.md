@@ -363,14 +363,14 @@ x Draw_Primitive (Rectangle, Circle, Line, Triangle) - Debug drawing in PIE (Don
 x Draw_Billboard - Sprite that always faces camera
 x Draw_Billboard_Pro - Billboard with rotation
 x Clear_Background - Change background color at runtime
-o Draw_Texture - Draw texture at position with tint
-o Draw_Texture_Pro - Draw textured rectangle with rotation/scale
+x Draw_Texture - Draw texture at position with tint
+x Draw_Texture_Pro - Draw textured rectangle with rotation/scale
 
 ### 7.8 Texture/Image Manipulation Nodes
-o Load_Texture - Load texture from file path
-o Unload_Texture - Free texture from memory
-o Get_Texture_Size - Returns texture width/height
-o Image_To_Texture - Create texture from image data
+x Load_Texture - Load texture from file path
+x Unload_Texture - Free texture from memory
+x Get_Texture_Size - Returns texture width/height
+x Image_To_Texture - Create texture from image data
 o Gen_Texture_Mipmaps - Generate mipmaps for texture
 
 ### 7.9 Audio Control Nodes Core (Not part of audio module)
