@@ -57,4 +57,11 @@ void StargraphModule::RegisterAssetType() {
         return graph.SaveToFile(fullPath);
     };
     AssetTypeRegistry::Get().RegisterType(info);
+
+    AssetTypeInfo sound;
+    sound.typeName = "Sound";
+    sound.extension = ".starsound";
+    sound.category = "Audio";
+    sound.moduleName = "Stargraph";
+    AssetTypeRegistry::Get().RegisterType(sound);
 }

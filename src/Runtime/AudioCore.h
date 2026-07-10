@@ -12,6 +12,7 @@ public:
     void CloseDevice();
 
     Sound* GetOrLoadSound(const std::string& path);
+    Sound* GetOrLoadCookedSound(const std::string& soundAssetPath);
 
     Music* LoadMusicHandle(const std::string& path);
     void UnloadMusicHandle(Music* music);
@@ -22,5 +23,6 @@ public:
 private:
     bool deviceInitialized = false;
     std::unordered_map<std::string, Sound> soundCache;
+    std::unordered_map<std::string, Sound> cookedSoundCache;
     std::vector<Music*> activeMusic;
 };

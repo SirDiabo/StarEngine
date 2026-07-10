@@ -558,7 +558,7 @@ x Packaged Game Default Icon
 
 ### 13.1 Audio Module
 o Move existing Audio Component to Module
-o WAV import and playback
+/ WAV import and playback
 o MIDI import and parsing with Instrument Selection (SoundFont or Sample)
 o SoundFont (SF2) import and synthesis
 o Audio graph nodes: Play Sound, Stop Sound, Set Volume, Set Pitch

@@ -1,4 +1,6 @@
 #include "AudioCore.h"
+#include "Core/StarAsset.h"
+#include "Core/CookedFile.h"
 #include <algorithm>
 
 AudioCore& AudioCore::Get() {
@@ -17,6 +19,8 @@ void AudioCore::CloseDevice() {
     StopAndClearMusic();
     for (auto& kv : soundCache) UnloadSound(kv.second);
     soundCache.clear();
+    for (auto& kv : cookedSoundCache) UnloadSound(kv.second);
+    cookedSoundCache.clear();
     CloseAudioDevice();
     deviceInitialized = false;
 }
@@ -30,6 +34,23 @@ Sound* AudioCore::GetOrLoadSound(const std::string& path) {
     if (loaded.frameCount == 0) return nullptr;
 
     auto inserted = soundCache.emplace(path, loaded);
+    return &inserted.first->second;
+}
+
+Sound* AudioCore::GetOrLoadCookedSound(const std::string& soundAssetPath) {
+    auto it = cookedSoundCache.find(soundAssetPath);
+    if (it != cookedSoundCache.end()) return &it->second;
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(soundAssetPath, asset) || asset.assetType != "Sound") return nullptr;
+
+    std::string resolved = CookedFile::Open(asset.sourcePath);
+    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+
+    Sound loaded = LoadSound(resolved.c_str());
+    if (loaded.frameCount == 0) return nullptr;
+
+    auto inserted = cookedSoundCache.emplace(soundAssetPath, loaded);
     return &inserted.first->second;
 }
 

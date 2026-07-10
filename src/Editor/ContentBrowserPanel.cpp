@@ -194,13 +194,14 @@ void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const st
 }
 
 void ContentBrowserPanel::ImportAssetAuto() {
-    static const std::vector<std::string> meshExts = {".obj", ".gltf", ".glb", ".iqm"};
+    static const std::vector<std::string> meshExts  = {".obj", ".gltf", ".glb", ".iqm"};
     static const std::vector<std::string> texExts   = {".png", ".jpg", ".jpeg", ".bmp"};
+    static const std::vector<std::string> soundExts = {".wav"};
 
     std::string path = NativeFileDialog::OpenFile(
         "Import Asset", "",
-        "Mesh or Texture (obj, gltf, glb, iqm, png, jpg, bmp)",
-        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp");
+        "Mesh, Texture or Sound (obj, gltf, glb, iqm, png, jpg, bmp, wav)",
+        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp;*.wav");
     if (path.empty()) return;
 
     std::string ext = fs::path(path).extension().string();
@@ -210,6 +211,8 @@ void ContentBrowserPanel::ImportAssetAuto() {
         CookImportedAsset(path, "StaticMesh", ".starasset");
     } else if (std::find(texExts.begin(), texExts.end(), ext) != texExts.end()) {
         CookImportedAsset(path, "Texture", ".startex");
+    } else if (std::find(soundExts.begin(), soundExts.end(), ext) != soundExts.end()) {
+        CookImportedAsset(path, "Sound", ".starsound");
     } else {
         importStatus = "Import failed: unrecognized file type " + ext;
     }
@@ -305,14 +308,15 @@ void ContentBrowserPanel::Render() {
 
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
-    const bool meshImportEnabled = ModuleManager::Get().IsModuleEnabled("Meshes");
+    const bool importEnabled = ModuleManager::Get().IsModuleEnabled("Meshes") ||
+                                ModuleManager::Get().IsModuleEnabled("Stargraph");
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
     DrawRectangleRec(pathBar, {30, 30, 34, 255});
 
     float pathLabelX = pathBar.x + 6;
-    if (meshImportEnabled) {
+    if (importEnabled) {
         Rectangle importBtn = {pathBar.x + 2, pathBar.y + 2, 18, 18};
         if (GuiButton(importBtn, "+")) ImportAssetAuto();
         pathLabelX = importBtn.x + importBtn.width + 6;
