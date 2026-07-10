@@ -139,6 +139,27 @@ void RegisterMathNodes() {
     RegisterWildcardMath("Multiply", '*');
     RegisterWildcardMath("Divide",   '/');
 
+    NodeTemplate mathPower;
+    mathPower.type = "Power";
+    mathPower.category = "Math";
+    mathPower.moduleName = "Stargraph";
+    mathPower.createPins = [](Node* node) {
+        node->inputs.push_back({"Base", PinType::Float, true, false, 0, "1.0"});
+        node->inputs.push_back({"Exponent", PinType::Float, true, false, 0, "2.0"});
+        node->outputs.push_back({"Result", PinType::Float, false, true});
+    };
+    mathPower.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float base = 1.0f, exponent = 2.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Base") base = GetScalarValue(p);
+            if (p.name == "Exponent") exponent = GetScalarValue(p);
+        }
+        float result = powf(base, exponent);
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(mathPower);
+
     NodeTemplate vec3Make;
     vec3Make.type = "Vec3_Make";
     vec3Make.category = "Math";
