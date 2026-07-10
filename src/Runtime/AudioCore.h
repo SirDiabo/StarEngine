@@ -15,6 +15,7 @@ public:
     Sound* GetOrLoadCookedSound(const std::string& soundAssetPath);
 
     Music* LoadMusicHandle(const std::string& path);
+    Music* GetOrLoadCookedMusic(const std::string& musicAssetPath);
     void UnloadMusicHandle(Music* music);
 
     void TickMusicStreams();

@@ -64,6 +64,20 @@ Music* AudioCore::LoadMusicHandle(const std::string& path) {
     return music;
 }
 
+Music* AudioCore::GetOrLoadCookedMusic(const std::string& musicAssetPath) {
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(musicAssetPath, asset) || asset.assetType != "Sound") return nullptr;
+
+    std::string resolved = CookedFile::Open(asset.sourcePath);
+    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+    Music loaded = LoadMusicStream(resolved.c_str());
+    if (loaded.frameCount == 0) return nullptr;
+
+    Music* music = new Music(loaded);
+    activeMusic.push_back(music);
+    return music;
+}
+
 void AudioCore::UnloadMusicHandle(Music* music) {
     if (!music) return;
     activeMusic.erase(std::remove(activeMusic.begin(), activeMusic.end(), music), activeMusic.end());

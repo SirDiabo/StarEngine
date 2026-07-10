@@ -127,6 +127,7 @@ private:
 
     AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;
+    AssetPickerPopup audioPathPicker;
     ViewportPanel* viewportPanel = nullptr;
     int lastComponentDetailIndex = -1;
     int componentActiveField = 0;

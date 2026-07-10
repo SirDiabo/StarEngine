@@ -41,6 +41,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     keyPickerOpen = false;
     keyPickerPinId = 0;
     keyPickerSearch[0] = '\0';
+    audioPathPicker.Close();
     scroll = {0, 0};
     didPan = false;
     variableDragActive = false;
@@ -61,6 +62,7 @@ void StargraphEditorPanel::Close() {
     keyPickerOpen = false;
     keyPickerPinId = 0;
     listeningForKeyPinId = 0;
+    audioPathPicker.Close();
 }
 
 Color StargraphEditorPanel::GetPinColor(PinType type) const {
@@ -711,7 +713,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp);
+    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp) || audioPathPicker.ContainsPoint(mp);
 
     if (lastComponentDetailIndex != selectedComponentIndex) {
         snprintf(compNameBuf, sizeof(compNameBuf), "%s", comp.name.c_str());
@@ -733,6 +735,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         componentActiveField = 0;
         componentMeshPicker.Close();
         componentMaterialPicker.Close();
+        audioPathPicker.Close();
     }
 
     auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal) {
@@ -818,7 +821,22 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight);
         }
     } else if (comp.componentType == "AudioComponent") {
-        textField("Sound Path", compSoundBuf, sizeof(compSoundBuf), 13, comp.soundAssetPath);
+        DrawText("Sound Path", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        DrawRectangleRec(r, {38, 38, 42, 255});
+        DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+        std::string soundLabel = comp.soundAssetPath.empty() ? "None" : std::filesystem::path(comp.soundAssetPath).stem().string();
+        DrawText(soundLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
+            audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
+        }
+        y += 22;
+        std::string pickedSound;
+        if (audioPathPicker.Render(pickedSound)) {
+            comp.soundAssetPath = pickedSound;
+            isDirty = true;
+        }
         floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume);
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Auto Play", &comp.autoPlay)) isDirty = true;
         y += 24;
@@ -1153,9 +1171,29 @@ void StargraphEditorPanel::RenderRightPanel() {
             if (pin.name == "Component_Name") continue;
             DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
             y += 14;
-            DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
-                     (int)panel.x + 12, (int)y, 11, WHITE);
-            y += 16;
+            if ((node.type == "Play_Sound" || node.type == "Load_Music") && pin.name == "Path") {
+                Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+                DrawRectangleRec(r, {38, 38, 42, 255});
+                DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+                std::string pathLabel = pin.defaultValue.empty() ? "None" : std::filesystem::path(pin.defaultValue).stem().string();
+                DrawText(pathLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
+                    audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
+                }
+                std::string pickedPath;
+                if (audioPathPicker.Render(pickedPath)) {
+                    Pin* editablePin = graph.FindPin(pin.id);
+                    if (editablePin) {
+                        editablePin->defaultValue = pickedPath;
+                        isDirty = true;
+                    }
+                }
+                y += 22;
+            } else {
+                DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
+                         (int)panel.x + 12, (int)y, 11, WHITE);
+                y += 16;
+            }
         }
         break;
     }

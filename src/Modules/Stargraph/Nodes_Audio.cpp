@@ -18,7 +18,7 @@ void RegisterAudioNodes() {
     playSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;
         for (const Pin& p : node.inputs) if (p.name == "Path") path = p.defaultValue;
-        Sound* snd = AudioCore::Get().GetOrLoadSound(path);
+        Sound* snd = AudioCore::Get().GetOrLoadCookedSound(path);
         if (snd) PlaySound(*snd);
         for (Pin& p : node.outputs) {
             if (p.name == "Sound") {
@@ -131,7 +131,7 @@ void RegisterAudioNodes() {
     loadMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;
         for (const Pin& p : node.inputs) if (p.name == "Path") path = p.defaultValue;
-        Music* music = AudioCore::Get().LoadMusicHandle(path);
+        Music* music = AudioCore::Get().GetOrLoadCookedMusic(path);
         for (Pin& p : node.outputs) {
             if (p.name == "Music") {
                 char buf[64];
