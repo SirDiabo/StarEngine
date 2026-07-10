@@ -1,12 +1,35 @@
 #include "Nodes_Utility.h"
 #include "NodeRegistry.h"
+#include "InputKeyNames.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/CameraComponent.h"
 #include "raylib.h"
 #include <cstdlib>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+
+static std::string Utf8Encode(int codepoint) {
+    std::string out;
+    if (codepoint <= 0) return out;
+    if (codepoint < 0x80) {
+        out += (char)codepoint;
+    } else if (codepoint < 0x800) {
+        out += (char)(0xC0 | (codepoint >> 6));
+        out += (char)(0x80 | (codepoint & 0x3F));
+    } else if (codepoint < 0x10000) {
+        out += (char)(0xE0 | (codepoint >> 12));
+        out += (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        out += (char)(0x80 | (codepoint & 0x3F));
+    } else {
+        out += (char)(0xF0 | (codepoint >> 18));
+        out += (char)(0x80 | ((codepoint >> 12) & 0x3F));
+        out += (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        out += (char)(0x80 | (codepoint & 0x3F));
+    }
+    return out;
+}
 
 namespace fs = std::filesystem;
 
@@ -282,6 +305,55 @@ void RegisterUtilityNodes() {
         for (Pin& p : node.outputs) if (p.name == "Y") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getMouseDelta);
+
+    NodeTemplate getKeyPressed;
+    getKeyPressed.type = "Get_Key_Pressed";
+    getKeyPressed.category = "Input";
+    getKeyPressed.moduleName = "Stargraph";
+    getKeyPressed.createPins = [](Node* node) {
+        node->outputs.push_back({"Key", PinType::String, false, true});
+    };
+    getKeyPressed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int key = GetKeyPressed();
+        std::string keyName = key != 0 ? InputKeyCodeToName(key) : "";
+        for (Pin& p : node.outputs) if (p.name == "Key") p.defaultValue = keyName;
+    };
+    NodeRegistry::Get().RegisterNode(getKeyPressed);
+
+    NodeTemplate getCharPressed;
+    getCharPressed.type = "Get_Char_Pressed";
+    getCharPressed.category = "Input";
+    getCharPressed.moduleName = "Stargraph";
+    getCharPressed.createPins = [](Node* node) {
+        node->outputs.push_back({"Char", PinType::String, false, true});
+    };
+    getCharPressed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int codepoint = GetCharPressed();
+        std::string ch = Utf8Encode(codepoint);
+        for (Pin& p : node.outputs) if (p.name == "Char") p.defaultValue = ch;
+    };
+    NodeRegistry::Get().RegisterNode(getCharPressed);
+
+    NodeTemplate getTouchPos;
+    getTouchPos.type = "Get_Touch_Position";
+    getTouchPos.category = "Input";
+    getTouchPos.moduleName = "Stargraph";
+    getTouchPos.createPins = [](Node* node) {
+        node->inputs.push_back({"Index", PinType::Integer, true, false, 0, "0"});
+        node->outputs.push_back({"X", PinType::Float, false, true});
+        node->outputs.push_back({"Y", PinType::Float, false, true});
+    };
+    getTouchPos.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int index = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Index") index = atoi(p.defaultValue.c_str());
+        Vector2 pos = GetTouchPosition(index);
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%g", pos.x);
+        for (Pin& p : node.outputs) if (p.name == "X") p.defaultValue = buf;
+        snprintf(buf, sizeof(buf), "%g", pos.y);
+        for (Pin& p : node.outputs) if (p.name == "Y") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getTouchPos);
 
     NodeTemplate getFPS;
     getFPS.type = "Get_FPS";

@@ -419,10 +419,10 @@ x Check_Collision_Circles - Circle collision
 x Get_Collision_Rec - Get collision rectangle
 
 ### 7.15 Input State Nodes
-o Get_Key_Pressed - Get first queued key press
-o Get_Char_Pressed - Unicode character pressed
+x Get_Key_Pressed - Get first queued key press
+x Get_Char_Pressed - Unicode character pressed
 x Get_Mouse_Delta - Mouse movement since last frame
-o Get_Touch_Position - Multi-touch support
+x Get_Touch_Position - Multi-touch support
 
 ### 7.16 Gesture Nodes
 o Is_Gesture_Detected - Check for tap/drag/swipe/pinch
