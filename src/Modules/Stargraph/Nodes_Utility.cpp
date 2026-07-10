@@ -895,4 +895,218 @@ void RegisterUtilityNodes() {
         DrawBillboardPro(cam, Texture2D{}, rec, pos, {0, 1, 0}, billboardSize, origin, rot, tint);
     };
     NodeRegistry::Get().RegisterNode(drawBillboardPro);
+
+    NodeTemplate takeScreenshot;
+    takeScreenshot.type = "Take_Screenshot";
+    takeScreenshot.category = "Utility";
+    takeScreenshot.moduleName = "Stargraph";
+    takeScreenshot.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Path", PinType::String, true, false, 0, "screenshot.png"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    takeScreenshot.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string path = "screenshot.png";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Path") path = p.defaultValue;
+        }
+        TakeScreenshot(path.c_str());
+    };
+    NodeRegistry::Get().RegisterNode(takeScreenshot);
+
+    NodeTemplate openURL;
+    openURL.type = "Open_URL";
+    openURL.category = "Utility";
+    openURL.moduleName = "Stargraph";
+    openURL.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"URL", PinType::String, true, false, 0, "https://"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    openURL.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string url = "https://";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "URL") url = p.defaultValue;
+        }
+        OpenURL(url.c_str());
+    };
+    NodeRegistry::Get().RegisterNode(openURL);
+
+    NodeTemplate setWindowOpacity;
+    setWindowOpacity.type = "Set_Window_Opacity";
+    setWindowOpacity.category = "Window";
+    setWindowOpacity.moduleName = "Stargraph";
+    setWindowOpacity.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Opacity", PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setWindowOpacity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float opacity = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Opacity") opacity = (float)atof(p.defaultValue.c_str());
+        }
+        SetWindowOpacity(opacity);
+    };
+    NodeRegistry::Get().RegisterNode(setWindowOpacity);
+
+    NodeTemplate setWindowPosition;
+    setWindowPosition.type = "Set_Window_Position";
+    setWindowPosition.category = "Window";
+    setWindowPosition.moduleName = "Stargraph";
+    setWindowPosition.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setWindowPosition.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 pos = {0, 0, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+        }
+        SetWindowPosition((int)pos.x, (int)pos.y);
+    };
+    NodeRegistry::Get().RegisterNode(setWindowPosition);
+
+    NodeTemplate getClipboardText;
+    getClipboardText.type = "Get_Clipboard_Text";
+    getClipboardText.category = "Clipboard";
+    getClipboardText.moduleName = "Stargraph";
+    getClipboardText.createPins = [](Node* node) {
+        node->outputs.push_back({"Text", PinType::String, false, true});
+    };
+    getClipboardText.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        const char* text = GetClipboardText();
+        for (Pin& p : node.outputs) if (p.name == "Text") p.defaultValue = text ? text : "";
+    };
+    NodeRegistry::Get().RegisterNode(getClipboardText);
+
+    NodeTemplate setClipboardText;
+    setClipboardText.type = "Set_Clipboard_Text";
+    setClipboardText.category = "Clipboard";
+    setClipboardText.moduleName = "Stargraph";
+    setClipboardText.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Text", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setClipboardText.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string text;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Text") text = p.defaultValue;
+        }
+        SetClipboardText(text.c_str());
+    };
+    NodeRegistry::Get().RegisterNode(setClipboardText);
+
+    NodeTemplate checkCollisionPointRec;
+    checkCollisionPointRec.type = "Check_Collision_Point_Rec";
+    checkCollisionPointRec.category = "Collision";
+    checkCollisionPointRec.moduleName = "Stargraph";
+    checkCollisionPointRec.createPins = [](Node* node) {
+        node->inputs.push_back({"Point", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
+    };
+    checkCollisionPointRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 point = {0, 0, 0}, recPos = {0, 0, 0}, recSize = {100, 100, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Point") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &point.x, &point.y, &point.z);
+            if (p.name == "RecPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &recPos.x, &recPos.y, &recPos.z);
+            if (p.name == "RecSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &recSize.x, &recSize.y, &recSize.z);
+        }
+        Rectangle rec = {recPos.x, recPos.y, recSize.x, recSize.y};
+        bool colliding = CheckCollisionPointRec({point.x, point.y}, rec);
+        for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(checkCollisionPointRec);
+
+    NodeTemplate checkCollisionRecs;
+    checkCollisionRecs.type = "Check_Collision_Recs";
+    checkCollisionRecs.category = "Collision";
+    checkCollisionRecs.moduleName = "Stargraph";
+    checkCollisionRecs.createPins = [](Node* node) {
+        node->inputs.push_back({"RecAPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecASize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"RecBPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecBSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
+    };
+    checkCollisionRecs.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "RecAPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aPos.x, &aPos.y, &aPos.z);
+            if (p.name == "RecASize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aSize.x, &aSize.y, &aSize.z);
+            if (p.name == "RecBPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bPos.x, &bPos.y, &bPos.z);
+            if (p.name == "RecBSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bSize.x, &bSize.y, &bSize.z);
+        }
+        Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
+        Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};
+        bool colliding = CheckCollisionRecs(recA, recB);
+        for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(checkCollisionRecs);
+
+    NodeTemplate checkCollisionCircles;
+    checkCollisionCircles.type = "Check_Collision_Circles";
+    checkCollisionCircles.category = "Collision";
+    checkCollisionCircles.moduleName = "Stargraph";
+    checkCollisionCircles.createPins = [](Node* node) {
+        node->inputs.push_back({"CenterA", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RadiusA", PinType::Float, true, false, 0, "50.0"});
+        node->inputs.push_back({"CenterB", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RadiusB", PinType::Float, true, false, 0, "50.0"});
+        node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
+    };
+    checkCollisionCircles.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 centerA = {0, 0, 0}, centerB = {0, 0, 0};
+        float radiusA = 50.0f, radiusB = 50.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "CenterA") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &centerA.x, &centerA.y, &centerA.z);
+            if (p.name == "RadiusA") radiusA = (float)atof(p.defaultValue.c_str());
+            if (p.name == "CenterB") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &centerB.x, &centerB.y, &centerB.z);
+            if (p.name == "RadiusB") radiusB = (float)atof(p.defaultValue.c_str());
+        }
+        bool colliding = CheckCollisionCircles({centerA.x, centerA.y}, radiusA, {centerB.x, centerB.y}, radiusB);
+        for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(checkCollisionCircles);
+
+    NodeTemplate getCollisionRec;
+    getCollisionRec.type = "Get_Collision_Rec";
+    getCollisionRec.category = "Collision";
+    getCollisionRec.moduleName = "Stargraph";
+    getCollisionRec.createPins = [](Node* node) {
+        node->inputs.push_back({"RecAPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecASize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"RecBPosition", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"RecBSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->outputs.push_back({"Position", PinType::Vec3, false, true});
+        node->outputs.push_back({"Size", PinType::Vec3, false, true});
+    };
+    getCollisionRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "RecAPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aPos.x, &aPos.y, &aPos.z);
+            if (p.name == "RecASize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aSize.x, &aSize.y, &aSize.z);
+            if (p.name == "RecBPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bPos.x, &bPos.y, &bPos.z);
+            if (p.name == "RecBSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bSize.x, &bSize.y, &bSize.z);
+        }
+        Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
+        Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};
+        Rectangle overlap = GetCollisionRec(recA, recB);
+        char buf[64];
+        for (Pin& p : node.outputs) {
+            if (p.name == "Position") {
+                snprintf(buf, sizeof(buf), "%g,%g,0", overlap.x, overlap.y);
+                p.defaultValue = buf;
+            }
+            if (p.name == "Size") {
+                snprintf(buf, sizeof(buf), "%g,%g,0", overlap.width, overlap.height);
+                p.defaultValue = buf;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getCollisionRec);
 }

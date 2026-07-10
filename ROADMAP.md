@@ -398,8 +398,8 @@ x Get_Working_Directory - Get current directory
 x Change_Directory - Change working directory
 
 ### 7.12 Utility Nodes
-o Take_Screenshot - Capture screen to input file path
-o Open_URL - Open URL in default browser
+x Take_Screenshot - Capture screen to input file path
+x Open_URL - Open URL in default browser
 x Set_Window_Title - Change window title
 x Get_Screen_Size - Get screen width/height
 x Get_Mouse_Position - Get mouse X/Y as Vec2
@@ -413,10 +413,10 @@ x Color_Tint - Multiply color with tint
 x Color_Alpha - Set color alpha
 
 ### 7.14 Collision Detection Nodes (For basic collision tracing. Not Part of any component or module.)
-o Check_Collision_Point_Rec - Point in rectangle
-o Check_Collision_Recs - Rectangle collision
-o Check_Collision_Circles - Circle collision
-o Get_Collision_Rec - Get collision rectangle
+x Check_Collision_Point_Rec - Point in rectangle
+x Check_Collision_Recs - Rectangle collision
+x Check_Collision_Circles - Circle collision
+x Get_Collision_Rec - Get collision rectangle
 
 ### 7.15 Input State Nodes
 o Get_Key_Pressed - Get first queued key press
@@ -433,12 +433,12 @@ o Get_Gesture_Hold_Duration - Long press time
 ### 7.17 Window Management Nodes
 x Toggle_Fullscreen - Switch fullscreen/windowed
 x Maximize_Window / Minimize_Window
-o Set_Window_Opacity - Window transparency
-o Set_Window_Position - Move window on screen
+x Set_Window_Opacity - Window transparency
+x Set_Window_Position - Move window on screen
 
 ### 7.18 Clipboard Nodes
-o Get_Clipboard_Text - Read clipboard content
-o Set_Clipboard_Text - Write to clipboard
+x Get_Clipboard_Text - Read clipboard content
+x Set_Clipboard_Text - Write to clipboard
 
 ### 7.19 Image Processing Nodes
 o Image_Load - Load image from file
