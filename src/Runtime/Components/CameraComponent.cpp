@@ -233,6 +233,9 @@ void CameraComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddFloat("FOV", &fov);
     outProperties.AddBool("Orthographic", &orthographic);
+    outProperties.AddBool("Use Control Yaw", &useControlYaw);
+    outProperties.AddBool("Use Control Pitch", &useControlPitch);
+    outProperties.AddBool("Use Control Roll", &useControlRoll);
 }
 
 void CameraComponent::Update(float deltaTime) {

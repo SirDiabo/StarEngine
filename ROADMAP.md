@@ -142,11 +142,11 @@ o Has Authority node (Host / Client branches). Always-true when no networking mo
 o Abstract NetworkBackend interface a networking module registers against, module-gated same as 2.5
 
 ### 2.9 Player Actor Nodes
-o Add Movement Input nodes - accumulate, normalize, move actor directly
-o Add Control Yaw / Add Control Pitch / Add Control Roll accumulate into normalized rotation delta
-o Get/Set Control Rotation - to be used with camera rotation or actor yaw
-o Pitch clamp to prevent flip 89°
-o Add Use Control Control Yaw/Pitch/Roll (seperate) to both Actor and Camera Component. Actor Yaw true by default, Camera Pitch true by default.
+x Add Movement Input nodes - accumulate, normalize, move actor directly
+x Add Control Yaw / Add Control Pitch / Add Control Roll accumulate into normalized rotation delta
+x Get/Set Control Rotation - to be used with camera rotation or actor yaw
+x Pitch clamp to prevent flip 89°
+x Add Use Control Control Yaw/Pitch/Roll (seperate) to both Actor and Camera Component. Actor Yaw true by default, Camera Pitch true by default.
 
 ### 2.10 Save / Load System
 o Save flag on variables and component fields (similar to 2.8)

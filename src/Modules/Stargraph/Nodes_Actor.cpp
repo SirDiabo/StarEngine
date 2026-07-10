@@ -445,6 +445,161 @@ void RegisterActorNodes() {
     };
     NodeRegistry::Get().RegisterNode(setInputFocus);
 
+    NodeTemplate addMovementInput;
+    addMovementInput.type = "Add_Movement_Input";
+    addMovementInput.category = "Actor";
+    addMovementInput.moduleName = "Stargraph";
+    addMovementInput.createPins = [](Node* node) {
+        node->inputs.push_back({"In",             PinType::Exec, true,  false});
+        node->inputs.push_back({"Target",         PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"World Direction", PinType::Vec3, true, false, 0, "0,0,1"});
+        node->inputs.push_back({"Scale Value",     PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Out",           PinType::Exec, false, true});
+    };
+    addMovementInput.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        Vector3 dir = {0, 0, 1};
+        float scaleValue = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+            if (p.name == "World Direction") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dir.x, &dir.y, &dir.z);
+            if (p.name == "Scale Value") scaleValue = (float)atof(p.defaultValue.c_str());
+        }
+        if (!target) return;
+        target->AddMovementInput(dir, scaleValue);
+    };
+    NodeRegistry::Get().RegisterNode(addMovementInput);
+
+    NodeTemplate addControlYawInput;
+    addControlYawInput.type = "Add_Control_Yaw_Input";
+    addControlYawInput.category = "Actor";
+    addControlYawInput.moduleName = "Stargraph";
+    addControlYawInput.createPins = [](Node* node) {
+        node->inputs.push_back({"In",    PinType::Exec, true,  false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Out",  PinType::Exec, false, true});
+    };
+    addControlYawInput.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        float value = 0.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+        }
+        if (!target) return;
+        target->AddControlYawInput(value);
+    };
+    NodeRegistry::Get().RegisterNode(addControlYawInput);
+
+    NodeTemplate addControlPitchInput;
+    addControlPitchInput.type = "Add_Control_Pitch_Input";
+    addControlPitchInput.category = "Actor";
+    addControlPitchInput.moduleName = "Stargraph";
+    addControlPitchInput.createPins = [](Node* node) {
+        node->inputs.push_back({"In",    PinType::Exec, true,  false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Out",  PinType::Exec, false, true});
+    };
+    addControlPitchInput.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        float value = 0.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+        }
+        if (!target) return;
+        target->AddControlPitchInput(value);
+    };
+    NodeRegistry::Get().RegisterNode(addControlPitchInput);
+
+    NodeTemplate addControlRollInput;
+    addControlRollInput.type = "Add_Control_Roll_Input";
+    addControlRollInput.category = "Actor";
+    addControlRollInput.moduleName = "Stargraph";
+    addControlRollInput.createPins = [](Node* node) {
+        node->inputs.push_back({"In",    PinType::Exec, true,  false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Out",  PinType::Exec, false, true});
+    };
+    addControlRollInput.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        float value = 0.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+        }
+        if (!target) return;
+        target->AddControlRollInput(value);
+    };
+    NodeRegistry::Get().RegisterNode(addControlRollInput);
+
+    NodeTemplate getControlRotation;
+    getControlRotation.type = "Get_Control_Rotation";
+    getControlRotation.category = "Actor";
+    getControlRotation.moduleName = "Stargraph";
+    getControlRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+    };
+    getControlRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
+            target->controlRotation.x, target->controlRotation.y, target->controlRotation.z);
+        for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getControlRotation);
+
+    NodeTemplate setControlRotation;
+    setControlRotation.type = "Set_Control_Rotation";
+    setControlRotation.category = "Actor";
+    setControlRotation.moduleName = "Stargraph";
+    setControlRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"In",       PinType::Exec, true,  false});
+        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
+        node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->outputs.push_back({"Out",     PinType::Exec, false, true});
+    };
+    setControlRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Rotation") {
+                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
+                    &target->controlRotation.x, &target->controlRotation.y, &target->controlRotation.z);
+                break;
+            }
+        }
+        if (target->controlRotation.x > 89.0f) target->controlRotation.x = 89.0f;
+        if (target->controlRotation.x < -89.0f) target->controlRotation.x = -89.0f;
+    };
+    NodeRegistry::Get().RegisterNode(setControlRotation);
+
     NodeTemplate setViewTarget;
     setViewTarget.type = "Set_View_Target";
     setViewTarget.category = "Actor";

@@ -22,6 +22,9 @@ void Actor::GetProperties(PropertyList& outProperties) {
     outProperties.AddVector3("Rotation", &rotation.x);
     outProperties.AddVector3("Scale", &scale.x);
     outProperties.AddBool("Show Mouse Cursor", &showMouseCursor);
+    outProperties.AddBool("Use Control Yaw", &useControlYaw);
+    outProperties.AddBool("Use Control Pitch", &useControlPitch);
+    outProperties.AddBool("Use Control Roll", &useControlRoll);
 }
 
 void Actor::SetGraphBehavior(GraphBehavior* behavior) {
@@ -30,6 +33,7 @@ void Actor::SetGraphBehavior(GraphBehavior* behavior) {
 }
 
 void Actor::BeginPlay() {
+    controlRotation = rotation;
     hasBegunPlay = true;
     OnBeginPlay();
     if (graphBehavior) graphBehavior->OnBeginPlay(this);
@@ -38,6 +42,24 @@ void Actor::BeginPlay() {
 void Actor::Tick(float deltaTime) {
     OnTick(deltaTime);
     if (graphBehavior) graphBehavior->OnTick(this, deltaTime);
+
+    if (useControlYaw)   rotation.y = controlRotation.y;
+    if (useControlPitch) rotation.x = controlRotation.x;
+    if (useControlRoll)  rotation.z = controlRotation.z;
+
+    if (cameraComponent) {
+        if (cameraComponent->useControlYaw)   cameraComponent->rotation.y = controlRotation.y - rotation.y;
+        if (cameraComponent->useControlPitch) cameraComponent->rotation.x = controlRotation.x - rotation.x;
+        if (cameraComponent->useControlRoll)  cameraComponent->rotation.z = controlRotation.z - rotation.z;
+    }
+
+    float moveLenSq = pendingMovementInput.x * pendingMovementInput.x
+                     + pendingMovementInput.y * pendingMovementInput.y
+                     + pendingMovementInput.z * pendingMovementInput.z;
+    if (moveLenSq > 1.0f) pendingMovementInput = Vector3Scale(pendingMovementInput, 1.0f / sqrtf(moveLenSq));
+    position = Vector3Add(position, Vector3Scale(pendingMovementInput, deltaTime));
+    pendingMovementInput = { 0, 0, 0 };
+
     for (Component* c : components) c->Update(deltaTime);
 }
 
@@ -113,4 +135,24 @@ Component* Actor::FindComponentByName(const std::string& name) const {
         if (c->GetName() == name) return c;
     }
     return nullptr;
+}
+
+void Actor::AddControlYawInput(float value) {
+    controlRotation.y += value;
+}
+
+void Actor::AddControlPitchInput(float value) {
+    controlRotation.x += value;
+    if (controlRotation.x > 89.0f) controlRotation.x = 89.0f;
+    if (controlRotation.x < -89.0f) controlRotation.x = -89.0f;
+}
+
+void Actor::AddControlRollInput(float value) {
+    controlRotation.z += value;
+}
+
+void Actor::AddMovementInput(Vector3 worldDirection, float scaleValue) {
+    float len = Vector3Length(worldDirection);
+    if (len > 0.0001f) worldDirection = Vector3Scale(worldDirection, 1.0f / len);
+    pendingMovementInput = Vector3Add(pendingMovementInput, Vector3Scale(worldDirection, scaleValue));
 }

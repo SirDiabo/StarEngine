@@ -37,6 +37,18 @@ public:
 
     bool hasBegunPlay = false;
 
+    Vector3 controlRotation{ 0, 0, 0 };
+    Vector3 pendingMovementInput{ 0, 0, 0 };
+
+    bool useControlYaw = true;
+    bool useControlPitch = false;
+    bool useControlRoll = false;
+
+    void AddControlYawInput(float value);
+    void AddControlPitchInput(float value);
+    void AddControlRollInput(float value);
+    void AddMovementInput(Vector3 worldDirection, float scaleValue);
+
     void AddComponent(Component* component);
     void RemoveComponent(Component* component);
     Component* GetRootComponent();

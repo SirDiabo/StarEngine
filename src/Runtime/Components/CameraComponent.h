@@ -6,6 +6,10 @@ public:
     float fov = 50.0f;
     bool orthographic = false;
 
+    bool useControlYaw = false;
+    bool useControlPitch = true;
+    bool useControlRoll = false;
+
     CameraComponent();
     const char* GetClassName() const override { return "CameraComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
