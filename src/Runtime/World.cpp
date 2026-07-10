@@ -1,5 +1,6 @@
 #include "World.h"
 #include "Actor.h"
+#include "AudioCore.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -54,6 +55,8 @@ void World::Tick(float deltaTime) {
         actors[i]->Tick(deltaTime);
     }
 
+    AudioCore::Get().TickMusicStreams();
+
     bool shouldLockMouse = false;
     for (const auto& actor : actors) {
         if (!actor->showMouseCursor) {
@@ -80,6 +83,7 @@ void World::EndPlay() {
     playing = false;
     viewTarget = nullptr;
     ShowCursor();
+    AudioCore::Get().StopAndClearMusic();
 }
 
 void World::FlushDestroyQueue() {

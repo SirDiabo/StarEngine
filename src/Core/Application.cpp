@@ -7,6 +7,7 @@
 #include "Core/BuildRunner.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
+#include "Runtime/AudioCore.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
@@ -51,6 +52,7 @@ bool Application::Initialize(int argc, char* argv[]) {
     InitWindow(1280, 720, "StarEngine");
     SetExitKey(0);
     SetTargetFPS(60);
+    AudioCore::Get().InitDevice();
 
     {
         fs::path candidates[] = {
@@ -165,6 +167,7 @@ void Application::Run() {
 void Application::Shutdown() {
     delete editor;
     editor = nullptr;
+    AudioCore::Get().CloseDevice();
     CloseWindow();
 }
 

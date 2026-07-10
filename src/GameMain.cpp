@@ -9,6 +9,7 @@
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/SceneRenderer.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/AudioCore.h"
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
@@ -46,6 +47,7 @@ int main(int argc, char* argv[]) {
 
     InitWindow(config.targetWidth, config.targetHeight, config.name.c_str());
     SetTargetFPS(60);
+    AudioCore::Get().InitDevice();
 
     fs::path iconPath = exeDir / "icon.png";
     if (fs::exists(iconPath)) {
@@ -113,6 +115,7 @@ int main(int argc, char* argv[]) {
 
     World::Get().EndPlay();
     AssetCache::Get().Clear();
+    AudioCore::Get().CloseDevice();
     ModuleManager::Get().ShutdownAll();
     CloseWindow();
     return 0;

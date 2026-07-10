@@ -16,6 +16,7 @@
 #include "Nodes_Components.h"
 #include "Nodes_Variables.h"
 #include "Nodes_Utility.h"
+#include "Nodes_Audio.h"
 
 StargraphModule::StargraphModule() {
     name = "Stargraph";
@@ -29,6 +30,7 @@ bool StargraphModule::Initialize() {
     RegisterComponentNodes();
     RegisterVariableNodes();
     RegisterUtilityNodes();
+    RegisterAudioNodes();
 
     RegisterCameraComponentNodes();
     RegisterMeshComponentNodes();

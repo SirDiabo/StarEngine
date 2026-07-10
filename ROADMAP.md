@@ -374,15 +374,15 @@ x Image_To_Texture - Create texture from image data
 o Gen_Texture_Mipmaps - Generate mipmaps for texture
 
 ### 7.9 Audio Control Nodes Core (Not part of audio module)
-o Play_Sound - Play a sound selectable in a drop down list. Returns Audio object property.
-o Stop_Sound - Stop playing sound.
-o Pause_Sound / Resume_Sound - Sound control
-o Is_Sound_Playing - Check playback state
-o Set_Master_Volume - Global volume control
-o Load_Music - Load music stream
-o Play_Music - Play music
-o Set_Music_Volume - Music volume control
-o Seek_Music - Seek to position in seconds
+x Play_Sound - Play a sound selectable in a drop down list. Returns Audio object property.
+x Stop_Sound - Stop playing sound.
+x Pause_Sound / Resume_Sound - Sound control
+x Is_Sound_Playing - Check playback state
+x Set_Master_Volume - Global volume control
+x Load_Music - Load music stream
+x Play_Music - Play music
+x Set_Music_Volume - Music volume control
+x Seek_Music - Seek to position in seconds
 
 ### 7.10 Camera Control Nodes
 x Get_Camera_Matrix - Get view matrix for custom rendering
