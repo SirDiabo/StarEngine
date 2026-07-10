@@ -425,10 +425,10 @@ x Get_Mouse_Delta - Mouse movement since last frame
 x Get_Touch_Position - Multi-touch support
 
 ### 7.16 Gesture Nodes
-o Is_Gesture_Detected - Check for tap/drag/swipe/pinch
-o Get_Gesture_Drag_Vector - Drag direction
-o Get_Gesture_Pinch_Angle - Pinch rotation
-o Get_Gesture_Hold_Duration - Long press time
+x Is_Gesture_Detected - Check for tap/drag/swipe/pinch
+x Get_Gesture_Drag_Vector - Drag direction
+x Get_Gesture_Pinch_Angle - Pinch rotation
+x Get_Gesture_Hold_Duration - Long press time
 
 ### 7.17 Window Management Nodes
 x Toggle_Fullscreen - Switch fullscreen/windowed

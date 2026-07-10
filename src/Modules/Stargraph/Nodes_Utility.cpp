@@ -33,6 +33,20 @@ static std::string Utf8Encode(int codepoint) {
 
 namespace fs = std::filesystem;
 
+static int GestureFromName(const std::string& name) {
+    if (name == "TAP") return GESTURE_TAP;
+    if (name == "DOUBLETAP") return GESTURE_DOUBLETAP;
+    if (name == "HOLD") return GESTURE_HOLD;
+    if (name == "DRAG") return GESTURE_DRAG;
+    if (name == "SWIPE_RIGHT") return GESTURE_SWIPE_RIGHT;
+    if (name == "SWIPE_LEFT") return GESTURE_SWIPE_LEFT;
+    if (name == "SWIPE_UP") return GESTURE_SWIPE_UP;
+    if (name == "SWIPE_DOWN") return GESTURE_SWIPE_DOWN;
+    if (name == "PINCH_IN") return GESTURE_PINCH_IN;
+    if (name == "PINCH_OUT") return GESTURE_PINCH_OUT;
+    return GESTURE_NONE;
+}
+
 static float GetScalarValue(const Pin& p) {
     if (p.type == PinType::Boolean) return (p.defaultValue == "true" || p.defaultValue == "1") ? 1.0f : 0.0f;
     if (p.type == PinType::Integer) return (float)atoi(p.defaultValue.c_str());
@@ -1346,4 +1360,60 @@ void RegisterUtilityNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(getCollisionRec);
+
+    NodeTemplate isGestureDetected;
+    isGestureDetected.type = "Is_Gesture_Detected";
+    isGestureDetected.category = "Input";
+    isGestureDetected.moduleName = "Stargraph";
+    isGestureDetected.createPins = [](Node* node) {
+        node->inputs.push_back({"Gesture", PinType::String, true, false, 0, "TAP"});
+        node->outputs.push_back({"Detected", PinType::Boolean, false, true});
+    };
+    isGestureDetected.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string gesture = "TAP";
+        for (const Pin& p : node.inputs) if (p.name == "Gesture") gesture = p.defaultValue;
+        bool detected = IsGestureDetected((unsigned int)GestureFromName(gesture));
+        for (Pin& p : node.outputs) if (p.name == "Detected") p.defaultValue = detected ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(isGestureDetected);
+
+    NodeTemplate getGestureDragVector;
+    getGestureDragVector.type = "Get_Gesture_Drag_Vector";
+    getGestureDragVector.category = "Input";
+    getGestureDragVector.moduleName = "Stargraph";
+    getGestureDragVector.createPins = [](Node* node) {
+        node->outputs.push_back({"Vector", PinType::Vec3, false, true});
+    };
+    getGestureDragVector.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector2 drag = GetGestureDragVector();
+        char buf[64]; snprintf(buf, sizeof(buf), "%g,%g,0", drag.x, drag.y);
+        for (Pin& p : node.outputs) if (p.name == "Vector") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getGestureDragVector);
+
+    NodeTemplate getGesturePinchAngle;
+    getGesturePinchAngle.type = "Get_Gesture_Pinch_Angle";
+    getGesturePinchAngle.category = "Input";
+    getGesturePinchAngle.moduleName = "Stargraph";
+    getGesturePinchAngle.createPins = [](Node* node) {
+        node->outputs.push_back({"Angle", PinType::Float, false, true});
+    };
+    getGesturePinchAngle.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", GetGesturePinchAngle());
+        for (Pin& p : node.outputs) if (p.name == "Angle") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getGesturePinchAngle);
+
+    NodeTemplate getGestureHoldDuration;
+    getGestureHoldDuration.type = "Get_Gesture_Hold_Duration";
+    getGestureHoldDuration.category = "Input";
+    getGestureHoldDuration.moduleName = "Stargraph";
+    getGestureHoldDuration.createPins = [](Node* node) {
+        node->outputs.push_back({"Duration", PinType::Float, false, true});
+    };
+    getGestureHoldDuration.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", GetGestureHoldDuration());
+        for (Pin& p : node.outputs) if (p.name == "Duration") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getGestureHoldDuration);
 }
