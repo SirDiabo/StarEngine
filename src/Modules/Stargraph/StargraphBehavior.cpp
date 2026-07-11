@@ -25,3 +25,11 @@ void StargraphBehavior::OnEndPlay(Actor* owner) {
     ctx.deltaTime = 0.0f;
     GraphExecutor::Run(graph, "Event_EndPlay", ctx);
 }
+
+void StargraphBehavior::OnCustomEvent(Actor* owner, const std::string& eventName,
+                                       const std::vector<std::pair<std::string, std::string>>& params) {
+    ExecutionContext ctx;
+    ctx.actor = owner;
+    ctx.deltaTime = 0.0f;
+    GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
+}

@@ -89,6 +89,47 @@ Node* Stargraph::FindNodeByType(const std::string& type) {
     return nullptr;
 }
 
+Node* Stargraph::FindNodeById(int id) {
+    std::string idStr = std::to_string(id);
+    for (Node& node : nodes) {
+        if (node.id == idStr) return &node;
+    }
+    return nullptr;
+}
+
+Node* Stargraph::FindCustomEventByName(const std::string& eventName) {
+    for (Node& node : nodes) {
+        if (node.type == "Custom_Event" && node.title == eventName) return &node;
+    }
+    return nullptr;
+}
+
+Pin* Stargraph::AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type) {
+    std::vector<Pin>& pins = isOutput ? node.outputs : node.inputs;
+    for (Pin& pin : pins) {
+        if (pin.name == name) return &pin;
+    }
+    Pin pin;
+    pin.name = name;
+    pin.type = type;
+    pin.isInput = !isOutput;
+    pin.isOutput = isOutput;
+    pin.id = nextPinId++;
+    pins.push_back(pin);
+    return &pins.back();
+}
+
+void Stargraph::RemoveDynamicPin(Node& node, bool isOutput, const std::string& pinName) {
+    std::vector<Pin>& pins = isOutput ? node.outputs : node.inputs;
+    for (auto it = pins.begin(); it != pins.end(); ++it) {
+        if (it->name == pinName) {
+            RemoveLink(it->id);
+            pins.erase(it);
+            return;
+        }
+    }
+}
+
 Variable* Stargraph::FindVariable(const std::string& name) {
     for (Variable& v : variables) {
         if (v.name == name) return &v;
@@ -137,6 +178,20 @@ PinType PinTypeFromString(const std::string& text) {
     if (text == "Vec3") return PinType::Vec3;
     if (text == "Object") return PinType::Object;
     return PinType::None;
+}
+
+std::string ReplicationModeToString(ReplicationMode mode) {
+    switch (mode) {
+        case ReplicationMode::Replicated: return "Replicated";
+        case ReplicationMode::ServerOnly: return "ServerOnly";
+        default: return "Local";
+    }
+}
+
+ReplicationMode ReplicationModeFromString(const std::string& text) {
+    if (text == "Replicated") return ReplicationMode::Replicated;
+    if (text == "ServerOnly") return ReplicationMode::ServerOnly;
+    return ReplicationMode::Local;
 }
 
 static bool FindPinLocation(const std::deque<Node>& nodes, int pinId, int& outNodeIndex, std::string& outPinName) {
@@ -200,6 +255,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "Name=" << variables[i].name << "\n";
         out << "Type=" << PinTypeToString(variables[i].type) << "\n";
         out << "Value=" << variables[i].value << "\n";
+        out << "Replication=" << ReplicationModeToString(variables[i].replication) << "\n";
         out << "\n";
     }
 
@@ -213,6 +269,28 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "Title=" << node.title << "\n";
         out << "PosX=" << node.posX << "\n";
         out << "PosY=" << node.posY << "\n";
+        if (node.type == "Custom_Event") {
+            out << "Replication=" << ReplicationModeToString(node.eventReplication) << "\n";
+            out << "Reliable=" << (node.eventReliable ? "true" : "false") << "\n";
+        }
+        {
+            std::string names;
+            for (const Pin& pin : node.inputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (!names.empty()) names += ",";
+                names += pin.name;
+            }
+            out << "InputPinNames=" << names << "\n";
+        }
+        {
+            std::string names;
+            for (const Pin& pin : node.outputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (!names.empty()) names += ",";
+                names += pin.name;
+            }
+            out << "OutputPinNames=" << names << "\n";
+        }
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
             out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
@@ -336,6 +414,33 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Title")) node->title = *v;
             if (const std::string* v = FindEntry(section, "PosX")) node->posX = std::stof(*v);
             if (const std::string* v = FindEntry(section, "PosY")) node->posY = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "Replication")) node->eventReplication = ReplicationModeFromString(*v);
+            if (const std::string* v = FindEntry(section, "Reliable")) node->eventReliable = (*v == "true");
+
+            auto ensurePins = [&](const std::string* namesEntry, std::vector<Pin>& pins, bool isOutput) {
+                if (!namesEntry || namesEntry->empty()) return;
+                size_t start = 0;
+                while (start <= namesEntry->size()) {
+                    size_t comma = namesEntry->find(',', start);
+                    std::string pinName = (comma == std::string::npos) ? namesEntry->substr(start) : namesEntry->substr(start, comma - start);
+                    if (!pinName.empty()) {
+                        bool exists = false;
+                        for (const Pin& p : pins) if (p.name == pinName) { exists = true; break; }
+                        if (!exists) {
+                            Pin pin;
+                            pin.name = pinName;
+                            pin.isInput = !isOutput;
+                            pin.isOutput = isOutput;
+                            pin.id = nextPinId++;
+                            pins.push_back(pin);
+                        }
+                    }
+                    if (comma == std::string::npos) break;
+                    start = comma + 1;
+                }
+            };
+            ensurePins(FindEntry(section, "InputPinNames"), node->inputs, false);
+            ensurePins(FindEntry(section, "OutputPinNames"), node->outputs, true);
 
             for (const auto& entry : section.entries) {
                 if (entry.first.rfind("Pin.", 0) == 0) {
@@ -362,6 +467,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Name")) var.name = *v;
             if (const std::string* v = FindEntry(section, "Type")) var.type = PinTypeFromString(*v);
             if (const std::string* v = FindEntry(section, "Value")) var.value = *v;
+            if (const std::string* v = FindEntry(section, "Replication")) var.replication = ReplicationModeFromString(*v);
             variables.push_back(var);
         }
     }

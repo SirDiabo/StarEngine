@@ -3,6 +3,12 @@
 #include "Components/SceneComponent.h"
 #include "raymath.h"
 #include <algorithm>
+#include <unordered_map>
+
+static std::unordered_map<uint32_t, Actor*>& NetIdRegistry() {
+    static std::unordered_map<uint32_t, Actor*> registry;
+    return registry;
+}
 
 Actor::Actor() {
     name = "Actor";
@@ -12,8 +18,20 @@ Actor::Actor() {
 }
 
 Actor::~Actor() {
+    if (netId != 0) NetIdRegistry().erase(netId);
     delete graphBehavior;
     for (Component* c : components) delete c;
+}
+
+void Actor::SetNetId(uint32_t id) {
+    if (netId != 0) NetIdRegistry().erase(netId);
+    netId = id;
+    if (netId != 0) NetIdRegistry()[netId] = this;
+}
+
+Actor* Actor::FindByNetId(uint32_t id) {
+    auto it = NetIdRegistry().find(id);
+    return it != NetIdRegistry().end() ? it->second : nullptr;
 }
 
 void Actor::GetProperties(PropertyList& outProperties) {

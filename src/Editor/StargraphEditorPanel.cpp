@@ -849,6 +849,180 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     }
 }
 
+static const char* ParamTypeShortName(PinType type) {
+    switch (type) {
+        case PinType::Boolean: return "Bool";
+        case PinType::Integer: return "Int";
+        case PinType::Float:   return "Float";
+        case PinType::String:  return "String";
+        case PinType::Vec3:    return "Vec3";
+        case PinType::Object:  return "Object";
+        default:                return "Float";
+    }
+}
+
+static PinType NextParamType(PinType type) {
+    switch (type) {
+        case PinType::Boolean: return PinType::Integer;
+        case PinType::Integer: return PinType::Float;
+        case PinType::Float:   return PinType::String;
+        case PinType::String:  return PinType::Vec3;
+        case PinType::Vec3:    return PinType::Object;
+        default:                return PinType::Boolean;
+    }
+}
+
+void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, Node& node) {
+    int nodeId = std::stoi(node.id);
+    if (lastEventDetailNodeId != nodeId) {
+        snprintf(eventNameBuf, sizeof(eventNameBuf), "%s", node.title.c_str());
+        int row = 0;
+        for (const Pin& pin : node.outputs) {
+            if (pin.type == PinType::Exec) continue;
+            if (row < 8) snprintf(eventParamNameBuf[row], 64, "%s", pin.name.c_str());
+            row++;
+        }
+        lastEventDetailNodeId = nodeId;
+        eventActiveField = 0;
+    }
+
+    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    y += 14;
+    Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+    std::string titleVal = node.title;
+    if (PropertyField::StringBox(nameRect, eventNameBuf, sizeof(eventNameBuf), 1, eventActiveField, titleVal)) {
+        node.title = titleVal;
+        isDirty = true;
+    }
+    y += 26;
+
+    DrawText("Replication", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    y += 14;
+    static const char* replNames[] = {"Local", "Replicated", "Server Only"};
+    if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, replNames[(int)node.eventReplication])) {
+        node.eventReplication = (ReplicationMode)(((int)node.eventReplication + 1) % 3);
+        isDirty = true;
+    }
+    y += 24;
+
+    if (node.eventReplication != ReplicationMode::Local) {
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Reliable", &node.eventReliable)) isDirty = true;
+        y += 24;
+    }
+
+    y += 6;
+    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+    y += 10;
+    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+    y += 18;
+
+    std::string pinToRemove;
+    int row = 0;
+    for (Pin& pin : node.outputs) {
+        if (pin.type == PinType::Exec) continue;
+
+        if (row < 8) {
+            Rectangle nameR = {panel.x + 8, y, panel.width - 16 - 66, 18};
+            std::string pname = pin.name;
+            if (PropertyField::StringBox(nameR, eventParamNameBuf[row], 64, 10 + row, eventActiveField, pname)) {
+                pin.name = pname;
+                isDirty = true;
+            }
+        }
+
+        Rectangle typeR = {panel.x + panel.width - 54, y, 30, 18};
+        if (GuiButton(typeR, ParamTypeShortName(pin.type))) {
+            pin.type = NextParamType(pin.type);
+            isDirty = true;
+        }
+
+        Rectangle delR = {panel.x + panel.width - 20, y, 18, 18};
+        if (GuiButton(delR, "X")) pinToRemove = pin.name;
+
+        y += 22;
+        row++;
+    }
+
+    if (!pinToRemove.empty()) {
+        graph.RemoveDynamicPin(node, true, pinToRemove);
+        isDirty = true;
+    }
+
+    y += 6;
+    if (row < 8) {
+        if (GuiButton({panel.x + 8, y, panel.width - 16, 20}, "+ Add Parameter")) {
+            std::string newName;
+            int n = 1;
+            do {
+                newName = "Param" + std::to_string(n++);
+                bool taken = false;
+                for (const Pin& p : node.outputs) if (p.name == newName) { taken = true; break; }
+                if (!taken) break;
+            } while (n < 100);
+            graph.AddDynamicPin(node, true, newName, PinType::Float);
+            isDirty = true;
+        }
+    }
+}
+
+void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y, Node& node) {
+    int nodeId = std::stoi(node.id);
+    if (lastEventDetailNodeId != nodeId) {
+        eventNameBuf[0] = '\0';
+        for (const Pin& p : node.inputs) if (p.name == "Event Name") snprintf(eventNameBuf, sizeof(eventNameBuf), "%s", p.defaultValue.c_str());
+        lastEventDetailNodeId = nodeId;
+        eventActiveField = 0;
+    }
+
+    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    y += 14;
+
+    Pin* eventNamePin = nullptr;
+    for (Pin& p : node.inputs) if (p.name == "Event Name") eventNamePin = &p;
+
+    Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+    if (eventNamePin) {
+        std::string val = eventNamePin->defaultValue;
+        if (PropertyField::StringBox(nameRect, eventNameBuf, sizeof(eventNameBuf), 1, eventActiveField, val)) {
+            eventNamePin->defaultValue = val;
+            isDirty = true;
+        }
+    }
+    y += 26;
+
+    if (GuiButton({panel.x + 8, y, panel.width - 16, 20}, "Refresh Pins")) {
+        std::string targetName = eventNamePin ? eventNamePin->defaultValue : "";
+        Node* targetEvent = graph.FindCustomEventByName(targetName);
+        if (targetEvent) {
+            std::vector<std::string> keep = {"Target", "Event Name"};
+            for (const Pin& srcPin : targetEvent->outputs) {
+                if (srcPin.type == PinType::Exec) continue;
+                graph.AddDynamicPin(node, false, srcPin.name, srcPin.type);
+                keep.push_back(srcPin.name);
+            }
+            std::vector<std::string> toRemove;
+            for (const Pin& p : node.inputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemove.push_back(p.name);
+            }
+            for (const std::string& n : toRemove) graph.RemoveDynamicPin(node, false, n);
+            isDirty = true;
+        }
+    }
+    y += 28;
+
+    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+    y += 18;
+    for (const Pin& pin : node.inputs) {
+        if (pin.type == PinType::Exec) continue;
+        if (pin.name == "Target" || pin.name == "Event Name") continue;
+        DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 16;
+    }
+}
+
 void StargraphEditorPanel::RenderLeftPanel() {
     float topY = bounds.y + toolbarHeight + componentOutlinerHeight;
     Rectangle panel = {bounds.x, topY, leftPanelWidth, bounds.height - toolbarHeight - componentOutlinerHeight};
@@ -1149,11 +1323,36 @@ void StargraphEditorPanel::RenderRightPanel() {
                 isDirty = true;
             }
         }
+        y += 26;
+
+        DrawText("Replication", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static const char* replNames[] = {"Local", "Replicated", "Server Only"};
+        Rectangle replRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style replStyle;
+        DrawRectangleRec(replRect, replStyle.box);
+        DrawRectangleLinesEx(replRect, 1, replStyle.border);
+        DrawText(replNames[(int)var.replication], (int)replRect.x + 4, (int)replRect.y + 3, 11, replStyle.text);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), replRect)) {
+            var.replication = (ReplicationMode)(((int)var.replication + 1) % 3);
+            isDirty = true;
+        }
         return;
     }
 
     if (selectedNodeId == -1) {
         DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, {100, 100, 110, 255});
+        return;
+    }
+
+    Node* selectedNode = graph.FindNodeById(selectedNodeId);
+    if (selectedNode && selectedNode->type == "Custom_Event") {
+        RenderCustomEventDetails(panel, y, *selectedNode);
+        return;
+    }
+    if (selectedNode && selectedNode->type == "Call_Custom_Event") {
+        RenderCallCustomEventDetails(panel, y, *selectedNode);
         return;
     }
 

@@ -24,6 +24,8 @@ private:
     void RenderToolbar();
     void RenderComponentOutliner(Rectangle area);
     void RenderComponentDetails(Rectangle panel, float& y);
+    void RenderCustomEventDetails(Rectangle panel, float y, Node& node);
+    void RenderCallCustomEventDetails(Rectangle panel, float y, Node& node);
     void RenderLeftPanel();
     void RenderGraph();
     void RenderRightPanel();
@@ -140,4 +142,9 @@ private:
     char compSoundBuf[256] = "";
     char compVolumeBuf[32] = "";
     char compFovBuf[32] = "";
+
+    int lastEventDetailNodeId = -1;
+    char eventNameBuf[128] = "";
+    int eventActiveField = 0;
+    char eventParamNameBuf[8][64] = {};
 };

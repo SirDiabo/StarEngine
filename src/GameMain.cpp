@@ -88,6 +88,7 @@ int main(int argc, char* argv[]) {
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
+        ModuleManager::Get().UpdateAll(deltaTime);
         World::Get().Tick(deltaTime);
 
         for (const auto& actor : World::Get().GetActors()) {

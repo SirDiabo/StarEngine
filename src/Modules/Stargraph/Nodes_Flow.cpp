@@ -1,5 +1,6 @@
 #include "Nodes_Flow.h"
 #include "NodeRegistry.h"
+#include "Runtime/Networking/NetworkBackend.h"
 #include <unordered_map>
 
 static std::unordered_map<std::string, bool> doOnceStates;
@@ -18,6 +19,17 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"False", PinType::Exec, false, true});
     };
     NodeRegistry::Get().RegisterNode(branch);
+
+    NodeTemplate hasAuthority;
+    hasAuthority.type = "Has_Authority";
+    hasAuthority.category = "Flow";
+    hasAuthority.moduleName = "Stargraph";
+    hasAuthority.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->outputs.push_back({"Authority", PinType::Exec, false, true});
+        node->outputs.push_back({"Remote",    PinType::Exec, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(hasAuthority);
 
     NodeTemplate forLoop;
     forLoop.type = "For_Loop";

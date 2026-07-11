@@ -15,6 +15,15 @@ enum class PinType {
     Wildcard
 };
 
+enum class ReplicationMode {
+    Local,          // Never leaves the machine.
+    Replicated,     // Client Authoritative. Writes sync up to host, then from host to everyone.
+    ServerOnly      // Write-Gated to Host, syncs out to clients. Clients can't write and only read this.
+};
+
+std::string ReplicationModeToString(ReplicationMode mode);
+ReplicationMode ReplicationModeFromString(const std::string& text);
+
 struct Pin {
     std::string name;
     PinType type = PinType::None;
@@ -33,6 +42,9 @@ struct Node {
     std::vector<Pin> inputs;
     std::vector<Pin> outputs;
     std::string componentClass;
+
+    ReplicationMode eventReplication = ReplicationMode::Local;
+    bool eventReliable = false;
 };
 
 struct Link {
@@ -44,6 +56,7 @@ struct Variable {
     std::string name;
     PinType type = PinType::None;
     std::string value;
+    ReplicationMode replication = ReplicationMode::Local;
 };
 
 // Design-time declaration of a component owned by a StarActor class (.staractor asset).
@@ -97,7 +110,14 @@ public:
     Pin* FindPin(int pinId);
     Node* FindNodeByPinId(int pinId);
     Node* FindNodeByType(const std::string& type);
+    Node* FindCustomEventByName(const std::string& eventName);
+    Node* FindNodeById(int id);
     bool RemoveNode(int nodeId);
+
+    // Custom Event stuff
+    Pin* AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type);
+    void RemoveDynamicPin(Node& node, bool isOutput, const std::string& pinName);
+    int AllocatePinId() { return nextPinId++; }
 
     Variable* FindVariable(const std::string& name);
     const Variable* FindVariable(const std::string& name) const;

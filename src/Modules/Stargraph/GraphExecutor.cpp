@@ -1,6 +1,7 @@
 #include "GraphExecutor.h"
 #include "Stargraph.h"
 #include "NodeRegistry.h"
+#include "Runtime/Networking/NetworkBackend.h"
 #include <cstdlib>
 #include <vector>
 #include <unordered_map>
@@ -199,6 +200,11 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
         }
     }
 
+    ExecuteFromNode(graph, current, ctx);
+}
+
+void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, ExecutionContext& ctx) {
+    Node* current = startNode;
     int safetyLimit = 10000;
     while (safetyLimit-- > 0) {
         Node* next = FollowExecLink(graph, current);
@@ -214,6 +220,13 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 if (p.name == "Condition") { condition = (p.defaultValue == "true" || p.defaultValue == "1"); break; }
             }
             current = FollowExecLink(graph, next, condition ? "True" : "False");
+            if (!current) break;
+            continue;
+        }
+
+        if (next->type == "Has_Authority") {
+            bool authority = NetworkBackendRegistry::Get().HasAuthority();
+            current = FollowExecLink(graph, next, authority ? "Authority" : "Remote");
             if (!current) break;
             continue;
         }
@@ -297,6 +310,25 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
         if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
         current = next;
     }
+}
+
+void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventName, ExecutionContext ctx,
+                                    const std::vector<std::pair<std::string, std::string>>& params) {
+    static int depth = 0;
+    if (depth > 32) return; // guard against event chains calling each other recursively forever
+
+    Node* eventNode = graph.FindCustomEventByName(eventName);
+    if (!eventNode) return;
+
+    for (const auto& param : params) {
+        for (Pin& p : eventNode->outputs) {
+            if (p.name == param.first) { p.defaultValue = param.second; break; }
+        }
+    }
+
+    depth++;
+    ExecuteFromNode(graph, eventNode, ctx);
+    depth--;
 }
 
 Node* GraphExecutor::FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName) {

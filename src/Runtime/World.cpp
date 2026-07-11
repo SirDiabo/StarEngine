@@ -1,6 +1,7 @@
 #include "World.h"
 #include "Actor.h"
 #include "AudioCore.h"
+#include "Networking/ReplicationManager.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -44,6 +45,7 @@ void World::SetInputFocus(Actor* actor) {
 
 void World::BeginPlay() {
     playing = true;
+    ReplicationManager::Reset();
     for (size_t i = 0; i < actors.size(); i++) {
         actors[i]->BeginPlay();
     }
@@ -51,9 +53,14 @@ void World::BeginPlay() {
 
 void World::Tick(float deltaTime) {
     if (!playing) return;
+
+    ReplicationManager::PreTick();
+
     for (size_t i = 0; i < actors.size(); i++) {
         actors[i]->Tick(deltaTime);
     }
+
+    ReplicationManager::PostTick();
 
     AudioCore::Get().TickMusicStreams();
 

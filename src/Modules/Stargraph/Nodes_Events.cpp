@@ -1,8 +1,13 @@
 #include "Nodes_Events.h"
 #include "NodeRegistry.h"
 #include "InputKeyNames.h"
+#include "Runtime/Actor.h"
+#include "Runtime/Networking/NetworkBackend.h"
+#include "GraphExecutor.h"
+#include "StargraphBehavior.h"
 #include "raylib.h"
 #include <cmath>
+#include <cstdlib>
 
 void RegisterEventNodes() {
     NodeTemplate beginPlay;
@@ -114,4 +119,67 @@ void RegisterEventNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(inputKey);
+
+    NodeTemplate customEvent;
+    customEvent.type = "Custom_Event";
+    customEvent.category = "Events";
+    customEvent.moduleName = "Stargraph";
+    customEvent.isEvent = true;
+    customEvent.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(customEvent);
+
+    NodeTemplate callCustomEvent;
+    callCustomEvent.type = "Call_Custom_Event";
+    callCustomEvent.category = "Events";
+    callCustomEvent.moduleName = "Stargraph";
+    callCustomEvent.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Event Name", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    callCustomEvent.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+
+        std::string eventName;
+        Actor* target = ctx.actor;
+        std::vector<std::pair<std::string, std::string>> params;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Event Name") eventName = p.defaultValue;
+            else if (p.name == "Target" && !p.defaultValue.empty()) target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            else if (p.name != "In") params.emplace_back(p.name, p.defaultValue);
+        }
+        if (eventName.empty() || !target) return;
+
+        if (target == ctx.actor) {
+            GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
+        } else if (GraphBehavior* behavior = target->GetGraphBehavior()) {
+            behavior->OnCustomEvent(target, eventName, params);
+        }
+
+        NetworkBackend* backend = NetworkBackendRegistry::Get().GetActive();
+        if (backend && target->GetNetId() != 0) {
+            Node* eventDef = nullptr;
+            if (target == ctx.actor) {
+                eventDef = graph.FindCustomEventByName(eventName);
+            } else if (auto* targetBehavior = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior())) {
+                eventDef = targetBehavior->GetGraph().FindCustomEventByName(eventName);
+            }
+            if (eventDef && eventDef->eventReplication != ReplicationMode::Local) {
+                bool allowed = eventDef->eventReplication == ReplicationMode::Replicated ||
+                                (eventDef->eventReplication == ReplicationMode::ServerOnly && backend->HasAuthority());
+                if (allowed) {
+                    ReplicatedEventCall call;
+                    call.netId = target->GetNetId();
+                    call.eventName = eventName;
+                    call.params = params;
+                    call.reliable = eventDef->eventReliable;
+                    backend->SendEventCall(call, false);
+                }
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(callCustomEvent);
 }

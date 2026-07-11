@@ -158,6 +158,7 @@ void Application::Run() {
         BeginDrawing();
         ClearBackground({20, 20, 20, 255});
         float deltaTime = GetFrameTime();
+        ModuleManager::Get().UpdateAll(deltaTime);
         World::Get().Tick(deltaTime);
         editor->Render();
         EndDrawing();

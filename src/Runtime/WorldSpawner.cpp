@@ -9,7 +9,7 @@
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
 
-void WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
+Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
     actor->position = {inst.posX, inst.posY, inst.posZ};
     actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
@@ -67,10 +67,14 @@ void WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
         meshComp->SetMaterialPath(inst.materialAssetPath);
         actor->AddComponent(meshComp);
     }
+
+    return actor;
 }
 
 void WorldSpawner::SpawnMapActors(const StarMap& map) {
+    uint32_t nextNetId = 1;
     for (const ActorInstance& inst : map.GetInstances()) {
-        SpawnActorFromInstance(inst);
+        Actor* actor = SpawnActorFromInstance(inst);
+        actor->SetNetId(nextNetId++);
     }
 }

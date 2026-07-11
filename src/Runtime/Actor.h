@@ -7,6 +7,7 @@
 #include "Components/CameraComponent.h"
 #include "raylib.h"
 #include <vector>
+#include <cstdint>
 
 class Component;
 
@@ -23,7 +24,12 @@ public:
     void EndPlay();
 
     void SetGraphBehavior(GraphBehavior* behavior);
+    GraphBehavior* GetGraphBehavior() const { return graphBehavior; }
     Matrix GetWorldMatrix() const;
+
+    uint32_t GetNetId() const { return netId; }
+    void SetNetId(uint32_t id);
+    static Actor* FindByNetId(uint32_t id);
 
     static Vector3 ComputeWorldPosition(Vector3 localPos, Vector3 parentPos, Vector3 parentRot, Vector3 parentScale);
     static Vector3 ComputeWorldRotation(Vector3 localRot, Vector3 parentRot);
@@ -72,4 +78,5 @@ private:
     CollisionComponent* collisionComponent = nullptr;
     AudioComponent* audioComponent = nullptr;
     CameraComponent* cameraComponent = nullptr;
+    uint32_t netId = 0;
 };

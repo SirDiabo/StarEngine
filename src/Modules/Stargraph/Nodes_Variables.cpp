@@ -1,5 +1,6 @@
 #include "Nodes_Variables.h"
 #include "NodeRegistry.h"
+#include "Runtime/Networking/NetworkBackend.h"
 
 void RegisterVariableNodes() {
     NodeTemplate getVar;
@@ -44,7 +45,11 @@ void RegisterVariableNodes() {
             if (p.name == "Value")         value   = p.defaultValue;
         }
         for (Variable& v : graph.GetVariables()) {
-            if (v.name == varName) { v.value = value; break; }
+            if (v.name != varName) continue;
+            
+            if (v.replication == ReplicationMode::ServerOnly && !NetworkBackendRegistry::Get().HasAuthority()) break;
+            v.value = value;
+            break;
         }
     };
     NodeRegistry::Get().RegisterNode(setVar);
