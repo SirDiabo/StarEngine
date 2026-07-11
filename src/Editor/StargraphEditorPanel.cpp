@@ -2193,6 +2193,18 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
         entries.push_back({t.category, t.type});
     }
+
+    for (const Node& node : graph.GetNodes()) {
+        if (node.type != "Custom_Event") continue;
+        std::string eventName = node.title;
+        if (eventName.empty()) continue;
+
+        std::string typeLower = "call_custom_event:" + eventName;
+        for (char& c : typeLower) c = (char)tolower(c);
+        if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
+
+        entries.push_back({"Events", "Call_Custom_Event:" + eventName});
+    }
     std::sort(entries.begin(), entries.end());
 
     if (entries.empty() && searchLower.empty()) { nodeMenuOpen = false; filterCompatibleWithPin = -1; return; }
@@ -2269,7 +2281,38 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
             DrawRectangleRec(btn, {65, 65, 85, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                Node* node = graph.CreateNode(entry.second);
+                std::string nodeType = entry.second;
+                std::string eventName;
+                if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
+                    eventName = nodeType.substr(18);
+                    nodeType = "Call_Custom_Event";
+                }
+                Node* node = graph.CreateNode(nodeType);
+                if (!eventName.empty()) {
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Event Name") {
+                            p.defaultValue = eventName;
+                            break;
+                        }
+                    }
+                    Node* targetEvent = graph.FindCustomEventByName(eventName);
+                    if (targetEvent) {
+                        std::vector<std::string> keep = {"Target", "Event Name"};
+                        for (const Pin& srcPin : targetEvent->outputs) {
+                            if (srcPin.type == PinType::Exec) continue;
+                            graph.AddDynamicPin(*node, false, srcPin.name, srcPin.type);
+                            keep.push_back(srcPin.name);
+                        }
+                        std::vector<std::string> toRemove;
+                        for (Pin& p : node->inputs) {
+                            if (p.type == PinType::Exec) continue;
+                            bool keepIt = false;
+                            for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
+                            if (!keepIt) toRemove.push_back(p.name);
+                        }
+                        for (const std::string& n : toRemove) graph.RemoveDynamicPin(*node, false, n);
+                    }
+                }
                 float rawNX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
                 float rawNY = (nodeMenuPos.y - graphArea.y - scroll.y) / zoom;
                 const float gridSnap = 16.0f;
@@ -2310,6 +2353,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             }
         }
         std::string entryDisplay = entry.second;
+        if (entryDisplay.rfind("Call_Custom_Event:", 0) == 0) {
+            entryDisplay = "Event " + entryDisplay.substr(18);
+        }
         for (char& c : entryDisplay) if (c == '_') c = ' ';
         DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
         y += itemH;
