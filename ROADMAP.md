@@ -134,12 +134,11 @@ x Get/Set View Target node. Actor's CameraComponent becomes the active render ca
 x Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
 
 ### 2.8 Replication Core
-o ReplicationMode enum on variables and custom events: Local (default) / Replicated / Server Only
-o Local = never leaves the machine, Replicated = client-authoritative, syncs up then out, Server Only = write-gated to host, syncs out
-o Server-Only writes gated by physical interaction (e.g. pickup) depend on CollisionComponent overlap events (13.5)
-o Property-diff snapshot path for variables, separate fire-once event queue for custom events
-o Has Authority node (Host / Client branches). Always-true when no networking module is active
-o Abstract NetworkBackend interface a networking module registers against, module-gated same as 2.5
+x ReplicationMode enum on variables and custom events: Local (default) / Replicated / Server Only
+x Local = never leaves the machine, Replicated = client-authoritative, syncs up then out, Server Only = write-gated to host, syncs out
+x Property-diff snapshot path for variables, separate fire-once event queue for custom events
+x Has Authority node (Host / Client branches). Always-true when no networking module is active
+x Abstract NetworkBackend interface a networking module registers against, module-gated same as 2.5
 
 ### 2.9 Player Actor Nodes
 x Add Movement Input nodes - accumulate, normalize, move actor directly
@@ -317,7 +316,7 @@ x Key input field renders searchable dropdown with all input names, matching Add
 x Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
 
 o Functions with inputs and outputs. Have their own graph with input and return node. (user-named, callable from other graphs)
-o Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
+x Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence
