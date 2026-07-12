@@ -2,6 +2,7 @@
 #include "NodeRegistry.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
+#include "Runtime/Networking/NetworkBackend.h"
 #include "StargraphBehavior.h"
 #include "Core/CookedFile.h"
 #include "raymath.h"
@@ -306,6 +307,20 @@ void RegisterActorNodes() {
                     spawned->SetGraphBehavior(new StargraphBehavior(std::move(loadedGraph)));
                 }
             }
+
+            NetworkBackend* backend = NetworkBackendRegistry::Get().GetActive();
+            if (backend && backend->IsHost()) {
+                spawned->SetNetId(backend->AllocateNetId());
+                ReplicatedActorSpawn spawn;
+                spawn.netId = spawned->GetNetId();
+                spawn.className = className;
+                spawn.graphPath = graphPath;
+                spawn.posX = spawned->position.x; spawn.posY = spawned->position.y; spawn.posZ = spawned->position.z;
+                spawn.rotX = spawned->rotation.x; spawn.rotY = spawned->rotation.y; spawn.rotZ = spawned->rotation.z;
+                spawn.scaleX = spawned->scale.x; spawn.scaleY = spawned->scale.y; spawn.scaleZ = spawned->scale.z;
+                backend->SendActorSpawn(spawn);
+            }
+
             for (Pin& p : node.outputs) {
                 if (p.name == "Spawned Actor") {
                     char buf[64];

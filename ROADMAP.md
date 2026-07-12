@@ -564,17 +564,18 @@ o Audio graph nodes: Play Sound, Stop Sound, Set Volume, Set Pitch
 o Adaptive music layer system that allows you to play multiple tracks to be controlled individually, add loop regions and exit events for easy transitioning
 
 ### 13.2 Networking / Replication Module
-o Host Lobby node (password input, max player slots)
-o Join Lobby node (password input)
-o Lightweight signaling relay: ephemeral room codes, rate-limited, stateless, no PII stored, sits behind standard DDoS protection
-o Transport: libjuice (MPL 2.0) for STUN/ICE/TURN NAT traversal; custom thin message-framing layer written on top
-o Direct P2P preferred, TURN fallback automatic when hole-punching fails
-o Lobby/project setting: "Direct (P2P + fallback)" and "Always Relay" (hides player IPs from each other, costs relay bandwidth for full session)
-o dev-supplied TURN relay (no StarEngine provided TURN Relay, at least not planned)
-o Listen-host authority model: host is authoritative, snapshot interpolation for remote actors, local prediction only for locally-controlled actor
-o Run on Server / Multicast-equivalent nodes kept as an escape hatch for one-off cases, not the default path
-o Implements the 2.8 NetworkBackend interface; third-party networking modules can implement their own against the same interface
-o Runtime-spawned actor existence replication - separate problem from 2.8 property/event sync
+x Host/Join/Disconnect nodes with password and max player slots
+x Transport via libdatachannel (MPL 2.0, wraps libjuice) with DTLS encryption and SCTP channels
+x Direct P2P via TCP rendezvous, then ICE/DTLS/SCTP over UDP with optional TURN fallback
+x Star topology: all clients connect to host only, host-authoritative with broadcast semantics
+x Signaling via direct TCP (no third-party relay), non-trickle ICE gathering before sending
+x NetworkBackend interface extended with sourceConnectionId and spawn-replication surface
+x Runtime actor spawn replication: host broadcasts net id, class path, transform; clients apply idempotently
+x Connection lifecycle events (OnPlayerConnected/Disconnected/ConnectedToHost/JoinFailed) as Custom Events
+x Security: constant-time password comparison, SIGPIPE handling, handshake thread caps, path validation
+o Listen-host authority for Variables/Events/spawn, defers continuous transform replication to 13.3+
+o Destroy replication for runtime-spawned actors; late-joiner catch-up broadcasts all actors (needs per-connection addressing)
+o Server/Multicast nodes available but not default
 
 ### 13.3 Physics Module
 o collision shapes component for overlap events

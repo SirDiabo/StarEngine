@@ -1,0 +1,9 @@
+name=Networking
+version=1.0
+description=Direct P2P multiplayer over libdatachannel
+author=StarEngine
+category=Networking
+enabledByDefault=false
+dependencies=
+assetTypes=
+nodeCategories=Networking
