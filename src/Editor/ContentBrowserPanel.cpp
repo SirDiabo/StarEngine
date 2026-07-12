@@ -3,6 +3,7 @@
 #include "Core/AssetRegistry.h"
 #include "Core/StarAsset.h"
 #include "Core/Module.h"
+#include "Core/EmbeddedAssets.h"
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "PropertyFields.h"
@@ -15,26 +16,10 @@
 
 namespace fs = std::filesystem;
 
-static std::string FindAssetsDir() {
-    fs::path exe = GetApplicationDirectory();
-    for (int i = 0; i < 5; i++) {
-        fs::path candidate = exe / "Assets";
-        if (fs::exists(candidate)) return candidate.string();
-        exe = exe.parent_path();
-    }
-    return "";
-}
-
 void ContentBrowserPanel::LoadIcons() {
-    std::string dir = FindAssetsDir();
-    if (dir.empty()) return;
-
     auto load = [&](const std::string& key, const std::string& file) {
-        fs::path p = fs::path(dir) / file;
-        if (fs::exists(p)) {
-            Texture2D tex = LoadTexture(p.string().c_str());
-            if (tex.id != 0) icons[key] = tex;
-        }
+        Texture2D tex = EmbeddedAssets::Get().LoadTextureAsset(file);
+        if (tex.id != 0) icons[key] = tex;
     };
 
     load("folder",   "icon_folder.png");

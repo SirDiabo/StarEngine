@@ -5,6 +5,7 @@
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Core/BuildRunner.h"
+#include "Core/EmbeddedAssets.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
@@ -54,21 +55,13 @@ bool Application::Initialize(int argc, char* argv[]) {
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
 
+    EmbeddedAssets::Get().Init(argc > 0 ? argv[0] : "");
+
     {
-        fs::path candidates[] = {
-            fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
-            fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
-            fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
-        };
-        for (const auto& p : candidates) {
-            if (fs::exists(p)) {
-                Image icon = LoadImage(p.string().c_str());
-                if (icon.data) {
-                    SetWindowIcon(icon);
-                    UnloadImage(icon);
-                }
-                break;
-            }
+        Image icon = EmbeddedAssets::Get().LoadImageAsset("logo.png");
+        if (icon.data) {
+            SetWindowIcon(icon);
+            UnloadImage(icon);
         }
     }
 

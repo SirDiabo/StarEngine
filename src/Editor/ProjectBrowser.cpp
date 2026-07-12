@@ -1,4 +1,5 @@
 #include "ProjectBrowser.h"
+#include "Core/EmbeddedAssets.h"
 #include "Core/Project.h"
 #include "raygui.h"
 #include "raylib.h"
@@ -54,20 +55,8 @@ void ProjectBrowser::LoadLogoIfNeeded() {
     if (logoLoadAttempted) return;
     logoLoadAttempted = true;
 
-    fs::path candidates[] = {
-        fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
-        fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
-        fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
-    };
-    for (const auto& p : candidates) {
-        if (fs::exists(p)) {
-            logo = LoadTexture(p.string().c_str());
-            if (logo.id != 0) {
-                logoLoaded = true;
-                break;
-            }
-        }
-    }
+    logo = EmbeddedAssets::Get().LoadTextureAsset("logo.png");
+    if (logo.id != 0) logoLoaded = true;
 }
 
 void ProjectBrowser::Render() {

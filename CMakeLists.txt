@@ -49,6 +49,11 @@ if(STARENGINE_BUILD_GAME)
     endif()
     if(WIN32)
         target_link_libraries(StarEngineGame PRIVATE ws2_32)
+
+        set_target_properties(StarEngineGame PROPERTIES WIN32_EXECUTABLE TRUE)
+        if(MSVC)
+            set_target_properties(StarEngineGame PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+        endif()
     endif()
 
     target_compile_definitions(StarEngineGame PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
@@ -60,6 +65,7 @@ if(STARENGINE_BUILD_GAME)
 else()
     file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp" "src/*.c")
     list(FILTER SOURCES EXCLUDE REGEX ".*/GameMain\\.cpp$")
+    list(FILTER SOURCES EXCLUDE REGEX ".*/Tools/.*\\.cpp$")
 
     add_executable(StarEngine ${SOURCES} ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngine generate_modules)
@@ -76,5 +82,22 @@ else()
 
     if(WIN32)
         target_link_libraries(StarEngine PRIVATE comdlg32 shell32 ole32 ws2_32)
+
+        set_target_properties(StarEngine PROPERTIES WIN32_EXECUTABLE TRUE)
+        if(MSVC)
+        
+            set_target_properties(StarEngine PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+        endif()
+        target_compile_definitions(StarEngine PRIVATE $<$<CONFIG:Debug>:STARENGINE_DEBUG_CONSOLE>)
     endif()
+    
+    add_executable(AssetPacker src/Tools/AssetPacker.cpp src/Core/StarPak.cpp)
+    target_include_directories(AssetPacker PRIVATE src)
+
+    add_custom_command(TARGET StarEngine POST_BUILD
+        COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE:StarEngine>"
+        COMMENT "Embedding Assets/ into StarEngine executable"
+        VERBATIM
+    )
+    add_dependencies(StarEngine AssetPacker)
 endif()

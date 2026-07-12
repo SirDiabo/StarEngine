@@ -137,9 +137,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: star-engine-${{ matrix.name }}
-          path: |
-            ${{ matrix.artifact-path }}
-            Assets/
+          path: ${{ matrix.artifact-path }}
           retention-days: 30
           compression-level: 9
 
@@ -242,20 +240,17 @@ jobs:
           # Windows
           mkdir -p staging/StarEngine
           cp artifacts/star-engine-windows/build/Release/StarEngine.exe staging/StarEngine/ || exit 1
-          cp -r artifacts/star-engine-windows/Assets staging/StarEngine/ || exit 1
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine/ && rm -rf StarEngine)
           
           # Linux
           mkdir -p staging/StarEngine
           cp artifacts/star-engine-linux/build/StarEngine staging/StarEngine/ || exit 1
-          cp -r artifacts/star-engine-linux/Assets staging/StarEngine/ || exit 1
           chmod +x staging/StarEngine/StarEngine
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine/ && rm -rf StarEngine)
           
           # macOS
           mkdir -p staging/StarEngine
           cp artifacts/star-engine-macos/build/StarEngine staging/StarEngine/ || exit 1
-          cp -r artifacts/star-engine-macos/Assets staging/StarEngine/ || exit 1
           chmod +x staging/StarEngine/StarEngine
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine/ && rm -rf StarEngine)
           

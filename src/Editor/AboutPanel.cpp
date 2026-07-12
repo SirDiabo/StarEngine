@@ -1,10 +1,8 @@
 #include "AboutPanel.h"
+#include "Core/EmbeddedAssets.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <string>
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 AboutPanel& AboutPanel::Get() {
     static AboutPanel instance;
@@ -15,20 +13,8 @@ void AboutPanel::Open() {
     open = true;
     preventClose = true;
     if (!logoLoaded) {
-        fs::path candidates[] = {
-            fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
-            fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
-            fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
-        };
-        for (const auto& p : candidates) {
-            if (fs::exists(p)) {
-                logo = LoadTexture(p.string().c_str());
-                if (logo.id != 0) {
-                    logoLoaded = true;
-                    break;
-                }
-            }
-        }
+        logo = EmbeddedAssets::Get().LoadTextureAsset("logo.png");
+        if (logo.id != 0) logoLoaded = true;
     }
 }
 

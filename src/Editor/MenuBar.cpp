@@ -1,9 +1,7 @@
 #include "MenuBar.h"
+#include "Core/EmbeddedAssets.h"
 #include "raygui.h"
 #include "raylib.h"
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 static const Color COLOR_MENUBAR_BG = { 45, 45, 48, 255 };
 static const Color COLOR_MENU_POPUP = { 55, 55, 60, 255 };
@@ -16,20 +14,10 @@ static const float MENU_BTN_PAD     = 10.0f;
 static const float MENU_CHECK_W     = 16.0f;
 
 void MenuBar::Initialize() {
-    fs::path candidates[] = {
-        fs::path(GetWorkingDirectory()) / "Assets" / "logo.png",
-        fs::path(GetApplicationDirectory()) / "Assets" / "logo.png",
-        fs::path(GetApplicationDirectory()) / ".." / "Assets" / "logo.png",
-    };
-    for (const auto& p : candidates) {
-        if (fs::exists(p)) {
-            logo = LoadTexture(p.string().c_str());
-            if (logo.id != 0) {
-                logoLoaded = true;
-                logoOffsetX = menuBarHeight - 4.0f + 6.0f;
-                break;
-            }
-        }
+    logo = EmbeddedAssets::Get().LoadTextureAsset("logo.png");
+    if (logo.id != 0) {
+        logoLoaded = true;
+        logoOffsetX = menuBarHeight - 4.0f + 6.0f;
     }
 }
 
