@@ -17,6 +17,8 @@ set(USE_NICE OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/libdatachannel)
 
+find_package(OpenSSL REQUIRED)
+
 set(MODULES_GENERATED_FILE "${CMAKE_BINARY_DIR}/Modules.modules.generated.h")
 
 add_custom_target(generate_modules ALL
@@ -41,6 +43,7 @@ if(STARENGINE_BUILD_GAME)
 
     target_link_libraries(StarEngineGame PRIVATE raylib)
     target_link_libraries(StarEngineGame PRIVATE LibDataChannel::LibDataChannel)
+    target_link_libraries(StarEngineGame PRIVATE OpenSSL::Crypto)
     if(PLATFORM STREQUAL "RGFW" AND UNIX AND NOT APPLE)
         target_link_libraries(StarEngineGame PRIVATE Xrandr)
     endif()
@@ -67,6 +70,7 @@ else()
 
     target_link_libraries(StarEngine PRIVATE raylib)
     target_link_libraries(StarEngine PRIVATE LibDataChannel::LibDataChannel)
+    target_link_libraries(StarEngine PRIVATE OpenSSL::Crypto)
 
     target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
 

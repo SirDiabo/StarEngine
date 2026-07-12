@@ -4,6 +4,7 @@
 #include <rtc/rtc.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -74,6 +75,11 @@ private:
     void BroadcastToChannel(bool eventsChannel, const std::string& payload, uint64_t excludeConnectionId);
     void PushLifecycle(LifecycleType type, uint64_t connId, const std::string& detail);
 
+    static std::string IpOnly(const std::string& peerAddress);
+    bool IsAuthBlocked(const std::string& ip);
+    void RecordAuthFailure(const std::string& ip);
+    void RecordAuthSuccess(const std::string& ip);
+
     std::string turnServerUrl;
     std::string expectedPassword;
     int maxPlayers = 8;
@@ -100,4 +106,11 @@ private:
 
     std::mutex lifecycleMutex;
     std::vector<LifecycleEvent> lifecycleQueue;
+
+    struct AuthFailState {
+        int failures = 0;
+        std::chrono::steady_clock::time_point blockedUntil{};
+    };
+    std::mutex authFailMutex;
+    std::unordered_map<std::string, AuthFailState> authFailsByIp;
 };

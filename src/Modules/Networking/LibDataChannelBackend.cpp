@@ -1,10 +1,16 @@
 #include "LibDataChannelBackend.h"
 #include "NetIO.h"
+#include "AuthChallenge.h"
 
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
 #include <algorithm>
+
+namespace {
+constexpr int kMaxAuthFailures = 5;
+constexpr auto kAuthBlockDuration = std::chrono::seconds(30);
+} // namespace
 
 LibDataChannelBackend::LibDataChannelBackend() {
     PlatformSocket::GlobalInit();
@@ -33,6 +39,33 @@ bool ConstantTimeEquals(const std::string& a, const std::string& b) {
     return diff == 0;
 }
 } // namespace
+
+std::string LibDataChannelBackend::IpOnly(const std::string& peerAddress) {
+    size_t colon = peerAddress.find(':');
+    return colon == std::string::npos ? peerAddress : peerAddress.substr(0, colon);
+}
+
+bool LibDataChannelBackend::IsAuthBlocked(const std::string& ip) {
+    std::lock_guard<std::mutex> lock(authFailMutex);
+    auto it = authFailsByIp.find(ip);
+    if (it == authFailsByIp.end()) return false;
+    return std::chrono::steady_clock::now() < it->second.blockedUntil;
+}
+
+void LibDataChannelBackend::RecordAuthFailure(const std::string& ip) {
+    std::lock_guard<std::mutex> lock(authFailMutex);
+    AuthFailState& state = authFailsByIp[ip];
+    state.failures++;
+    if (state.failures >= kMaxAuthFailures) {
+        state.blockedUntil = std::chrono::steady_clock::now() + kAuthBlockDuration;
+        state.failures = 0;
+    }
+}
+
+void LibDataChannelBackend::RecordAuthSuccess(const std::string& ip) {
+    std::lock_guard<std::mutex> lock(authFailMutex);
+    authFailsByIp.erase(ip);
+}
 
 // Host
 std::string LibDataChannelBackend::StartHost(uint16_t port, const std::string& password,
@@ -91,18 +124,38 @@ void LibDataChannelBackend::HostAcceptLoop() {
 }
 
 void LibDataChannelBackend::HostHandshakeClient(PlatformSocket sock) {
+    std::string ip = IpOnly(sock.PeerAddressString());
+    if (IsAuthBlocked(ip)) return;
+
     std::string helloFrame;
     if (!sock.ReadFrame(helloFrame, 5000)) return;
-
     auto hello = NetIO::ParseLines(helloFrame);
     if (hello["type"] != "hello") return;
-    if (!ConstantTimeEquals(hello["password"], expectedPassword)) {
+
+    // Challenge-response so the password itself never crosses the wire.
+    std::string nonce = AuthChallenge::GenerateNonceHex();
+    if (nonce.empty()) return;
+
+    std::string challengeFrame;
+    NetIO::AppendLine(challengeFrame, "type", "challenge");
+    NetIO::AppendLine(challengeFrame, "nonce", nonce);
+    if (!sock.WriteFrame(challengeFrame)) return;
+
+    std::string authFrame;
+    if (!sock.ReadFrame(authFrame, 5000)) return;
+    auto auth = NetIO::ParseLines(authFrame);
+    if (auth["type"] != "auth") return;
+
+    std::string expectedHmac = AuthChallenge::ComputeHmacHex(expectedPassword, nonce);
+    if (!ConstantTimeEquals(auth["hmac"], expectedHmac)) {
+        RecordAuthFailure(ip);
         std::string frame;
         NetIO::AppendLine(frame, "type", "reject");
         NetIO::AppendLine(frame, "reason", "Incorrect password");
         sock.WriteFrame(frame);
         return;
     }
+    RecordAuthSuccess(ip);
 
     uint64_t connId = nextConnectionId.fetch_add(1);
     auto conn = CreateConnection(connId);
@@ -193,14 +246,35 @@ void LibDataChannelBackend::ClientJoinThread(std::string host, uint16_t port, st
 
     std::string helloFrame;
     NetIO::AppendLine(helloFrame, "type", "hello");
-    NetIO::AppendLine(helloFrame, "password", password);
     if (!sock.WriteFrame(helloFrame)) {
         PushLifecycle(LifecycleType::JoinFailed, 0, "Lost connection while saying hello");
         return;
     }
 
+    std::string challengeFrame;
+    if (!sock.ReadFrame(challengeFrame, 15000)) {
+        PushLifecycle(LifecycleType::JoinFailed, 0, "Host did not respond");
+        return;
+    }
+    auto challenge = NetIO::ParseLines(challengeFrame);
+    if (challenge["type"] == "reject") {
+        PushLifecycle(LifecycleType::JoinFailed, 0, challenge["reason"]);
+        return;
+    }
+    if (challenge["type"] != "challenge") {
+        PushLifecycle(LifecycleType::JoinFailed, 0, "Host sent an unexpected handshake message");
+        return;
+    }
+
+    std::string authFrame;
+    NetIO::AppendLine(authFrame, "type", "auth");
+    NetIO::AppendLine(authFrame, "hmac", AuthChallenge::ComputeHmacHex(password, challenge["nonce"]));
+    if (!sock.WriteFrame(authFrame)) {
+        PushLifecycle(LifecycleType::JoinFailed, 0, "Lost connection while authenticating");
+        return;
+    }
+
     std::string responseFrame;
-    
     if (!sock.ReadFrame(responseFrame, 15000)) {
         PushLifecycle(LifecycleType::JoinFailed, 0, "Host did not respond");
         return;
