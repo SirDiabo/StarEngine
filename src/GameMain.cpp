@@ -2,6 +2,7 @@
 #include "Core/ContentPathResolver.h"
 #include "Core/CookedFile.h"
 #include "Core/PackageCipher.h"
+#include "Core/StarPak.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -16,6 +17,7 @@
 #include "raymath.h"
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -28,19 +30,31 @@ static std::string FindBootstrapFile(const fs::path& exeDir) {
 }
 
 int main(int argc, char* argv[]) {
-    fs::path exeDir = argc > 0 ? fs::path(argv[0]).parent_path() : fs::path();
+    fs::path exePath = argc > 0 ? fs::path(argv[0]) : fs::path();
+    fs::path exeDir = exePath.empty() ? fs::current_path() : exePath.parent_path();
     if (exeDir.empty()) exeDir = fs::current_path();
     std::error_code ec;
     exeDir = fs::absolute(exeDir, ec);
+    if (!exePath.empty()) exePath = fs::absolute(exePath, ec);
 
-    std::string bootstrapPath = FindBootstrapFile(exeDir);
     PackagedGameConfig config;
-    if (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
-        return 1;
-    }
 
-    ContentPathResolver::SetContentRoot((exeDir / "Content").string());
-    CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+    StarPak::Reader pak;
+    if (!exePath.empty() && pak.LoadFromExecutable(exePath.string())) {
+        std::vector<uint8_t> bootBytes = pak.ReadEntry(StarPak::kBootConfigPath);
+        if (bootBytes.empty()) return 1;
+        if (!PackagedGameConfig::LoadFromText(std::string(bootBytes.begin(), bootBytes.end()), config)) {
+            return 1;
+        }
+        CookedFile::SetActivePak(std::move(pak), CookCipherFromName(config.cipher), config.cipherKey);
+    } else {
+        std::string bootstrapPath = FindBootstrapFile(exeDir);
+        if (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
+            return 1;
+        }
+        ContentPathResolver::SetContentRoot((exeDir / "Content").string());
+        CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+    }
 
     RegisterAllModules();
     if (!ModuleManager::Get().InitializeAll()) return 1;

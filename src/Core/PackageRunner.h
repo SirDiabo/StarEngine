@@ -4,12 +4,21 @@
 #include "Project.h"
 #include <string>
 
+enum class PackageFormat {
+    SingleFile,
+    LooseFolder,
+};
+
+std::string PackageFormatName(PackageFormat format);
+PackageFormat PackageFormatFromName(const std::string& name);
+
 struct PackageOptions {
     std::string projectRoot;
     std::string outputDir;
     PackagePlatform platform = PackagePlatform::Linux;
     GameRenderer renderer = GameRenderer::Hardware;
     CookCipher cipher = CookCipher::None;
+    PackageFormat format = PackageFormat::SingleFile;
 };
 
 struct PackageResult {

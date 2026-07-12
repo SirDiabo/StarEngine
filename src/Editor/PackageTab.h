@@ -3,6 +3,7 @@
 #include "ChoicePopup.h"
 #include "Core/PackagePlatform.h"
 #include "Core/PackageCipher.h"
+#include "Core/PackageRunner.h"
 #include "Core/Project.h"
 #include <string>
 #include <vector>
@@ -22,15 +23,15 @@ private:
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
     CookCipher cipher = CookCipher::None;
+    PackageFormat format = PackageFormat::SingleFile;
     std::string outputDir;
 
     ChoicePopup platformPopup;
     ChoicePopup rendererPopup;
     ChoicePopup cipherPopup;
+    
+    ChoicePopup formatPopup;
 
-    // Packaging shells out to cmake configure+build synchronously, same as
-    // the existing module-rebuild path (BuildRunner) - it blocks the editor
-    // for the duration, there is no background job system in this codebase.
     bool hasResult = false;
     bool lastSuccess = false;
     std::string resultMessage;

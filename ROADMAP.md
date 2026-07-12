@@ -497,15 +497,15 @@ x Renderer choice per project (Hardware/OpenGL or Software/CPU via raylib's rlsw
 o move packaging out of the top menu and next to the play button on the viewport top bar thing
 
 ### 10.1 Packaging into a single executable (blob)
-o Ship one .exe with no loose Content folder alongside it
-o Define a pak archive format: index of [relative path, offset, size] plus concatenated cooked bytes, written by the cooker instead of a loose output folder
-o Cooker writes a single .starpak file (index + blob) in place of current per-file Content/ tree
-o Embed the .starpak into the compiled executable, appended after the linked binary, with a footer (magic + offset + size) found via argv[0]
-o Runtime virtual filesystem: CookedFile reads directly from the embedded pak's byte range in memory
-o Extract file-API-only formats (.obj, non-binary .gltf) to a per-run temp file sourced from the in-memory pak
-o Resolve sibling files (mtl textures, gltf buffers) from the pak index by shared parent path instead of scanning a disk directory
-o PackageRunner produces the single exe (with appended pak) as the only required output artifact
-o Keep loose-folder packaging as a project setting for fast iteration/patching without a full rebuild
+x Ship one .exe with no loose Content folder alongside it (single-file/pak packaging format, default)
+x Define a pak archive format: index of [relative path, offset, size] plus concatenated cooked bytes, written by the cooker instead of a loose output folder
+x Cooker writes a single .starpak file (index + blob) in place of current per-file Content/ tree
+x Embed the .starpak into the compiled executable, appended after the linked binary, with a footer (magic + offset + size) found via argv[0]
+x Runtime virtual filesystem: CookedFile reads directly from the embedded pak's byte range in memory
+x Extract file-API-only formats (.obj, non-binary .gltf) to a per-run temp file sourced from the in-memory pak (gltf itself not implemented yet, obj path done)
+x Resolve sibling files (mtl textures, gltf buffers) from the pak index by shared parent path instead of scanning a disk directory (mtl/textures done, gltf buffers pending gltf support)
+x PackageRunner produces the single exe (with appended pak) as the only required output artifact
+x Keep loose-folder packaging as a project setting for fast iteration/patching without a full rebuild
 o Verify appended trailing data survives code signing/packaging tools on Windows and macOS before relying on this approach
 
 ### 10.2 Shipping prebuilt engine libraries per platform

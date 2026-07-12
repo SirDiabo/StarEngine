@@ -1,10 +1,9 @@
 #include "PackagedGameConfig.h"
 #include <fstream>
+#include <sstream>
 
-bool PackagedGameConfig::LoadFromFile(const std::string& path, PackagedGameConfig& out) {
-    std::ifstream in(path);
-    if (!in.is_open()) return false;
-
+bool PackagedGameConfig::LoadFromText(const std::string& text, PackagedGameConfig& out) {
+    std::istringstream in(text);
     std::string line;
     while (std::getline(in, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -23,4 +22,25 @@ bool PackagedGameConfig::LoadFromFile(const std::string& path, PackagedGameConfi
         else if (key == "cipherKey") out.cipherKey = value;
     }
     return true;
+}
+
+bool PackagedGameConfig::LoadFromFile(const std::string& path, PackagedGameConfig& out) {
+    std::ifstream in(path);
+    if (!in.is_open()) return false;
+
+    std::ostringstream text;
+    text << in.rdbuf();
+    return LoadFromText(text.str(), out);
+}
+
+std::string PackagedGameConfig::ToText() const {
+    std::ostringstream out;
+    out << "name=" << name << "\n";
+    out << "targetWidth=" << targetWidth << "\n";
+    out << "targetHeight=" << targetHeight << "\n";
+    out << "defaultMap=" << defaultMap << "\n";
+    out << "renderer=" << renderer << "\n";
+    out << "cipher=" << cipher << "\n";
+    out << "cipherKey=" << cipherKey << "\n";
+    return out.str();
 }

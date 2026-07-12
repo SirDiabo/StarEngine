@@ -1,6 +1,8 @@
 #include "PackageCooker.h"
+#include "StarPak.h"
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,6 +17,9 @@ bool IsTextProjectFile(const fs::path& p) {
     return ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
            ext == ".staractor" || ext == ".stargraph" || ext == ".startex";
 }
+
+bool IsObjFile(const fs::path& p) { return p.extension() == ".obj"; }
+bool IsMtlFile(const fs::path& p) { return p.extension() == ".mtl"; }
 
 std::vector<uint8_t> ReadBytes(const fs::path& p) {
     std::ifstream in(p, std::ios::binary);
@@ -40,27 +45,78 @@ std::string UniqueImportedName(const fs::path& source, std::unordered_set<std::s
     return name;
 }
 
-} // namespace
+std::vector<std::string> ParseMtllibReferences(const std::vector<uint8_t>& objBytes) {
+    std::vector<std::string> result;
+    std::string text(objBytes.begin(), objBytes.end());
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.rfind("mtllib", 0) != 0) continue;
+        std::istringstream ls(line.substr(6));
+        std::string token;
+        while (ls >> token) result.push_back(token);
+    }
+    return result;
+}
 
-CookResult PackageCooker::Cook(const std::string& contentRootStr, const std::string& outputContentDirStr,
-                                 CookCipher cipher, const std::string& cipherKey) {
+std::vector<std::string> ParseMtlTextureReferences(const std::vector<uint8_t>& mtlBytes) {
+    static const std::vector<std::string> mapKeys = {
+        "map_Kd", "map_Ka", "map_Ks", "map_Ns", "map_d", "map_Bump", "bump", "norm", "disp", "decal",
+    };
+
+    std::vector<std::string> result;
+    std::string text(mtlBytes.begin(), mtlBytes.end());
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::istringstream ls(line);
+        std::string key;
+        ls >> key;
+
+        bool isMap = false;
+        for (const auto& k : mapKeys) {
+            if (key == k) { isMap = true; break; }
+        }
+        if (!isMap) continue;
+
+        std::string token, last;
+        while (ls >> token) last = token;
+        if (!last.empty()) result.push_back(last);
+    }
+    return result;
+}
+
+using CookSink = std::function<void(const std::string& virtualPath, std::vector<uint8_t>&& bytes)>;
+
+CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const std::string& cipherKey,
+                         const CookSink& sink) {
     CookResult result;
-    fs::path contentRoot(contentRootStr);
-    fs::path outputContentDir(outputContentDirStr);
     fs::path importedDirRelative = "_Imported";
 
     if (!fs::exists(contentRoot)) {
-        result.error = "Content folder not found: " + contentRootStr;
+        result.error = "Content folder not found: " + contentRoot.string();
         return result;
     }
 
     std::error_code ec;
-    fs::create_directories(outputContentDir, ec);
+    auto cipherImpl = CreateCookCipher(cipher);
 
-    std::unordered_map<std::string, std::string> importedNames;
+    std::unordered_map<std::string, std::string> importedNames; // absolute source path -> virtual path
     std::unordered_set<std::string> reservedImportedNames;
-    
-    std::vector<std::pair<std::string, std::string>> pendingImports;
+    std::vector<std::pair<std::string, std::string>> importQueue; // absolute source path, virtual path
+
+    auto queueImport = [&](const std::string& absoluteSource) -> std::string {
+        auto found = importedNames.find(absoluteSource);
+        if (found != importedNames.end()) return found->second;
+
+        std::string name = UniqueImportedName(fs::path(absoluteSource), reservedImportedNames);
+        std::string virtualPath = (importedDirRelative / name).generic_string();
+        importedNames.emplace(absoluteSource, virtualPath);
+        importQueue.emplace_back(absoluteSource, virtualPath);
+        return virtualPath;
+    };
 
     auto rewriteLine = [&](const std::string& line) -> std::string {
         size_t sep = line.find('=');
@@ -75,27 +131,16 @@ CookResult PackageCooker::Cook(const std::string& contentRootStr, const std::str
 
         fs::path relativeToContent = fs::relative(valuePath, contentRoot, ec);
         bool insideContent = !ec && relativeToContent.generic_string().rfind("..", 0) != 0;
-        if (insideContent) {
-            return key + "=" + relativeToContent.generic_string();
-        }
+        if (insideContent) return key + "=" + relativeToContent.generic_string();
 
-        auto found = importedNames.find(value);
-        if (found != importedNames.end()) return key + "=" + found->second;
-
-        std::string name = UniqueImportedName(valuePath, reservedImportedNames);
-        std::string relativeDest = (importedDirRelative / name).generic_string();
-        importedNames.emplace(value, relativeDest);
-        pendingImports.emplace_back(value, (outputContentDir / importedDirRelative / name).string());
-        return key + "=" + relativeDest;
+        return key + "=" + queueImport(value);
     };
-
-    auto cipherImpl = CreateCookCipher(cipher);
 
     for (const auto& entry : fs::recursive_directory_iterator(contentRoot)) {
         if (!entry.is_regular_file()) continue;
 
         fs::path relative = fs::relative(entry.path(), contentRoot, ec);
-        fs::path destPath = outputContentDir / relative;
+        std::string virtualPath = relative.generic_string();
 
         std::vector<uint8_t> bytes;
         if (IsTextProjectFile(entry.path())) {
@@ -113,17 +158,69 @@ CookResult PackageCooker::Cook(const std::string& contentRootStr, const std::str
         }
 
         cipherImpl->Transform(bytes, cipherKey);
-        WriteBytes(destPath, bytes);
+        sink(virtualPath, std::move(bytes));
         result.filesCooked++;
     }
 
-    for (const auto& [source, dest] : pendingImports) {
-        std::vector<uint8_t> bytes = ReadBytes(source);
+    for (size_t i = 0; i < importQueue.size(); i++) {
+        std::string source = importQueue[i].first;
+        std::string virtualPath = importQueue[i].second;
+
+        fs::path sourcePath(source);
+        std::vector<uint8_t> bytes = ReadBytes(sourcePath);
+
+        if (IsObjFile(sourcePath)) {
+            for (const std::string& mtlName : ParseMtllibReferences(bytes)) {
+                fs::path mtlPath = sourcePath.parent_path() / mtlName;
+                if (fs::exists(mtlPath)) queueImport(mtlPath.string());
+            }
+        } else if (IsMtlFile(sourcePath)) {
+            for (const std::string& texName : ParseMtlTextureReferences(bytes)) {
+                fs::path texPath = sourcePath.parent_path() / texName;
+                if (fs::exists(texPath)) queueImport(texPath.string());
+            }
+        }
+
         cipherImpl->Transform(bytes, cipherKey);
-        WriteBytes(dest, bytes);
+        sink(virtualPath, std::move(bytes));
         result.filesCooked++;
     }
 
     result.success = true;
+    return result;
+}
+
+} // namespace
+
+CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std::string& outputContentDirStr,
+                                     CookCipher cipher, const std::string& cipherKey) {
+    fs::path outputContentDir(outputContentDirStr);
+    std::error_code ec;
+    fs::create_directories(outputContentDir, ec);
+
+    return CookInternal(fs::path(contentRootStr), cipher, cipherKey,
+        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes) {
+            WriteBytes(outputContentDir / virtualPath, bytes);
+        });
+}
+
+CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std::string& outputPakFileStr,
+                                     CookCipher cipher, const std::string& cipherKey,
+                                     const std::string& bootConfigText) {
+    StarPak::Writer writer;
+
+    CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey,
+        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes) {
+            writer.AddFile(virtualPath, bytes);
+        });
+    if (!result.success) return result;
+
+    writer.AddFile(StarPak::kBootConfigPath,
+                   std::vector<uint8_t>(bootConfigText.begin(), bootConfigText.end()));
+
+    if (!writer.WriteToFile(outputPakFileStr)) {
+        result.success = false;
+        result.error = "Could not write pak file: " + outputPakFileStr;
+    }
     return result;
 }

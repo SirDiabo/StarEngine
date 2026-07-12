@@ -88,6 +88,26 @@ void PackageTab::Render(float x, float y, float width, float height) {
               (int)fx, (int)fy, 10, {110, 110, 118, 255});
     fy += 24;
 
+    // Format
+    DrawText("Packaging Format", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    fy += 14;
+    Rectangle formatRow = SelectRow(fx, fy, fw, 22);
+    DrawRectangleRec(formatRow, {26, 26, 28, 255});
+    DrawRectangleLinesEx(formatRow, 1, {55, 55, 60, 255});
+    std::string formatLabel = format == PackageFormat::LooseFolder
+        ? "Loose Content folder (debug)" : "Single file (.starpak embedded)";
+    DrawText(formatLabel.c_str(), (int)formatRow.x + 6, (int)formatRow.y + 5, 12, WHITE);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, formatRow) && !formatPopup.IsOpen()) {
+        formatPopup.Open({formatRow.x, formatRow.y + formatRow.height}, fw, {
+            {"Single file (.starpak embedded)", true, ""},
+            {"Loose Content folder (debug)", true, ""},
+        });
+    }
+    fy += 20;
+    DrawText("Single file ships one exe with no loose Content/ folder. Loose folder is faster to re-package for testing.",
+              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+    fy += 24;
+
     // Output folder
     DrawText("Output Folder", (int)fx, (int)fy, 11, {140, 140, 150, 255});
     fy += 14;
@@ -158,6 +178,11 @@ void PackageTab::Render(float x, float y, float width, float height) {
     if (cipherPopup.Render(cipherChoice)) {
         cipher = AllCookCiphers()[cipherChoice];
     }
+
+    int formatChoice = 0;
+    if (formatPopup.Render(formatChoice)) {
+        format = formatChoice == 1 ? PackageFormat::LooseFolder : PackageFormat::SingleFile;
+    }
 }
 
 void PackageTab::RunPackage() {
@@ -167,6 +192,7 @@ void PackageTab::RunPackage() {
     options.platform = platforms[selectedPlatformIndex].platform;
     options.renderer = renderer;
     options.cipher = cipher;
+    options.format = format;
 
     PackageResult result = PackageRunner::Package(options);
 

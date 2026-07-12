@@ -9,6 +9,9 @@ struct CookResult {
 };
 
 namespace PackageCooker {
-    CookResult Cook(const std::string& contentRoot, const std::string& outputContentDir,
-                     CookCipher cipher, const std::string& cipherKey);
+    CookResult CookLoose(const std::string& contentRoot, const std::string& outputContentDir,
+                          CookCipher cipher, const std::string& cipherKey);
+
+    CookResult CookToPak(const std::string& contentRoot, const std::string& outputPakFile,
+                         CookCipher cipher, const std::string& cipherKey, const std::string& bootConfigText);
 }

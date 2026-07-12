@@ -1,11 +1,21 @@
 #include "PackageRunner.h"
 #include "PackageCooker.h"
+#include "StarPak.h"
+#include "Runtime/PackagedGameConfig.h"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <random>
 #include <thread>
+
+std::string PackageFormatName(PackageFormat format) {
+    return format == PackageFormat::LooseFolder ? "LooseFolder" : "SingleFile";
+}
+
+PackageFormat PackageFormatFromName(const std::string& name) {
+    return name == "LooseFolder" ? PackageFormat::LooseFolder : PackageFormat::SingleFile;
+}
 
 namespace fs = std::filesystem;
 
@@ -193,29 +203,50 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     }
 
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
-    fs::path outputContentDir = fs::path(options.outputDir) / "Content";
     std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();
 
-    CookResult cookResult = PackageCooker::Cook(contentRoot.string(), outputContentDir.string(),
-                                                  options.cipher, cipherKey);
-    if (!cookResult.success) {
-        result.error = "Cooking failed: " + cookResult.error;
-        return result;
-    }
-    result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n";
-
     const ProjectSettings& settings = Project::Get().GetSettings();
-    std::string relativeDefaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
 
-    fs::path bootstrapPath = fs::path(options.outputDir) / (settings.name + ".starproject");
-    std::ofstream out(bootstrapPath);
-    out << "name=" << settings.name << "\n";
-    out << "targetWidth=" << settings.targetWidth << "\n";
-    out << "targetHeight=" << settings.targetHeight << "\n";
-    out << "defaultMap=" << relativeDefaultMap << "\n";
-    out << "renderer=" << rendererKey << "\n";
-    out << "cipher=" << CookCipherName(options.cipher) << "\n";
-    out << "cipherKey=" << cipherKey << "\n";
+    PackagedGameConfig bootConfig;
+    bootConfig.name = settings.name;
+    bootConfig.targetWidth = settings.targetWidth;
+    bootConfig.targetHeight = settings.targetHeight;
+    bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
+    bootConfig.renderer = rendererKey;
+    bootConfig.cipher = CookCipherName(options.cipher);
+    bootConfig.cipherKey = cipherKey;
+
+    if (options.format == PackageFormat::SingleFile) {
+        fs::path pakTempPath = buildDir / "content.starpak";
+
+        CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
+                                                            options.cipher, cipherKey, bootConfig.ToText());
+        if (!cookResult.success) {
+            result.error = "Cooking failed: " + cookResult.error;
+            return result;
+        }
+        result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
+            " files into a single .starpak.\n";
+
+        if (!StarPak::AppendPakToExecutable(outputExe.string(), pakTempPath.string())) {
+            result.error = "Could not append pak data to the packaged executable.";
+            return result;
+        }
+    } else {
+        fs::path outputContentDir = fs::path(options.outputDir) / "Content";
+
+        CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string(),
+                                                            options.cipher, cipherKey);
+        if (!cookResult.success) {
+            result.error = "Cooking failed: " + cookResult.error;
+            return result;
+        }
+        result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n";
+
+        fs::path bootstrapPath = fs::path(options.outputDir) / (settings.name + ".starproject");
+        std::ofstream out(bootstrapPath);
+        out << bootConfig.ToText();
+    }
 
     result.success = true;
     result.outputExecutable = outputExe.string();

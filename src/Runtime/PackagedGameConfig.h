@@ -11,4 +11,6 @@ struct PackagedGameConfig {
     std::string cipherKey;
 
     static bool LoadFromFile(const std::string& path, PackagedGameConfig& out);
+    static bool LoadFromText(const std::string& text, PackagedGameConfig& out);
+    std::string ToText() const;
 };
