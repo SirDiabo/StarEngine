@@ -166,4 +166,45 @@ void ForceActivate(char* buf, size_t bufSize) {
     GuiTextBox({mp.x, mp.y, 1, 1}, buf, (int)bufSize, false);
 }
 
+static const float kArrayRowHeight = 18.0f;
+static const float kArrayBtnW = 16.0f;
+static const float kArrayBtnGap = 2.0f;
+static const float kArrayControlsWidth = kArrayBtnW * 3 + kArrayBtnGap * 2;
+
+float ArrayControlsWidth() { return kArrayControlsWidth; }
+float ArrayRowHeight() { return kArrayRowHeight; }
+
+void ArrayHeader(Rectangle r, const char* label, int count, ArrayAction& action, const Style& style) {
+    char text[80];
+    snprintf(text, sizeof(text), "%s (%d)", label, count);
+    DrawText(text, (int)r.x, (int)r.y + 3, 11, style.label);
+
+    Rectangle addBtn = {r.x + r.width - kArrayBtnW, r.y, kArrayBtnW, r.height};
+    if (GuiButton(addBtn, "+")) action.addClicked = true;
+}
+
+void ArrayRowControls(Rectangle rowRect, int index, int count, ArrayAction& action, const Style& style) {
+    (void)style;
+    float x = rowRect.x + rowRect.width - kArrayControlsWidth;
+    Rectangle upBtn = {x, rowRect.y, kArrayBtnW, rowRect.height};
+    Rectangle downBtn = {x + kArrayBtnW + kArrayBtnGap, rowRect.y, kArrayBtnW, rowRect.height};
+    Rectangle removeBtn = {x + (kArrayBtnW + kArrayBtnGap) * 2, rowRect.y, kArrayBtnW, rowRect.height};
+
+    bool canUp = index > 0;
+    bool canDown = index < count - 1;
+
+    GuiSetState(canUp ? STATE_NORMAL : STATE_DISABLED);
+    if (GuiButton(upBtn, "^") && canUp) action.moveUpIndex = index;
+
+    GuiSetState(canDown ? STATE_NORMAL : STATE_DISABLED);
+    if (GuiButton(downBtn, "v") && canDown) action.moveDownIndex = index;
+
+    GuiSetState(STATE_NORMAL);
+    if (GuiButton(removeBtn, "x")) action.removeIndex = index;
+}
+
+Rectangle ArrayValueRect(Rectangle rowRect) {
+    return {rowRect.x, rowRect.y, rowRect.width - kArrayControlsWidth - 4, rowRect.height};
+}
+
 }

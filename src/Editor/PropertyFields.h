@@ -29,6 +29,22 @@ bool Vec3Row(Rectangle rowRect, char bufX[32], char bufY[32], char bufZ[32], int
 
 void ForceActivate(char* buf, size_t bufSize);
 
+struct ArrayAction {
+    bool addClicked = false;
+    int removeIndex = -1;
+    int moveUpIndex = -1;
+    int moveDownIndex = -1;
+
+    bool Any() const { return addClicked || removeIndex >= 0 || moveUpIndex >= 0 || moveDownIndex >= 0; }
+};
+
+float ArrayControlsWidth();
+float ArrayRowHeight();
+void ArrayHeader(Rectangle r, const char* label, int count, ArrayAction& action, const Style& style = {});
+void ArrayRowControls(Rectangle rowRect, int index, int count, ArrayAction& action, const Style& style = {});
+
+Rectangle ArrayValueRect(Rectangle rowRect);
+
 struct DragState {
     bool active = false;
     int fieldId = -1;

@@ -76,7 +76,7 @@ x Asset editors that are already open are focused rather than reopened
 x PropertyFields slots (src/Editor/PropertyFields.h/.cpp): FloatBox, IntBox, StringBox, BoolBox, Vec3Row
 x Fix raygui quirk where global cursor-index shared across text boxes; force-activates fields so cursor appears at text end
 x Click-drag-to-scrub on FloatBox/IntBox
-o Array-of-fields wrapper - deferred until array-typed variables exist; just loops existing fields with an incrementing id
+x Array-of-fields wrapper (ArrayHeader/ArrayRowControls/ArrayValueRect in PropertyFields.h/.cpp)
 o Registry-reference dropdown field (project-level named lists: Save Files, Languages, etc.), with inline create-new
 
 ---

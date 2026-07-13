@@ -1071,7 +1071,8 @@ void StargraphEditorPanel::RenderLeftPanel() {
                 variableNameActiveField = 0;
             }
         } else {
-            DrawText(vars[i].name.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+            std::string label = vars[i].name + (vars[i].isArray ? " []" : "");
+            DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
 
             if (CheckCollisionPointRec(mousePos, row)) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -1180,6 +1181,125 @@ void StargraphEditorPanel::RenderLeftPanel() {
     }
 }
 
+void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField) {
+    if (varArrayBufs.size() != var.arrayValues.size()) {
+        varArrayBufs.resize(var.arrayValues.size());
+    }
+
+    PropertyField::ArrayAction action;
+
+    Rectangle headerRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
+    PropertyField::ArrayHeader(headerRect, "Elements", (int)var.arrayValues.size(), action);
+    y += PropertyField::ArrayRowHeight() + 4;
+
+    for (size_t i = 0; i < var.arrayValues.size(); i++) {
+        Rectangle rowRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
+        Rectangle valueRect = PropertyField::ArrayValueRect(rowRect);
+        int fieldId = 10 + (int)i * 4; // 4 id slots per element; Vec3Row needs 3
+
+        std::string elem = var.arrayValues[i];
+        bool changed = false;
+
+        switch (var.type) {
+            case PinType::Boolean: {
+                bool bval = (elem == "true" || elem == "1");
+                Rectangle boolRect = {valueRect.x, valueRect.y, 18, valueRect.height};
+                if (PropertyField::BoolBox(boolRect, bval)) {
+                    elem = bval ? "true" : "false";
+                    changed = true;
+                }
+                DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 11, WHITE);
+                break;
+            }
+            case PinType::Integer: {
+                int ival = atoi(elem.c_str());
+                if (PropertyField::IntBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                           fieldId, activeField, ival)) {
+                    elem = std::to_string(ival);
+                    changed = true;
+                }
+                break;
+            }
+            case PinType::Float: {
+                float fval = (float)atof(elem.c_str());
+                if (PropertyField::FloatBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                             fieldId, activeField, fval)) {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%.2f", fval);
+                    elem = buf;
+                    changed = true;
+                }
+                break;
+            }
+            case PinType::Vec3: {
+                float vx = 0, vy = 0, vz = 0;
+                sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                if (PropertyField::Vec3Row(valueRect, varArrayBufs[i].text[0], varArrayBufs[i].text[1],
+                                            varArrayBufs[i].text[2], fieldId, activeField, vx, vy, vz)) {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+                    elem = buf;
+                    changed = true;
+                }
+                break;
+            }
+            default: {
+                std::string strVal = elem;
+                if (PropertyField::StringBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                              fieldId, activeField, strVal, true, "(empty)")) {
+                    elem = strVal;
+                    changed = true;
+                }
+                break;
+            }
+        }
+
+        if (changed) {
+            var.arrayValues[i] = elem;
+            isDirty = true;
+        }
+
+        PropertyField::ArrayRowControls(rowRect, (int)i, (int)var.arrayValues.size(), action);
+        y += PropertyField::ArrayRowHeight() + 3;
+    }
+
+    if (action.addClicked) {
+        std::string def = var.DefaultElementText();
+        var.arrayValues.push_back(def);
+
+        ArrayElemBuf buf;
+        if (var.type == PinType::Vec3) {
+            float vx = 0, vy = 0, vz = 0;
+            sscanf(def.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+            snprintf(buf.text[0], sizeof(buf.text[0]), "%.2f", vx);
+            snprintf(buf.text[1], sizeof(buf.text[1]), "%.2f", vy);
+            snprintf(buf.text[2], sizeof(buf.text[2]), "%.2f", vz);
+        } else {
+            snprintf(buf.text[0], sizeof(buf.text[0]), "%s", def.c_str());
+        }
+        varArrayBufs.push_back(buf);
+        isDirty = true;
+    } else if (action.removeIndex >= 0 && action.removeIndex < (int)var.arrayValues.size()) {
+        var.arrayValues.erase(var.arrayValues.begin() + action.removeIndex);
+        if (action.removeIndex < (int)varArrayBufs.size())
+            varArrayBufs.erase(varArrayBufs.begin() + action.removeIndex);
+        isDirty = true;
+        activeField = 0;
+    } else if (action.moveUpIndex > 0 && action.moveUpIndex < (int)var.arrayValues.size()) {
+        std::swap(var.arrayValues[action.moveUpIndex], var.arrayValues[action.moveUpIndex - 1]);
+        if (action.moveUpIndex < (int)varArrayBufs.size())
+            std::swap(varArrayBufs[action.moveUpIndex], varArrayBufs[action.moveUpIndex - 1]);
+        isDirty = true;
+        activeField = 0;
+    } else if (action.moveDownIndex >= 0 && action.moveDownIndex + 1 < (int)var.arrayValues.size()) {
+        std::swap(var.arrayValues[action.moveDownIndex], var.arrayValues[action.moveDownIndex + 1]);
+        if (action.moveDownIndex + 1 < (int)varArrayBufs.size())
+            std::swap(varArrayBufs[action.moveDownIndex], varArrayBufs[action.moveDownIndex + 1]);
+        isDirty = true;
+        activeField = 0;
+    }
+}
+
 void StargraphEditorPanel::RenderRightPanel() {
     Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight,
                        rightPanelWidth, bounds.height - toolbarHeight};
@@ -1229,6 +1349,30 @@ void StargraphEditorPanel::RenderRightPanel() {
                     snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
                     break;
             }
+
+            varArrayBufs.resize(var.arrayValues.size());
+            for (size_t i = 0; i < var.arrayValues.size(); i++) {
+                const std::string& elem = var.arrayValues[i];
+                switch (var.type) {
+                    case PinType::Vec3: {
+                        float vx = 0, vy = 0, vz = 0;
+                        sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", vx);
+                        snprintf(varArrayBufs[i].text[1], sizeof(varArrayBufs[i].text[1]), "%.2f", vy);
+                        snprintf(varArrayBufs[i].text[2], sizeof(varArrayBufs[i].text[2]), "%.2f", vz);
+                        break;
+                    }
+                    case PinType::Integer:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%d", atoi(elem.c_str()));
+                        break;
+                    case PinType::Float:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", atof(elem.c_str()));
+                        break;
+                    default:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%s", elem.c_str());
+                        break;
+                }
+            }
         };
 
         if (lastDetailIndex != selectedVariableIndex) {
@@ -1270,16 +1414,43 @@ void StargraphEditorPanel::RenderRightPanel() {
                 case PinType::Vec3:    var.value = "0.00,0.00,0.00"; break;
                 default:               var.value = ""; break;
             }
+            var.arrayValues.clear();
+            varArrayBufs.clear();
             refreshValueBuffers();
             isDirty = true;
             activeField = 0;
         }
         y += 24;
 
+        DrawText("Array", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        {
+            Rectangle arrayCheckRect = {panel.x + 8, y, 18, 18};
+            bool isArr = var.isArray;
+            if (PropertyField::BoolBox(arrayCheckRect, isArr)) {
+                var.isArray = isArr;
+                if (var.isArray) {
+                    var.arrayValues.clear();
+                    var.arrayValues.push_back(var.value.empty() ? var.DefaultElementText() : var.value);
+                } else {
+                    var.value = var.arrayValues.empty() ? var.DefaultElementText() : var.arrayValues.front();
+                    var.arrayValues.clear();
+                }
+                varArrayBufs.clear();
+                refreshValueBuffers();
+                isDirty = true;
+                activeField = 0;
+            }
+            DrawText(isArr ? "true" : "false", (int)arrayCheckRect.x + 24, (int)arrayCheckRect.y + 2, 12, WHITE);
+        }
+        y += 24;
+
         DrawText("Default Value", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
 
-        if (var.type == PinType::Boolean) {
+        if (var.isArray) {
+            RenderVariableArrayEditor(panel, y, var, activeField);
+        } else if (var.type == PinType::Boolean) {
             bool bval = (var.value == "true" || var.value == "1");
             Rectangle boolRect = {panel.x + 8, y, 18, 18};
             if (PropertyField::BoolBox(boolRect, bval)) {

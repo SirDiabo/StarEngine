@@ -56,7 +56,12 @@ struct Variable {
     std::string name;
     PinType type = PinType::None;
     std::string value;
+    bool isArray = false;
+    std::vector<std::string> arrayValues;
+
     ReplicationMode replication = ReplicationMode::Local;
+
+    std::string DefaultElementText() const;
 };
 
 // Design-time declaration of a component owned by a StarActor class (.staractor asset).

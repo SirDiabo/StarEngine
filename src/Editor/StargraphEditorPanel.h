@@ -29,6 +29,7 @@ private:
     void RenderLeftPanel();
     void RenderGraph();
     void RenderRightPanel();
+    void RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField);
     void RenderNodeContextMenu();
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
@@ -96,6 +97,9 @@ private:
     bool addingVariable = false;
     int variableNameActiveField = 0;
     int listeningForKeyPinId = 0;
+
+    struct ArrayElemBuf { char text[3][64] = {"", "", ""}; };
+    std::vector<ArrayElemBuf> varArrayBufs;
 
     bool keyPickerOpen = false;
     int keyPickerPinId = 0;

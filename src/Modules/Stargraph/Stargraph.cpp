@@ -38,6 +38,16 @@ void Stargraph::RemoveLink(int pinId) {
     }
 }
 
+std::string Variable::DefaultElementText() const {
+    switch (type) {
+        case PinType::Boolean: return "false";
+        case PinType::Integer: return "0";
+        case PinType::Float:   return "0.00";
+        case PinType::Vec3:    return "0.00,0.00,0.00";
+        default:                return "";
+    }
+}
+
 void Stargraph::AddVariable(const Variable& var) {
     variables.push_back(var);
 }
@@ -251,11 +261,20 @@ bool Stargraph::SaveToFile(const std::string& path) const {
     out << "Count=" << variables.size() << "\n";
     out << "\n";
     for (size_t i = 0; i < variables.size(); i++) {
+        const Variable& var = variables[i];
         out << "[Variable" << i << "]\n";
-        out << "Name=" << variables[i].name << "\n";
-        out << "Type=" << PinTypeToString(variables[i].type) << "\n";
-        out << "Value=" << variables[i].value << "\n";
-        out << "Replication=" << ReplicationModeToString(variables[i].replication) << "\n";
+        out << "Name=" << var.name << "\n";
+        out << "Type=" << PinTypeToString(var.type) << "\n";
+        out << "IsArray=" << (var.isArray ? "true" : "false") << "\n";
+        if (var.isArray) {
+            out << "ArrayCount=" << var.arrayValues.size() << "\n";
+            for (size_t e = 0; e < var.arrayValues.size(); e++) {
+                out << "Element" << e << "=" << var.arrayValues[e] << "\n";
+            }
+        } else {
+            out << "Value=" << var.value << "\n";
+        }
+        out << "Replication=" << ReplicationModeToString(var.replication) << "\n";
         out << "\n";
     }
 
@@ -466,7 +485,19 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             Variable var;
             if (const std::string* v = FindEntry(section, "Name")) var.name = *v;
             if (const std::string* v = FindEntry(section, "Type")) var.type = PinTypeFromString(*v);
-            if (const std::string* v = FindEntry(section, "Value")) var.value = *v;
+            if (const std::string* v = FindEntry(section, "IsArray")) var.isArray = (*v == "true");
+            if (var.isArray) {
+                int count = 0;
+                if (const std::string* v = FindEntry(section, "ArrayCount")) count = std::stoi(*v);
+                var.arrayValues.reserve(count > 0 ? (size_t)count : 0);
+                for (int e = 0; e < count; e++) {
+                    std::string key = "Element" + std::to_string(e);
+                    if (const std::string* v = FindEntry(section, key)) var.arrayValues.push_back(*v);
+                    else var.arrayValues.push_back(var.DefaultElementText());
+                }
+            } else if (const std::string* v = FindEntry(section, "Value")) {
+                var.value = *v;
+            }
             if (const std::string* v = FindEntry(section, "Replication")) var.replication = ReplicationModeFromString(*v);
             variables.push_back(var);
         }
