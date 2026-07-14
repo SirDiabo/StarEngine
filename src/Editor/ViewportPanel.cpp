@@ -341,7 +341,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         }
     }
 
-    if (!playing || World::Get().GetActors().empty() || !World::Get().GetActors().front()->GetCameraComponent()) {
+    if (!playing || World::Get().GetActors().empty() || !World::Get().GetViewTarget()) {
         UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
     }
 }
