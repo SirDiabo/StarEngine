@@ -18,6 +18,24 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"True",  PinType::Exec, false, true});
         node->outputs.push_back({"False", PinType::Exec, false, true});
     };
+    branch.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        bool condition = false;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Condition") condition = (p.defaultValue == "true" || p.defaultValue == "1");
+        }
+        const char* outputName = condition ? "True" : "False";
+        for (Pin& p : node.outputs) if (p.name == outputName) {
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId == p.id) {
+                    Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                    if (next) {
+                        NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                    }
+                }
+            }
+        }
+    };
     NodeRegistry::Get().RegisterNode(branch);
 
     NodeTemplate hasAuthority;
@@ -28,6 +46,21 @@ void RegisterFlowNodes() {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->outputs.push_back({"Authority", PinType::Exec, false, true});
         node->outputs.push_back({"Remote",    PinType::Exec, false, true});
+    };
+    hasAuthority.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        bool authority = NetworkBackendRegistry::Get().HasAuthority();
+        const char* outputName = authority ? "Authority" : "Remote";
+        for (Pin& p : node.outputs) if (p.name == outputName) {
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId == p.id) {
+                    Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                    if (next) {
+                        NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                    }
+                }
+            }
+        }
     };
     NodeRegistry::Get().RegisterNode(hasAuthority);
 
@@ -43,6 +76,39 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Index",     PinType::Integer, false, true});
         node->outputs.push_back({"Completed", PinType::Exec,    false, true});
     };
+    forLoop.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int first = 0, last = 9;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "First" && !p.defaultValue.empty()) first = atoi(p.defaultValue.c_str());
+            if (p.name == "Last" && !p.defaultValue.empty()) last = atoi(p.defaultValue.c_str());
+        }
+        for (int i = first; i <= last; i++) {
+            char buf[64]; snprintf(buf, sizeof(buf), "%d", i);
+            for (Pin& p : node.outputs) if (p.name == "Index") p.defaultValue = buf;
+            for (Pin& p : node.outputs) if (p.name == "Loop Body") {
+                for (const Link& lk : graph.GetLinks()) {
+                    if (lk.outputPinId == p.id) {
+                        Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                        if (next) {
+                            NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                            if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                        }
+                    }
+                }
+            }
+        }
+        for (Pin& p : node.outputs) if (p.name == "Completed") {
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId == p.id) {
+                    Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                    if (next) {
+                        NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                    }
+                }
+            }
+        }
+    };
     NodeRegistry::Get().RegisterNode(forLoop);
 
     NodeTemplate whileLoop;
@@ -55,6 +121,39 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Loop Body", PinType::Exec, false, true});
         node->outputs.push_back({"Completed", PinType::Exec, false, true});
     };
+    whileLoop.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int loopLimit = 1000;
+        while (true) {
+            bool condition = false;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "Condition") { condition = (p.defaultValue == "true" || p.defaultValue == "1"); break; }
+            }
+            if (!condition) break;
+            for (Pin& p : node.outputs) if (p.name == "Loop Body") {
+                for (const Link& lk : graph.GetLinks()) {
+                    if (lk.outputPinId == p.id) {
+                        Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                        if (next) {
+                            NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                            if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                        }
+                    }
+                }
+            }
+            if (--loopLimit <= 0) break;
+        }
+        for (Pin& p : node.outputs) if (p.name == "Completed") {
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId == p.id) {
+                    Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                    if (next) {
+                        NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                    }
+                }
+            }
+        }
+    };
     NodeRegistry::Get().RegisterNode(whileLoop);
 
     NodeTemplate sequence;
@@ -66,6 +165,20 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"0", PinType::Exec, false, true});
         node->outputs.push_back({"1", PinType::Exec, false, true});
         node->outputs.push_back({"2", PinType::Exec, false, true});
+    };
+    sequence.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (const Pin& outPin : node.outputs) {
+            if (outPin.type != PinType::Exec) continue;
+            for (const Link& lk : graph.GetLinks()) {
+                if (lk.outputPinId == outPin.id) {
+                    Node* next = graph.FindNodeByPinId(lk.inputPinId);
+                    if (next) {
+                        NodeTemplate* tmpl = const_cast<NodeTemplate*>(NodeRegistry::Get().GetTemplate(next->type));
+                        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+                    }
+                }
+            }
+        }
     };
     NodeRegistry::Get().RegisterNode(sequence);
 
