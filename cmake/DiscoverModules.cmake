@@ -29,20 +29,22 @@ endif()
 set(STARENGINE_MODULE_PLAIN_SOURCES "")
 
 foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
-    file(GLOB _starengine_module_dirs CONFIGURE_DEPENDS "${MODULE_ROOT}/*")
+    string(REPLACE "\\" "/" _normalized_root "${MODULE_ROOT}")
+    file(GLOB _starengine_module_dirs CONFIGURE_DEPENDS "${_normalized_root}/*")
     foreach(_module_dir ${_starengine_module_dirs})
-        if(NOT IS_DIRECTORY "${_module_dir}")
+        string(REPLACE "\\" "/" _normalized_dir "${_module_dir}")
+        if(NOT IS_DIRECTORY "${_normalized_dir}")
             continue()
         endif()
 
-        if(EXISTS "${_module_dir}/CMakeLists.txt")
-        
-            get_filename_component(_module_name "${_module_dir}" NAME)
-            add_subdirectory("${_module_dir}" "${CMAKE_BINARY_DIR}/modules/${_module_name}")
-        elseif(NOT "${MODULE_ROOT}" STREQUAL "${CMAKE_SOURCE_DIR}/src/Modules")
-        
+        if(EXISTS "${_normalized_dir}/CMakeLists.txt")
+            
+            get_filename_component(_module_name "${_normalized_dir}" NAME)
+            add_subdirectory("${_normalized_dir}" "${CMAKE_BINARY_DIR}/modules/${_module_name}")
+        elseif(NOT "${_normalized_root}" STREQUAL "${CMAKE_SOURCE_DIR}/src/Modules")
+            
             file(GLOB_RECURSE _module_sources CONFIGURE_DEPENDS
-                "${_module_dir}/*.cpp" "${_module_dir}/*.c")
+                "${_normalized_dir}/*.cpp" "${_normalized_dir}/*.c")
             list(APPEND STARENGINE_MODULE_PLAIN_SOURCES ${_module_sources})
         endif()
     endforeach()
