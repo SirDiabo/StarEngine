@@ -2,14 +2,18 @@
 #include "Core/Project.h"
 #include "Core/AssetRegistry.h"
 #include "Core/StarAsset.h"
+#include "Core/StarMaterial.h"
 #include "Core/Module.h"
 #include "Core/EmbeddedAssets.h"
+#include "Core/SourceVendoring.h"
+#include "Core/ObjMtlParser.h"
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "PropertyFields.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
+#include <fstream>
 #include <cstring>
 #include <cstdio>
 #include <algorithm>
@@ -147,6 +151,20 @@ void ContentBrowserPanel::CancelPendingCreate() {
     isCreatingNewItem = false;
 }
 
+namespace {
+std::vector<uint8_t> ReadFileBytes(const std::filesystem::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
+fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, const std::string& ext) {
+    fs::path target = folder / (baseName + ext);
+    int suffix = 1;
+    while (fs::exists(target)) target = folder / (baseName + "_" + std::to_string(suffix++) + ext);
+    return target;
+}
+}
+
 void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const std::string& assetType,
                                              const std::string& extension) {
     fs::path src(srcPath);
@@ -156,17 +174,55 @@ void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const st
 
     std::string assetName = src.stem().string();
     fs::path folder = GetCurrentFolderPath();
-    fs::path target = folder / (assetName + extension);
-    int suffix = 1;
-    while (fs::exists(target)) {
-        target = folder / (assetName + "_" + std::to_string(suffix++) + extension);
-    }
+    fs::path target = UniqueTargetPath(folder, assetName, extension);
+    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
 
     StarAsset asset;
     asset.assetType = assetType;
     asset.sourcePath = absoluteSrc.string();
+    asset.vendoredSourcePath = SourceVendoring::Vendor(contentRoot.string(), asset.sourcePath, target.stem().string());
     if (assetType == "StaticMesh") {
         asset.importScaleX = asset.importScaleY = asset.importScaleZ = 100.0f;
+
+        if (ObjMtlParser::IsObjFile(absoluteSrc)) {
+            std::vector<uint8_t> objBytes = ReadFileBytes(absoluteSrc);
+            for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(objBytes)) {
+                fs::path mtlPath = absoluteSrc.parent_path() / mtlName;
+                if (!fs::exists(mtlPath, ec)) continue;
+
+                std::vector<uint8_t> mtlBytes = ReadFileBytes(mtlPath);
+                for (const ObjMtlParser::MtlMaterial& mat : ObjMtlParser::ParseMtlMaterials(mtlBytes)) {
+                    MaterialSlot slot;
+                    slot.usemtlName = mat.name;
+
+                    StarMaterial starMat;
+                    starMat.baseColor = Color{mat.colorR, mat.colorG, mat.colorB, mat.colorA};
+
+                    if (!mat.texturePath.empty()) {
+                        fs::path texPath = mtlPath.parent_path() / mat.texturePath;
+                        if (fs::exists(texPath, ec)) {
+                            fs::path texTarget = UniqueTargetPath(folder, fs::path(mat.texturePath).stem().string(), ".startex");
+                            StarAsset texAsset;
+                            texAsset.assetType = "Texture";
+                            texAsset.sourcePath = fs::absolute(texPath, ec).string();
+                            texAsset.vendoredSourcePath =
+                                SourceVendoring::Vendor(contentRoot.string(), texAsset.sourcePath, texTarget.stem().string());
+                            if (texAsset.SaveToFile(texTarget.string())) {
+                                AssetRegistry::Get().RegisterAsset(texTarget.string(), texAsset.sourcePath, texTarget.string());
+                                starMat.textureAssetPath = fs::relative(texTarget, contentRoot, ec).generic_string();
+                            }
+                        }
+                    }
+
+                    fs::path matTarget = UniqueTargetPath(folder, mat.name.empty() ? assetName : mat.name, ".starmat");
+                    if (starMat.SaveToFile(matTarget.string())) {
+                        slot.materialPath = fs::relative(matTarget, contentRoot, ec).generic_string();
+                    }
+
+                    asset.materialSlots.push_back(slot);
+                }
+            }
+        }
     }
 
     if (asset.SaveToFile(target.string())) {

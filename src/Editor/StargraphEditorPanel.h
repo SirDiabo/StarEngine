@@ -133,6 +133,7 @@ private:
 
     AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;
+    int materialSlotPickerIndex = -1;
     AssetPickerPopup audioPathPicker;
     ViewportPanel* viewportPanel = nullptr;
     int lastComponentDetailIndex = -1;

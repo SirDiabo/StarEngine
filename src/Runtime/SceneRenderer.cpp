@@ -13,7 +13,7 @@ static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, Vector3 rot, Vecto
     if (!mc->meshPath.empty()) {
         StarAsset asset;
         if (StarAsset::LoadFromFile(mc->meshPath, asset) && asset.assetType == "StaticMesh") {
-            model = AssetCache::Get().GetOrLoadModel(asset.sourcePath);
+            model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
         }
     }
     if (!model) return;
@@ -22,22 +22,8 @@ static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, Vector3 rot, Vecto
     Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
     model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
-    Color tint = WHITE;
-    if (!mc->materialPath.empty()) {
-        StarMaterial material;
-        if (StarMaterial::LoadFromFile(mc->materialPath, material)) {
-            tint = material.baseColor;
-            if (!material.textureAssetPath.empty()) {
-                if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material.textureAssetPath)) {
-                    for (int i = 0; i < model->materialCount; i++) {
-                        model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
-                    }
-                }
-            }
-        }
-    }
-
-    DrawModel(*model, pos, 1.0f, tint);
+    AssetCache::ApplyMaterialSlots(model, mc->materialPaths);
+    DrawModel(*model, pos, 1.0f, WHITE);
 }
 
 void SceneRenderer::DrawWorldActors(bool showPlaceholders) {

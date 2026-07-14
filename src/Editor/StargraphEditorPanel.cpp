@@ -3,6 +3,7 @@
 #include "ViewportPanel.h"
 #include "PropertyFields.h"
 #include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/StarAsset.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -736,6 +737,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         componentMeshPicker.Close();
         componentMaterialPicker.Close();
         audioPathPicker.Close();
+        materialSlotPickerIndex = -1;
     }
 
     auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal) {
@@ -803,7 +805,43 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     if (comp.componentType == "MeshComponent") {
         assetField("Static Mesh", comp.meshAssetPath, componentMeshPicker, ".starasset", comp.meshAssetPath);
-        assetField("Material", comp.materialAssetPath, componentMaterialPicker, ".starmat", comp.materialAssetPath);
+
+        std::vector<MaterialSlot> meshSlots;
+        if (!comp.meshAssetPath.empty()) {
+            StarAsset meshAsset;
+            if (StarAsset::LoadFromFile(comp.meshAssetPath, meshAsset)) meshSlots = meshAsset.materialSlots;
+        }
+        if (comp.materialAssetPaths.size() != meshSlots.size()) comp.materialAssetPaths.resize(meshSlots.size());
+
+        if (meshSlots.empty()) {
+            DrawText("No material slots", (int)panel.x + 8, (int)y, 10, {130, 130, 140, 255});
+            y += 18;
+        } else {
+            DrawText("Materials", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+            y += 14;
+            for (size_t i = 0; i < meshSlots.size(); i++) {
+                Rectangle rowRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
+                DrawRectangleRec(rowRect, {38, 38, 42, 255});
+                DrawRectangleLinesEx(rowRect, 1, {70, 70, 80, 255});
+                std::string slotName = meshSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : meshSlots[i].usemtlName;
+                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 2, 10, {150, 150, 160, 255});
+                std::string matLabel = comp.materialAssetPaths[i].empty() ? "None" :
+                    std::filesystem::path(comp.materialAssetPaths[i]).stem().string();
+                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 2, 10, WHITE);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
+                    componentMeshPicker.Close();
+                    componentMaterialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
+                    materialSlotPickerIndex = (int)i;
+                }
+                y += PropertyField::ArrayRowHeight() + 3;
+            }
+            std::string pickedMat;
+            if (componentMaterialPicker.Render(pickedMat)) {
+                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)comp.materialAssetPaths.size())
+                    comp.materialAssetPaths[materialSlotPickerIndex] = pickedMat;
+                isDirty = true;
+            }
+        }
     } else if (comp.componentType == "CollisionComponent") {
         DrawText("Shape", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;

@@ -2,17 +2,19 @@
 #include "raylib.h"
 #include "SceneComponent.h"
 #include <string>
+#include <vector>
 
 class MeshComponent : public SceneComponent {
 public:
     std::string meshPath;
-    std::string materialPath;
+    std::vector<std::string> materialPaths; // parallel to the mesh asset's material slots
 
     const char* GetClassName() const override { return "MeshComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
     void SetMeshPath(const std::string& path);
-    void SetMaterialPath(const std::string& path);
+    void SetMaterialPaths(const std::vector<std::string>& paths);
+    void SetMaterialPath(int slotIndex, const std::string& path);
 };
 
 void RegisterMeshComponentNodes();

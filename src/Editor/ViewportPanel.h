@@ -5,6 +5,7 @@
 #include "raylib.h"
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class Actor;
 class LogPanel;
@@ -38,7 +39,7 @@ private:
     void RenderPlayLogOverlay(Rectangle client);
     void HandleMapInteraction(Rectangle client);
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
-    void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
+    void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
                              Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
     void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
 

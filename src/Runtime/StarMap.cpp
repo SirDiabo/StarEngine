@@ -24,7 +24,10 @@ bool StarMap::SaveToFile(const std::string& path) const {
         out << "Class=" << inst.className << "\n";
         out << "Graph=" << inst.graphAssetPath << "\n";
         out << "Mesh=" << inst.meshAssetPath << "\n";
-        out << "Material=" << inst.materialAssetPath << "\n";
+        out << "MaterialCount=" << inst.materialAssetPaths.size() << "\n";
+        for (size_t m = 0; m < inst.materialAssetPaths.size(); m++) {
+            out << "Material" << m << "=" << inst.materialAssetPaths[m] << "\n";
+        }
         out << "PosX=" << inst.posX << "\n";
         out << "PosY=" << inst.posY << "\n";
         out << "PosZ=" << inst.posZ << "\n";
@@ -87,7 +90,14 @@ bool StarMap::LoadFromFile(const std::string& path) {
             if (const std::string* v = Find(section, "Class"))  inst.className = *v;
             if (const std::string* v = Find(section, "Graph"))  inst.graphAssetPath = *v;
             if (const std::string* v = Find(section, "Mesh"))   inst.meshAssetPath = *v;
-            if (const std::string* v = Find(section, "Material")) inst.materialAssetPath = *v;
+            if (const std::string* v = Find(section, "MaterialCount")) {
+                int count = std::stoi(*v);
+                if (count > 0) inst.materialAssetPaths.resize((size_t)count);
+                for (int m = 0; m < count; m++) {
+                    if (const std::string* mv = Find(section, "Material" + std::to_string(m)))
+                        inst.materialAssetPaths[m] = *mv;
+                }
+            }
             if (const std::string* v = Find(section, "PosX"))   inst.posX   = std::stof(*v);
             if (const std::string* v = Find(section, "PosY"))   inst.posY   = std::stof(*v);
             if (const std::string* v = Find(section, "PosZ"))   inst.posZ   = std::stof(*v);

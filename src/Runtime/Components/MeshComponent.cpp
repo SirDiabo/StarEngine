@@ -55,7 +55,7 @@ void RegisterMeshComponentNodes() {
         }
         if (!target) return;
         if (MeshComponent* mc = dynamic_cast<MeshComponent*>(target)) {
-            mc->SetMaterialPath(path);
+            mc->SetMaterialPath(0, path);
         }
     };
     NodeRegistry::Get().RegisterNode(setMaterial);
@@ -64,7 +64,6 @@ void RegisterMeshComponentNodes() {
 void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddString("Static Mesh", &meshPath);
-    outProperties.AddString("Material", &materialPath);
 }
 
 void MeshComponent::Update(float deltaTime) {
@@ -75,6 +74,12 @@ void MeshComponent::SetMeshPath(const std::string& path) {
     meshPath = path;
 }
 
-void MeshComponent::SetMaterialPath(const std::string& path) {
-    materialPath = path;
+void MeshComponent::SetMaterialPaths(const std::vector<std::string>& paths) {
+    materialPaths = paths;
+}
+
+void MeshComponent::SetMaterialPath(int slotIndex, const std::string& path) {
+    if (slotIndex < 0) return;
+    if ((size_t)slotIndex >= materialPaths.size()) materialPaths.resize(slotIndex + 1);
+    materialPaths[slotIndex] = path;
 }

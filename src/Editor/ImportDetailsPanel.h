@@ -1,7 +1,9 @@
 #pragma once
 #include "raylib.h"
 #include "AssetPickerPopup.h"
+#include "Core/StarAsset.h"
 #include <string>
+#include <vector>
 
 class ImportDetailsPanel {
 public:
@@ -26,6 +28,7 @@ private:
     char scaleBuf[3][32] = {};
     int activeField = 0;
 
-    std::string defaultMaterialPath;
+    std::vector<MaterialSlot> materialSlots;
+    int materialSlotPickerIndex = -1;
     AssetPickerPopup materialPicker;
 };

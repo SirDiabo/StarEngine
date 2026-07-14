@@ -31,6 +31,7 @@ void DetailsPanel::RefreshFromSelection(const ActorInstance& inst) {
     activeField = 0;
     meshPicker.Close();
     materialPicker.Close();
+    materialSlotPickerIndex = -1;
     classComponentsValid = false;
 }
 
@@ -119,19 +120,41 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     std::string pickedMesh;
     if (meshPicker.Render(pickedMesh)) inst.meshAssetPath = pickedMesh;
 
-    DrawText("Material", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
-    y += 14;
-    Rectangle matRow = {x + 8, y, w - 16, 18};
-    DrawRectangleRec(matRow, {30, 30, 32, 255});
-    DrawRectangleLinesEx(matRow, 1, {65, 65, 75, 255});
-    DrawText(AssetDisplayName(inst.materialAssetPath).c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 11, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !pickerBlocksInput) {
-        meshPicker.Close();
-        materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
+    std::vector<MaterialSlot> meshSlots;
+    if (!inst.meshAssetPath.empty()) {
+        StarAsset meshAsset;
+        if (StarAsset::LoadFromFile(inst.meshAssetPath, meshAsset)) meshSlots = meshAsset.materialSlots;
     }
-    y += 22;
+    if (inst.materialAssetPaths.size() != meshSlots.size()) inst.materialAssetPaths.resize(meshSlots.size());
+
+    if (meshSlots.empty()) {
+        DrawText("No material slots", (int)x + 8, (int)y, 10, {110, 110, 118, 255});
+        y += 18;
+        return;
+    }
+
+    DrawText("Materials", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    y += 14;
+    for (size_t i = 0; i < meshSlots.size(); i++) {
+        Rectangle matRow = {x + 8, y, w - 16, 18};
+        DrawRectangleRec(matRow, {30, 30, 32, 255});
+        DrawRectangleLinesEx(matRow, 1, {65, 65, 75, 255});
+        std::string slotName = meshSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : meshSlots[i].usemtlName;
+        DrawText(slotName.c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 10, {150, 150, 160, 255});
+        std::string matLabel = AssetDisplayName(inst.materialAssetPaths[i]);
+        DrawText(matLabel.c_str(), (int)(matRow.x + matRow.width * 0.5f), (int)matRow.y + 3, 10, WHITE);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !pickerBlocksInput) {
+            meshPicker.Close();
+            materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
+            materialSlotPickerIndex = (int)i;
+        }
+        y += 22;
+    }
     std::string pickedMat;
-    if (materialPicker.Render(pickedMat)) inst.materialAssetPath = pickedMat;
+    if (materialPicker.Render(pickedMat)) {
+        if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)inst.materialAssetPaths.size())
+            inst.materialAssetPaths[materialSlotPickerIndex] = pickedMat;
+    }
 }
 
 void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float x, float& y, float w) {

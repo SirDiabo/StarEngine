@@ -26,7 +26,7 @@ void ImportDetailsPanel::LoadFromAsset() {
     snprintf(scaleBuf[0], sizeof(scaleBuf[0]), "%.2f", asset.importScaleX);
     snprintf(scaleBuf[1], sizeof(scaleBuf[1]), "%.2f", asset.importScaleY);
     snprintf(scaleBuf[2], sizeof(scaleBuf[2]), "%.2f", asset.importScaleZ);
-    defaultMaterialPath = asset.defaultMaterialPath;
+    materialSlots = asset.materialSlots;
 }
 
 void ImportDetailsPanel::SaveToAsset() {
@@ -42,7 +42,7 @@ void ImportDetailsPanel::SaveToAsset() {
     asset.importScaleX = (float)atof(scaleBuf[0]);
     asset.importScaleY = (float)atof(scaleBuf[1]);
     asset.importScaleZ = (float)atof(scaleBuf[2]);
-    asset.defaultMaterialPath = defaultMaterialPath;
+    asset.materialSlots = materialSlots;
 
     asset.SaveToFile(assetPath);
 }
@@ -52,6 +52,7 @@ void ImportDetailsPanel::Open(const std::string& path, const std::string& type) 
     assetType = type;
     activeField = 0;
     materialPicker.Close();
+    materialSlotPickerIndex = -1;
     LoadFromAsset();
     open = true;
 }
@@ -59,6 +60,7 @@ void ImportDetailsPanel::Open(const std::string& path, const std::string& type) 
 void ImportDetailsPanel::Close() {
     open = false;
     materialPicker.Close();
+    materialSlotPickerIndex = -1;
 }
 
 void ImportDetailsPanel::Render() {
@@ -66,7 +68,7 @@ void ImportDetailsPanel::Render() {
 
     bool isMesh = (assetType == "StaticMesh");
     float boxWidth = 340;
-    float boxHeight = isMesh ? 300 : 120;
+    float boxHeight = isMesh ? (196.0f + materialSlots.size() * 24.0f + (materialSlots.empty() ? 0.0f : 38.0f)) : 120.0f;
 
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
@@ -98,19 +100,33 @@ void ImportDetailsPanel::Render() {
         vec3Row("Rotation", rotBuf, 4);
         vec3Row("Scale", scaleBuf, 7);
 
-        DrawText("Default Material", (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
-        y += 14;
-        Rectangle matRow = {box.x + 10, y, boxWidth - 20, 18};
-        DrawRectangleRec(matRow, {30, 30, 32, 255});
-        DrawRectangleLinesEx(matRow, 1, {65, 65, 75, 255});
-        std::string matLabel = defaultMaterialPath.empty() ? "None" : fs::path(defaultMaterialPath).stem().string();
-        DrawText(matLabel.c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 11, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !pickerBlocksInput) {
-            materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
+        if (materialSlots.empty()) {
+            DrawText("No material slots (plain .obj, no mtllib)", (int)box.x + 10, (int)y, 10, {140, 140, 150, 255});
+            y += 20;
+        } else {
+            DrawText("Materials", (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
+            y += 14;
+            for (size_t i = 0; i < materialSlots.size(); i++) {
+                Rectangle rowRect = {box.x + 10, y, boxWidth - 20, 18};
+                DrawRectangleRec(rowRect, {30, 30, 32, 255});
+                DrawRectangleLinesEx(rowRect, 1, {65, 65, 75, 255});
+                std::string slotName = materialSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : materialSlots[i].usemtlName;
+                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 3, 10, {150, 150, 160, 255});
+                std::string matLabel = materialSlots[i].materialPath.empty() ? "None" :
+                    fs::path(materialSlots[i].materialPath).stem().string();
+                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 3, 10, WHITE);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
+                    materialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
+                    materialSlotPickerIndex = (int)i;
+                }
+                y += 24;
+            }
+            std::string pickedMat;
+            if (materialPicker.Render(pickedMat)) {
+                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size())
+                    materialSlots[materialSlotPickerIndex].materialPath = pickedMat;
+            }
         }
-        y += 24;
-        std::string pickedMat;
-        if (materialPicker.Render(pickedMat)) defaultMaterialPath = pickedMat;
     } else {
         DrawText("No import options for this asset type yet.", (int)box.x + 10, (int)y, 11, {150, 150, 160, 255});
         y += 24;

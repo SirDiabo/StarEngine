@@ -244,7 +244,10 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "ScaleY=" << comp.scaleY << "\n";
         out << "ScaleZ=" << comp.scaleZ << "\n";
         out << "Mesh=" << comp.meshAssetPath << "\n";
-        out << "Material=" << comp.materialAssetPath << "\n";
+        out << "MaterialCount=" << comp.materialAssetPaths.size() << "\n";
+        for (size_t m = 0; m < comp.materialAssetPaths.size(); m++) {
+            out << "Material" << m << "=" << comp.materialAssetPaths[m] << "\n";
+        }
         out << "CollisionShape=" << comp.collisionShape << "\n";
         out << "CollisionRadius=" << comp.collisionRadius << "\n";
         out << "CollisionHeight=" << comp.collisionHeight << "\n";
@@ -414,7 +417,14 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = std::stof(*v);
             if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = std::stof(*v);
             if (const std::string* v = FindEntry(section, "Mesh")) comp.meshAssetPath = *v;
-            if (const std::string* v = FindEntry(section, "Material")) comp.materialAssetPath = *v;
+            if (const std::string* v = FindEntry(section, "MaterialCount")) {
+                int count = std::stoi(*v);
+                if (count > 0) comp.materialAssetPaths.resize((size_t)count);
+                for (int m = 0; m < count; m++) {
+                    if (const std::string* mv = FindEntry(section, "Material" + std::to_string(m)))
+                        comp.materialAssetPaths[m] = *mv;
+                }
+            }
             if (const std::string* v = FindEntry(section, "CollisionShape")) comp.collisionShape = *v;
             if (const std::string* v = FindEntry(section, "CollisionRadius")) comp.collisionRadius = std::stof(*v);
             if (const std::string* v = FindEntry(section, "CollisionHeight")) comp.collisionHeight = std::stof(*v);

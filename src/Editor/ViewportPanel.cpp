@@ -60,13 +60,13 @@ void ViewportPanel::InvalidateClassGraph(const std::string& graphAssetPath) {
     classGraphCache.erase(graphAssetPath);
 }
 
-void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::string& materialAssetPath,
+void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
                                         Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor) {
     Model* model = nullptr;
     if (!meshAssetPath.empty()) {
         StarAsset asset;
         if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
-            model = AssetCache::Get().GetOrLoadModel(asset.sourcePath);
+            model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
         }
     }
 
@@ -75,22 +75,8 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
         Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
-        Color tint = WHITE;
-        if (!materialAssetPath.empty()) {
-            StarMaterial material;
-            if (StarMaterial::LoadFromFile(materialAssetPath, material)) {
-                tint = material.baseColor;
-                if (!material.textureAssetPath.empty()) {
-                    if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material.textureAssetPath)) {
-                        for (int i = 0; i < model->materialCount; i++) {
-                            model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
-                        }
-                    }
-                }
-            }
-        }
-
-        DrawModel(*model, pos, 1.0f, tint);
+        AssetCache::ApplyMaterialSlots(model, materialAssetPaths);
+        DrawModel(*model, pos, 1.0f, WHITE);
         if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
     } else {
         DrawCube(pos, scale.x, scale.y, scale.z, fallbackColor);
@@ -216,13 +202,11 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     inst.rotX = asset.importRotX;
     inst.rotY = asset.importRotY;
     inst.rotZ = asset.importRotZ;
-    // Mesh scale is a 1.0 = original-size multiplier, unlike the placeholder
-    // box scale (which is an absolute box dimension) used by graph actors.
-    // Starts from the asset's stored import scale rather than always 1.0.
+    
     inst.scaleX = asset.importScaleX;
     inst.scaleY = asset.importScaleY;
     inst.scaleZ = asset.importScaleZ;
-    if (!asset.defaultMaterialPath.empty()) inst.materialAssetPath = asset.defaultMaterialPath;
+    for (const MaterialSlot& slot : asset.materialSlots) inst.materialAssetPaths.push_back(slot.materialPath);
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;
@@ -398,7 +382,7 @@ void ViewportPanel::RenderScene() {
                         Vector3 compScale = Actor::ComputeWorldScale({comp.scaleX, comp.scaleY, comp.scaleZ}, scl);
 
                         if (comp.componentType == "MeshComponent") {
-                            DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPath, compPos, compRot,
+                            DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPaths, compPos, compRot,
                                                 compScale, selected, fallbackColor);
                             drewAnyMesh = true;
                         } else if (comp.componentType == "CollisionComponent" && selected) {
@@ -409,10 +393,10 @@ void ViewportPanel::RenderScene() {
 
                 if (!drewAnyMesh) {
                     Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
-                    DrawInstanceOrMesh("", "", pos, rot, boxSize, false, fallbackColor);
+                    DrawInstanceOrMesh("", {}, pos, rot, boxSize, false, fallbackColor);
                 }
             } else {
-                DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPath, pos, rot, scl, selected, fallbackColor);
+                DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
             }
         }
     }

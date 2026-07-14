@@ -26,7 +26,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 if (decl.componentType == "MeshComponent") {
                     auto* mesh = new MeshComponent();
                     mesh->SetMeshPath(decl.meshAssetPath);
-                    mesh->SetMaterialPath(decl.materialAssetPath);
+                    mesh->SetMaterialPaths(decl.materialAssetPaths);
                     comp = mesh;
                 } else if (decl.componentType == "CollisionComponent") {
                     auto* collision = new CollisionComponent();
@@ -64,7 +64,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     if (!inst.meshAssetPath.empty()) {
         auto* meshComp = new MeshComponent();
         meshComp->SetMeshPath(inst.meshAssetPath);
-        meshComp->SetMaterialPath(inst.materialAssetPath);
+        meshComp->SetMaterialPaths(inst.materialAssetPaths);
         actor->AddComponent(meshComp);
     }
 

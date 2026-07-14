@@ -1,5 +1,6 @@
 #include "PackageCooker.h"
 #include "StarPak.h"
+#include "ObjMtlParser.h"
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -17,9 +18,6 @@ bool IsTextProjectFile(const fs::path& p) {
     return ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
            ext == ".staractor" || ext == ".stargraph" || ext == ".startex";
 }
-
-bool IsObjFile(const fs::path& p) { return p.extension() == ".obj"; }
-bool IsMtlFile(const fs::path& p) { return p.extension() == ".mtl"; }
 
 std::vector<uint8_t> ReadBytes(const fs::path& p) {
     std::ifstream in(p, std::ios::binary);
@@ -43,49 +41,6 @@ std::string UniqueImportedName(const fs::path& source, std::unordered_set<std::s
     }
     reserved.insert(name);
     return name;
-}
-
-std::vector<std::string> ParseMtllibReferences(const std::vector<uint8_t>& objBytes) {
-    std::vector<std::string> result;
-    std::string text(objBytes.begin(), objBytes.end());
-    std::istringstream in(text);
-    std::string line;
-    while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.rfind("mtllib", 0) != 0) continue;
-        std::istringstream ls(line.substr(6));
-        std::string token;
-        while (ls >> token) result.push_back(token);
-    }
-    return result;
-}
-
-std::vector<std::string> ParseMtlTextureReferences(const std::vector<uint8_t>& mtlBytes) {
-    static const std::vector<std::string> mapKeys = {
-        "map_Kd", "map_Ka", "map_Ks", "map_Ns", "map_d", "map_Bump", "bump", "norm", "disp", "decal",
-    };
-
-    std::vector<std::string> result;
-    std::string text(mtlBytes.begin(), mtlBytes.end());
-    std::istringstream in(text);
-    std::string line;
-    while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        std::istringstream ls(line);
-        std::string key;
-        ls >> key;
-
-        bool isMap = false;
-        for (const auto& k : mapKeys) {
-            if (key == k) { isMap = true; break; }
-        }
-        if (!isMap) continue;
-
-        std::string token, last;
-        while (ls >> token) last = token;
-        if (!last.empty()) result.push_back(last);
-    }
-    return result;
 }
 
 using CookSink = std::function<void(const std::string& virtualPath, std::vector<uint8_t>&& bytes)>;
@@ -118,7 +73,7 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
         return virtualPath;
     };
 
-    auto rewriteLine = [&](const std::string& line) -> std::string {
+    auto rewriteLine = [&](const std::string& line, const std::string& vendoredFallback) -> std::string {
         size_t sep = line.find('=');
         if (sep == std::string::npos) return line;
 
@@ -127,7 +82,13 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
         if (value.empty()) return line;
 
         fs::path valuePath(value);
-        if (!valuePath.is_absolute() || !fs::exists(valuePath)) return line;
+        bool exists = valuePath.is_absolute() && fs::exists(valuePath);
+
+        if (!exists && key == "Source" && !vendoredFallback.empty()) {
+            std::error_code vec;
+            if (fs::exists(contentRoot / vendoredFallback, vec)) return key + "=" + vendoredFallback;
+        }
+        if (!exists) return line;
 
         fs::path relativeToContent = fs::relative(valuePath, contentRoot, ec);
         bool insideContent = !ec && relativeToContent.generic_string().rfind("..", 0) != 0;
@@ -145,12 +106,20 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
         std::vector<uint8_t> bytes;
         if (IsTextProjectFile(entry.path())) {
             std::ifstream in(entry.path());
-            std::ostringstream rewritten;
+            std::vector<std::string> lines;
             std::string line;
             while (std::getline(in, line)) {
                 if (!line.empty() && line.back() == '\r') line.pop_back();
-                rewritten << rewriteLine(line) << "\n";
+                lines.push_back(line);
             }
+
+            std::string vendoredFallback;
+            for (const std::string& l : lines) {
+                if (l.rfind("VendoredSource=", 0) == 0) { vendoredFallback = l.substr(15); break; }
+            }
+
+            std::ostringstream rewritten;
+            for (const std::string& l : lines) rewritten << rewriteLine(l, vendoredFallback) << "\n";
             std::string text = rewritten.str();
             bytes.assign(text.begin(), text.end());
         } else {
@@ -169,13 +138,13 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
         fs::path sourcePath(source);
         std::vector<uint8_t> bytes = ReadBytes(sourcePath);
 
-        if (IsObjFile(sourcePath)) {
-            for (const std::string& mtlName : ParseMtllibReferences(bytes)) {
+        if (ObjMtlParser::IsObjFile(sourcePath)) {
+            for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(bytes)) {
                 fs::path mtlPath = sourcePath.parent_path() / mtlName;
                 if (fs::exists(mtlPath)) queueImport(mtlPath.string());
             }
-        } else if (IsMtlFile(sourcePath)) {
-            for (const std::string& texName : ParseMtlTextureReferences(bytes)) {
+        } else if (ObjMtlParser::IsMtlFile(sourcePath)) {
+            for (const std::string& texName : ObjMtlParser::ParseMtlTextureReferences(bytes)) {
                 fs::path texPath = sourcePath.parent_path() / texName;
                 if (fs::exists(texPath)) queueImport(texPath.string());
             }
