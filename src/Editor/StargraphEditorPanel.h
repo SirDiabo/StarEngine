@@ -152,4 +152,6 @@ private:
     char eventNameBuf[128] = "";
     int eventActiveField = 0;
     char eventParamNameBuf[8][64] = {};
+
+    bool showSelfActorDetails = false;
 };

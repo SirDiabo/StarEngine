@@ -555,10 +555,24 @@ void StargraphEditorPanel::RenderToolbar() {
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
 
-    std::string tabLabel = graph.assetName + (isDirty ? " *" : "");
-    DrawText(tabLabel.c_str(), (int)bounds.x + 8, (int)bounds.y + 8, 13, WHITE);
-
     float btnY = toolbar.y + 4;
+    float btnLeft = bounds.x + 8;
+
+    Rectangle saveBtn = {btnLeft, btnY, 50, 22};
+    if (GuiButton(saveBtn, "Save")) {
+        SaveGraph();
+    }
+    btnLeft += 54;
+
+    Vector2 mp = GetMousePosition();
+    bool canStop = !varValueSnapshot.empty();
+
+    Rectangle selfBtn = {btnLeft, btnY, 48, 22};
+    bool selfHovered = CheckCollisionPointRec(mp, selfBtn);
+    Color selfColor = showSelfActorDetails ? Color{70, 130, 200, 255} : Color{50, 100, 160, 255};
+    DrawRectangleRec(selfBtn, selfHovered ? Color{80, 150, 230, 255} : selfColor);
+    DrawText("Self", (int)selfBtn.x + 7, (int)selfBtn.y + 4, 13, WHITE);
+
     float btnRight = bounds.x + bounds.width - 4;
 
     Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
@@ -569,36 +583,40 @@ void StargraphEditorPanel::RenderToolbar() {
     }
     btnRight -= 26;
 
-    Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
-    if (GuiButton(saveBtn, "Save")) {
-        SaveGraph();
+    Rectangle stopBtn = {btnRight - 48, btnY, 48, 22};
+    if (canStop) {
+        bool stopHovered = CheckCollisionPointRec(mp, stopBtn);
+        Color stopColor = stopHovered ? Color{160, 40, 40, 255} : Color{130, 30, 30, 255};
+        DrawRectangleRec(stopBtn, stopColor);
+        DrawText("STOP", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
+        btnRight -= 52;
     }
-    btnRight -= 54;
 
-    Vector2 mp = GetMousePosition();
-    bool canStop = !varValueSnapshot.empty();
-
-    Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
-    bool stopHovered = canStop && CheckCollisionPointRec(mp, stopBtn);
-    Color stopColor = canStop ? (stopHovered ? Color{160, 40, 40, 255} : Color{130, 30, 30, 255})
-                               : Color{70, 45, 45, 255};
-    DrawRectangleRec(stopBtn, stopColor);
-    DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, canStop ? WHITE : Color{150, 130, 130, 255});
-    btnRight -= 26;
-
-    Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
-    bool playHovered = CheckCollisionPointRec(mp, playBtn);
-    DrawRectangleRec(playBtn, playHovered ? Color{40, 160, 75, 255} : Color{30, 130, 60, 255});
-    DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
+    Rectangle playBtn = {btnRight - 48, btnY, 48, 22};
+    if (!canStop) {
+        bool playHovered = CheckCollisionPointRec(mp, playBtn);
+        DrawRectangleRec(playBtn, playHovered ? Color{40, 160, 75, 255} : Color{30, 130, 60, 255});
+        DrawText("PLAY", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
+        btnRight -= 52;
+    }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (CheckCollisionPointRec(mp, selfBtn)) {
+            showSelfActorDetails = !showSelfActorDetails;
+            if (showSelfActorDetails) {
+                selectedNodeId = -1;
+                selectedNodeIds.clear();
+                selectedVariableIndex = -1;
+                selectedComponentIndex = -1;
+            }
+        }
         if (canStop && CheckCollisionPointRec(mp, stopBtn)) {
             for (size_t i = 0; i < graph.GetVariables().size() && i < varValueSnapshot.size(); i++) {
                 graph.GetVariables()[i].value = varValueSnapshot[i];
             }
             varValueSnapshot.clear();
         }
-        if (CheckCollisionPointRec(mp, playBtn)) {
+        if (!canStop && CheckCollisionPointRec(mp, playBtn)) {
             varValueSnapshot.clear();
             for (const Variable& v : graph.GetVariables()) {
                 varValueSnapshot.push_back(v.value);
@@ -1346,6 +1364,13 @@ void StargraphEditorPanel::RenderRightPanel() {
 
     float y = panel.y + 8;
 
+    if (showSelfActorDetails) {
+        DrawText(graph.assetName.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        y += 20;
+        DrawText("Actor properties", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        return;
+    }
+
     std::vector<ComponentDecl>& comps = graph.GetComponents();
     if (selectedComponentIndex >= 0 && selectedComponentIndex < (int)comps.size()) {
         RenderComponentDetails(panel, y);
@@ -1567,6 +1592,7 @@ void StargraphEditorPanel::RenderRightPanel() {
 
     for (const Node& node : graph.GetNodes()) {
         if (std::stoi(node.id) != selectedNodeId) continue;
+
         DrawText(node.title.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
         y += 20;
         DrawText(node.type.c_str(), (int)panel.x + 8, (int)y, 11, {120, 120, 130, 255});
