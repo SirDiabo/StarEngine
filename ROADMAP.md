@@ -109,6 +109,15 @@ x Module Browser panel (enable/disable per project)
 x Third-party module import
 x Module manifest format (.starmodule)
 
+### 2.4.1 Project-Scoped External Modules
+x Project only Modules. ModuleManager scans both the engine's built-in src/Modules and the current project's Modules/ directory
+x .starmodule manifest optional repository field (owner/repo) for catalog/repo-imported modules
+x A module folder with its own CMakeLists.txt is add_subdirectory()'d and registers its link target via starengine_register_module(), instead of being globbed as loose source
+x Networking module split out of the engine source tree into its own standalone repo folder
+x Module Browser's single Import button replaced with three import paths: from disk, from a typed "owner/repo" repository, and from a curated plain-text catalog index
+o Blocking "this runs native code" trust warning before importing a non-catalog repository (currently just listed as "(external)" on the row)
+o "Update module" action (re-clone/diff against the pinned repository). Using release tab tags or latest commit date of main branch to detect updates.
+
 ### 2.5 Module-Gated Registration and Rebuild-on-Import
 x NodeRegistry entries tagged with their owning module, filtered by IsEnabled() when populating the Add Node menu
 x AssetTypeRegistry entries tagged with their owning module, filtered by IsEnabled() in content browser create menu and double-click-to-open
@@ -118,6 +127,7 @@ x Trigger an engine rebuild (cmake --build) from the Module Browser after an imp
 x On successful rebuild, relaunch the new editor binary with the current project path so the freshly imported module is live without the user manually restarting
 x Project/layout state preserved across the relaunch (open editor tabs, active map, dock layout)
 x Rebuild failure surfaces the compiler error in the Log panel instead of silently leaving the old binary running
+x CMake auto-reconfigures on module import via CONFIGURE_DEPENDS on the module-discovery globs, instead of requiring a manual cmake reconfigure before the rebuild
 
 ### 2.6 Component editing at runtime
 x Add references of components nodes in the graph editor, similar to variable get and set. To get a reference of a component.

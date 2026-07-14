@@ -8,16 +8,10 @@ option(STARENGINE_BUILD_GAME "Build the runtime-only packaged game instead of th
 
 add_subdirectory(external/raylib)
 
-set(NO_WEBSOCKET ON CACHE BOOL "" FORCE)
-set(NO_MEDIA ON CACHE BOOL "" FORCE)
-set(NO_EXAMPLES ON CACHE BOOL "" FORCE)
-set(NO_TESTS ON CACHE BOOL "" FORCE)
-set(USE_GNUTLS OFF CACHE BOOL "" FORCE)
-set(USE_NICE OFF CACHE BOOL "" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-add_subdirectory(external/libdatachannel)
+include(cmake/StarEngineModule.cmake)
 
-find_package(OpenSSL REQUIRED)
+# Discovers built-in + project modules
+include(cmake/DiscoverModules.cmake)
 
 set(MODULES_GENERATED_FILE "${CMAKE_BINARY_DIR}/Modules.modules.generated.h")
 
@@ -25,6 +19,7 @@ add_custom_target(generate_modules ALL
     COMMAND ${CMAKE_COMMAND} -E echo "Generating Modules.modules.generated.h"
     COMMAND ${CMAKE_COMMAND}
         -DMODULES_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src/Modules"
+        -DMODULES_PROJECT_DIR="${STARENGINE_PROJECT_MODULES_DIR}"
         -DMODULES_OUTPUT_FILE="${MODULES_GENERATED_FILE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/GenerateModules.cmake"
     BYPRODUCTS ${MODULES_GENERATED_FILE}
@@ -34,6 +29,7 @@ add_custom_target(generate_modules ALL
 if(STARENGINE_BUILD_GAME)
     file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS "src/Core/*.cpp" "src/Runtime/*.cpp" "src/Modules/*.cpp")
     list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/Core/Application\\.cpp$")
+    list(APPEND GAME_SOURCES ${STARENGINE_MODULE_PLAIN_SOURCES})
 
     add_executable(StarEngineGame ${GAME_SOURCES} src/GameMain.cpp ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngineGame generate_modules)
@@ -42,14 +38,13 @@ if(STARENGINE_BUILD_GAME)
     target_include_directories(StarEngineGame PRIVATE "${CMAKE_BINARY_DIR}")
 
     target_link_libraries(StarEngineGame PRIVATE raylib)
-    target_link_libraries(StarEngineGame PRIVATE LibDataChannel::LibDataChannel)
-    target_link_libraries(StarEngineGame PRIVATE OpenSSL::Crypto)
+    if(STARENGINE_MODULE_LIBRARIES)
+        target_link_libraries(StarEngineGame PRIVATE ${STARENGINE_MODULE_LIBRARIES})
+    endif()
     if(PLATFORM STREQUAL "RGFW" AND UNIX AND NOT APPLE)
         target_link_libraries(StarEngineGame PRIVATE Xrandr)
     endif()
     if(WIN32)
-        target_link_libraries(StarEngineGame PRIVATE ws2_32)
-
         set_target_properties(StarEngineGame PROPERTIES WIN32_EXECUTABLE TRUE)
         if(MSVC)
             set_target_properties(StarEngineGame PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
@@ -66,6 +61,7 @@ else()
     file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp" "src/*.c")
     list(FILTER SOURCES EXCLUDE REGEX ".*/GameMain\\.cpp$")
     list(FILTER SOURCES EXCLUDE REGEX ".*/Tools/.*\\.cpp$")
+    list(APPEND SOURCES ${STARENGINE_MODULE_PLAIN_SOURCES})
 
     add_executable(StarEngine ${SOURCES} ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngine generate_modules)
@@ -75,13 +71,16 @@ else()
     target_include_directories(StarEngine PRIVATE "${CMAKE_BINARY_DIR}")
 
     target_link_libraries(StarEngine PRIVATE raylib)
-    target_link_libraries(StarEngine PRIVATE LibDataChannel::LibDataChannel)
-    target_link_libraries(StarEngine PRIVATE OpenSSL::Crypto)
+    if(STARENGINE_MODULE_LIBRARIES)
+        target_link_libraries(StarEngine PRIVATE ${STARENGINE_MODULE_LIBRARIES})
+    endif()
 
     target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
+    target_compile_definitions(StarEngine PRIVATE STARENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}")
+    target_compile_definitions(StarEngine PRIVATE STARENGINE_BUILD_CONFIG="$<CONFIG>")
 
     if(WIN32)
-        target_link_libraries(StarEngine PRIVATE comdlg32 shell32 ole32 ws2_32)
+        target_link_libraries(StarEngine PRIVATE comdlg32 shell32 ole32)
 
         set_target_properties(StarEngine PROPERTIES WIN32_EXECUTABLE TRUE)
         if(MSVC)

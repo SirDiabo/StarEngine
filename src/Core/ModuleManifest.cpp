@@ -35,6 +35,7 @@ bool ModuleManifest::LoadFromFile(const std::string& filePath, ModuleManifest& o
     outManifest.description = data.count("description") ? data["description"] : "";
     outManifest.author      = data.count("author")      ? data["author"]      : "";
     outManifest.category    = data.count("category")    ? data["category"]    : "Other";
+    outManifest.repository  = data.count("repository")  ? data["repository"]  : "";
     outManifest.enabledByDefault = !data.count("enabledByDefault") || data["enabledByDefault"] != "false";
 
     if (data.count("dependencies"))   outManifest.dependencies   = SplitCsv(data["dependencies"]);
@@ -42,6 +43,7 @@ bool ModuleManifest::LoadFromFile(const std::string& filePath, ModuleManifest& o
     if (data.count("nodeCategories")) outManifest.nodeCategories = SplitCsv(data["nodeCategories"]);
 
     outManifest.sourcePath = fs::path(filePath).parent_path().string();
+    outManifest.hasExternalDependencies = fs::exists(fs::path(outManifest.sourcePath) / "CMakeLists.txt");
     return true;
 }
 
@@ -52,6 +54,7 @@ bool ModuleManifest::SaveToFile(const std::string& filePath, const ModuleManifes
     data["description"]       = manifest.description;
     data["author"]            = manifest.author;
     data["category"]          = manifest.category;
+    data["repository"]        = manifest.repository;
     data["enabledByDefault"]  = manifest.enabledByDefault ? "true" : "false";
     data["dependencies"]      = JoinCsv(manifest.dependencies);
     data["assetTypes"]        = JoinCsv(manifest.assetTypes);

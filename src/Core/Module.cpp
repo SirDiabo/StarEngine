@@ -1,4 +1,5 @@
 #include "Module.h"
+#include "Project.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -42,25 +43,36 @@ std::string ModuleManager::GetModulesSourceRoot() {
 #endif
 }
 
+std::string ModuleManager::GetProjectModulesRoot() {
+    const std::string& rootPath = Project::Get().GetRootPath();
+    if (rootPath.empty()) return "";
+    return Project::Get().GetModulesDirectory();
+}
+
+static void ScanManifestsUnder(const std::string& modulesRoot, std::vector<ModuleEntry>& entries) {
+    if (modulesRoot.empty() || !fs::exists(modulesRoot) || !fs::is_directory(modulesRoot)) return;
+
+    for (const auto& dirEntry : fs::directory_iterator(modulesRoot)) {
+        if (!dirEntry.is_directory()) continue;
+        for (const auto& fileEntry : fs::directory_iterator(dirEntry.path())) {
+            if (fileEntry.path().extension() != ".starmodule") continue;
+
+            ModuleEntry entry;
+            if (ModuleManifest::LoadFromFile(fileEntry.path().string(), entry.manifest)) {
+                entry.hasManifest = true;
+                entries.push_back(entry);
+            }
+            break;
+        }
+    }
+}
+
 void ModuleManager::ScanManifests() {
     entries.clear();
 
-    std::string modulesRoot = GetModulesSourceRoot();
-    if (fs::exists(modulesRoot) && fs::is_directory(modulesRoot)) {
-        for (const auto& dirEntry : fs::directory_iterator(modulesRoot)) {
-            if (!dirEntry.is_directory()) continue;
-            for (const auto& fileEntry : fs::directory_iterator(dirEntry.path())) {
-                if (fileEntry.path().extension() != ".starmodule") continue;
-
-                ModuleEntry entry;
-                if (ModuleManifest::LoadFromFile(fileEntry.path().string(), entry.manifest)) {
-                    entry.hasManifest = true;
-                    entries.push_back(entry);
-                }
-                break;
-            }
-        }
-    }
+    // Engine's built-in modules, then the current project's imported modules.
+    ScanManifestsUnder(GetModulesSourceRoot(), entries);
+    ScanManifestsUnder(GetProjectModulesRoot(), entries);
 
     // Attach compiled-in instances to matching manifests, and add any
     // registered module that has no manifest on disk.

@@ -11,12 +11,10 @@ endif()
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Modules)
 
-# Find all .starmodule files in src/Modules/*/
-file(GLOB MODULE_DIRS "${MODULES_SOURCE_DIR}/*")
-
 set(MODULE_NAMES "")
 set(MODULE_HEADERS "")
 
+file(GLOB MODULE_DIRS "${MODULES_SOURCE_DIR}/*")
 foreach(MODULE_DIR ${MODULE_DIRS})
     if(IS_DIRECTORY ${MODULE_DIR})
         get_filename_component(MODULE_NAME ${MODULE_DIR} NAME)
@@ -28,6 +26,26 @@ foreach(MODULE_DIR ${MODULE_DIRS})
         endif()
     endif()
 endforeach()
+
+if(DEFINED MODULES_PROJECT_DIR AND EXISTS "${MODULES_PROJECT_DIR}")
+    file(GLOB PROJECT_MODULE_DIRS "${MODULES_PROJECT_DIR}/*")
+    foreach(MODULE_DIR ${PROJECT_MODULE_DIRS})
+        if(IS_DIRECTORY ${MODULE_DIR})
+            file(GLOB MANIFEST_FILES "${MODULE_DIR}/*.starmodule")
+            list(LENGTH MANIFEST_FILES MANIFEST_COUNT)
+            if(MANIFEST_COUNT GREATER 0)
+                list(GET MANIFEST_FILES 0 MANIFEST_FILE)
+                file(STRINGS "${MANIFEST_FILE}" MANIFEST_NAME_LINE REGEX "^name=")
+                string(REPLACE "name=" "" MODULE_NAME "${MANIFEST_NAME_LINE}")
+                string(STRIP "${MODULE_NAME}" MODULE_NAME)
+                if(MODULE_NAME)
+                    list(APPEND MODULE_NAMES ${MODULE_NAME}Module)
+                    list(APPEND MODULE_HEADERS "${MODULE_NAME}Module.h")
+                endif()
+            endif()
+        endif()
+    endforeach()
+endif()
 
 # Generate the file
 file(WRITE ${MODULES_OUTPUT_FILE}

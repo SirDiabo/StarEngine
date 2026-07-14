@@ -32,6 +32,11 @@ public:
     const std::string& GetRootPath() const { return rootPath; }
     const std::string& GetProjectFilePath() const { return projectFilePath; }
 
+    std::string GetModulesDirectory() const;
+
+private:
+    void WriteActiveProjectPointer() const;
+
 private:
     ProjectSettings settings;
     std::string rootPath;

@@ -1,11 +1,34 @@
 #include "Project.h"
 #include "Module.h"
+#include "LayoutSerializer.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
+
+static std::string GetStarEngineHomeDir() {
+    std::string home;
+#ifdef _WIN32
+    char* buf = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
+        home = buf;
+        free(buf);
+    } else {
+        home = ".";
+    }
+#else
+    const char* h = getenv("HOME");
+    home = h ? h : ".";
+#endif
+    fs::path dir = fs::path(home) / ".starengine";
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    return dir.string();
+}
 
 std::string GameRendererName(GameRenderer renderer) {
     return renderer == GameRenderer::Software ? "Software" : "Hardware";
@@ -65,7 +88,21 @@ bool Project::Load(const std::string& path) {
 
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
 
+    std::error_code ec;
+    fs::create_directories(fs::path(GetModulesDirectory()), ec);
+    WriteActiveProjectPointer();
+
     return true;
+}
+
+std::string Project::GetModulesDirectory() const {
+    return (fs::path(rootPath) / "Modules").string();
+}
+
+void Project::WriteActiveProjectPointer() const {
+    std::unordered_map<std::string, std::string> data;
+    data["ProjectRoot"] = rootPath;
+    LayoutSerializer::Save((fs::path(GetStarEngineHomeDir()) / "active_project.cfg").string(), data);
 }
 
 void Project::Save() {

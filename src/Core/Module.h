@@ -47,6 +47,8 @@ public:
 
     static std::string GetModulesSourceRoot();
 
+    static std::string GetProjectModulesRoot();
+
 private:
     std::vector<Module*> modules;
     std::vector<ModuleEntry> entries;

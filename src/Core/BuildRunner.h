@@ -12,7 +12,11 @@ class BuildRunner {
 public:
     static BuildRunner& Get();
 
-    BuildResult RunBuild(const std::string& buildDir);
+    BuildResult RunBuild(const std::string& buildDir, const std::string& config = "");
+
+    static std::string GetDefaultBuildDirectory();
+
+    static std::string GetDefaultBuildConfig();
 
     void SetRelaunchCallback(std::function<void()> callback) { relaunchCallback = callback; }
     void TriggerRelaunch();
