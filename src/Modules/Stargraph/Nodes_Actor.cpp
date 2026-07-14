@@ -488,6 +488,52 @@ void RegisterActorNodes() {
     };
     NodeRegistry::Get().RegisterNode(addMovementInput);
 
+    NodeTemplate getMovementSpeed;
+    getMovementSpeed.type = "Get_Movement_Speed";
+    getMovementSpeed.category = "Actor";
+    getMovementSpeed.moduleName = "Stargraph";
+    getMovementSpeed.createPins = [](Node* node) {
+        node->inputs.push_back({"Target",         PinType::Object, true, false, 0, ""});
+        node->outputs.push_back({"Speed",           PinType::Float, true, false, 0, "0.0"});
+    };
+    getMovementSpeed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                break;
+            }
+        }
+        if (!target) return;
+        char buf[64]; snprintf(buf, sizeof(buf), "%g", target->MovementSpeed);
+        for (Pin& p : node.outputs) if (p.name == "Speed") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getMovementSpeed);
+
+    NodeTemplate setMovementSpeed;
+    setMovementSpeed.type = "Set_Movement_Speed";
+    setMovementSpeed.category = "Actor";
+    setMovementSpeed.moduleName = "Stargraph";
+    setMovementSpeed.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"New Speed", PinType::Float, true, false, 0, "600.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setMovementSpeed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        float newSpeed = 600.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            }
+            if (p.name == "New Speed") newSpeed = (float)atof(p.defaultValue.c_str());
+        }
+        if (!target) return;
+        target->MovementSpeed = newSpeed;
+    };
+    NodeRegistry::Get().RegisterNode(setMovementSpeed);
+
     NodeTemplate addControlYawInput;
     addControlYawInput.type = "Add_Control_Yaw_Input";
     addControlYawInput.category = "Actor";

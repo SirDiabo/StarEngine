@@ -50,6 +50,8 @@ public:
     bool useControlPitch = false;
     bool useControlRoll = false;
 
+    float MovementSpeed = 600.0f;
+
     void AddControlYawInput(float value);
     void AddControlPitchInput(float value);
     void AddControlRollInput(float value);

@@ -75,7 +75,7 @@ void Actor::Tick(float deltaTime) {
                      + pendingMovementInput.y * pendingMovementInput.y
                      + pendingMovementInput.z * pendingMovementInput.z;
     if (moveLenSq > 1.0f) pendingMovementInput = Vector3Scale(pendingMovementInput, 1.0f / sqrtf(moveLenSq));
-    position = Vector3Add(position, Vector3Scale(pendingMovementInput, deltaTime));
+    position = Vector3Add(position, Vector3Scale(pendingMovementInput * MovementSpeed, deltaTime));
     pendingMovementInput = { 0, 0, 0 };
 
     for (Component* c : components) c->Update(deltaTime);
