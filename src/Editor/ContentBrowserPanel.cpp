@@ -30,6 +30,8 @@ void ContentBrowserPanel::LoadIcons() {
     load("actor",    "icon_actor.png");
     load("starmap",  "icon_starmap.png");
     load("asset",    "icon_asset.png");
+    load("texture",  "icon_texture.png");
+    load("material", "icon_material.png");
     iconsLoaded = true;
 }
 
@@ -51,6 +53,8 @@ Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const 
     if (entry.isFolder) key = "folder";
     else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
     else if (entry.extension == ".starmap") key = "starmap";
+    else if (entry.extension == ".startex") key = "texture";
+    else if (entry.extension == ".starmat") key = "material";
 
     auto it = icons.find(key);
     if (it != icons.end()) return it->second;
@@ -78,6 +82,7 @@ std::vector<ContentEntry> ContentBrowserPanel::ScanCurrentFolder() const {
         item.extension    = entry.path().extension().string();
 
         if (entry.is_directory()) {
+            if (item.fullDiskName == "_Source") continue;
             item.isFolder = true;
             item.displayName = item.fullDiskName;
             folders.push_back(item);
@@ -415,7 +420,7 @@ void ContentBrowserPanel::Render() {
                               iconRect.width * 0.5f, iconRect.height * 0.6f}, iconColor);
         }
 
-        DrawRectangleRec(labelRect, {35, 35, 40, 200});
+        DrawRectangleRec(labelRect, {35, 35, 40, 0});
         std::string label = entries[i].displayName;
         int labelW = MeasureText(label.c_str(), 10);
         if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
