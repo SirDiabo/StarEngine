@@ -25,4 +25,5 @@ private:
     std::deque<LogEntry> logs;
     int maxLogs = 100;
     int totalPushed = 0;
+    float scrollOffset = 0.0f;
 };

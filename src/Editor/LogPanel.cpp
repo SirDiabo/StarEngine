@@ -34,10 +34,34 @@ void LogPanel::Render() {
     DrawRectangleRec(bounds, { 40, 40, 40, 255 });
     DrawRectangleLinesEx(bounds, 1, { 80, 80, 80, 255 });
 
-    float y    = bounds.y + 4;
-    float maxY = bounds.y + bounds.height - 10;
-    for (auto it = logs.rbegin(); it != logs.rend() && y < maxY; ++it) {
+    float lineHeight = 15.0f;
+    float padding = 4.0f;
+    float contentHeight = logs.size() * lineHeight;
+    float visibleHeight = bounds.height - padding * 2;
+
+    Vector2 mouse = GetMousePosition();
+    Rectangle contentArea = { bounds.x + padding, bounds.y + padding, bounds.width - padding * 2, visibleHeight };
+    if (CheckCollisionPointRec(mouse, contentArea)) {
+        scrollOffset -= GetMouseWheelMove() * lineHeight * 3;
+    }
+
+    float maxScroll = (contentHeight > visibleHeight) ? (contentHeight - visibleHeight) : 0.0f;
+    if (scrollOffset < 0.0f) scrollOffset = 0.0f;
+    if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+
+    BeginScissorMode((int)bounds.x + 1, (int)bounds.y + 1, (int)bounds.width - 2, (int)bounds.height - 2);
+    float y = bounds.y + padding - scrollOffset;
+    for (auto it = logs.rbegin(); it != logs.rend() && y < bounds.y + bounds.height - padding; ++it) {
         DrawText(it->message.c_str(), (int)bounds.x + 5, (int)y, 10, LogEntryColor(it->level));
-        y += 15;
+        y += lineHeight;
+    }
+    EndScissorMode();
+
+    if (contentHeight > visibleHeight) {
+        float scrollRatio = (maxScroll > 0) ? scrollOffset / maxScroll : 0;
+        float barHeight = (visibleHeight / contentHeight) * visibleHeight;
+        float barY = bounds.y + padding + scrollRatio * (visibleHeight - barHeight);
+        DrawRectangleRec({ bounds.x + bounds.width - 7, barY, 4, barHeight }, { 100, 100, 100, 180 });
+        DrawRectangleLinesEx({ bounds.x + bounds.width - 7, barY, 4, barHeight }, 1, { 150, 150, 150, 255 });
     }
 }
