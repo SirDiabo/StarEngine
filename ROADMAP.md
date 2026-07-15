@@ -268,7 +268,7 @@ x Ctrl+C and Ctrl+V to copy selected nodes and paste to cursor position
 x Click pin to start wire, release on compatible pin to connect
 x Release on empty space opens Add Node menu filtered to compatible types
 x Alt+click pin to delete all links on that pin
-/ Ctrl+drag pin to detach and re-route; on pins with multiple links this drops all but one connection
+x Ctrl+drag pin to detach and re-route; on pins with multiple links the whole bundle detaches together and reconnects to wherever the drag completes
 x Alt+hover wire turns red, alt+click deletes it
 o Right-click a wire: popup with "Break Link" / "Add Reroute Node"
 o Double-click a wire inserts a reroute node
@@ -356,8 +356,7 @@ x Custom Event nodes (Functionally, same as functions but without their own grap
 / Call Custom Event node is exposed in the Add Node menu; only the named custom events it calls should be user-facing
 
 ### 7.2 Flow Control
-/ Branch, For_Loop, While_Loop, Sequence exist but only fire the first node of the branch they take (8)
-/ Do_Once, Gate, Flip_Flop have the same one-node limitation
+x Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop, Has_Authority walk their body through the shared exec-chain walker, so chains longer than one node continue and data pins propagate (8)
 o Delay (requires timer system)
 
 ### 7.3 Math
@@ -499,12 +498,11 @@ x Draw_Circle_3D - Debug sphere visualization
 ## 8. Graph Executor
 x Exec pin chain walking with safety limit
 x Data pin evaluation with recursive upstream propagation
-x Flow control: Branch, For_Loop, Sequence handled specially
+x Flow control (Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop, Has_Authority) routes through ExecuteLinkedNodes, exposed as a public GraphExecutor method (7.2)
 x ExecutionContext struct (Actor*, float deltaTime) threaded through all nodes
 x Event_Tick writes deltaTime into Delta Seconds output pin before execution
 x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
-/ Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop call their target node directly instead of through the shared exec-chain walker (ExecuteLinkedNodes), so data pins are not propagated and chains longer than one node do not continue
 o Pin values stored as strings on Pin::defaultValue, parsed on every read instead of a typed value
 o Wildcard type resolution at runtime
 o Async nodes (Delay, latent actions)
