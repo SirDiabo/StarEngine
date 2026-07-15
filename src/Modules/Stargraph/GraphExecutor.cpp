@@ -84,11 +84,10 @@ void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionCon
     }
 }
 
-static void ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionContext& ctx) {
-    if (!startNode) return;
+void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionContext& ctx) {
     Node* current = startNode;
     int limit = 1000;
-    while (limit-- > 0) {
+    while (current && limit-- > 0) {
         GraphExecutor::PropagateDataPins(graph, current, ctx);
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(current->type);
         if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
@@ -104,7 +103,6 @@ static void ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionConte
             }
             if (next) break;
         }
-        if (!next) break;
         current = next;
     }
 }
@@ -134,7 +132,7 @@ static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx)
             if (outPin.type == PinType::Exec && outPin.name == "Completed") {
                 for (const Link& link : graph.GetLinks()) {
                     if (link.outputPinId == outPin.id) {
-                        ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                        GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
                     }
                 }
             }
@@ -147,7 +145,7 @@ static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx)
                 if (outPin.type == PinType::Exec && outPin.name == "Started") {
                     for (const Link& link : graph.GetLinks()) {
                         if (link.outputPinId == outPin.id) {
-                            ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                            GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
                         }
                     }
                 }
@@ -158,7 +156,7 @@ static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx)
             if (outPin.type == PinType::Exec && outPin.name == "Triggered") {
                 for (const Link& link : graph.GetLinks()) {
                     if (link.outputPinId == outPin.id) {
-                        ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+                        GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
                     }
                 }
             }
