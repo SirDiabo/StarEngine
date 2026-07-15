@@ -77,7 +77,7 @@ x PropertyFields slots (src/Editor/PropertyFields.h/.cpp): FloatBox, IntBox, Str
 x Fix raygui quirk where global cursor-index shared across text boxes; force-activates fields so cursor appears at text end
 x Click-drag-to-scrub on FloatBox/IntBox
 x Array-of-fields wrapper (ArrayHeader/ArrayRowControls/ArrayValueRect in PropertyFields.h/.cpp)
-/ Newly activated field shows the previous field's leftover buffer for one frame before it refreshes
+x Newly activated field seeds its buffer from the source value on the activation frame itself
 o Registry-reference dropdown field (project-level named lists: Save Files, Languages, etc.), with inline create-new
 
 ---

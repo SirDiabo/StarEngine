@@ -19,7 +19,7 @@ bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFiel
 
 bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
                std::string& outVal, bool allowActivate = true, const char* placeholder = nullptr,
-               const Style& style = {});
+               const char* inactiveDisplay = nullptr, const Style& style = {});
 
 bool BoolBox(Rectangle r, bool& outVal);
 

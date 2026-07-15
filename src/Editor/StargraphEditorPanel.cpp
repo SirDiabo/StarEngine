@@ -2044,20 +2044,15 @@ void StargraphEditorPanel::RenderGraph() {
                         }
                     }
                 } else {
-                    char inactiveBuf[256];
-                    char* activeBuf = editBuffer;
-                    if (editingPinId != pin.id) {
-                        snprintf(inactiveBuf, sizeof(inactiveBuf), "%s", pin.defaultValue.c_str());
-                        activeBuf = inactiveBuf;
-                    }
                     bool allowActivate = (linkFromPin == -1);
                     const char* targetPlaceholder = nullptr;
                     if (pin.name == "Target" && pin.defaultValue.empty()) {
                         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
                         if (tmpl && tmpl->category == "Actor") targetPlaceholder = "self";
                     }
-                    if (PropertyField::StringBox(fieldRect, activeBuf, sizeof(editBuffer), pin.id, editingPinId,
-                                                  pin.defaultValue, allowActivate, targetPlaceholder)) {
+                    if (PropertyField::StringBox(fieldRect, editBuffer, sizeof(editBuffer), pin.id, editingPinId,
+                                                  pin.defaultValue, allowActivate, targetPlaceholder,
+                                                  pin.defaultValue.c_str())) {
                         isDirty = true;
                     }
                 }

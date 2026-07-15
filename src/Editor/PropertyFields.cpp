@@ -20,8 +20,8 @@ static float ApplyDrag(float currentVal, float startVal) {
 }
 
 static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
-                         bool allowActivate, const char* placeholder, const Style& style,
-                         const std::function<void()>& onActivate) {
+                         bool allowActivate, const char* placeholder, const char* inactiveDisplay,
+                         const Style& style, const std::function<void()>& onActivate) {
     Vector2 mp = GetMousePosition();
 
     if (activeField == fieldId) {
@@ -33,16 +33,18 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
         return false;
     }
 
+    const char* display = inactiveDisplay ? inactiveDisplay : buf;
+
     bool clicked = allowActivate && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
     if (clicked) {
         if (onActivate) onActivate();
     }
     DrawRectangleRec(r, style.box);
     DrawRectangleLinesEx(r, 1, style.border);
-    if (buf[0] == '\0' && placeholder != nullptr) {
+    if (display[0] == '\0' && placeholder != nullptr) {
         DrawText(placeholder, (int)r.x + 4, (int)r.y + 3, 11, style.label);
     } else {
-        DrawText(buf, (int)r.x + 4, (int)r.y + 3, 11, style.text);
+        DrawText(display, (int)r.x + 4, (int)r.y + 3, 11, style.text);
     }
     if (clicked) activeField = fieldId;
     return false;
@@ -50,7 +52,7 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
 
 bool FloatBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
               float& outVal, bool allowActivate, const Style& style) {
-    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, style,
+    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, nullptr, style,
                                   [&]() { snprintf(buf, bufSize, "%.2f", outVal); });
 
     if (g_drag.active && g_drag.fieldId == fieldId) {
@@ -85,7 +87,7 @@ bool FloatBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFi
 
 bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
             int& outVal, bool allowActivate, const Style& style) {
-    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, style,
+    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, nullptr, nullptr, style,
                                   [&]() { snprintf(buf, bufSize, "%d", outVal); });
 
     if (g_drag.active && g_drag.fieldId == fieldId) {
@@ -119,9 +121,10 @@ bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFiel
 }
 
 bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
-               std::string& outVal, bool allowActivate, const char* placeholder, const Style& style) {
-    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, placeholder, style,
-                                  [&]() { snprintf(buf, bufSize, "%s", outVal.c_str()); });
+               std::string& outVal, bool allowActivate, const char* placeholder,
+               const char* inactiveDisplay, const Style& style) {
+    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, placeholder, inactiveDisplay,
+                                  style, [&]() { snprintf(buf, bufSize, "%s", outVal.c_str()); });
     if (committed) {
         outVal = buf;
         return true;
