@@ -77,6 +77,7 @@ x PropertyFields slots (src/Editor/PropertyFields.h/.cpp): FloatBox, IntBox, Str
 x Fix raygui quirk where global cursor-index shared across text boxes; force-activates fields so cursor appears at text end
 x Click-drag-to-scrub on FloatBox/IntBox
 x Array-of-fields wrapper (ArrayHeader/ArrayRowControls/ArrayValueRect in PropertyFields.h/.cpp)
+/ Newly activated field shows the previous field's leftover buffer for one frame before it refreshes
 o Registry-reference dropdown field (project-level named lists: Save Files, Languages, etc.), with inline create-new
 
 ---
@@ -138,7 +139,7 @@ x Actors with camera components automatically view the first camera, but are abl
 x Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
 
 ### 2.7 Input Focus and View Target
-x Get/Set Input Focus nodes. Actor receives input events when focused
+/ Get/Set Input Focus nodes exist, but Input_Key still fires for every actor regardless of focus
 x Input Focus is per-machine and unreplicated; it decides which actor reads local input, independent of Has Authority
 x Get/Set View Target node. Actor's CameraComponent becomes the active render camera
 x Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
@@ -171,6 +172,15 @@ o Auto-generates graph nodes per mapping (e.g. "Key Jump"), built on existing In
 o Generated nodes scoped to graphs of actor classes that own the relevant InputComponent (extends 5.4 Add Node filtering)
 o Get InputComponent + Override Input node for runtime rebinding
 o Rebind overrides are Save-flaggable (2.10) for persistence across sessions
+o Input Device concept: Keyboard/Mouse always active by default, gamepads added as separate devices once claimed
+o Device claim flow: unclaimed devices listen for any input, first press assigns that device to the next open player slot, only active once an Input Component requests multiple devices
+o Rebind overrides stored per device, giving each local player their own control scheme
+o Mapped input event nodes pick their target Input Component from a details panel field instead of an input pin
+o Multiple Input Components per actor, one per device, once multi-component-per-type support exists (13.5)
+
+### 2.12 Component Hierarchy
+o Component::parent consulted for world transform composition (currently set on creation but never read)
+o Editor field to set a component's parent among the actor's other components
 
 ---
 
@@ -210,6 +220,11 @@ o Right clicking a .staractor in Content Browser lets you create a Sub Class
 o Subclass Actors retain all of Parents logic, letting you build on top of it.
 o "Create Character" content-browser template. Actor subclass pre-wired with Player, Collision and Mesh Components.
 
+### 3.6 Asset Picker
+o Single shared asset picker used everywhere instead of several separate implementations
+o Play_Sound and other asset-path input fields get a picker instead of a raw text field
+o Node input fields store asset references relative to the project instead of absolute source paths
+
 ---
 
 ## 4. Project System
@@ -237,6 +252,7 @@ x Bezier wire rendering with Alt+click to delete
 x Zoom with scroll wheel
 x Pan with middle mouse drag
 x Node display names: underscores replaced with spaces
+/ Node title text size scales with zoom with no min/max clamp, grows past node bounds when fully zoomed out
 
 ### 5.2 Node Interaction
 x Drag nodes by header with 16-unit grid snapping
@@ -252,7 +268,7 @@ x Ctrl+C and Ctrl+V to copy selected nodes and paste to cursor position
 x Click pin to start wire, release on compatible pin to connect
 x Release on empty space opens Add Node menu filtered to compatible types
 x Alt+click pin to delete all links on that pin
-x Ctrl+drag pin to detach and re-route
+/ Ctrl+drag pin to detach and re-route; on pins with multiple links this drops all but one connection
 x Alt+hover wire turns red, alt+click deletes it
 o Right-click a wire: popup with "Break Link" / "Add Reroute Node"
 o Double-click a wire inserts a reroute node
@@ -262,6 +278,7 @@ x Searchable, scrollable, grouped by category
 x Filters to compatible types when opened from pin drag
 x Node names display with spaces, scroll does not bleed to graph zoom
 x Menu repositions to stay within graph area bounds
+o Search accepts math symbols (+, -, *, /, %) as aliases for Add, Subtract, Multiply, Divide, Modulo
 
 ### 5.5 Left Panel (My Blueprint)
 x Graphs, Variables, Functions, Macros sections
@@ -295,6 +312,14 @@ o Generic command/undo-stack abstraction, not Stargraph-specific internally
 o First application: node move/create/delete, wire connect/disconnect
 o Viewport and Details panel edits register against the same stack later, not a separate system
 
+### 5.9 Editor Layout
+o Stargraph Editor panels (Components, Variables, Details, Graph) use DockArea like the Level Editor instead of a fixed layout
+
+### 5.10 Component Preview
+o Viewport panel inside the Stargraph Editor showing the actor's declared components
+o During Play in Graph, adds small default test environment (floor and skybox) for previewing an actor in isolation during graph editing
+o Runtime pin value tooltips during Play for live graph debugging
+
 ---
 
 ## 6. Variables and Pin Types
@@ -324,13 +349,15 @@ x Mouse wheel exposed through Input_Key node as axis float (-1..1)
 x Mouse X and Mouse Y exposed through Input_Key node as axis floats (-1..1)
 x Key input field renders searchable dropdown with all input names, matching Add Node menu UX
 x Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Trigger Axis L/R, DPad U/D/L/R, Special L/R, etc.)
+/ Gamepad Inputs hardcoded to gamepad index 0, no multi-controller support yet
 
 o Functions with inputs and outputs. Have their own graph with input and return node. (user-named, callable from other graphs)
 x Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
+/ Call Custom Event node is exposed in the Add Node menu; only the named custom events it calls should be user-facing
 
 ### 7.2 Flow Control
-x Branch, For_Loop, While_Loop, Sequence
-x Do_Once, Gate, Flip_Flop
+/ Branch, For_Loop, While_Loop, Sequence exist but only fire the first node of the branch they take (8)
+/ Do_Once, Gate, Flip_Flop have the same one-node limitation
 o Delay (requires timer system)
 
 ### 7.3 Math
@@ -477,8 +504,12 @@ x ExecutionContext struct (Actor*, float deltaTime) threaded through all nodes
 x Event_Tick writes deltaTime into Delta Seconds output pin before execution
 x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
+/ Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop call their target node directly instead of through the shared exec-chain walker (ExecuteLinkedNodes), so data pins are not propagated and chains longer than one node do not continue
+o Pin values stored as strings on Pin::defaultValue, parsed on every read instead of a typed value
 o Wildcard type resolution at runtime
 o Async nodes (Delay, latent actions)
+o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
+o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds
 o Bytecode compilation as a lower-risk option if profiling shows Stargraph is an actual bottleneck
 
 ---
@@ -678,3 +709,10 @@ o Wire double-click on .starasset to open in AssetPreviewTab
 o Center panel: single-mesh viewport using extracted camera/model code
 o Right panel: reuse existing ImportDetailsPanel
 o Top bar: Reimport button re-cooks from stored SourcePath without file browser
+o Extend the same pattern to Texture, Material, Sound, and other asset types
+
+---
+
+## 16. Log Panel
+o Logs saved to a log file on disk (Project/Saved/{date-time.log})
+o Log panel text is selectable and copyable
