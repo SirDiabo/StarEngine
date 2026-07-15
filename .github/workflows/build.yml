@@ -3,8 +3,20 @@ name: Build
 on:
   push:
     branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'src/**'
+      - 'Assets/**'
+      - '.gitmodules'
   pull_request:
     branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'src/**'
+      - 'Assets/**'
+      - '.gitmodules'
 
 permissions:
   contents: read
@@ -13,7 +25,58 @@ env:
   CMAKE_BUILD_PARALLEL_LEVEL: 4
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.compare-version.outputs.changed }}
+      current-version: ${{ steps.extract-version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Current Version
+        id: extract-version
+        run: |
+          VERSION=$(grep -oP 'project\(\w+\s+VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep -oP 'cmake_minimum_required\(VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "❌ Could not extract version from CMakeLists.txt"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get Last Released Version
+        id: last-version
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "LAST_VERSION=none" >> $GITHUB_OUTPUT
+          else
+            # Extract version from tag (assuming format v1.0.0-build.123)
+            LAST_VERSION=$(echo "$LAST_TAG" | sed -E 's/v([0-9.]+).*/\1/')
+            echo "LAST_VERSION=$LAST_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compare Versions
+        id: compare-version
+        run: |
+          CURRENT="${{ steps.extract-version.outputs.VERSION }}"
+          LAST="${{ steps.last-version.outputs.LAST_VERSION }}"
+          
+          if [ "$LAST" = "none" ] || [ "$CURRENT" != "$LAST" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Version changed: $LAST → $CURRENT"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Version unchanged: $CURRENT"
+          fi
+
   lint:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
     runs-on: ubuntu-latest
     name: Code Quality
     steps:
@@ -38,7 +101,8 @@ jobs:
           cppcheck --enable=all --suppress=missingIncludeSystem src/ 2>&1 || true
 
   build:
-    needs: lint
+    needs: [check-version, lint]
+    if: needs.check-version.outputs.version-changed == 'true'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -140,57 +204,6 @@ jobs:
           path: ${{ matrix.artifact-path }}
           retention-days: 30
           compression-level: 9
-
-  check-version:
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      version-changed: ${{ steps.compare-version.outputs.changed }}
-      current-version: ${{ steps.extract-version.outputs.VERSION }}
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Extract Current Version
-        id: extract-version
-        run: |
-          VERSION=$(grep -oP 'project\(\w+\s+VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
-          if [ -z "$VERSION" ]; then
-            VERSION=$(grep -oP 'cmake_minimum_required\(VERSION\s+\K[0-9.]+' CMakeLists.txt | head -1)
-          fi
-          if [ -z "$VERSION" ]; then
-            echo "❌ Could not extract version from CMakeLists.txt"
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Get Last Released Version
-        id: last-version
-        run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -z "$LAST_TAG" ]; then
-            echo "LAST_VERSION=none" >> $GITHUB_OUTPUT
-          else
-            # Extract version from tag (assuming format v1.0.0-build.123)
-            LAST_VERSION=$(echo "$LAST_TAG" | sed -E 's/v([0-9.]+).*/\1/')
-            echo "LAST_VERSION=$LAST_VERSION" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Compare Versions
-        id: compare-version
-        run: |
-          CURRENT="${{ steps.extract-version.outputs.VERSION }}"
-          LAST="${{ steps.last-version.outputs.LAST_VERSION }}"
-          
-          if [ "$LAST" = "none" ] || [ "$CURRENT" != "$LAST" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "✅ Version changed: $LAST → $CURRENT"
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Version unchanged: $CURRENT"
-          fi
 
   release:
     needs: [build, check-version]
