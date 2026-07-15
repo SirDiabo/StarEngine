@@ -2,6 +2,7 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
 #include "Runtime/Networking/NetworkBackend.h"
+#include "Runtime/World.h"
 #include <cstdlib>
 #include <vector>
 #include <unordered_map>
@@ -108,6 +109,8 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
 }
 
 static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx) {
+    if (ctx.actor != World::Get().GetInputFocus()) return;
+
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
     if (!tmpl || !tmpl->execute) return;
 

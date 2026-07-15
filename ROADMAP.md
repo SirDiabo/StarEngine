@@ -139,7 +139,7 @@ x Actors with camera components automatically view the first camera, but are abl
 x Add nodes to other existing components: "Set Static Mesh" for Mesh Component, etc.
 
 ### 2.7 Input Focus and View Target
-/ Get/Set Input Focus nodes exist, but Input_Key still fires for every actor regardless of focus
+x Get/Set Input Focus nodes exist; Input_Key only processes for the actor holding input focus
 x Input Focus is per-machine and unreplicated; it decides which actor reads local input, independent of Has Authority
 x Get/Set View Target node. Actor's CameraComponent becomes the active render camera
 x Only one actor holds input focus / view target at a time by default. Switching is explicit via nodes
