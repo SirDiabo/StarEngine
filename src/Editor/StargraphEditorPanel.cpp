@@ -186,12 +186,30 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
     isDirty = true;
     RefreshWildcardPins(graph.FindNodeByPinId(outputPinId));
     RefreshWildcardPins(graph.FindNodeByPinId(inputPinId));
+
+    for (int extraPinId : rerouteExtraPins) {
+        int extraOutputPinId = linkFromIsOutput ? extraPinId : pinId;
+        int extraInputPinId  = linkFromIsOutput ? pinId       : extraPinId;
+        if (!PinsCompatible(extraOutputPinId, extraInputPinId)) continue;
+
+        bool inputTaken = false;
+        for (const Link& lk : graph.GetLinks()) {
+            if (lk.inputPinId == extraInputPinId) { inputTaken = true; break; }
+        }
+        if (inputTaken) continue;
+
+        graph.AddLink({extraOutputPinId, extraInputPinId});
+        RefreshWildcardPins(graph.FindNodeByPinId(extraOutputPinId));
+        RefreshWildcardPins(graph.FindNodeByPinId(extraInputPinId));
+    }
+
     CancelLink();
 }
 
 void StargraphEditorPanel::CancelLink() {
     linkFromPin = -1;
     linkFromIsOutput = false;
+    rerouteExtraPins.clear();
 }
 
 void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
@@ -204,6 +222,33 @@ void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
     isDirty = true;
     RefreshWildcardPins(graph.FindNodeByPinId(pinId));
     if (otherPinId != -1) RefreshWildcardPins(graph.FindNodeByPinId(otherPinId));
+}
+
+void StargraphEditorPanel::RemoveSpecificLink(int outputPinId, int inputPinId) {
+    graph.RemoveSpecificLink(outputPinId, inputPinId);
+    isDirty = true;
+    RefreshWildcardPins(graph.FindNodeByPinId(outputPinId));
+    RefreshWildcardPins(graph.FindNodeByPinId(inputPinId));
+}
+
+void StargraphEditorPanel::BeginReroute(int pinId) {
+    std::vector<int> otherPinIds;
+    for (const Link& lk : graph.GetLinks()) {
+        if (lk.outputPinId == pinId) otherPinIds.push_back(lk.inputPinId);
+        else if (lk.inputPinId == pinId) otherPinIds.push_back(lk.outputPinId);
+    }
+    if (otherPinIds.empty()) return;
+
+    RemoveLinkFromPin(pinId);
+
+    linkFromPin = otherPinIds[0];
+    linkFromIsOutput = false;
+    for (const Node& n : graph.GetNodes()) {
+        for (const Pin& p : n.outputs) if (p.id == linkFromPin) { linkFromIsOutput = true; break; }
+        for (const Pin& p : n.inputs)  if (p.id == linkFromPin) { linkFromIsOutput = false; break; }
+    }
+
+    rerouteExtraPins.assign(otherPinIds.begin() + 1, otherPinIds.end());
 }
 
 void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
@@ -1637,19 +1682,25 @@ void StargraphEditorPanel::RenderWireInProgress() {
     if (linkFromPin == -1) return;
 
     Vector2 mousePos = GetMousePosition();
-    Vector2 fromPos  = {0, 0};
-    Color wireColor  = {180, 180, 180, 200};
 
-    for (const Node& node : graph.GetNodes()) {
-        for (const Pin& pin : node.outputs) {
-            if (pin.id == linkFromPin) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
+    std::vector<int> dragPins = {linkFromPin};
+    dragPins.insert(dragPins.end(), rerouteExtraPins.begin(), rerouteExtraPins.end());
+
+    for (int dragPinId : dragPins) {
+        Vector2 fromPos = {0, 0};
+        Color wireColor = {180, 180, 180, 200};
+
+        for (const Node& node : graph.GetNodes()) {
+            for (const Pin& pin : node.outputs) {
+                if (pin.id == dragPinId) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
+            }
+            for (const Pin& pin : node.inputs) {
+                if (pin.id == dragPinId) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
+            }
         }
-        for (const Pin& pin : node.inputs) {
-            if (pin.id == linkFromPin) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
-        }
+
+        DrawLineBezier(fromPos, mousePos, 2.0f, wireColor);
     }
-
-    DrawLineBezier(fromPos, mousePos, 2.0f, wireColor);
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) CancelLink();
 }
@@ -1750,7 +1801,7 @@ void StargraphEditorPanel::RenderGraph() {
         if (hovered) {
             DrawLineBezier(from, to, 3.0f, {255, 80, 80, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                RemoveLinkFromPin(link.outputPinId);
+                RemoveSpecificLink(link.outputPinId, link.inputPinId);
                 break;
             }
         } else {
@@ -1794,19 +1845,7 @@ void StargraphEditorPanel::RenderGraph() {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(outputPin->id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
-                        int otherPinId = -1;
-                        for (const Link& lk : graph.GetLinks()) {
-                            if (lk.inputPinId == outputPin->id) { otherPinId = lk.outputPinId; break; }
-                            if (lk.outputPinId == outputPin->id) { otherPinId = lk.inputPinId; break; }
-                        }
-                        if (otherPinId != -1) {
-                            RemoveLinkFromPin(outputPin->id);
-                            linkFromPin = otherPinId;
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
-                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
-                            }
-                        }
+                        BeginReroute(outputPin->id);
                     } else if (linkFromPin == -1) {
                         linkFromPin = outputPin->id; linkFromIsOutput = true;
                     }
@@ -1940,19 +1979,7 @@ void StargraphEditorPanel::RenderGraph() {
                         if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                             RemoveLinkFromPin(pin.id);
                         } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
-                            int otherPinId = -1;
-                            for (const Link& lk : graph.GetLinks()) {
-                                if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
-                                if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
-                            }
-                            if (otherPinId != -1) {
-                                RemoveLinkFromPin(pin.id);
-                                linkFromPin = otherPinId;
-                                for (const Node& n : graph.GetNodes()) {
-                                    for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
-                                    for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
-                                }
-                            }
+                            BeginReroute(pin.id);
                         } else if (!isDraggingLink) {
                             linkFromPin = pin.id; linkFromIsOutput = false;
                         }
@@ -2043,19 +2070,7 @@ void StargraphEditorPanel::RenderGraph() {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
-                        int otherPinId = -1;
-                        for (const Link& lk : graph.GetLinks()) {
-                            if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
-                            if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
-                        }
-                        if (otherPinId != -1) {
-                            RemoveLinkFromPin(pin.id);
-                            linkFromPin = otherPinId;
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
-                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
-                            }
-                        }
+                        BeginReroute(pin.id);
                     } else if (linkFromPin == -1) {
                         linkFromPin = pin.id; linkFromIsOutput = false;
                     }
@@ -2091,19 +2106,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
-                        int otherPinId = -1;
-                        for (const Link& lk : graph.GetLinks()) {
-                            if (lk.inputPinId == pin.id) { otherPinId = lk.outputPinId; break; }
-                            if (lk.outputPinId == pin.id) { otherPinId = lk.inputPinId; break; }
-                        }
-                        if (otherPinId != -1) {
-                            RemoveLinkFromPin(pin.id);
-                            linkFromPin = otherPinId;
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& p : n.outputs) if (p.id == otherPinId) { linkFromIsOutput = true; break; }
-                                for (const Pin& p : n.inputs) if (p.id == otherPinId) { linkFromIsOutput = false; break; }
-                            }
-                        }
+                        BeginReroute(pin.id);
                     } else if (linkFromPin == -1) {
                         linkFromPin = pin.id; linkFromIsOutput = true;
                     }

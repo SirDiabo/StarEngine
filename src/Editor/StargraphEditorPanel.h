@@ -37,6 +37,8 @@ private:
     void TryCompleteLink(int pinId, bool onInput);
     void CancelLink();
     void RemoveLinkFromPin(int pinId);
+    void RemoveSpecificLink(int outputPinId, int inputPinId);
+    void BeginReroute(int pinId);
     void RefreshWildcardPins(Node* node);
     void DeleteSelected();
     void CopySelectedNodes();
@@ -75,6 +77,7 @@ private:
 
     int linkFromPin = -1;
     bool linkFromIsOutput = false;
+    std::vector<int> rerouteExtraPins;
 
     bool nodeMenuOpen = false;
     bool nodeMenuJustOpened = false;

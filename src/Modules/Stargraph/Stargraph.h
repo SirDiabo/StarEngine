@@ -106,6 +106,7 @@ public:
     Node* CreateNode(const std::string& type);
     void AddLink(const Link& link);
     void RemoveLink(int pinId);
+    void RemoveSpecificLink(int outputPinId, int inputPinId);
     void AddVariable(const Variable& var);
     void RemoveVariable(size_t index);
     void RenameVariable(size_t index, const std::string& newName);

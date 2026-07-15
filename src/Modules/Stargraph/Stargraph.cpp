@@ -38,6 +38,15 @@ void Stargraph::RemoveLink(int pinId) {
     }
 }
 
+void Stargraph::RemoveSpecificLink(int outputPinId, int inputPinId) {
+    for (auto it = links.begin(); it != links.end(); ++it) {
+        if (it->outputPinId == outputPinId && it->inputPinId == inputPinId) {
+            links.erase(it);
+            return;
+        }
+    }
+}
+
 std::string Variable::DefaultElementText() const {
     switch (type) {
         case PinType::Boolean: return "false";
