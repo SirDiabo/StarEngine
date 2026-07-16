@@ -49,8 +49,8 @@ static int GestureFromName(const std::string& name) {
 
 static float GetScalarValue(const Pin& p) {
     if (p.type == PinType::Boolean) return (p.defaultValue == "true" || p.defaultValue == "1") ? 1.0f : 0.0f;
-    if (p.type == PinType::Integer) return (float)atoi(p.defaultValue.c_str());
-    return (float)atof(p.defaultValue.c_str());
+    if (p.type == PinType::Integer) return (float)p.defaultValue.AsInt();
+    return p.defaultValue.AsFloat();
 }
 
 void RegisterUtilityNodes() {
@@ -187,8 +187,8 @@ void RegisterUtilityNodes() {
         int start = 0, length = 0;
         for (const Pin& p : node.inputs) {
             if (p.name == "In") in = p.defaultValue;
-            if (p.name == "Start") start = atoi(p.defaultValue.c_str());
-            if (p.name == "Length") length = atoi(p.defaultValue.c_str());
+            if (p.name == "Start") start = p.defaultValue.AsInt();
+            if (p.name == "Length") length = p.defaultValue.AsInt();
         }
         std::string result;
         if (start >= 0 && start < (int)in.size() && length > 0) {
@@ -359,7 +359,7 @@ void RegisterUtilityNodes() {
     };
     getTouchPos.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int index = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Index") index = atoi(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Index") index = p.defaultValue.AsInt();
         Vector2 pos = GetTouchPosition(index);
         char buf[32];
         snprintf(buf, sizeof(buf), "%g", pos.x);
@@ -393,7 +393,7 @@ void RegisterUtilityNodes() {
     setTargetFPS.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int fps = 60;
         for (const Pin& p : node.inputs) {
-            if (p.name == "FPS") fps = atoi(p.defaultValue.c_str());
+            if (p.name == "FPS") fps = p.defaultValue.AsInt();
         }
         SetTargetFPS(fps);
     };
@@ -496,7 +496,7 @@ void RegisterUtilityNodes() {
     colorToHex.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float r = 1, g = 1, b = 1;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Color") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+            if (p.name == "Color") ReadVec3(p, r, g, b);
         }
         int ri = (int)(r * 255), gi = (int)(g * 255), bi = (int)(b * 255);
         if (ri < 0) ri = 0; if (ri > 255) ri = 255;
@@ -523,9 +523,9 @@ void RegisterUtilityNodes() {
         float rb = 1, gb = 1, bb = 1;
         float alpha = 0.5f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &ra, &ga, &ba);
-            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &rb, &gb, &bb);
-            if (p.name == "Alpha") alpha = (float)atof(p.defaultValue.c_str());
+            if (p.name == "A") ReadVec3(p, ra, ga, ba);
+            if (p.name == "B") ReadVec3(p, rb, gb, bb);
+            if (p.name == "Alpha") alpha = p.defaultValue.AsFloat();
         }
         float r = ra + (rb - ra) * alpha;
         float g = ga + (gb - ga) * alpha;
@@ -549,8 +549,8 @@ void RegisterUtilityNodes() {
         float cr = 1, cg = 1, cb = 1;
         float tr = 1, tg = 1, tb = 1;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Color") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &cr, &cg, &cb);
-            if (p.name == "Tint") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &tr, &tg, &tb);
+            if (p.name == "Color") ReadVec3(p, cr, cg, cb);
+            if (p.name == "Tint") ReadVec3(p, tr, tg, tb);
         }
         float r = cr * tr;
         float g = cg * tg;
@@ -574,8 +574,8 @@ void RegisterUtilityNodes() {
         float r = 1, g = 1, b = 1;
         float alpha = 1.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Color") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
-            if (p.name == "Alpha") alpha = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Color") ReadVec3(p, r, g, b);
+            if (p.name == "Alpha") alpha = p.defaultValue.AsFloat();
         }
         char buf[64];
         snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r, g, b, alpha);
@@ -601,12 +601,12 @@ void RegisterUtilityNodes() {
         int lines = 10;
         Color color = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Center") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &center.x, &center.y, &center.z);
-            if (p.name == "Size") size = (float)atof(p.defaultValue.c_str());
-            if (p.name == "Lines") lines = atoi(p.defaultValue.c_str());
+            if (p.name == "Center") ReadVec3(p, center.x, center.y, center.z);
+            if (p.name == "Size") size = p.defaultValue.AsFloat();
+            if (p.name == "Lines") lines = p.defaultValue.AsInt();
             if (p.name == "Color") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -635,8 +635,8 @@ void RegisterUtilityNodes() {
         Vector3 pos = {0, 0, 0};
         float size = 50.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Size") size = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Size") size = p.defaultValue.AsFloat();
         }
         DrawLine3D(pos, {pos.x + size, pos.y, pos.z}, RED);
         DrawLine3D(pos, {pos.x, pos.y + size, pos.z}, GREEN);
@@ -660,11 +660,11 @@ void RegisterUtilityNodes() {
         Vector3 size = {10, 10, 10};
         Color color = RED;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Size") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &size.x, &size.y, &size.z);
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Size") ReadVec3(p, size.x, size.y, size.z);
             if (p.name == "Color") {
                 float r = 1, g = 0, b = 0;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -688,11 +688,11 @@ void RegisterUtilityNodes() {
         float radius = 50.0f;
         Color color = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Radius") radius = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Radius") radius = p.defaultValue.AsFloat();
             if (p.name == "Color") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -717,11 +717,11 @@ void RegisterUtilityNodes() {
         Vector3 end = {0, 0, 100};
         Color color = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Start") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &start.x, &start.y, &start.z);
-            if (p.name == "End") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &end.x, &end.y, &end.z);
+            if (p.name == "Start") ReadVec3(p, start.x, start.y, start.z);
+            if (p.name == "End") ReadVec3(p, end.x, end.y, end.z);
             if (p.name == "Color") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -861,11 +861,11 @@ void RegisterUtilityNodes() {
         Color color = WHITE;
         for (const Pin& p : node.inputs) {
             if (p.name == "Type") type = p.defaultValue;
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Size") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &size.x, &size.y, &size.z);
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Size") ReadVec3(p, size.x, size.y, size.z);
             if (p.name == "Color") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -895,7 +895,7 @@ void RegisterUtilityNodes() {
         for (const Pin& p : node.inputs) {
             if (p.name == "Color") {
                 float r = 0, g = 0, b = 0;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 color = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -917,8 +917,8 @@ void RegisterUtilityNodes() {
         Vector3 pos = {0, 0, 0};
         float size = 100.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Size") size = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Size") size = p.defaultValue.AsFloat();
         }
         Camera3D cam = {0};
         cam.up = {0, 1, 0};
@@ -963,12 +963,12 @@ void RegisterUtilityNodes() {
         float rot = 0.0f;
         Color tint = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
-            if (p.name == "Size") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &size.x, &size.y, &size.z);
-            if (p.name == "Rotation") rot = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
+            if (p.name == "Size") ReadVec3(p, size.x, size.y, size.z);
+            if (p.name == "Rotation") rot = p.defaultValue.AsFloat();
             if (p.name == "Tint") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -1092,10 +1092,10 @@ void RegisterUtilityNodes() {
         Color tint = WHITE;
         for (const Pin& p : node.inputs) {
             if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
             if (p.name == "Tint") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -1126,14 +1126,14 @@ void RegisterUtilityNodes() {
         Color tint = WHITE;
         for (const Pin& p : node.inputs) {
             if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
-            if (p.name == "SourcePosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &srcPos.x, &srcPos.y, &srcPos.z);
-            if (p.name == "SourceSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &srcSize.x, &srcSize.y, &srcSize.z);
-            if (p.name == "DestPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dstPos.x, &dstPos.y, &dstPos.z);
-            if (p.name == "DestSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dstSize.x, &dstSize.y, &dstSize.z);
-            if (p.name == "Rotation") rot = (float)atof(p.defaultValue.c_str());
+            if (p.name == "SourcePosition") ReadVec3(p, srcPos.x, srcPos.y, srcPos.z);
+            if (p.name == "SourceSize") ReadVec3(p, srcSize.x, srcSize.y, srcSize.z);
+            if (p.name == "DestPosition") ReadVec3(p, dstPos.x, dstPos.y, dstPos.z);
+            if (p.name == "DestSize") ReadVec3(p, dstSize.x, dstSize.y, dstSize.z);
+            if (p.name == "Rotation") rot = p.defaultValue.AsFloat();
             if (p.name == "Tint") {
                 float r = 1, g = 1, b = 1;
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f", &r, &g, &b);
+                ReadVec3(p, r, g, b);
                 tint = { (unsigned char)(r * 255), (unsigned char)(g * 255), (unsigned char)(b * 255), 255 };
             }
         }
@@ -1195,7 +1195,7 @@ void RegisterUtilityNodes() {
     setWindowOpacity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float opacity = 1.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Opacity") opacity = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Opacity") opacity = p.defaultValue.AsFloat();
         }
         SetWindowOpacity(opacity);
     };
@@ -1213,7 +1213,7 @@ void RegisterUtilityNodes() {
     setWindowPosition.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 pos = {0, 0, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Position") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &pos.x, &pos.y, &pos.z);
+            if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
         }
         SetWindowPosition((int)pos.x, (int)pos.y);
     };
@@ -1263,9 +1263,9 @@ void RegisterUtilityNodes() {
     checkCollisionPointRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 point = {0, 0, 0}, recPos = {0, 0, 0}, recSize = {100, 100, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Point") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &point.x, &point.y, &point.z);
-            if (p.name == "RecPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &recPos.x, &recPos.y, &recPos.z);
-            if (p.name == "RecSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &recSize.x, &recSize.y, &recSize.z);
+            if (p.name == "Point") ReadVec3(p, point.x, point.y, point.z);
+            if (p.name == "RecPosition") ReadVec3(p, recPos.x, recPos.y, recPos.z);
+            if (p.name == "RecSize") ReadVec3(p, recSize.x, recSize.y, recSize.z);
         }
         Rectangle rec = {recPos.x, recPos.y, recSize.x, recSize.y};
         bool colliding = CheckCollisionPointRec({point.x, point.y}, rec);
@@ -1287,10 +1287,10 @@ void RegisterUtilityNodes() {
     checkCollisionRecs.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "RecAPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aPos.x, &aPos.y, &aPos.z);
-            if (p.name == "RecASize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aSize.x, &aSize.y, &aSize.z);
-            if (p.name == "RecBPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bPos.x, &bPos.y, &bPos.z);
-            if (p.name == "RecBSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bSize.x, &bSize.y, &bSize.z);
+            if (p.name == "RecAPosition") ReadVec3(p, aPos.x, aPos.y, aPos.z);
+            if (p.name == "RecASize") ReadVec3(p, aSize.x, aSize.y, aSize.z);
+            if (p.name == "RecBPosition") ReadVec3(p, bPos.x, bPos.y, bPos.z);
+            if (p.name == "RecBSize") ReadVec3(p, bSize.x, bSize.y, bSize.z);
         }
         Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
         Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};
@@ -1314,10 +1314,10 @@ void RegisterUtilityNodes() {
         Vector3 centerA = {0, 0, 0}, centerB = {0, 0, 0};
         float radiusA = 50.0f, radiusB = 50.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "CenterA") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &centerA.x, &centerA.y, &centerA.z);
-            if (p.name == "RadiusA") radiusA = (float)atof(p.defaultValue.c_str());
-            if (p.name == "CenterB") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &centerB.x, &centerB.y, &centerB.z);
-            if (p.name == "RadiusB") radiusB = (float)atof(p.defaultValue.c_str());
+            if (p.name == "CenterA") ReadVec3(p, centerA.x, centerA.y, centerA.z);
+            if (p.name == "RadiusA") radiusA = p.defaultValue.AsFloat();
+            if (p.name == "CenterB") ReadVec3(p, centerB.x, centerB.y, centerB.z);
+            if (p.name == "RadiusB") radiusB = p.defaultValue.AsFloat();
         }
         bool colliding = CheckCollisionCircles({centerA.x, centerA.y}, radiusA, {centerB.x, centerB.y}, radiusB);
         for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
@@ -1339,10 +1339,10 @@ void RegisterUtilityNodes() {
     getCollisionRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "RecAPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aPos.x, &aPos.y, &aPos.z);
-            if (p.name == "RecASize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aSize.x, &aSize.y, &aSize.z);
-            if (p.name == "RecBPosition") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bPos.x, &bPos.y, &bPos.z);
-            if (p.name == "RecBSize") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bSize.x, &bSize.y, &bSize.z);
+            if (p.name == "RecAPosition") ReadVec3(p, aPos.x, aPos.y, aPos.z);
+            if (p.name == "RecASize") ReadVec3(p, aSize.x, aSize.y, aSize.z);
+            if (p.name == "RecBPosition") ReadVec3(p, bPos.x, bPos.y, bPos.z);
+            if (p.name == "RecBSize") ReadVec3(p, bSize.x, bSize.y, bSize.z);
         }
         Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
         Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};

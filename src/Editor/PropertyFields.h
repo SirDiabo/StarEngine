@@ -2,6 +2,8 @@
 #include "raylib.h"
 #include <string>
 
+class PinValue;
+
 namespace PropertyField {
 
 struct Style {
@@ -19,6 +21,10 @@ bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFiel
 
 bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
                std::string& outVal, bool allowActivate = true, const char* placeholder = nullptr,
+               const char* inactiveDisplay = nullptr, const Style& style = {});
+
+bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
+               PinValue& outVal, bool allowActivate = true, const char* placeholder = nullptr,
                const char* inactiveDisplay = nullptr, const Style& style = {});
 
 bool BoolBox(Rectangle r, bool& outVal);

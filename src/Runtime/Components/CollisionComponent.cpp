@@ -23,7 +23,7 @@ void RegisterCollisionComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Radius" && !p.defaultValue.empty()) radius = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Radius" && !p.defaultValue.empty()) radius = p.defaultValue.AsFloat();
         }
         if (!target) return;
         if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(target)) {
@@ -51,7 +51,7 @@ void RegisterCollisionComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Height" && !p.defaultValue.empty()) height = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Height" && !p.defaultValue.empty()) height = p.defaultValue.AsFloat();
         }
         if (!target) return;
         if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(target)) {

@@ -70,7 +70,9 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, Exec
 
         for (const Pin& outPin : fromNode->outputs) {
             if (outPin.id == link.outputPinId) {
-                inputPin.defaultValue = outPin.defaultValue;
+                if (inputPin.defaultValue != outPin.defaultValue) {
+                    inputPin.defaultValue = outPin.defaultValue;
+                }
                 break;
             }
         }

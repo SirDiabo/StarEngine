@@ -6,9 +6,9 @@
 #include <ctime>
 
 static float GetScalarValue(const Pin& p) {
-    if (p.type == PinType::Boolean) return (p.defaultValue == "true" || p.defaultValue == "1") ? 1.0f : 0.0f;
-    if (p.type == PinType::Integer) return (float)atoi(p.defaultValue.c_str());
-    return (float)atof(p.defaultValue.c_str());
+    if (p.type == PinType::Boolean) return p.defaultValue.AsBool() ? 1.0f : 0.0f;
+    if (p.type == PinType::Integer) return (float)p.defaultValue.AsInt();
+    return p.defaultValue.AsFloat();
 }
 
 void RegisterMathNodes() {
@@ -57,11 +57,11 @@ void RegisterMathNodes() {
                 bool aIsScalar = !aIsVec, bIsScalar = !bIsVec;
                 for (const Pin& p : node.inputs) {
                     if (p.name == "A") {
-                        if (aIsVec) sscanf(p.defaultValue.c_str(), "%f,%f,%f", &aVec.x, &aVec.y, &aVec.z);
+                        if (aIsVec) ReadVec3(p, aVec.x, aVec.y, aVec.z);
                         else aScalar = GetScalarValue(p);
                     }
                     if (p.name == "B") {
-                        if (bIsVec) sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bVec.x, &bVec.y, &bVec.z);
+                        if (bIsVec) ReadVec3(p, bVec.x, bVec.y, bVec.z);
                         else bScalar = GetScalarValue(p);
                     }
                 }
@@ -173,9 +173,9 @@ void RegisterMathNodes() {
     vec3Make.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "X" && !p.defaultValue.empty()) x = (float)atof(p.defaultValue.c_str());
-            if (p.name == "Y" && !p.defaultValue.empty()) y = (float)atof(p.defaultValue.c_str());
-            if (p.name == "Z" && !p.defaultValue.empty()) z = (float)atof(p.defaultValue.c_str());
+            if (p.name == "X" && !p.defaultValue.empty()) x = p.defaultValue.AsFloat();
+            if (p.name == "Y" && !p.defaultValue.empty()) y = p.defaultValue.AsFloat();
+            if (p.name == "Z" && !p.defaultValue.empty()) z = p.defaultValue.AsFloat();
         }
         char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", x, y, z);
         for (Pin& p : node.outputs) if (p.name == "Vector") p.defaultValue = buf;
@@ -195,7 +195,7 @@ void RegisterMathNodes() {
     vec3Break.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+            if (p.name == "Vector") ReadVec3(p, x, y, z);
         }
         char buf[32];
         for (Pin& p : node.outputs) {
@@ -217,7 +217,7 @@ void RegisterMathNodes() {
     vec3Length.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+            if (p.name == "Vector") ReadVec3(p, x, y, z);
         }
         float len = sqrtf(x*x + y*y + z*z);
         char buf[32]; snprintf(buf, sizeof(buf), "%g", len);
@@ -236,7 +236,7 @@ void RegisterMathNodes() {
     vec3Normalize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+            if (p.name == "Vector") ReadVec3(p, x, y, z);
         }
         float len = sqrtf(x*x + y*y + z*z);
         float nx = 0, ny = 0, nz = 0;
@@ -259,8 +259,8 @@ void RegisterMathNodes() {
         float ax = 0, ay = 0, az = 0;
         float bx = 0, by = 0, bz = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &ax, &ay, &az);
-            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bx, &by, &bz);
+            if (p.name == "A") ReadVec3(p, ax, ay, az);
+            if (p.name == "B") ReadVec3(p, bx, by, bz);
         }
         float dot = ax*bx + ay*by + az*bz;
         char buf[32]; snprintf(buf, sizeof(buf), "%g", dot);
@@ -281,8 +281,8 @@ void RegisterMathNodes() {
         float ax = 0, ay = 0, az = 0;
         float bx = 0, by = 0, bz = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &ax, &ay, &az);
-            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bx, &by, &bz);
+            if (p.name == "A") ReadVec3(p, ax, ay, az);
+            if (p.name == "B") ReadVec3(p, bx, by, bz);
         }
         Vector3 a = {ax, ay, az};
         Vector3 b = {bx, by, bz};
@@ -305,8 +305,8 @@ void RegisterMathNodes() {
         float ax = 0, ay = 0, az = 0;
         float bx = 0, by = 0, bz = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &ax, &ay, &az);
-            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &bx, &by, &bz);
+            if (p.name == "A") ReadVec3(p, ax, ay, az);
+            if (p.name == "B") ReadVec3(p, bx, by, bz);
         }
         float dx = ax - bx, dy = ay - by, dz = az - bz;
         float dist = sqrtf(dx*dx + dy*dy + dz*dz);
@@ -328,8 +328,8 @@ void RegisterMathNodes() {
         Vector3 v = {0, 0, 0};
         float s = 1.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
-            if (p.name == "Scale" && !p.defaultValue.empty()) s = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Vector") ReadVec3(p, v.x, v.y, v.z);
+            if (p.name == "Scale" && !p.defaultValue.empty()) s = p.defaultValue.AsFloat();
         }
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", v.x * s, v.y * s, v.z * s);
@@ -350,8 +350,8 @@ void RegisterMathNodes() {
     vec3NormalizedDistance.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 a = {0, 0, 0}, b = {0, 0, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
-            if (p.name == "B") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
+            if (p.name == "A") ReadVec3(p, a.x, a.y, a.z);
+            if (p.name == "B") ReadVec3(p, b.x, b.y, b.z);
         }
         Vector3 delta = Vector3Subtract(b, a);
         float dist = Vector3Length(delta);
@@ -376,8 +376,8 @@ void RegisterMathNodes() {
     vec3Reflect.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 v = {0, 0, 0}, n = {0, 1, 0};
         for (const Pin& p : node.inputs) {
-            if (p.name == "Vector") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
-            if (p.name == "Normal") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &n.x, &n.y, &n.z);
+            if (p.name == "Vector") ReadVec3(p, v.x, v.y, v.z);
+            if (p.name == "Normal") ReadVec3(p, n.x, n.y, n.z);
         }
         Vector3 r = Vector3Reflect(v, n);
         char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);
@@ -395,7 +395,7 @@ void RegisterMathNodes() {
     };
     floatToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float v = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = p.defaultValue.AsFloat();
         char buf[64]; snprintf(buf, sizeof(buf), "%g", v);
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
@@ -411,7 +411,7 @@ void RegisterMathNodes() {
     };
     intToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int v = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = p.defaultValue.AsInt();
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(v);
     };
     NodeRegistry::Get().RegisterNode(intToStr);
@@ -441,7 +441,7 @@ void RegisterMathNodes() {
     };
     floatToInt.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float v = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = (float)atof(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = p.defaultValue.AsFloat();
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string((int)v);
     };
     NodeRegistry::Get().RegisterNode(floatToInt);
@@ -456,7 +456,7 @@ void RegisterMathNodes() {
     };
     intToFloat.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int v = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = atoi(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Value" && !p.defaultValue.empty()) v = p.defaultValue.AsInt();
         char buf[32]; snprintf(buf, sizeof(buf), "%g", (float)v);
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
@@ -472,7 +472,7 @@ void RegisterMathNodes() {
     };
     vec3ToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Value") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &x, &y, &z);
+        for (const Pin& p : node.inputs) if (p.name == "Value") ReadVec3(p, x, y, z);
         char buf[64]; snprintf(buf, sizeof(buf), "(%g, %g, %g)", x, y, z);
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
@@ -555,7 +555,7 @@ void RegisterMathNodes() {
 
             float v = 0;
             if (inType == PinType::Integer) {
-                for (const Pin& p : node.inputs) if (p.name == "Value") v = (float)atoi(p.defaultValue.c_str());
+                for (const Pin& p : node.inputs) if (p.name == "Value") v = (float)p.defaultValue.AsInt();
             } else {
                 for (const Pin& p : node.inputs) if (p.name == "Value") v = GetScalarValue(p);
             }
@@ -798,8 +798,8 @@ void RegisterMathNodes() {
     intModulo.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int a = 0, b = 1;
         for (const Pin& p : node.inputs) {
-            if (p.name == "A") a = atoi(p.defaultValue.c_str());
-            if (p.name == "B") b = atoi(p.defaultValue.c_str());
+            if (p.name == "A") a = p.defaultValue.AsInt();
+            if (p.name == "B") b = p.defaultValue.AsInt();
         }
         int result = (b != 0) ? a % b : 0;
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(result);
@@ -885,8 +885,8 @@ void RegisterMathNodes() {
     intRandomRange.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int min = 0, max = 100;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Min") min = atoi(p.defaultValue.c_str());
-            if (p.name == "Max") max = atoi(p.defaultValue.c_str());
+            if (p.name == "Min") min = p.defaultValue.AsInt();
+            if (p.name == "Max") max = p.defaultValue.AsInt();
         }
         int result = min + rand() % (max - min + 1);
         for (Pin& p : node.outputs) if (p.name == "Value") p.defaultValue = std::to_string(result);

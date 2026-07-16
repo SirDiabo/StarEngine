@@ -113,7 +113,7 @@ void RegisterAudioNodes() {
     };
     setMasterVolume.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float volume = 1.0f;
-        for (const Pin& p : node.inputs) if (p.name == "Volume") volume = (float)atof(p.defaultValue.c_str());
+        for (const Pin& p : node.inputs) if (p.name == "Volume") volume = p.defaultValue.AsFloat();
         SetMasterVolume(volume);
     };
     NodeRegistry::Get().RegisterNode(setMasterVolume);
@@ -193,7 +193,7 @@ void RegisterAudioNodes() {
         float volume = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
-            if (p.name == "Volume") volume = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Volume") volume = p.defaultValue.AsFloat();
         }
         if (music) SetMusicVolume(*music, volume);
     };
@@ -214,7 +214,7 @@ void RegisterAudioNodes() {
         float position = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
-            if (p.name == "Position") position = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Position") position = p.defaultValue.AsFloat();
         }
         if (music) SeekMusicStream(*music, position);
     };

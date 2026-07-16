@@ -51,7 +51,7 @@ void RegisterComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Location") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &loc.x, &loc.y, &loc.z);
+            if (p.name == "Location") ReadVec3(p, loc.x, loc.y, loc.z);
         }
         if (!target) return;
         target->position = loc;
@@ -77,7 +77,7 @@ void RegisterComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Rotation") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &rot.x, &rot.y, &rot.z);
+            if (p.name == "Rotation") ReadVec3(p, rot.x, rot.y, rot.z);
         }
         if (!target) return;
         target->rotation = rot;
@@ -103,7 +103,7 @@ void RegisterComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Scale") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &scl.x, &scl.y, &scl.z);
+            if (p.name == "Scale") ReadVec3(p, scl.x, scl.y, scl.z);
         }
         if (!target) return;
         target->scale = scl;

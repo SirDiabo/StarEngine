@@ -69,8 +69,8 @@ void RegisterFlowNodes() {
     forLoop.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int first = 0, last = 9;
         for (const Pin& p : node.inputs) {
-            if (p.name == "First" && !p.defaultValue.empty()) first = atoi(p.defaultValue.c_str());
-            if (p.name == "Last" && !p.defaultValue.empty()) last = atoi(p.defaultValue.c_str());
+            if (p.name == "First" && !p.defaultValue.empty()) first = p.defaultValue.AsInt();
+            if (p.name == "Last" && !p.defaultValue.empty()) last = p.defaultValue.AsInt();
         }
         for (int i = first; i <= last; i++) {
             char buf[64]; snprintf(buf, sizeof(buf), "%d", i);

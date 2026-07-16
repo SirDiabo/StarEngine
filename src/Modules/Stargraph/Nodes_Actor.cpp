@@ -56,8 +56,7 @@ void RegisterActorNodes() {
         if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Location") {
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &target->position.x, &target->position.y, &target->position.z);
+                ReadVec3(p, target->position.x, target->position.y, target->position.z);
                 break;
             }
         }
@@ -111,8 +110,7 @@ void RegisterActorNodes() {
         if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Rotation") {
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &target->rotation.x, &target->rotation.y, &target->rotation.z);
+                ReadVec3(p, target->rotation.x, target->rotation.y, target->rotation.z);
                 break;
             }
         }
@@ -166,8 +164,7 @@ void RegisterActorNodes() {
         if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Scale") {
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &target->scale.x, &target->scale.y, &target->scale.z);
+                ReadVec3(p, target->scale.x, target->scale.y, target->scale.z);
                 break;
             }
         }
@@ -480,8 +477,8 @@ void RegisterActorNodes() {
                 target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
                 break;
             }
-            if (p.name == "World Direction") sscanf(p.defaultValue.c_str(), "%f,%f,%f", &dir.x, &dir.y, &dir.z);
-            if (p.name == "Scale Value") scaleValue = (float)atof(p.defaultValue.c_str());
+            if (p.name == "World Direction") ReadVec3(p, dir.x, dir.y, dir.z);
+            if (p.name == "Scale Value") scaleValue = p.defaultValue.AsFloat();
         }
         if (!target) return;
         target->AddMovementInput(dir, scaleValue);
@@ -527,7 +524,7 @@ void RegisterActorNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "New Speed") newSpeed = (float)atof(p.defaultValue.c_str());
+            if (p.name == "New Speed") newSpeed = p.defaultValue.AsFloat();
         }
         if (!target) return;
         target->MovementSpeed = newSpeed;
@@ -551,7 +548,7 @@ void RegisterActorNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
         if (!target) return;
         target->AddControlYawInput(value);
@@ -575,7 +572,7 @@ void RegisterActorNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
         if (!target) return;
         target->AddControlPitchInput(value);
@@ -599,7 +596,7 @@ void RegisterActorNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Value") value = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
         if (!target) return;
         target->AddControlRollInput(value);
@@ -651,8 +648,7 @@ void RegisterActorNodes() {
         if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Rotation") {
-                sscanf(p.defaultValue.c_str(), "%f,%f,%f",
-                    &target->controlRotation.x, &target->controlRotation.y, &target->controlRotation.z);
+                ReadVec3(p, target->controlRotation.x, target->controlRotation.y, target->controlRotation.z);
                 break;
             }
         }

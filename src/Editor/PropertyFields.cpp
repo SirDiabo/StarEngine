@@ -1,5 +1,6 @@
 #include "PropertyFields.h"
 #include "raygui.h"
+#include "Modules/Stargraph/Stargraph.h"
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -122,6 +123,18 @@ bool IntBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeFiel
 
 bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
                std::string& outVal, bool allowActivate, const char* placeholder,
+               const char* inactiveDisplay, const Style& style) {
+    bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, placeholder, inactiveDisplay,
+                                  style, [&]() { snprintf(buf, bufSize, "%s", outVal.c_str()); });
+    if (committed) {
+        outVal = buf;
+        return true;
+    }
+    return false;
+}
+
+bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,
+               PinValue& outVal, bool allowActivate, const char* placeholder,
                const char* inactiveDisplay, const Style& style) {
     bool committed = TextBoxCore(r, buf, bufSize, fieldId, activeField, allowActivate, placeholder, inactiveDisplay,
                                   style, [&]() { snprintf(buf, bufSize, "%s", outVal.c_str()); });

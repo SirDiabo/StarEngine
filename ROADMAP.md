@@ -503,7 +503,7 @@ x ExecutionContext struct (Actor*, float deltaTime) threaded through all nodes
 x Event_Tick writes deltaTime into Delta Seconds output pin before execution
 x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
-o Pin values stored as strings on Pin::defaultValue, parsed on every read instead of a typed value
+x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
 o Wildcard type resolution at runtime
 o Async nodes (Delay, latent actions)
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs

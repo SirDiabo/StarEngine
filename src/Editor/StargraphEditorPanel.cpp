@@ -1092,7 +1092,7 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
     y += 26;
 
     if (GuiButton({panel.x + 8, y, panel.width - 16, 20}, "Refresh Pins")) {
-        std::string targetName = eventNamePin ? eventNamePin->defaultValue : "";
+        std::string targetName = eventNamePin ? std::string(eventNamePin->defaultValue) : std::string();
         Node* targetEvent = graph.FindCustomEventByName(targetName);
         if (targetEvent) {
             std::vector<std::string> keep = {"Target", "Event Name"};
@@ -1654,7 +1654,7 @@ void StargraphEditorPanel::RenderRightPanel() {
                 Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
                 DrawRectangleRec(r, {38, 38, 42, 255});
                 DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
-                std::string pathLabel = pin.defaultValue.empty() ? "None" : std::filesystem::path(pin.defaultValue).stem().string();
+                std::string pathLabel = pin.defaultValue.empty() ? "None" : std::filesystem::path((std::string)pin.defaultValue).stem().string();
                 DrawText(pathLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
                     audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");

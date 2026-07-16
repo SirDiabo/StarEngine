@@ -26,7 +26,7 @@ void RegisterCameraComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "FOV" && !p.defaultValue.empty()) fov = (float)atof(p.defaultValue.c_str());
+            if (p.name == "FOV" && !p.defaultValue.empty()) fov = p.defaultValue.AsFloat();
         }
         if (!target) return;
         if (CameraComponent* cc = dynamic_cast<CameraComponent*>(target)) {

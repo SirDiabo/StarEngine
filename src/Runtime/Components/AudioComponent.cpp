@@ -51,7 +51,7 @@ void RegisterAudioComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
             }
-            if (p.name == "Volume" && !p.defaultValue.empty()) volume = (float)atof(p.defaultValue.c_str());
+            if (p.name == "Volume" && !p.defaultValue.empty()) volume = p.defaultValue.AsFloat();
         }
         if (!target) return;
         if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
