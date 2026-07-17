@@ -8,6 +8,9 @@
 #include "Components/SceneComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
@@ -20,6 +23,9 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
         if (loadedGraph.LoadFromFile(inst.graphAssetPath)) {
             auto* behavior = new StargraphBehavior(loadedGraph);
             actor->SetGraphBehavior(behavior);
+
+            std::unordered_map<std::string, Component*> componentsByName;
+            std::vector<std::pair<Component*, std::string>> pendingParents;
 
             for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
                 Component* comp = nullptr;
@@ -57,6 +63,14 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
                 comp->SetName(decl.name);
                 actor->AddComponent(comp);
+
+                componentsByName[decl.name] = comp;
+                if (!decl.parentName.empty()) pendingParents.push_back({comp, decl.parentName});
+            }
+
+            for (auto& [comp, parentName] : pendingParents) {
+                auto it = componentsByName.find(parentName);
+                if (it != componentsByName.end() && it->second != comp) comp->parent = it->second;
             }
         }
     }

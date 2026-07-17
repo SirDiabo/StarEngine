@@ -324,8 +324,8 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
             }
             if (camActor) {
                 CameraComponent* cc = camActor->GetCameraComponent();
-                Vector3 compPos = Actor::ComputeWorldPosition(cc->position, camActor->position, camActor->rotation, camActor->scale);
-                Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, camActor->rotation);
+                Vector3 compPos = camActor->GetComponentWorldPosition(cc);
+                Vector3 compRot = camActor->GetComponentWorldRotation(cc);
                 float yr = compRot.y * DEG2RAD;
                 float pr = compRot.x * DEG2RAD;
                 Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
@@ -348,6 +348,33 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 
 static Color ClassColor(const std::string& className) {
     return {200, 160, 80, 255};
+}
+
+static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, const ComponentDecl& target,
+                                       Vector3 basePos, Vector3 baseRot, Vector3 baseScale,
+                                       Vector3& outPos, Vector3& outRot, Vector3& outScale) {
+    std::vector<const ComponentDecl*> chain;
+    const ComponentDecl* cur = &target;
+    int guard = 0;
+    while (cur && guard++ < 64) {
+        chain.push_back(cur);
+        if (cur->parentName.empty()) break;
+        const ComponentDecl* next = nullptr;
+        for (const ComponentDecl& c : comps) {
+            if (c.name == cur->parentName) { next = &c; break; }
+        }
+        cur = next;
+    }
+
+    outPos = basePos;
+    outRot = baseRot;
+    outScale = baseScale;
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+        const ComponentDecl* c = *it;
+        outPos = Actor::ComputeWorldPosition({c->posX, c->posY, c->posZ}, outPos, outRot, outScale);
+        outRot = Actor::ComputeWorldRotation({c->rotX, c->rotY, c->rotZ}, outRot);
+        outScale = Actor::ComputeWorldScale({c->scaleX, c->scaleY, c->scaleZ}, outScale);
+    }
 }
 
 void ViewportPanel::RenderScene() {
@@ -377,9 +404,9 @@ void ViewportPanel::RenderScene() {
 
                 if (classGraph) {
                     for (const ComponentDecl& comp : classGraph->GetComponents()) {
-                        Vector3 compPos = Actor::ComputeWorldPosition({comp.posX, comp.posY, comp.posZ}, pos, rot, scl);
-                        Vector3 compRot = Actor::ComputeWorldRotation({comp.rotX, comp.rotY, comp.rotZ}, rot);
-                        Vector3 compScale = Actor::ComputeWorldScale({comp.scaleX, comp.scaleY, comp.scaleZ}, scl);
+                        Vector3 compPos, compRot, compScale;
+                        ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
+                                                   compPos, compRot, compScale);
 
                         if (comp.componentType == "MeshComponent") {
                             DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPaths, compPos, compRot,

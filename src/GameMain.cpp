@@ -87,8 +87,8 @@ int main(int argc, char* argv[]) {
     for (const auto& actor : World::Get().GetActors()) {
         if (actor->GetCameraComponent()) {
             CameraComponent* cc = actor->GetCameraComponent();
-            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, actor->position, actor->rotation, actor->scale);
-            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, actor->rotation);
+            Vector3 compPos = actor->GetComponentWorldPosition(cc);
+            Vector3 compRot = actor->GetComponentWorldRotation(cc);
             float yr = compRot.y * DEG2RAD;
             float pr = compRot.x * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
@@ -108,8 +108,8 @@ int main(int argc, char* argv[]) {
         for (const auto& actor : World::Get().GetActors()) {
             if (actor->GetCameraComponent()) {
                 CameraComponent* cc = actor->GetCameraComponent();
-                Vector3 compPos = Actor::ComputeWorldPosition(cc->position, actor->position, actor->rotation, actor->scale);
-                Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, actor->rotation);
+                Vector3 compPos = actor->GetComponentWorldPosition(cc);
+                Vector3 compRot = actor->GetComponentWorldRotation(cc);
                 float yr = compRot.y * DEG2RAD;
                 float pr = compRot.x * DEG2RAD;
                 Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};

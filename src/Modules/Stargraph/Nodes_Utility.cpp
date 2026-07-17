@@ -925,8 +925,8 @@ void RegisterUtilityNodes() {
         Actor* viewTarget = World::Get().GetViewTarget();
         if (viewTarget && viewTarget->GetCameraComponent()) {
             CameraComponent* cc = viewTarget->GetCameraComponent();
-            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, viewTarget->position, viewTarget->rotation, viewTarget->scale);
-            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, viewTarget->rotation);
+            Vector3 compPos = viewTarget->GetComponentWorldPosition(cc);
+            Vector3 compRot = viewTarget->GetComponentWorldRotation(cc);
             float yr = compRot.y * DEG2RAD;
             float pr = compRot.x * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
@@ -977,8 +977,8 @@ void RegisterUtilityNodes() {
         Actor* viewTarget = World::Get().GetViewTarget();
         if (viewTarget && viewTarget->GetCameraComponent()) {
             CameraComponent* cc = viewTarget->GetCameraComponent();
-            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, viewTarget->position, viewTarget->rotation, viewTarget->scale);
-            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, viewTarget->rotation);
+            Vector3 compPos = viewTarget->GetComponentWorldPosition(cc);
+            Vector3 compRot = viewTarget->GetComponentWorldRotation(cc);
             float yr = compRot.y * DEG2RAD;
             float pr = compRot.x * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};

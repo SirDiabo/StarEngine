@@ -179,8 +179,8 @@ o Mapped input event nodes pick their target Input Component from a details pane
 o Multiple Input Components per actor, one per device, once multi-component-per-type support exists (13.5)
 
 ### 2.12 Component Hierarchy
-o Component::parent consulted for world transform composition (currently set on creation but never read)
-o Editor field to set a component's parent among the actor's other components
+x Component::parent consulted for world transform composition (Actor::GetComponentWorldTransform walks the parent chain, used everywhere a component's world position/rotation is computed)
+x Editor field to set a component's parent among the actor's other components (Details panel Parent field, cycles through valid non-cyclic choices)
 
 ---
 

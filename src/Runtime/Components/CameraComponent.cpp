@@ -140,8 +140,8 @@ void RegisterCameraComponentNodes() {
         cam.up = {0, 1, 0};
         if (targetActor->GetCameraComponent()) {
             CameraComponent* cc = targetActor->GetCameraComponent();
-            Vector3 compPos = Actor::ComputeWorldPosition(cc->position, targetActor->position, targetActor->rotation, targetActor->scale);
-            Vector3 compRot = Actor::ComputeWorldRotation(cc->rotation, targetActor->rotation);
+            Vector3 compPos = targetActor->GetComponentWorldPosition(cc);
+            Vector3 compRot = targetActor->GetComponentWorldRotation(cc);
             float yr = compRot.y * DEG2RAD;
             float pr = compRot.x * DEG2RAD;
             Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};

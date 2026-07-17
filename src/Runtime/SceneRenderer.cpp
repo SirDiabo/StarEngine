@@ -35,9 +35,8 @@ void SceneRenderer::DrawWorldActors(bool showPlaceholders) {
         bool drewAnyMesh = false;
         for (Component* comp : actor->GetComponents()) {
             if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
-                Vector3 pos = Actor::ComputeWorldPosition(comp->position, actor->position, actor->rotation, actor->scale);
-                Vector3 rot = Actor::ComputeWorldRotation(comp->rotation, actor->rotation);
-                Vector3 scl = Actor::ComputeWorldScale(comp->scale, actor->scale);
+                Vector3 pos, rot, scl;
+                actor->GetComponentWorldTransform(comp, pos, rot, scl);
                 DrawMeshComponent(mc, pos, rot, scl);
                 drewAnyMesh = true;
             }

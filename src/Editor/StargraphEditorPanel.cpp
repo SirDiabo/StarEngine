@@ -774,6 +774,32 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     }
 }
 
+static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, size_t componentIndex) {
+    const std::vector<ComponentDecl>& comps = graph.GetComponents();
+    const ComponentDecl& self = comps[componentIndex];
+
+    std::vector<std::string> excluded = {self.name};
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const ComponentDecl& c : comps) {
+            bool parentExcluded = std::find(excluded.begin(), excluded.end(), c.parentName) != excluded.end();
+            bool alreadyExcluded = std::find(excluded.begin(), excluded.end(), c.name) != excluded.end();
+            if (parentExcluded && !alreadyExcluded) {
+                excluded.push_back(c.name);
+                changed = true;
+            }
+        }
+    }
+
+    std::vector<std::string> options = {""};
+    for (const ComponentDecl& c : comps) {
+        if (std::find(excluded.begin(), excluded.end(), c.name) == excluded.end())
+            options.push_back(c.name);
+    }
+    return options;
+}
+
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
@@ -858,6 +884,21 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     textField("Name", compNameBuf, sizeof(compNameBuf), 1, comp.name);
     y += 4;
+
+    {
+        DrawText("Parent", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        std::vector<std::string> parentOptions = GetValidParentOptions(graph, (size_t)selectedComponentIndex);
+        std::string parentLabel = comp.parentName.empty() ? "None (Root)" : comp.parentName;
+        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, parentLabel.c_str())) {
+            auto it = std::find(parentOptions.begin(), parentOptions.end(), comp.parentName);
+            size_t idx = (it != parentOptions.end()) ? (size_t)(it - parentOptions.begin()) : 0;
+            idx = (idx + 1) % parentOptions.size();
+            comp.parentName = parentOptions[idx];
+            isDirty = true;
+        }
+        y += 24;
+    }
 
     vec3Row("Position", compPosBuf, 2, comp.posX, comp.posY, comp.posZ);
     y += 2;

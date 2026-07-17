@@ -113,6 +113,38 @@ Vector3 Actor::ComputeWorldScale(Vector3 localScale, Vector3 parentScale) {
     return Vector3Multiply(localScale, parentScale);
 }
 
+void Actor::GetComponentWorldTransform(Component* comp, Vector3& outPos, Vector3& outRot, Vector3& outScale) const {
+    std::vector<Component*> chain;
+    Component* c = comp;
+    int guard = 0;
+    while (c && guard++ < 64) {
+        chain.push_back(c);
+        c = c->parent;
+    }
+
+    outPos = position;
+    outRot = rotation;
+    outScale = scale;
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+        Component* cur = *it;
+        outPos = ComputeWorldPosition(cur->position, outPos, outRot, outScale);
+        outRot = ComputeWorldRotation(cur->rotation, outRot);
+        outScale = ComputeWorldScale(cur->scale, outScale);
+    }
+}
+
+Vector3 Actor::GetComponentWorldPosition(Component* comp) const {
+    Vector3 pos, rot, scl;
+    GetComponentWorldTransform(comp, pos, rot, scl);
+    return pos;
+}
+
+Vector3 Actor::GetComponentWorldRotation(Component* comp) const {
+    Vector3 pos, rot, scl;
+    GetComponentWorldTransform(comp, pos, rot, scl);
+    return rot;
+}
+
 void Actor::AddComponent(Component* component) {
     components.push_back(component);
     component->parent = GetRootComponent();

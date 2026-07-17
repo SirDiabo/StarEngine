@@ -243,6 +243,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "[Component" << i << "]\n";
         out << "Type=" << comp.componentType << "\n";
         out << "Name=" << comp.name << "\n";
+        out << "Parent=" << comp.parentName << "\n";
         out << "PosX=" << comp.posX << "\n";
         out << "PosY=" << comp.posY << "\n";
         out << "PosZ=" << comp.posZ << "\n";
@@ -416,6 +417,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             ComponentDecl comp;
             if (const std::string* v = FindEntry(section, "Type")) comp.componentType = *v;
             if (const std::string* v = FindEntry(section, "Name")) comp.name = *v;
+            if (const std::string* v = FindEntry(section, "Parent")) comp.parentName = *v;
             if (const std::string* v = FindEntry(section, "PosX")) comp.posX = std::stof(*v);
             if (const std::string* v = FindEntry(section, "PosY")) comp.posY = std::stof(*v);
             if (const std::string* v = FindEntry(section, "PosZ")) comp.posZ = std::stof(*v);
