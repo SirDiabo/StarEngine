@@ -1,6 +1,7 @@
 #include "Project.h"
 #include "Module.h"
 #include "LayoutSerializer.h"
+#include "NamedListRegistry.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -87,6 +88,7 @@ bool Project::Load(const std::string& path) {
     }
 
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
+    NamedListRegistry::Get().Load(rootPath);
 
     std::error_code ec;
     fs::create_directories(fs::path(GetModulesDirectory()), ec);

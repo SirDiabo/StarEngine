@@ -11,6 +11,7 @@
 #include "Core/ContentPathResolver.h"
 #include "Core/Project.h"
 #include "AssetPickerPopup.h"
+#include "RegistryPickerPopup.h"
 #include "ChoicePopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
@@ -125,6 +126,7 @@ void Editor::Render() {
 
     // Layer 8: asset picker popups (always topmost).
     AssetPickerPopup::FlushDeferredDraws();
+    RegistryPickerPopup::FlushDeferredDraws();
     ChoicePopup::FlushDeferredDraws();
 }
 

@@ -78,7 +78,8 @@ x Fix raygui quirk where global cursor-index shared across text boxes; force-act
 x Click-drag-to-scrub on FloatBox/IntBox
 x Array-of-fields wrapper (ArrayHeader/ArrayRowControls/ArrayValueRect in PropertyFields.h/.cpp)
 x Newly activated field seeds its buffer from the source value on the activation frame itself
-o Registry-reference dropdown field (project-level named lists: Save Files, Languages, etc.), with inline create-new
+x Registry-reference dropdown field (RegistryPickerPopup + NamedListRegistry), project-level
+  named lists (Save Files, Languages, etc.) scoped by category string, with inline create-new
 
 ---
 
