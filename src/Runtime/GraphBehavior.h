@@ -15,4 +15,6 @@ public:
 
     virtual void OnCustomEvent(Actor* owner, const std::string& eventName,
                                 const std::vector<std::pair<std::string, std::string>>& params) {}
+
+    virtual void OnDestroyed(Actor* owner) {}
 };

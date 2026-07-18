@@ -41,6 +41,16 @@ void RegisterEventNodes() {
     };
     NodeRegistry::Get().RegisterNode(endPlay);
 
+    NodeTemplate destroyed;
+    destroyed.type = "Event_Destroyed";
+    destroyed.category = "Events";
+    destroyed.moduleName = "Stargraph";
+    destroyed.isEvent = true;
+    destroyed.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(destroyed);
+
     NodeTemplate inputKey;
     inputKey.type = "Input_Key";
     inputKey.category = "Input";

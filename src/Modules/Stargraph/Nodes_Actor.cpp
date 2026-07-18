@@ -273,7 +273,9 @@ void RegisterActorNodes() {
                 break;
             }
         }
-        if (target) World::Get().DestroyActor(target);
+        if (!target) return;
+        if (GraphBehavior* behavior = target->GetGraphBehavior()) behavior->OnDestroyed(target);
+        World::Get().DestroyActor(target);
     };
     NodeRegistry::Get().RegisterNode(destroyActor);
 

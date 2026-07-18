@@ -344,6 +344,7 @@ x Replace Float/Int/Vec3 math nodes with single wildcard Add/Subtract/Multiply/D
 
 ### 7.1 Events
 x Event_BeginPlay, Event_Tick (Delta Seconds), Event_EndPlay
+x Event_Destroyed fires when Destroy_Actor targets this actor, separate from Event_EndPlay which only fires on world shutdown or level change
 x Input_Key node supporting keyboard keys via searchable key dropdown
 x Mouse buttons (Left, Right, Middle) exposed through Input_Key node as boolean held
 x Mouse wheel exposed through Input_Key node as axis float (-1..1)
@@ -499,6 +500,9 @@ o Add input "Duration" float to Print nodes and remove the viewport print list l
 o Add Delay Node with input exec and "Duration" float and out exec that fires after that timer passed
 o Add "Timer by Function Name" that fires custom events and functions. Inputs: "Function Name" string, "Rate" float, "Loop" bool and "Limit to Frame Rate" bool
 o More Timer nodes like "Pause Timer by Function Name", "Resume Timer by Function Name","Clear Timer by Function Name"
+
+### 7.23 Timer by Event
+o Set Timer by Event binds an actual event delegate instead of a function name string, so it can carry parameters, unlike Timer by Function Name (7.22) with only lists parameterless custom events
 
 ---
 
