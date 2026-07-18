@@ -20,4 +20,5 @@ void RegisterMathNodes();
 void RegisterActorNodes();
 void RegisterComponentNodes();
 void RegisterVariableNodes();
+void RegisterSaveNodes();
 void RegisterUtilityNodes();

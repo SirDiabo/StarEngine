@@ -1,4 +1,5 @@
 #include "StargraphEditorPanel.h"
+#include "Core/SaveFileRegistry.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "ViewportPanel.h"
 #include "PropertyFields.h"
@@ -110,7 +111,7 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
 }
 
 bool StargraphEditorPanel::IsPrimitiveNode(const Node& node) const {
-    return node.type == "Get_Variable" || node.type == "Get_Component";
+    return node.type == "Get_Variable" || node.type == "Get_Component" || node.type == "Get_Saved_Variable";
 }
 
 float StargraphEditorPanel::GetPrimitiveNodeHeight() const {
@@ -803,7 +804,9 @@ static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, si
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp) || audioPathPicker.ContainsPoint(mp);
+    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
+                            || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp);
+    const float kSaveColWidth = 24.0f;
 
     if (lastComponentDetailIndex != selectedComponentIndex) {
         snprintf(compNameBuf, sizeof(compNameBuf), "%s", comp.name.c_str());
@@ -826,42 +829,65 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         componentMeshPicker.Close();
         componentMaterialPicker.Close();
         audioPathPicker.Close();
+        savePicker.Close();
         materialSlotPickerIndex = -1;
     }
 
-    auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal) {
+    auto saveButton = [&](Rectangle fieldRect, const char* fieldKey) {
+        Rectangle btn = {fieldRect.x + fieldRect.width + 4, fieldRect.y, 18, 18};
+        bool has = comp.savableFields.count(fieldKey) && !comp.savableFields[fieldKey].empty();
+        DrawRectangleRec(btn, has ? Color{80, 140, 95, 255} : Color{38, 38, 42, 255});
+        DrawRectangleLinesEx(btn, 1, {70, 70, 80, 255});
+        DrawText("S", (int)btn.x + 5, (int)btn.y + 3, 11, has ? WHITE : Color{120, 120, 130, 255});
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, btn) && !pickerBlocksInput) {
+            saveTargetFieldKey = fieldKey;
+            savePicker.Open({btn.x, btn.y + btn.height}, SaveFileRegistry::Category());
+        }
+    };
+
+    auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal,
+                          const char* saveKey = nullptr) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
-        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
+        Rectangle r = {panel.x + 8, y, w, 18};
         if (PropertyField::StringBox(r, buf, bufSize, fieldId, componentActiveField, outVal, !pickerBlocksInput))
             isDirty = true;
+        if (saveKey) saveButton(r, saveKey);
         y += 22;
     };
 
-    auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal) {
+    auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal,
+                           const char* saveKey = nullptr) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
-        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
+        Rectangle r = {panel.x + 8, y, w, 18};
         if (PropertyField::FloatBox(r, buf, bufSize, fieldId, componentActiveField, outVal, !pickerBlocksInput))
             isDirty = true;
+        if (saveKey) saveButton(r, saveKey);
         y += 22;
     };
 
-    auto vec3Row = [&](const char* label, char bufs[3][32], int fieldBase, float& vx, float& vy, float& vz) {
+    auto vec3Row = [&](const char* label, char bufs[3][32], int fieldBase, float& vx, float& vy, float& vz,
+                        const char* saveKey = nullptr) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {180, 200, 230, 255});
         y += 16;
-        Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
+        float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
+        Rectangle row = {panel.x + 8, y, w, 18};
         if (PropertyField::Vec3Row(row, bufs[0], bufs[1], bufs[2], fieldBase, componentActiveField,
                                     vx, vy, vz, !pickerBlocksInput))
             isDirty = true;
+        if (saveKey) saveButton(row, saveKey);
         y += 22;
     };
 
     auto assetField = [&](const char* label, const std::string& current, AssetPickerPopup& picker,
-                           const char* extension, std::string& outVal) {
+                           const char* extension, std::string& outVal, const char* saveKey = nullptr) {
         DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
-        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
+        Rectangle r = {panel.x + 8, y, w, 18};
         DrawRectangleRec(r, {38, 38, 42, 255});
         DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
         std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
@@ -871,6 +897,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             componentMaterialPicker.Close();
             picker.Open({r.x, r.y + r.height}, extension);
         }
+        if (saveKey) saveButton(r, saveKey);
         y += 22;
         std::string picked;
         if (picker.Render(picked)) {
@@ -900,15 +927,15 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         y += 24;
     }
 
-    vec3Row("Position", compPosBuf, 2, comp.posX, comp.posY, comp.posZ);
+    vec3Row("Position", compPosBuf, 2, comp.posX, comp.posY, comp.posZ, "Position");
     y += 2;
-    vec3Row("Rotation", compRotBuf, 5, comp.rotX, comp.rotY, comp.rotZ);
+    vec3Row("Rotation", compRotBuf, 5, comp.rotX, comp.rotY, comp.rotZ, "Rotation");
     y += 2;
-    vec3Row("Scale", compScaleBuf, 8, comp.scaleX, comp.scaleY, comp.scaleZ);
+    vec3Row("Scale", compScaleBuf, 8, comp.scaleX, comp.scaleY, comp.scaleZ, "Scale");
     y += 6;
 
     if (comp.componentType == "MeshComponent") {
-        assetField("Static Mesh", comp.meshAssetPath, componentMeshPicker, ".starasset", comp.meshAssetPath);
+        assetField("Static Mesh", comp.meshAssetPath, componentMeshPicker, ".starasset", comp.meshAssetPath, "Static Mesh");
 
         std::vector<MaterialSlot> meshSlots;
         if (!comp.meshAssetPath.empty()) {
@@ -957,15 +984,15 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
         y += 24;
         if (comp.collisionShape != "Box") {
-            floatField("Radius", compRadiusBuf, sizeof(compRadiusBuf), 11, comp.collisionRadius);
+            floatField("Radius", compRadiusBuf, sizeof(compRadiusBuf), 11, comp.collisionRadius, "Radius");
         }
         if (comp.collisionShape == "Capsule") {
-            floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight);
+            floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight, "Height");
         }
     } else if (comp.componentType == "AudioComponent") {
         DrawText("Sound Path", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;
-        Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+        Rectangle r = {panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18};
         DrawRectangleRec(r, {38, 38, 42, 255});
         DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
         std::string soundLabel = comp.soundAssetPath.empty() ? "None" : std::filesystem::path(comp.soundAssetPath).stem().string();
@@ -973,21 +1000,32 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
             audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
         }
+        saveButton(r, "Sound Path");
         y += 22;
         std::string pickedSound;
         if (audioPathPicker.Render(pickedSound)) {
             comp.soundAssetPath = pickedSound;
             isDirty = true;
         }
-        floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume);
+        floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume, "Volume");
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Auto Play", &comp.autoPlay)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Auto Play");
         y += 24;
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Looping", &comp.looping)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Looping");
         y += 24;
     } else if (comp.componentType == "CameraComponent") {
-        floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov);
+        floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov, "FOV");
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
         y += 24;
+    }
+
+    std::string pickedSaveFile;
+    if (savePicker.Render(pickedSaveFile)) {
+        if (pickedSaveFile.empty()) comp.savableFields.erase(saveTargetFieldKey);
+        else comp.savableFields[saveTargetFieldKey] = pickedSaveFile;
+        isDirty = true;
     }
 }
 
@@ -1529,6 +1567,7 @@ void StargraphEditorPanel::RenderRightPanel() {
             refreshValueBuffers();
             lastDetailIndex = selectedVariableIndex;
             activeField = 0;
+            savePicker.Close();
         }
 
         Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
@@ -1656,6 +1695,25 @@ void StargraphEditorPanel::RenderRightPanel() {
         DrawText(replNames[(int)var.replication], (int)replRect.x + 4, (int)replRect.y + 3, 11, replStyle.text);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), replRect)) {
             var.replication = (ReplicationMode)(((int)var.replication + 1) % 3);
+            isDirty = true;
+        }
+        y += 26;
+
+        DrawText("Save File", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle saveRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style saveStyle;
+        DrawRectangleRec(saveRect, saveStyle.box);
+        DrawRectangleLinesEx(saveRect, 1, saveStyle.border);
+        std::string saveLabel = var.saveFile.empty() ? "None" : var.saveFile;
+        DrawText(saveLabel.c_str(), (int)saveRect.x + 4, (int)saveRect.y + 3, 11, saveStyle.text);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), saveRect) && !savePicker.IsOpen()) {
+            saveTargetFieldKey.clear();
+            savePicker.Open({saveRect.x, saveRect.y + saveRect.height}, SaveFileRegistry::Category());
+        }
+        std::string pickedSaveFile;
+        if (savePicker.Render(pickedSaveFile)) {
+            var.saveFile = pickedSaveFile;
             isDirty = true;
         }
         return;
@@ -2255,16 +2313,21 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)graph.GetVariables().size()) {
         Vector2 mp = GetMousePosition();
         const Variable& var = graph.GetVariables()[variableDragIndex];
-        bool makingSet = IsKeyDown(KEY_LEFT_ALT);
-        std::string label = (makingSet ? "Set: " : "Get: ") + var.name;
-        std::string hint = makingSet ? "" : "  (Alt = Set)";
+        bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        bool alt  = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+        bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+        std::string label = ctrl && alt ? ("Load Saved: " + var.name)
+                           : ctrl        ? ("Save: " + var.name)
+                           : shift       ? ("Get Saved: " + var.name)
+                           : alt         ? ("Set: " + var.name)
+                                         : ("Get: " + var.name);
+        std::string hint = "  (Alt=Set, Ctrl=Save, Ctrl+Alt=Load Saved, Shift=Get Saved)";
         std::string full = label + hint;
         int w = (int)MeasureText(full.c_str(), 12) + 12;
         DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
         DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
         DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
-        if (!hint.empty())
-            DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
+        DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
@@ -2273,7 +2336,31 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 Node* node = nullptr;
                 const Variable& var = graph.GetVariables()[variableDragIndex];
 
-                if (IsKeyDown(KEY_LEFT_ALT)) {
+                if (ctrl && alt) {
+                    node = graph.CreateNode("Load_Saved_Variable");
+                    node->title = "Load Saved: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Variable_Name") p.defaultValue = var.name;
+                    }
+                    for (Pin& p : node->outputs) {
+                        if (p.name == "Value") p.type = var.type;
+                    }
+                } else if (ctrl) {
+                    node = graph.CreateNode("Save_Variable");
+                    node->title = "Save: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Variable_Name") p.defaultValue = var.name;
+                    }
+                } else if (shift) {
+                    node = graph.CreateNode("Get_Saved_Variable");
+                    node->title = "Get Saved: " + var.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Variable_Name") p.defaultValue = var.name;
+                    }
+                    for (Pin& p : node->outputs) {
+                        if (p.name == "Value") p.type = var.type;
+                    }
+                } else if (IsKeyDown(KEY_LEFT_ALT)) {
                     node = graph.CreateNode("Set_Variable");
                     node->title = "Set: " + var.name;
                     for (Pin& p : node->inputs) {

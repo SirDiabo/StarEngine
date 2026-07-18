@@ -2,6 +2,7 @@
 #include "NodeRegistry.h"
 #include "Core/CookedFile.h"
 #include <fstream>
+#include <sstream>
 
 Node* Stargraph::CreateNode(const std::string& type) {
     nodes.emplace_back();
@@ -267,6 +268,15 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "Volume=" << comp.volume << "\n";
         out << "CameraFOV=" << comp.cameraFov << "\n";
         out << "CameraOrthographic=" << (comp.cameraOrthographic ? "true" : "false") << "\n";
+        {
+            std::string savable;
+            for (const auto& kv : comp.savableFields) {
+                if (kv.second.empty()) continue;
+                if (!savable.empty()) savable += ",";
+                savable += kv.first + ":" + kv.second;
+            }
+            out << "SavableFields=" << savable << "\n";
+        }
         out << "\n";
     }
 
@@ -288,6 +298,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
             out << "Value=" << var.value << "\n";
         }
         out << "Replication=" << ReplicationModeToString(var.replication) << "\n";
+        out << "SaveFile=" << var.saveFile << "\n";
         out << "\n";
     }
 
@@ -445,6 +456,15 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Volume")) comp.volume = std::stof(*v);
             if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = std::stof(*v);
             if (const std::string* v = FindEntry(section, "CameraOrthographic")) comp.cameraOrthographic = (*v == "true");
+            if (const std::string* v = FindEntry(section, "SavableFields")) {
+                std::stringstream ss(*v);
+                std::string entry;
+                while (std::getline(ss, entry, ',')) {
+                    size_t colon = entry.find(':');
+                    if (colon == std::string::npos) continue;
+                    comp.savableFields[entry.substr(0, colon)] = entry.substr(colon + 1);
+                }
+            }
             components.push_back(comp);
         } else if (section.name != "Nodes" && section.name.rfind("Node", 0) == 0) {
             const std::string* typeValue = FindEntry(section, "Type");
@@ -520,6 +540,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                 var.value = *v;
             }
             if (const std::string* v = FindEntry(section, "Replication")) var.replication = ReplicationModeFromString(*v);
+            if (const std::string* v = FindEntry(section, "SaveFile")) var.saveFile = *v;
             variables.push_back(var);
         }
     }

@@ -12,6 +12,7 @@ public:
 
     const std::vector<std::string>& GetList(const std::string& category) const;
     bool AddEntry(const std::string& category, const std::string& name);
+    bool RemoveEntry(const std::string& category, const std::string& name);
     bool HasEntry(const std::string& category, const std::string& name) const;
 
 private:

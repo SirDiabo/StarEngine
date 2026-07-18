@@ -160,11 +160,11 @@ x Pitch clamp to prevent flip 89°
 x Add Use Control Control Yaw/Pitch/Roll (seperate) to both Actor and Camera Component. Actor Yaw true by default, Camera Pitch true by default.
 
 ### 2.10 Save / Load System
-o Save flag on variables and component fields (similar to 2.8)
-o Project-level Save Files registry (name, encrypted, portable) - per-variable field picks a name, doesn't restate file settings
-o PIE Save files live in the project's existing Saved/ directory, Packaged in common OS save directories (AppData, .local, etc.)
-o Save All / Save Variable (dropdown-picked) nodes (Self Scoped. Each Actor saves its own stuff)
-o Load File / Load All nodes
+x Save flag on variables (Variable::saveFile) and component fields (ComponentDecl::savableFields, driven off the existing PropertyList reflection so no Runtime/Components/*.cpp needed touching)
+x Project-level Save Files registry (name via NamedListRegistry "SaveFiles" category, encrypted flag via SaveFileRegistry, editable in Project Settings) - per-variable field picks a name, doesn't restate file settings
+x PIE Save files live in the project's Saved/SaveGames/ directory (SavePaths), Packaged in common OS save directories (AppData, Library/Application Support, .local/share)
+x Save All / Save Variable (dropdown-picked) nodes (Self Scoped. Each Actor saves its own stuff)
+x Load File / Load All nodes, plus Get Saved Variable (read only) and Load Saved Variable (syncs the actual variable) dropdown-picked nodes, all reachable by Ctrl/Shift/Ctrl+Alt dragging a variable
 
 ### 2.11 Input Component and Mapping
 o InputComponent: authored list of named mappings (name, default key) in Details panel
@@ -358,7 +358,6 @@ x Custom Event nodes (Functionally, same as functions but without their own grap
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop, Has_Authority walk their body through the shared exec-chain walker, so chains longer than one node continue and data pins propagate (8)
-o Delay (requires timer system)
 
 ### 7.3 Math
 x Float/Int/Vec3 Add/Subtract/Multiply/Divide
@@ -494,6 +493,12 @@ x Draw_Ray - Visualize raycasts
 x Draw_Cube - Debug cube visualization
 x Draw_Circle_3D - Debug sphere visualization
 
+### 7.22 Async Timer Nodes
+o Add timer system and latent actions
+o Add input "Duration" float to Print nodes and remove the viewport print list limit, allowing them to stack and autoremove themselves using a lifespan
+o Add Delay Node with input exec and "Duration" float and out exec that fires after that timer passed
+o Add "Timer by Function Name" that fires custom events and functions. Inputs: "Function Name" string, "Rate" float, "Loop" bool and "Limit to Frame Rate" bool
+
 ---
 
 ## 8. Graph Executor
@@ -506,7 +511,6 @@ x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
 x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
 o Wildcard type resolution at runtime
-o Async nodes (Delay, latent actions)
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
 o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds
 o Bytecode compilation as a lower-risk option if profiling shows Stargraph is an actual bottleneck

@@ -62,6 +62,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 comp->rotation = {decl.rotX, decl.rotY, decl.rotZ};
                 comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
                 comp->SetName(decl.name);
+                comp->savableFields = decl.savableFields;
                 actor->AddComponent(comp);
 
                 componentsByName[decl.name] = comp;

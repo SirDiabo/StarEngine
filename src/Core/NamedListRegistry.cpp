@@ -59,6 +59,17 @@ bool NamedListRegistry::AddEntry(const std::string& category, const std::string&
     return true;
 }
 
+bool NamedListRegistry::RemoveEntry(const std::string& category, const std::string& name) {
+    auto it = lists.find(category);
+    if (it == lists.end()) return false;
+    auto& entries = it->second;
+    auto found = std::find(entries.begin(), entries.end(), name);
+    if (found == entries.end()) return false;
+    entries.erase(found);
+    Save();
+    return true;
+}
+
 bool NamedListRegistry::HasEntry(const std::string& category, const std::string& name) const {
     const auto& entries = GetList(category);
     return std::find(entries.begin(), entries.end(), name) != entries.end();

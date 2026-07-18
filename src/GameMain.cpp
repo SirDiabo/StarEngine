@@ -1,5 +1,6 @@
 #include "Core/Module.h"
 #include "Core/ContentPathResolver.h"
+#include "Core/SavePaths.h"
 #include "Core/CookedFile.h"
 #include "Core/PackageCipher.h"
 #include "Core/StarPak.h"
@@ -57,6 +58,7 @@ int main(int argc, char* argv[]) {
     }
 
     RegisterAllModules();
+    SavePaths::SetPackagedGameName(config.name);
     if (!ModuleManager::Get().InitializeAll()) return 1;
 
     InitWindow(config.targetWidth, config.targetHeight, config.name.c_str());

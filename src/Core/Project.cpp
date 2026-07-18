@@ -2,11 +2,13 @@
 #include "Module.h"
 #include "LayoutSerializer.h"
 #include "NamedListRegistry.h"
+#include "SaveFileRegistry.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <random>
 
 namespace fs = std::filesystem;
 
@@ -37,6 +39,16 @@ std::string GameRendererName(GameRenderer renderer) {
 
 GameRenderer GameRendererFromName(const std::string& name) {
     return name == "Software" ? GameRenderer::Software : GameRenderer::Hardware;
+}
+
+static std::string GenerateSaveEncryptionKey() {
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(0, (int)sizeof(alphabet) - 2);
+    std::string key(24, ' ');
+    for (char& c : key) c = alphabet[dist(gen)];
+    return key;
 }
 
 Project& Project::Get() {
@@ -77,6 +89,7 @@ bool Project::Load(const std::string& path) {
         else if (key == "targetHeight") settings.targetHeight = std::stoi(value);
         else if (key == "defaultMap") settings.defaultMapPath = value;
         else if (key == "renderer") settings.renderer = GameRendererFromName(value);
+        else if (key == "saveEncryptionKey") settings.saveEncryptionKey = value;
         else if (key == "disabledModules") {
             settings.disabledModules.clear();
             std::stringstream ss(value);
@@ -89,10 +102,16 @@ bool Project::Load(const std::string& path) {
 
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
     NamedListRegistry::Get().Load(rootPath);
+    SaveFileRegistry::Get().Load(rootPath);
 
     std::error_code ec;
     fs::create_directories(fs::path(GetModulesDirectory()), ec);
     WriteActiveProjectPointer();
+
+    if (settings.saveEncryptionKey.empty()) {
+        settings.saveEncryptionKey = GenerateSaveEncryptionKey();
+        Save();
+    }
 
     return true;
 }
@@ -120,6 +139,7 @@ void Project::Save() {
     out << "targetHeight=" << settings.targetHeight << "\n";
     out << "defaultMap=" << settings.defaultMapPath << "\n";
     out << "renderer=" << GameRendererName(settings.renderer) << "\n";
+    out << "saveEncryptionKey=" << settings.saveEncryptionKey << "\n";
 
     out << "disabledModules=";
     for (size_t i = 0; i < settings.disabledModules.size(); i++) {

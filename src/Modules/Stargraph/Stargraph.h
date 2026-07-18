@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <deque>
+#include <unordered_map>
 #include <cstdlib>
 #include <cstdio>
 #include <ostream>
@@ -153,6 +154,7 @@ struct Variable {
     std::vector<std::string> arrayValues;
 
     ReplicationMode replication = ReplicationMode::Local;
+    std::string saveFile; // Name of a project Save File (SaveFileRegistry). Empty = not saved.
 
     std::string DefaultElementText() const;
 };
@@ -188,6 +190,9 @@ struct ComponentDecl {
     // CameraComponent
     float cameraFov = 50.0f;
     bool cameraOrthographic = false;
+
+    // SaveFileRegistry
+    std::unordered_map<std::string, std::string> savableFields;
 };
 
 class Stargraph {

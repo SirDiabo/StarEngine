@@ -2,6 +2,8 @@
 #include "Runtime/Object.h"
 #include "Runtime/Property.h"
 #include "raylib.h"
+#include <string>
+#include <unordered_map>
 
 class PropertyList;
 
@@ -12,6 +14,8 @@ public:
     Vector3 scale = {1, 1, 1};
 
     Component* parent = nullptr;
+
+    std::unordered_map<std::string, std::string> savableFields;
 
     virtual void GetEditorProperties(PropertyList& outProperties) { }
     virtual void Update(float deltaTime) = 0;

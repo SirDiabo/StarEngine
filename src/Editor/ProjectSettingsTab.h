@@ -2,6 +2,7 @@
 #include "EditorTab.h"
 #include "AssetPickerPopup.h"
 #include "ChoicePopup.h"
+#include <string>
 
 class MenuBar;
 
@@ -19,5 +20,7 @@ private:
 
     char widthBuf[16]  = "";
     char heightBuf[16] = "";
+    char newSaveFileBuf[64] = "";
+    std::string newSaveFileName;
     int activeField = 0;
 };

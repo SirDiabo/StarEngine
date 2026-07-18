@@ -15,6 +15,7 @@
 #include "Nodes_Actor.h"
 #include "Nodes_Components.h"
 #include "Nodes_Variables.h"
+#include "Nodes_Save.h"
 #include "Nodes_Utility.h"
 #include "Nodes_Audio.h"
 
@@ -29,6 +30,7 @@ bool StargraphModule::Initialize() {
     RegisterActorNodes();
     RegisterComponentNodes();
     RegisterVariableNodes();
+    RegisterSaveNodes();
     RegisterUtilityNodes();
     RegisterAudioNodes();
 

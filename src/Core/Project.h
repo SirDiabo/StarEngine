@@ -17,6 +17,7 @@ struct ProjectSettings {
     std::string defaultMapPath;
     GameRenderer renderer = GameRenderer::Hardware;
     std::vector<std::string> disabledModules;
+    std::string saveEncryptionKey;
 };
 
 class Project {

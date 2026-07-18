@@ -3,6 +3,7 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "AssetPickerPopup.h"
+#include "RegistryPickerPopup.h"
 #include <string>
 #include <vector>
 
@@ -155,6 +156,9 @@ private:
     char eventNameBuf[128] = "";
     int eventActiveField = 0;
     char eventParamNameBuf[8][64] = {};
+
+    RegistryPickerPopup savePicker;
+    std::string saveTargetFieldKey;
 
     bool showSelfActorDetails = false;
 };
