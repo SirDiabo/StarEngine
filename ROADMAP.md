@@ -498,6 +498,7 @@ o Add timer system and latent actions
 o Add input "Duration" float to Print nodes and remove the viewport print list limit, allowing them to stack and autoremove themselves using a lifespan
 o Add Delay Node with input exec and "Duration" float and out exec that fires after that timer passed
 o Add "Timer by Function Name" that fires custom events and functions. Inputs: "Function Name" string, "Rate" float, "Loop" bool and "Limit to Frame Rate" bool
+o More Timer nodes like "Pause Timer by Function Name", "Resume Timer by Function Name","Clear Timer by Function Name"
 
 ---
 
@@ -510,6 +511,7 @@ x Event_Tick writes deltaTime into Delta Seconds output pin before execution
 x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
 x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
+x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-id-keyed static map, so separate actor instances of the same class no longer share state
 o Wildcard type resolution at runtime
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
 o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds

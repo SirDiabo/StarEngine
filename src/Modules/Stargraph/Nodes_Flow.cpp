@@ -2,11 +2,6 @@
 #include "NodeRegistry.h"
 #include "GraphExecutor.h"
 #include "Runtime/Networking/NetworkBackend.h"
-#include <unordered_map>
-
-static std::unordered_map<std::string, bool> doOnceStates;
-static std::unordered_map<std::string, bool> gateStates;
-static std::unordered_map<std::string, bool> flipFlopStates;
 
 static void RunFromPin(Node& node, Stargraph& graph, ExecutionContext& ctx, const char* pinName) {
     for (const Pin& p : node.outputs) {
@@ -139,18 +134,15 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     doOnce.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        std::string nodeId = node.id;
-        bool& state = doOnceStates[nodeId];
-
         for (const Pin& p : node.inputs) {
             if (p.name == "Reset") {
-                state = false;
+                node.flowState = false;
             }
         }
 
-        if (!state) {
+        if (!node.flowState) {
             RunFromPin(node, graph, ctx, "Out");
-            state = true;
+            node.flowState = true;
         }
     };
     NodeRegistry::Get().RegisterNode(doOnce);
@@ -166,15 +158,12 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     gate.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        std::string nodeId = node.id;
-        bool& state = gateStates[nodeId];
-
         for (const Pin& p : node.inputs) {
-            if (p.name == "Open") state = true;
-            if (p.name == "Close") state = false;
+            if (p.name == "Open") node.flowState = true;
+            if (p.name == "Close") node.flowState = false;
         }
 
-        if (state) {
+        if (node.flowState) {
             RunFromPin(node, graph, ctx, "Out");
         }
     };
@@ -190,11 +179,9 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"False", PinType::Exec, false, true});
     };
     flipFlop.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        std::string nodeId = node.id;
-        bool& state = flipFlopStates[nodeId];
-        state = !state;
+        node.flowState = !node.flowState;
 
-        RunFromPin(node, graph, ctx, state ? "True" : "False");
+        RunFromPin(node, graph, ctx, node.flowState ? "True" : "False");
     };
     NodeRegistry::Get().RegisterNode(flipFlop);
 }

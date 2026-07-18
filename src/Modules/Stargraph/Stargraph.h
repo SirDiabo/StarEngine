@@ -139,6 +139,9 @@ struct Node {
 
     ReplicationMode eventReplication = ReplicationMode::Local;
     bool eventReliable = false;
+
+    // Runtime-only flow control state
+    bool flowState = false;
 };
 
 struct Link {
