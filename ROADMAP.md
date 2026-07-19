@@ -733,3 +733,59 @@ x Log Panel in Stargraph Editor Tab
 o Add Clear button to both Log Panels
 o Make Log panel text is selectable and copyable
 o Logs saved to a log file on disk (Project/Saved/Logs/{YYYY-MM-DD-hh-mm-ss}.log)
+
+---
+
+## 17. Clean Up
+
+### 17.1 Critical Bugs
+
+o Command-injection via popen/system with unsanitized paths (PackageRunner, ModuleImporter, Application::Relaunch). Move to argv[]-based spawn and allowlist-validate names (^[A-Za-z0-9._/-]+$), reject embedded quotes.
+o StarPak footer bounds check is too weak (StarPak.cpp:132). Require pakOffset+pakSize == fileSize - sizeof(Footer) exactly instead of a loose overlap check.
+o (long)pos truncation in StarPak blob read (StarPak.cpp:107). Use data() + static_cast<ptrdiff_t>(pos) so files over 2GB / 32-bit builds read the right slice.
+o Path traversal in CookedFile sibling extraction (CookedFile.cpp:48). Reject any virtual path that is not lexically normal or does not share the expected parent before writing under the mirror dir.
+o Component Target pins round-trip raw pointers as %p and re-cast with strtoull (MeshComponent, Audio, Camera, Collision, Nodes_Events). Resolve targets via a stable id/NetId registry, not pointer hex, so destroyed actors/components do not dangle.
+o World::EndPlay re-entrancy (World.cpp:89). Spawning/destroying actors inside EndPlay mutates the actors list mid-loop. Stage new spawns in a separate list handled after the loop.
+
+### 17.2 High Priority Bugs
+
+o RemoveComponent leaves a dangling rootComponent (Actor.cpp:162). Null rootComponent when the removed component is the root.
+o AssetCache mutates the shared cached Model::transform (SceneRenderer.cpp:23, AssetPreviewViewport.cpp:165). Store per-draw transform locally; copy the model instead of editing the cache. ReloadModel must invalidate any long-lived Model* references.
+o Per-frame StarAsset::LoadFromFile in DrawMeshComponent and AssetPreviewViewport (SceneRenderer.cpp:14, AssetPreviewViewport.cpp:148). Cache the resolved Model* and materials on the component; re-resolve only on path/slot change.
+o ImportDetailsPanel::RenderInline saves the asset every frame (ImportDetailsPanel.cpp:113). Save only on commit, picker selection, or tab close.
+o Global raygui text-edit state shared across all panels (PropertyFields.cpp:23). One active textbox keeps raylib's edit mode alive and blocks input elsewhere. Track a single editor-wide active field and clear others on focus change.
+o Unvalidated std::stoi/std::stof on untrusted files throws and aborts load (StarMap.cpp:86/96/101, StarAsset.cpp:59, Project.cpp:88). Parse with from_chars/try-catch, default and clamp counts.
+o Unsynchronized statics touched from backend threads (NetIdRegistry, lastSyncedValue, GenerateObjectId). Guard with a mutex / std::atomic.
+o WorldSpawner reuses nextNetId from 1 on each SpawnMapActors call (WorldSpawner.cpp:90). Use a persistent counter so re-spawns do not overwrite existing registry entries.
+o GraphExecutor wildcard type resolution is O(nodes x pins x links) every frame (GraphExecutor.cpp:222, Nodes_Math). Cache resolved wildcard types, invalidate only on graph mutation.
+o FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Build a pinId -> (node, pin) map at load/mutation like the existing type cache.
+
+### 17.3 Medium Priority Bugs
+
+o Vec3Divide has no zero guard (Nodes_Math.cpp:98). Match the scalar != 0 guards to avoid NaN propagation.
+o Get_Variable / Set_Variable hard-typed to Float (Nodes_Variables.cpp). Make the pin a Wildcard resolved from the variable type so non-float variables are not coerced.
+o RunCustomEvent uses a global static recursion depth (GraphExecutor.cpp). Thread depth per execution so one actor's chain does not suppress another's.
+o TimerManager fires timers whose owner/actor may be destroyed (TimerManager.cpp:134). Validate liveness before firing and make timer cleanup mandatory on actor destroy.
+o ProcessInputKey previous-held map grows unbounded (GraphExecutor.cpp:140). Store previous-held on the node as runtime state or clear entries on graph destroy.
+o Get_Game_Time accumulates a global gameTime per call (Nodes_Utility.cpp:121). Keep game time in World and read it.
+o ContentBrowserPanel scans the filesystem every frame (ScanCurrentFolder). Cache entries and refresh on navigate/import.
+o AppendPakToExecutable does not strip an existing STARPAKF footer before re-appending (StarPak.cpp:179, PackageRunner.cpp:191). Truncate prior footer so re-packaging leaves one.
+o Loaded_Texture leaks / Dangling on per-frame re-eval, and Draw_Billboard passes an empty Texture2D (Nodes_Utility.cpp:1029/954/1009). Dedupe by path and require a valid texture input.
+o SaveFileFormat applies XOR blindly with no marker (SaveFileFormat.cpp:54). Store an encryption marker and rename the cipher to "obfuscation" where it gates save integrity.
+o PackageCooker keeps a broken absolute Source= on dead external links (PackageCooker.cpp:93). Warn/error instead of shipping a missing-path reference.
+o ViewportPanel drop with a zero-sized render target produces NaN world coords. Early-out when renderTargetWidth/Height <= 0.
+o Floating panels closed via the header X linger in the floating list (DockArea.cpp:99). Erase on close like docked tabs.
+o LayoutSerializer has no newline/equals escaping and no write-success check. Escape values and check f.good() so layout/registry/settings survive special characters.
+
+### 17.4 Low Priority Bugs
+
+o StarAsset::ResolveSourcePath returns the invalid path as last resort instead of "" (StarAsset.cpp:7).
+o BuildRunner overwrites the running binary in place on POSIX (BuildRunner.cpp:53). Mirror the Windows rename-to-.old + relaunch strategy.
+o Project::Load calls Save() as a side effect (Project.cpp:111). Defer key generation/save to an explicit post-init step.
+o SavePaths defaults every packaged game to the same StarEngineGame save dir (SavePaths.cpp:47). Always set the game name at package launch.
+o EmbeddedAssets casts (int)bytes.size(), overflowing for >2GB blobs (EmbeddedAssets.cpp:55). Bound-check before casting to raylib.
+o Module::RebuildEntries rescans the whole tree on every Register (Module.cpp:97). Defer ScanManifests until after all registrations.
+o AssetPreviewViewport fly-mode look direction is inconsistent with orbit (AssetPreviewViewport.cpp:107). Normalize to match.
+o Unbounded file slurping in CookedFile / PackageCooker / SaveFileFormat via istreambuf_iterator. Bound reads by file_size.
+o NativeFileDialog concatenates filter into a 256-byte buffer with no length check (NativeFileDialog.cpp:19). Bound the copy.
+o Asset/Registry/Choice popups are not clamped to screen edges. Clamp area to screen size like the context menus do.
