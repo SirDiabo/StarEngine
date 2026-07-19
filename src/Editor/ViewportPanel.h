@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
 class Actor;
 class LogPanel;
@@ -28,8 +29,8 @@ public:
     bool IsPlaying() const { return playing; }
 
     void SetLogPanel(LogPanel* panel) { logPanel = panel; }
-
     void InvalidateClassGraph(const std::string& graphAssetPath);
+    void SetPackageCallback(std::function<void()> callback) { onPackageRequested = callback; }
 
 private:
     void EnsureRenderTarget(int width, int height);
@@ -56,6 +57,7 @@ private:
 
     bool playing = false;
     LogPanel* logPanel = nullptr;
+    std::function<void()> onPackageRequested;
 
     bool flying = false;
     bool orbiting = false;

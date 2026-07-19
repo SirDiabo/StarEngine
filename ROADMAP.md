@@ -542,7 +542,7 @@ x Editor only box that shows warnings, errors and prints on the top left of the 
 
 ---
 
-## 10. Game Packaging
+## 10.0 Game Packaging
 x Runtime-only CMake build target (no Editor/ code, no StargraphEditorPanel)
 x Packaged executable loads a StarMap directly, runs the world
 x Asset path resolution relative to packaged executable
@@ -550,7 +550,7 @@ x All .staractor and .starmap files included in package output
 x Platform targets: Windows, Linux (Windows via mingw-w64 cross toolchain, verified; macOS needs osxcross, wired but unverified; Web wired via emcmake, unverified, no single-executable output; Android not implemented, needs a full APK project template)
 x Content encryption at cook time (XOR, extensible to AES-128/256 later)
 x Renderer choice per project (Hardware/OpenGL or Software/CPU via raylib's rlsw backend, packaged games only)
-o move packaging out of the top menu and next to the play button on the viewport top bar thing
+x move packaging out of the top menu and next to the play button on the viewport top bar thing
 
 ### 10.1 Packaging into a single executable (blob)
 x Ship one .exe with no loose Content folder alongside it (single-file/pak packaging format, default)
@@ -562,7 +562,6 @@ x Extract file-API-only formats (.obj, non-binary .gltf) to a per-run temp file 
 x Resolve sibling files (mtl textures, gltf buffers) from the pak index by shared parent path instead of scanning a disk directory (mtl/textures done, gltf buffers pending gltf support)
 x PackageRunner produces the single exe (with appended pak) as the only required output artifact
 x Keep loose-folder packaging as a project setting for fast iteration/patching without a full rebuild
-o Verify appended trailing data survives code signing/packaging tools on Windows and macOS before relying on this approach
 
 ### 10.2 Shipping prebuilt engine libraries per platform
 o Package a game without the engine source tree on disk (mirrors UE's precompiled engine, compiles only project game code)

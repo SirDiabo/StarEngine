@@ -25,6 +25,8 @@ public:
 
     void TogglePanelVisible(const std::string& name);
 
+    void SetPackageCallback(std::function<void()> callback);
+
     // Called by Editor when an asset drop happens over the viewport area.
     std::function<void(const std::string&, const std::string&)> onAssetOpened;
 

@@ -553,6 +553,12 @@ void ViewportPanel::RenderToolbar() {
         if (GuiButton(saveBtn, "Save")) SaveMap();
         btnRight -= 54;
         if (mapDirty) DrawText("*", (int)btnRight - 10, (int)btnY + 4, 14, {200, 160, 60, 255});
+
+        if (!playing) {
+            Rectangle packageBtn = {btnRight - 66, btnY, 66, 22};
+            if (GuiButton(packageBtn, "Package")) onPackageRequested();
+            btnRight -= 70;
+        }
     }
 }
 

@@ -48,6 +48,7 @@ void Editor::Initialize() {
         OpenAssetInTab(path, ext);
     };
     tab->Initialize();
+    tab->SetPackageCallback([this]() { OpenPackageTab(); });
     levelTab = tab;
     editorTabs.emplace_back(tab);
 

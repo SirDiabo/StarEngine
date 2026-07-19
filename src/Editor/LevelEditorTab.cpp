@@ -137,7 +137,6 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { "Project Settings" } },
-        { "Package", { "Package Project" } },
         { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
@@ -185,4 +184,8 @@ void LevelEditorTab::LoadLayoutFromDialog() {
 void LevelEditorTab::TogglePanelVisible(const std::string& name) {
     bool current = dockArea.IsPanelVisible(name);
     dockArea.SetPanelVisible(name, !current);
+}
+
+void LevelEditorTab::SetPackageCallback(std::function<void()> callback) {
+    if (viewportPanel) viewportPanel->SetPackageCallback(callback);
 }
