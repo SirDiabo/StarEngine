@@ -47,9 +47,10 @@ void ImportDetailsPanel::SaveToAsset() {
     asset.SaveToFile(assetPath);
 }
 
-void ImportDetailsPanel::Open(const std::string& path, const std::string& type) {
+void ImportDetailsPanel::Open(const std::string& path, const std::string& type, bool inlinePanelMode) {
     assetPath = path;
     assetType = type;
+    inlinePanel = inlinePanelMode;
     activeField = 0;
     materialPicker.Close();
     materialSlotPickerIndex = -1;
@@ -59,12 +60,18 @@ void ImportDetailsPanel::Open(const std::string& path, const std::string& type) 
 
 void ImportDetailsPanel::Close() {
     open = false;
+    inlinePanel = false;
     materialPicker.Close();
     materialSlotPickerIndex = -1;
 }
 
+void ImportDetailsPanel::ApplyAndClose() {
+    SaveToAsset();
+    Close();
+}
+
 void ImportDetailsPanel::Render() {
-    if (!open) return;
+    if (!open || inlinePanel) return;
 
     bool isMesh = (assetType == "StaticMesh");
     float boxWidth = 340;
@@ -78,12 +85,43 @@ void ImportDetailsPanel::Render() {
     DrawRectangleRec(box, {40, 40, 46, 255});
     DrawRectangleLinesEx(box, 1, {80, 80, 90, 255});
 
+    RenderBody(box, boxWidth, true);
+
+    Rectangle importBtn = {box.x + boxWidth - 154, box.y + boxHeight - 28, 70, 22};
+    Rectangle skipBtn = {box.x + boxWidth - 80, box.y + boxHeight - 28, 70, 22};
+    Vector2 mp = GetMousePosition();
+    bool pickerBlocksInput = materialPicker.ContainsPoint(mp);
+    if (GuiButton(importBtn, "Import") && !pickerBlocksInput) {
+        SaveToAsset();
+        Close();
+    }
+    if (GuiButton(skipBtn, "Skip") && !pickerBlocksInput) {
+        Close();
+    }
+}
+
+void ImportDetailsPanel::RenderInline(Rectangle area) {
+    if (!open || !inlinePanel) return;
+
+    DrawRectangleRec(area, {38, 38, 42, 255});
+    DrawRectangleLinesEx(area, 1, {65, 65, 70, 255});
+
+    DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, {200, 210, 230, 255});
+    Rectangle inner = {area.x, area.y + 24, area.width, area.height - 24};
+
+    RenderBody(inner, inner.width, false);
+    if (activeField != 0 || materialPicker.IsOpen()) SaveToAsset();
+}
+
+void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
     std::string title = "Import Options - " + fs::path(assetPath).stem().string();
-    DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, {200, 210, 230, 255});
+    if (modal) DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, {200, 210, 230, 255});
 
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialPicker.ContainsPoint(mp);
-    float y = box.y + 30;
+    float y = box.y + (modal ? 30 : 8);
+
+    bool isMesh = (assetType == "StaticMesh");
 
     auto vec3Row = [&](const char* label, char bufs[3][32], int firstFieldId) {
         DrawText(label, (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
@@ -130,15 +168,5 @@ void ImportDetailsPanel::Render() {
     } else {
         DrawText("No import options for this asset type yet.", (int)box.x + 10, (int)y, 11, {150, 150, 160, 255});
         y += 24;
-    }
-
-    Rectangle importBtn = {box.x + boxWidth - 154, box.y + boxHeight - 28, 70, 22};
-    Rectangle skipBtn = {box.x + boxWidth - 80, box.y + boxHeight - 28, 70, 22};
-    if (GuiButton(importBtn, "Import") && !pickerBlocksInput) {
-        SaveToAsset();
-        Close();
-    }
-    if (GuiButton(skipBtn, "Skip") && !pickerBlocksInput) {
-        Close();
     }
 }

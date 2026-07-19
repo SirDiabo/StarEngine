@@ -10,6 +10,7 @@ public:
 
     Model* GetOrLoadModel(const std::string& sourceMeshPath);
     Texture2D* GetOrLoadTexture(const std::string& textureAssetPath);
+    void ReloadModel(const std::string& sourceMeshPath);
     void Clear();
 
     static void ApplyMaterialSlots(Model* model, const std::vector<std::string>& materialPaths);

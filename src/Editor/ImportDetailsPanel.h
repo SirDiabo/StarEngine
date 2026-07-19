@@ -9,17 +9,21 @@ class ImportDetailsPanel {
 public:
     static ImportDetailsPanel& Get();
 
-    void Open(const std::string& assetPath, const std::string& assetType);
+    void Open(const std::string& assetPath, const std::string& assetType, bool inlinePanel = false);
     void Close();
     bool IsOpen() const { return open; }
 
     void Render();
+    void RenderInline(Rectangle area);
+    void ApplyAndClose();
 
 private:
     void LoadFromAsset();
     void SaveToAsset();
+    void RenderBody(Rectangle box, float boxWidth, bool modal);
 
     bool open = false;
+    bool inlinePanel = false;
     std::string assetPath;
     std::string assetType;
 

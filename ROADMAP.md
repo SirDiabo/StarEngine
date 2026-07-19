@@ -716,13 +716,13 @@ o CI build caching
 Double-clicking a StaticMesh asset opens a dedicated tab: viewport with the mesh,
 import details panel on the right, and Reimport button in the top bar.
 
-o Extract reusable ViewportPanel pieces (orbit/pan camera, model/texture cache) for
-  shared use between level and preview viewports
-o New AssetPreviewTab (EditorTab subclass)
-o Wire double-click on .starasset to open in AssetPreviewTab
-o Center panel: single-mesh viewport using extracted camera/model code
-o Right panel: reuse existing ImportDetailsPanel
-o Top bar: Reimport button re-cooks from stored SourcePath without file browser
+x Extract reusable ViewportPanel pieces (orbit/pan camera, model/texture cache) for
+  shared use between level and preview viewports (AssetPreviewViewport)
+x New AssetPreviewTab (EditorTab subclass)
+x Wire double-click on .starasset to open in AssetPreviewTab
+x Center panel: single-mesh viewport using extracted camera/model code
+x Right panel: reuse existing ImportDetailsPanel
+x Top bar: Reimport button re-cooks from stored SourcePath without file browser
 o Extend the same pattern to Texture, Material, Sound, and other asset types
 
 ---

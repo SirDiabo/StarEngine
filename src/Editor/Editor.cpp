@@ -2,6 +2,7 @@
 #include "EditorTab.h"
 #include "LevelEditorTab.h"
 #include "StargraphEditorTab.h"
+#include "AssetPreviewTab.h"
 #include "ProjectSettingsTab.h"
 #include "PackageTab.h"
 #include "MenuBar.h"
@@ -190,7 +191,25 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
 }
 
 void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& extension) {
-    if (extension == ".staractor" || extension == ".stargraph") {
+    if (extension == ".starasset") {
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            auto* previewTab = dynamic_cast<AssetPreviewTab*>(editorTabs[i].get());
+            if (previewTab && previewTab->GetAssetPath() == fullPath) {
+                editorTabs[activeEditorTab]->OnDeactivated();
+                activeEditorTab = i;
+                editorTabs[activeEditorTab]->OnActivated();
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                return;
+            }
+        }
+        auto* previewTab = new AssetPreviewTab(fullPath);
+        previewTab->Initialize();
+        editorTabs.emplace_back(previewTab);
+        editorTabs[activeEditorTab]->OnDeactivated();
+        activeEditorTab = (int)editorTabs.size() - 1;
+        editorTabs[activeEditorTab]->OnActivated();
+        editorTabs[activeEditorTab]->BuildMenus(menuBar);
+    } else if (extension == ".staractor" || extension == ".stargraph") {
         // Check if already open.
         for (int i = 0; i < (int)editorTabs.size(); i++) {
             auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[i].get());

@@ -62,6 +62,13 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
     }
 }
 
+void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
+    auto it = meshCache.find(sourceMeshPath);
+    if (it == meshCache.end()) return;
+    UnloadModel(it->second);
+    meshCache.erase(it);
+}
+
 void AssetCache::Clear() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
     meshCache.clear();
