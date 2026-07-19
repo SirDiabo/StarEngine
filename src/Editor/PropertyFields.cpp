@@ -8,6 +8,8 @@
 
 namespace PropertyField {
 
+static int g_activeField = 0;
+
 static DragState g_drag;
 
 static float ApplyDrag(float currentVal, float startVal) {
@@ -25,10 +27,17 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
                          const Style& style, const std::function<void()>& onActivate) {
     Vector2 mp = GetMousePosition();
 
-    if (activeField == fieldId) {
+    bool isActive = (activeField == fieldId) && (g_activeField == 0 || g_activeField == fieldId) && allowActivate;
+    if (activeField == fieldId && !isActive) {
+        activeField = 0;
+        if (g_activeField == fieldId) g_activeField = 0;
+    }
+
+    if (isActive) {
         GuiTextBox(r, buf, (int)bufSize, true);
         if (IsKeyPressed(KEY_ENTER) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, r))) {
             activeField = 0;
+            if (g_activeField == fieldId) g_activeField = 0;
             return true;
         }
         return false;
@@ -39,6 +48,8 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
     bool clicked = allowActivate && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r);
     if (clicked) {
         if (onActivate) onActivate();
+        activeField = fieldId;
+        g_activeField = fieldId;
     }
     DrawRectangleRec(r, style.box);
     DrawRectangleLinesEx(r, 1, style.border);
@@ -47,7 +58,6 @@ static bool TextBoxCore(Rectangle r, char* buf, size_t bufSize, int fieldId, int
     } else {
         DrawText(display, (int)r.x + 4, (int)r.y + 3, 11, style.text);
     }
-    if (clicked) activeField = fieldId;
     return false;
 }
 

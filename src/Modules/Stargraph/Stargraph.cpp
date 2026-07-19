@@ -93,15 +93,9 @@ Pin* Stargraph::FindPin(int pinId) {
 }
 
 Node* Stargraph::FindNodeByPinId(int pinId) {
-    for (Node& node : nodes) {
-        for (const Pin& pin : node.inputs) {
-            if (pin.id == pinId) return &node;
-        }
-        for (const Pin& pin : node.outputs) {
-            if (pin.id == pinId) return &node;
-        }
-    }
-    return nullptr;
+    if (!nodesByTypeCacheBuilt) BuildCaches();
+    auto it = pinToNodeCache.find(pinId);
+    return it != pinToNodeCache.end() ? it->second : nullptr;
 }
 
 Node* Stargraph::FindNodeByType(const std::string& type) {
@@ -125,19 +119,27 @@ Node* Stargraph::FindCustomEventByName(const std::string& eventName) {
 }
 
 const std::vector<Node*>& Stargraph::GetNodesOfType(const std::string& type) {
-    if (!nodesByTypeCacheBuilt) {
-        nodesByTypeCache.clear();
-        for (Node& node : nodes) nodesByTypeCache[node.type].push_back(&node);
-        nodesByTypeCacheBuilt = true;
-    }
+    if (!nodesByTypeCacheBuilt) BuildCaches();
     static const std::vector<Node*> empty;
     auto it = nodesByTypeCache.find(type);
     return it != nodesByTypeCache.end() ? it->second : empty;
 }
 
+void Stargraph::BuildCaches() {
+    nodesByTypeCache.clear();
+    pinToNodeCache.clear();
+    for (Node& node : nodes) {
+        nodesByTypeCache[node.type].push_back(&node);
+        for (const Pin& pin : node.inputs) pinToNodeCache[pin.id] = &node;
+        for (const Pin& pin : node.outputs) pinToNodeCache[pin.id] = &node;
+    }
+    nodesByTypeCacheBuilt = true;
+}
+
 void Stargraph::InvalidateNodeTypeCache() {
     nodesByTypeCacheBuilt = false;
     nodesByTypeCache.clear();
+    pinToNodeCache.clear();
 }
 
 Pin* Stargraph::AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type) {

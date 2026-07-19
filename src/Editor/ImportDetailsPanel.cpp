@@ -109,8 +109,13 @@ void ImportDetailsPanel::RenderInline(Rectangle area) {
     DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, {200, 210, 230, 255});
     Rectangle inner = {area.x, area.y + 24, area.width, area.height - 24};
 
+    int prevActiveField = activeField;
     RenderBody(inner, inner.width, false);
-    if (activeField != 0 || materialPicker.IsOpen()) SaveToAsset();
+
+    if ((prevActiveField != 0 && activeField == 0) || pendingSave) {
+        SaveToAsset();
+        pendingSave = false;
+    }
 }
 
 void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
@@ -161,8 +166,10 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
             }
             std::string pickedMat;
             if (materialPicker.Render(pickedMat)) {
-                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size())
+                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size()) {
                     materialSlots[materialSlotPickerIndex].materialPath = pickedMat;
+                    pendingSave = true;
+                }
             }
         }
     } else {

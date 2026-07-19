@@ -749,16 +749,16 @@ x World::EndPlay re-entrancy (World.cpp:89). Now snapshots the current actor set
 
 ### 17.2 High Priority Bugs
 
-o RemoveComponent leaves a dangling rootComponent (Actor.cpp:162). Null rootComponent when the removed component is the root.
-o AssetCache mutates the shared cached Model::transform (SceneRenderer.cpp:23, AssetPreviewViewport.cpp:165). Store per-draw transform locally; copy the model instead of editing the cache. ReloadModel must invalidate any long-lived Model* references.
-o Per-frame StarAsset::LoadFromFile in DrawMeshComponent and AssetPreviewViewport (SceneRenderer.cpp:14, AssetPreviewViewport.cpp:148). Cache the resolved Model* and materials on the component; re-resolve only on path/slot change.
-o ImportDetailsPanel::RenderInline saves the asset every frame (ImportDetailsPanel.cpp:113). Save only on commit, picker selection, or tab close.
-o Global raygui text-edit state shared across all panels (PropertyFields.cpp:23). One active textbox keeps raylib's edit mode alive and blocks input elsewhere. Track a single editor-wide active field and clear others on focus change.
-o Unvalidated std::stoi/std::stof on untrusted files throws and aborts load (StarMap.cpp:86/96/101, StarAsset.cpp:59, Project.cpp:88). Parse with from_chars/try-catch, default and clamp counts.
-o Unsynchronized statics touched from backend threads (NetIdRegistry, lastSyncedValue, GenerateObjectId). Guard with a mutex / std::atomic.
-o WorldSpawner reuses nextNetId from 1 on each SpawnMapActors call (WorldSpawner.cpp:90). Use a persistent counter so re-spawns do not overwrite existing registry entries.
-o GraphExecutor wildcard type resolution is O(nodes x pins x links) every frame (GraphExecutor.cpp:222, Nodes_Math). Cache resolved wildcard types, invalidate only on graph mutation.
-o FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Build a pinId -> (node, pin) map at load/mutation like the existing type cache.
+x RemoveComponent leaves a dangling rootComponent (Actor.cpp:162). Now nulls rootComponent when the removed component is the root.
+/ AssetCache mutates the shared cached Model::transform (SceneRenderer.cpp:23, AssetPreviewViewport.cpp:165). Now saves and restores the cached model's transform around each draw instead of leaving it mutated for the rest of the frame. ReloadModel still removes the cache entry; callers that kept a long-lived Model* should re-resolve (tracked separately).
+x Per-frame StarAsset::LoadFromFile in DrawMeshComponent (SceneRenderer.cpp:14). MeshComponent now caches the resolved Model* and only re-resolves when meshPath changes, so the per-frame .starasset parse is gone. AssetPreviewViewport still re-reads the asset each frame for live import-edits (intended).
+x ImportDetailsPanel::RenderInline saves the asset every frame (ImportDetailsPanel.cpp:113). Now saves only on field commit or material-picker selection, not while merely focused.
+x Global raygui text-edit state shared across all panels (PropertyFields.cpp:23). TextBoxCore now tracks a single editor-wide active field and releases any other panel's stale active field, so focusing one field no longer leaves another stuck in edit mode.
+x Unvalidated std::stoi/std::stof on untrusted files throws and aborts load (StarMap.cpp, StarAsset.cpp, Project.cpp). Replaced with SafeParse::ToInt/ToFloat (std::from_chars + default on failure).
+x Unsynchronized statics touched from backend threads (NetIdRegistry, lastSyncedValue, GenerateObjectId, NetworkBackendRegistry::active). NetIdRegistry and lastSyncedValue are now mutex-guarded, GenerateObjectId uses std::atomic, and the active backend is a std::atomic.
+x WorldSpawner reuses nextNetId from 1 on each SpawnMapActors call (WorldSpawner.cpp:90). Net ids now come from a persistent World allocator reset only on BeginPlay, so re-spawns never reuse a live actor's id.
+/ GraphExecutor wildcard type resolution is O(nodes x pins x links) every frame (GraphExecutor.cpp:222, Nodes_Math). Not yet cached; resolveWildcardPins still rescans links/nodes per call. FindNodeByPinId is now O(1) via a pinId->node map (see below), which removes the dominant lookup cost on the exec chain.
+x FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Now O(1) via a pinId -> node map built with the existing type cache and invalidated on graph mutation.
 
 ### 17.3 Medium Priority Bugs
 

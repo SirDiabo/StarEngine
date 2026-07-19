@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include "SafeParse.h"
 #include <unordered_map>
 #include <random>
 
@@ -85,8 +86,8 @@ bool Project::Load(const std::string& path) {
         if (!value.empty() && value.back() == '\r') value.pop_back();
 
         if (key == "name") settings.name = value;
-        else if (key == "targetWidth") settings.targetWidth = std::stoi(value);
-        else if (key == "targetHeight") settings.targetHeight = std::stoi(value);
+        else if (key == "targetWidth") settings.targetWidth = SafeParse::ToInt(value);
+        else if (key == "targetHeight") settings.targetHeight = SafeParse::ToInt(value);
         else if (key == "defaultMap") settings.defaultMapPath = value;
         else if (key == "renderer") settings.renderer = GameRendererFromName(value);
         else if (key == "saveEncryptionKey") settings.saveEncryptionKey = value;

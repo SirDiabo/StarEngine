@@ -1,6 +1,8 @@
 #include "MeshComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Core/StarAsset.h"
+#include "Runtime/AssetCache.h"
 #include <cstdlib>
 #include "Runtime/PointerUtil.h"
 
@@ -72,15 +74,34 @@ void MeshComponent::Update(float deltaTime) {
 }
 
 void MeshComponent::SetMeshPath(const std::string& path) {
+    if (meshPath == path) return;
     meshPath = path;
+    InvalidateCachedModel();
 }
 
 void MeshComponent::SetMaterialPaths(const std::vector<std::string>& paths) {
     materialPaths = paths;
+    InvalidateCachedModel();
 }
 
 void MeshComponent::SetMaterialPath(int slotIndex, const std::string& path) {
     if (slotIndex < 0) return;
     if ((size_t)slotIndex >= materialPaths.size()) materialPaths.resize(slotIndex + 1);
     materialPaths[slotIndex] = path;
+    InvalidateCachedModel();
+}
+
+Model* MeshComponent::GetCachedModel() {
+    if (meshPath == cachedModelPath && cachedModel) return cachedModel;
+
+    cachedModel = nullptr;
+    cachedModelPath.clear();
+    if (meshPath.empty()) return nullptr;
+
+    StarAsset asset;
+    if (StarAsset::LoadFromFile(meshPath, asset) && asset.assetType == "StaticMesh") {
+        cachedModel = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
+        cachedModelPath = meshPath;
+    }
+    return cachedModel;
 }

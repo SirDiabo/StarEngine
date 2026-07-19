@@ -45,9 +45,14 @@ void World::SetInputFocus(Actor* actor) {
     }
 }
 
+uint32_t World::AllocateNetId() {
+    return nextNetId++;
+}
+
 void World::BeginPlay() {
     playing = true;
     ReplicationManager::Reset();
+    ResetNetIds();
     for (size_t i = 0; i < actors.size(); i++) {
         actors[i]->BeginPlay();
     }

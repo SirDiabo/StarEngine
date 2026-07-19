@@ -6,9 +6,9 @@ NetworkBackendRegistry& NetworkBackendRegistry::Get() {
 }
 
 void NetworkBackendRegistry::Register(NetworkBackend* backend) {
-    active = backend;
+    active.store(backend);
 }
 
 void NetworkBackendRegistry::Unregister(NetworkBackend* backend) {
-    if (active == backend) active = nullptr;
+    if (active.load() == backend) active.store(nullptr);
 }

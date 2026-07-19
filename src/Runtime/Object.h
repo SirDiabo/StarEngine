@@ -1,5 +1,6 @@
 #pragma once
 #include "Property.h"
+#include <atomic>
 #include <string>
 
 class Object {
@@ -22,7 +23,7 @@ protected:
 private:
     unsigned int objectId = GenerateObjectId();
     static unsigned int GenerateObjectId() {
-        static unsigned int nextId = 1;
-        return nextId++;
+        static std::atomic<unsigned int> nextId{1};
+        return nextId.fetch_add(1);
     }
 };

@@ -4,10 +4,16 @@
 #include "raymath.h"
 #include <algorithm>
 #include <unordered_map>
+#include <mutex>
 
 static std::unordered_map<uint32_t, Actor*>& NetIdRegistry() {
     static std::unordered_map<uint32_t, Actor*> registry;
     return registry;
+}
+
+static std::mutex& NetIdRegistryMutex() {
+    static std::mutex m;
+    return m;
 }
 
 Actor::Actor() {
@@ -18,18 +24,23 @@ Actor::Actor() {
 }
 
 Actor::~Actor() {
-    if (netId != 0) NetIdRegistry().erase(netId);
+    if (netId != 0) {
+        std::lock_guard<std::mutex> lock(NetIdRegistryMutex());
+        NetIdRegistry().erase(netId);
+    }
     delete graphBehavior;
     for (Component* c : components) delete c;
 }
 
 void Actor::SetNetId(uint32_t id) {
+    std::lock_guard<std::mutex> lock(NetIdRegistryMutex());
     if (netId != 0) NetIdRegistry().erase(netId);
     netId = id;
     if (netId != 0) NetIdRegistry()[netId] = this;
 }
 
 Actor* Actor::FindByNetId(uint32_t id) {
+    std::lock_guard<std::mutex> lock(NetIdRegistryMutex());
     auto it = NetIdRegistry().find(id);
     return it != NetIdRegistry().end() ? it->second : nullptr;
 }
@@ -162,6 +173,7 @@ void Actor::AddComponent(Component* component) {
 void Actor::RemoveComponent(Component* component) {
     auto it = std::find(components.begin(), components.end(), component);
     if (it != components.end()) {
+        if (rootComponent == component) rootComponent = nullptr;
         if (meshComponent == component) meshComponent = nullptr;
         if (collisionComponent == component) collisionComponent = nullptr;
         if (audioComponent == component) audioComponent = nullptr;

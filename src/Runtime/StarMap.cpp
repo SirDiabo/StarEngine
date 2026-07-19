@@ -1,5 +1,6 @@
 #include "StarMap.h"
 #include "Core/CookedFile.h"
+#include "Core/SafeParse.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -83,7 +84,7 @@ bool StarMap::LoadFromFile(const std::string& path) {
     for (const Section& section : sections) {
         if (section.name == "StarMap") {
             if (const std::string* v = Find(section, "Name")) mapName = *v;
-            if (const std::string* v = Find(section, "Version")) formatVersion = std::stoi(*v);
+            if (const std::string* v = Find(section, "Version")) formatVersion = SafeParse::ToInt(*v);
         } else if (section.name != "Instances" && section.name.rfind("Instance", 0) == 0) {
             ActorInstance inst;
             if (const std::string* v = Find(section, "Name"))   inst.name  = *v;
@@ -91,22 +92,22 @@ bool StarMap::LoadFromFile(const std::string& path) {
             if (const std::string* v = Find(section, "Graph"))  inst.graphAssetPath = *v;
             if (const std::string* v = Find(section, "Mesh"))   inst.meshAssetPath = *v;
             if (const std::string* v = Find(section, "MaterialCount")) {
-                int count = std::stoi(*v);
+                int count = SafeParse::ToInt(*v);
                 if (count > 0) inst.materialAssetPaths.resize((size_t)count);
                 for (int m = 0; m < count; m++) {
                     if (const std::string* mv = Find(section, "Material" + std::to_string(m)))
                         inst.materialAssetPaths[m] = *mv;
                 }
             }
-            if (const std::string* v = Find(section, "PosX"))   inst.posX   = std::stof(*v);
-            if (const std::string* v = Find(section, "PosY"))   inst.posY   = std::stof(*v);
-            if (const std::string* v = Find(section, "PosZ"))   inst.posZ   = std::stof(*v);
-            if (const std::string* v = Find(section, "RotX"))   inst.rotX   = std::stof(*v);
-            if (const std::string* v = Find(section, "RotY"))   inst.rotY   = std::stof(*v);
-            if (const std::string* v = Find(section, "RotZ"))   inst.rotZ   = std::stof(*v);
-            if (const std::string* v = Find(section, "ScaleX")) inst.scaleX = std::stof(*v);
-            if (const std::string* v = Find(section, "ScaleY")) inst.scaleY = std::stof(*v);
-            if (const std::string* v = Find(section, "ScaleZ")) inst.scaleZ = std::stof(*v);
+            if (const std::string* v = Find(section, "PosX"))   inst.posX   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "PosY"))   inst.posY   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "PosZ"))   inst.posZ   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "RotX"))   inst.rotX   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "RotY"))   inst.rotY   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "RotZ"))   inst.rotZ   = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "ScaleX")) inst.scaleX = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "ScaleY")) inst.scaleY = SafeParse::ToFloat(*v);
+            if (const std::string* v = Find(section, "ScaleZ")) inst.scaleZ = SafeParse::ToFloat(*v);
             instances.push_back(inst);
         }
     }

@@ -15,6 +15,13 @@ public:
     void SetMeshPath(const std::string& path);
     void SetMaterialPaths(const std::vector<std::string>& paths);
     void SetMaterialPath(int slotIndex, const std::string& path);
+
+    Model* GetCachedModel();
+    void InvalidateCachedModel() { cachedModel = nullptr; cachedModelPath.clear(); }
+
+private:
+    std::string cachedModelPath;
+    Model* cachedModel = nullptr;
 };
 
 void RegisterMeshComponentNodes();

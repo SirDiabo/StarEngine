@@ -3,27 +3,23 @@
 #include "Actor.h"
 #include "Components/MeshComponent.h"
 #include "AssetCache.h"
-#include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "raylib.h"
 #include "raymath.h"
 
 static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, Vector3 rot, Vector3 scale) {
-    Model* model = nullptr;
-    if (!mc->meshPath.empty()) {
-        StarAsset asset;
-        if (StarAsset::LoadFromFile(mc->meshPath, asset) && asset.assetType == "StaticMesh") {
-            model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
-        }
-    }
+    Model* model = mc->GetCachedModel();
     if (!model) return;
 
     Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
     Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
-    model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
+    Matrix localTransform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
+    Matrix savedTransform = model->transform;
+    model->transform = localTransform;
     AssetCache::ApplyMaterialSlots(model, mc->materialPaths);
     DrawModel(*model, pos, 1.0f, WHITE);
+    model->transform = savedTransform;
 }
 
 void SceneRenderer::DrawWorldActors(bool showPlaceholders) {

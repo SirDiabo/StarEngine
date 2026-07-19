@@ -31,6 +31,8 @@ private:
     char rotBuf[3][32] = {};
     char scaleBuf[3][32] = {};
     int activeField = 0;
+    int lastActiveField = 0;
+    bool pendingSave = false;
 
     std::vector<MaterialSlot> materialSlots;
     int materialSlotPickerIndex = -1;

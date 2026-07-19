@@ -87,9 +87,8 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
 }
 
 void WorldSpawner::SpawnMapActors(const StarMap& map) {
-    uint32_t nextNetId = 1;
     for (const ActorInstance& inst : map.GetInstances()) {
         Actor* actor = SpawnActorFromInstance(inst);
-        actor->SetNetId(nextNetId++);
+        actor->SetNetId(World::Get().AllocateNetId());
     }
 }

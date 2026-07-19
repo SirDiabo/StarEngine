@@ -251,8 +251,10 @@ private:
     int nextNodeId = 1;
 
     std::unordered_map<std::string, std::vector<Node*>> nodesByTypeCache;
+    std::unordered_map<int, Node*> pinToNodeCache;
     bool nodesByTypeCacheBuilt = false;
     void InvalidateNodeTypeCache();
+    void BuildCaches();
 };
 
 std::string PinTypeToString(PinType type);

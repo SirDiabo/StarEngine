@@ -1,6 +1,7 @@
 #include "StarAsset.h"
 #include "CookedFile.h"
 #include <cstdlib>
+#include "Core/SafeParse.h"
 #include <filesystem>
 #include <fstream>
 
@@ -56,16 +57,16 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
         if (key == "Type") outAsset.assetType = value;
         else if (key == "Source") outAsset.sourcePath = value;
         else if (key == "VendoredSource") outAsset.vendoredSourcePath = value;
-        else if (key == "PosX") outAsset.importPosX = std::stof(value);
-        else if (key == "PosY") outAsset.importPosY = std::stof(value);
-        else if (key == "PosZ") outAsset.importPosZ = std::stof(value);
-        else if (key == "RotX") outAsset.importRotX = std::stof(value);
-        else if (key == "RotY") outAsset.importRotY = std::stof(value);
-        else if (key == "RotZ") outAsset.importRotZ = std::stof(value);
-        else if (key == "ScaleX") outAsset.importScaleX = std::stof(value);
-        else if (key == "ScaleY") outAsset.importScaleY = std::stof(value);
-        else if (key == "ScaleZ") outAsset.importScaleZ = std::stof(value);
-        else if (key == "MaterialSlotCount") materialSlotCount = std::atoi(value.c_str());
+        else if (key == "PosX") outAsset.importPosX = SafeParse::ToFloat(value);
+        else if (key == "PosY") outAsset.importPosY = SafeParse::ToFloat(value);
+        else if (key == "PosZ") outAsset.importPosZ = SafeParse::ToFloat(value);
+        else if (key == "RotX") outAsset.importRotX = SafeParse::ToFloat(value);
+        else if (key == "RotY") outAsset.importRotY = SafeParse::ToFloat(value);
+        else if (key == "RotZ") outAsset.importRotZ = SafeParse::ToFloat(value);
+        else if (key == "ScaleX") outAsset.importScaleX = SafeParse::ToFloat(value);
+        else if (key == "ScaleY") outAsset.importScaleY = SafeParse::ToFloat(value);
+        else if (key == "ScaleZ") outAsset.importScaleZ = SafeParse::ToFloat(value);
+        else if (key == "MaterialSlotCount") materialSlotCount = SafeParse::ToInt(value);
         else if (key.rfind("MaterialSlot", 0) == 0) {
             size_t nameEnd = key.find_first_not_of("0123456789", 12);
             if (nameEnd == std::string::npos) continue;

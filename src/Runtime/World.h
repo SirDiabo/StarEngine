@@ -26,12 +26,16 @@ public:
     Actor* GetInputFocus() const { return inputFocus; }
     void SetInputFocus(Actor* actor);
 
+    uint32_t AllocateNetId();
+    void ResetNetIds() { nextNetId = 1; }
+
 private:
     std::vector<std::unique_ptr<Actor>> actors;
     std::vector<Actor*> pendingDestroy;
     bool playing = false;
     Actor* viewTarget = nullptr;
     Actor* inputFocus = nullptr;
+    uint32_t nextNetId = 1;
 
     void FlushDestroyQueue();
 };

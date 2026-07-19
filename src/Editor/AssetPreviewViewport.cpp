@@ -162,11 +162,13 @@ void AssetPreviewViewport::RenderScene() {
     if (model) {
         Matrix scaleMatrix = MatrixScale(scl.x, scl.y, scl.z);
         Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+        Matrix savedTransform = model->transform;
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
         AssetCache::ApplyMaterialSlots(model, matPaths);
         DrawModel(*model, pos, 1.0f, WHITE);
         DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 120});
+        model->transform = savedTransform;
     } else {
         Color fallback = {200, 160, 80, 255};
         DrawCube(pos, scl.x, scl.y, scl.z, fallback);

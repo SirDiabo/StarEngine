@@ -4,10 +4,12 @@
 #include "Runtime/World.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include <mutex>
 
 namespace {
 
 std::unordered_map<std::string, std::string> lastSyncedValue;
+std::mutex lastSyncedValueMutex;
 
 std::string SnapshotKey(uint32_t netId, const std::string& varName) {
     return std::to_string(netId) + ":" + varName;
@@ -16,6 +18,7 @@ std::string SnapshotKey(uint32_t netId, const std::string& varName) {
 } // namespace
 
 void ReplicationManager::Reset() {
+    std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
     lastSyncedValue.clear();
 }
 
@@ -41,7 +44,10 @@ void ReplicationManager::PreTick() {
             if (isHost && var.replication == ReplicationMode::ServerOnly) break;
 
             var.value = update.value;
-            lastSyncedValue[SnapshotKey(update.netId, update.variableName)] = update.value;
+            {
+                std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
+                lastSyncedValue[SnapshotKey(update.netId, update.variableName)] = update.value;
+            }
 
             if (isHost && var.replication == ReplicationMode::Replicated) {
                 backend->SendPropertyUpdate(update, true);
@@ -87,10 +93,15 @@ void ReplicationManager::PostTick() {
             if (var.replication == ReplicationMode::ServerOnly && !hasAuthority) continue;
 
             std::string key = SnapshotKey(actor->GetNetId(), var.name);
-            auto it = lastSyncedValue.find(key);
-            if (it != lastSyncedValue.end() && it->second == var.value) continue;
-
-            lastSyncedValue[key] = var.value;
+            bool changed = false;
+            {
+                std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
+                auto it = lastSyncedValue.find(key);
+                if (it != lastSyncedValue.end() && it->second == var.value) continue;
+                lastSyncedValue[key] = var.value;
+                changed = true;
+            }
+            if (!changed) continue;
 
             ReplicatedPropertyUpdate update;
             update.netId = actor->GetNetId();

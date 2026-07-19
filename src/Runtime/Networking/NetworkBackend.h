@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -58,12 +59,12 @@ public:
 
     void Register(NetworkBackend* backend);
     void Unregister(NetworkBackend* backend);
-    NetworkBackend* GetActive() const { return active; }
+    NetworkBackend* GetActive() const { return active.load(); }
 
     // No backend registered means singleplayer
-    bool HasAuthority() const { return !active || active->HasAuthority(); }
-    bool IsHost() const { return !active || active->IsHost(); }
+    bool HasAuthority() const { NetworkBackend* b = active.load(); return !b || b->HasAuthority(); }
+    bool IsHost() const { NetworkBackend* b = active.load(); return !b || b->IsHost(); }
 
 private:
-    NetworkBackend* active = nullptr;
+    std::atomic<NetworkBackend*> active{ nullptr };
 };
