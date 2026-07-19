@@ -5,6 +5,8 @@
 #include <sstream>
 
 Node* Stargraph::CreateNode(const std::string& type) {
+    InvalidateNodeTypeCache();
+
     nodes.emplace_back();
     Node* node = &nodes.back();
     node->id = std::to_string(nextNodeId++);
@@ -103,10 +105,8 @@ Node* Stargraph::FindNodeByPinId(int pinId) {
 }
 
 Node* Stargraph::FindNodeByType(const std::string& type) {
-    for (Node& node : nodes) {
-        if (node.type == type) return &node;
-    }
-    return nullptr;
+    const std::vector<Node*>& typed = GetNodesOfType(type);
+    return typed.empty() ? nullptr : typed[0];
 }
 
 Node* Stargraph::FindNodeById(int id) {
@@ -118,10 +118,26 @@ Node* Stargraph::FindNodeById(int id) {
 }
 
 Node* Stargraph::FindCustomEventByName(const std::string& eventName) {
-    for (Node& node : nodes) {
-        if (node.type == "Custom_Event" && node.title == eventName) return &node;
+    for (Node* node : GetNodesOfType("Custom_Event")) {
+        if (node->title == eventName) return node;
     }
     return nullptr;
+}
+
+const std::vector<Node*>& Stargraph::GetNodesOfType(const std::string& type) {
+    if (!nodesByTypeCacheBuilt) {
+        nodesByTypeCache.clear();
+        for (Node& node : nodes) nodesByTypeCache[node.type].push_back(&node);
+        nodesByTypeCacheBuilt = true;
+    }
+    static const std::vector<Node*> empty;
+    auto it = nodesByTypeCache.find(type);
+    return it != nodesByTypeCache.end() ? it->second : empty;
+}
+
+void Stargraph::InvalidateNodeTypeCache() {
+    nodesByTypeCacheBuilt = false;
+    nodesByTypeCache.clear();
 }
 
 Pin* Stargraph::AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type) {
@@ -170,6 +186,7 @@ bool Stargraph::RemoveNode(int nodeId) {
             for (const Pin& pin : it->inputs) RemoveLink(pin.id);
             for (const Pin& pin : it->outputs) RemoveLink(pin.id);
             nodes.erase(it);
+            InvalidateNodeTypeCache();
             return true;
         }
     }
@@ -411,6 +428,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
     if (!in.is_open()) return false;
 
     nodes.clear();
+    InvalidateNodeTypeCache();
     links.clear();
     variables.clear();
     components.clear();

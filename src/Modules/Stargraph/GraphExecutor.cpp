@@ -170,20 +170,14 @@ static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx)
 }
 
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
-    Node* current = graph.FindNodeByType(eventType);
-    if (!current) {
-        if (eventType == "Event_Tick") {
-            std::deque<Node>& nodes = const_cast<std::deque<Node>&>(graph.GetNodes());
-            for (Node& node : nodes) {
-                const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-                if (!tmpl) continue;
-                if (node.type == "Input_Key") {
-                    ProcessInputKey(node, graph, ctx);
-                }
-            }
+    if (eventType == "Event_Tick") {
+        for (Node* node : graph.GetNodesOfType("Input_Key")) {
+            ProcessInputKey(*node, graph, ctx);
         }
-        return;
     }
+
+    Node* current = graph.FindNodeByType(eventType);
+    if (!current) return;
 
     if (eventType == "Event_Tick") {
         for (Pin& p : current->outputs) {
@@ -191,14 +185,6 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%f", ctx.deltaTime);
                 p.defaultValue = buf;
-            }
-        }
-        std::deque<Node>& nodes = const_cast<std::deque<Node>&>(graph.GetNodes());
-        for (Node& node : nodes) {
-            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-            if (!tmpl) continue;
-            if (node.type == "Input_Key") {
-                ProcessInputKey(node, graph, ctx);
             }
         }
     }

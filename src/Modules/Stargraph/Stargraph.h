@@ -224,6 +224,9 @@ public:
     Node* FindNodeById(int id);
     bool RemoveNode(int nodeId);
 
+    // Nodes tagged by type, built once and reused until a node is created or removed
+    const std::vector<Node*>& GetNodesOfType(const std::string& type);
+
     // Custom Event stuff
     Pin* AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type);
     void RemoveDynamicPin(Node& node, bool isOutput, const std::string& pinName);
@@ -246,6 +249,10 @@ private:
     std::vector<ComponentDecl> components;
     int nextPinId = 1;
     int nextNodeId = 1;
+
+    std::unordered_map<std::string, std::vector<Node*>> nodesByTypeCache;
+    bool nodesByTypeCacheBuilt = false;
+    void InvalidateNodeTypeCache();
 };
 
 std::string PinTypeToString(PinType type);

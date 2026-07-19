@@ -502,7 +502,7 @@ o Add "Timer by Function Name" that fires custom events and functions. Inputs: "
 o More Timer nodes like "Pause Timer by Function Name", "Resume Timer by Function Name","Clear Timer by Function Name"
 
 ### 7.23 Timer by Event
-o Set Timer by Event binds an actual event delegate instead of a function name string, so it can carry parameters, unlike Timer by Function Name (7.22) with only lists parameterless custom events
+o Set Timer by Event binds an actual event delegate instead of a function name string, so it can carry parameters, unlike Timer by Function Name (7.22) which only lists parameterless custom events
 
 ---
 
@@ -516,6 +516,7 @@ x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
 x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
 x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-id-keyed static map, so separate actor instances of the same class no longer share state
+x Stargraph caches nodes tagged by type, built once and invalidated on CreateNode/RemoveNode; FindNodeByType, FindCustomEventByName, and the Event_Tick Input_Key scan all read from it instead of walking every node
 o Wildcard type resolution at runtime
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
 o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds
