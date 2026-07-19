@@ -14,6 +14,19 @@
 #include <filesystem>
 #include <sstream>
 
+static bool IsTimerFunctionNameNode(const std::string& type) {
+    return type == "Timer_By_Function_Name" || type == "Pause_Timer_By_Function_Name" ||
+           type == "Resume_Timer_By_Function_Name" || type == "Clear_Timer_By_Function_Name";
+}
+
+static std::vector<std::string> GetParameterlessCustomEventNames(Stargraph& graph) {
+    std::vector<std::string> names;
+    for (Node* node : graph.GetNodesOfType("Custom_Event")) {
+        if (node->outputs.size() == 1) names.push_back(node->title);
+    }
+    return names;
+}
+
 const float StargraphEditorPanel::nodeWidth      = 190.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
 const float StargraphEditorPanel::pinRadius      = 5.0f;
@@ -2142,12 +2155,31 @@ void StargraphEditorPanel::RenderGraph() {
                             listeningForKeyPinId = 0;
                         }
                     }
+                } else if (pin.name == "Function Name" && IsTimerFunctionNameNode(node.type)) {
+                    if (!keyPickerOpen || keyPickerPinId != pin.id) {
+                        DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                        DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                        DrawText(pin.defaultValue.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                    }
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect)) {
+                        keyPickerKind = PinPickerKind::FunctionName;
+                        keyPickerPinId = pin.id;
+                        keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
+                        keyPickerWidth = fieldRect.width;
+                        snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
+                        keyPickerScroll = 0;
+                        keyPickerJustOpened = true;
+                        keyPickerOpen = true;
+                        editingPinId = 0;
+                        listeningForKeyPinId = 0;
+                    }
                 } else {
                     bool allowActivate = (linkFromPin == -1);
                     const char* targetPlaceholder = nullptr;
                     if (pin.name == "Target" && pin.defaultValue.empty()) {
                         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-                        if (tmpl && tmpl->category == "Actor") targetPlaceholder = "self";
+                        if (tmpl && (tmpl->category == "Actor" || tmpl->category == "Timers")) targetPlaceholder = "self";
                     }
                     if (PropertyField::StringBox(fieldRect, editBuffer, sizeof(editBuffer), pin.id, editingPinId,
                                                   pin.defaultValue, allowActivate, targetPlaceholder,
@@ -2745,7 +2777,8 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     }
     if (!targetPin) { keyPickerOpen = false; keyPickerPinId = 0; return; }
 
-    std::vector<std::string> allKeys = GetInputKeyNames();
+    std::vector<std::string> allKeys = (keyPickerKind == PinPickerKind::FunctionName)
+        ? GetParameterlessCustomEventNames(graph) : GetInputKeyNames();
 
     std::vector<int> filtered;
     std::string searchLower = keyPickerSearch;

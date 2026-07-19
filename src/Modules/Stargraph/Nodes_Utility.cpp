@@ -4,6 +4,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Runtime/PrintMessageLog.h"
 #include "raylib.h"
 #include <cstdlib>
 #include <cmath>
@@ -59,16 +60,19 @@ void RegisterUtilityNodes() {
     printString.category = "Utility";
     printString.moduleName = "Stargraph";
     printString.createPins = [](Node* node) {
-        node->inputs.push_back({"In",   PinType::Exec,   true,  false});
-        node->inputs.push_back({"Text", PinType::String, true,  false, 0, "Hello"});
+        node->inputs.push_back({"In",       PinType::Exec,   true,  false});
+        node->inputs.push_back({"Text",     PinType::String, true,  false, 0, "Hello"});
+        node->inputs.push_back({"Duration", PinType::Float,  true,  false, 0, "2.0"});
         node->outputs.push_back({"Out", PinType::Exec,   false, true});
     };
     printString.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string text = "Hello";
+        float duration = 2.0f;
         for (const Pin& pin : node.inputs) {
-            if (pin.name == "Text") { text = pin.defaultValue; break; }
+            if (pin.name == "Text") text = pin.defaultValue;
+            else if (pin.name == "Duration" && !pin.defaultValue.empty()) duration = pin.defaultValue.AsFloat();
         }
-        TraceLog(LOG_INFO, "Print_String: %s", text.c_str());
+        PrintMessageLog::Get().Add(PrintMessageType::Info, text, duration);
     };
     NodeRegistry::Get().RegisterNode(printString);
 
@@ -77,16 +81,19 @@ void RegisterUtilityNodes() {
     printWarning.category = "Utility";
     printWarning.moduleName = "Stargraph";
     printWarning.createPins = [](Node* node) {
-        node->inputs.push_back({"In",   PinType::Exec,   true,  false});
-        node->inputs.push_back({"Text", PinType::String, true,  false, 0, "Warning"});
+        node->inputs.push_back({"In",       PinType::Exec,   true,  false});
+        node->inputs.push_back({"Text",     PinType::String, true,  false, 0, "Warning"});
+        node->inputs.push_back({"Duration", PinType::Float,  true,  false, 0, "2.0"});
         node->outputs.push_back({"Out", PinType::Exec,   false, true});
     };
     printWarning.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string text = "Warning";
+        float duration = 2.0f;
         for (const Pin& pin : node.inputs) {
-            if (pin.name == "Text") { text = pin.defaultValue; break; }
+            if (pin.name == "Text") text = pin.defaultValue;
+            else if (pin.name == "Duration" && !pin.defaultValue.empty()) duration = pin.defaultValue.AsFloat();
         }
-        TraceLog(LOG_WARNING, "Print_Warning: %s", text.c_str());
+        PrintMessageLog::Get().Add(PrintMessageType::Warning, text, duration);
     };
     NodeRegistry::Get().RegisterNode(printWarning);
 
@@ -95,16 +102,19 @@ void RegisterUtilityNodes() {
     printError.category = "Utility";
     printError.moduleName = "Stargraph";
     printError.createPins = [](Node* node) {
-        node->inputs.push_back({"In",   PinType::Exec,   true,  false});
-        node->inputs.push_back({"Text", PinType::String, true,  false, 0, "Error"});
+        node->inputs.push_back({"In",       PinType::Exec,   true,  false});
+        node->inputs.push_back({"Text",     PinType::String, true,  false, 0, "Error"});
+        node->inputs.push_back({"Duration", PinType::Float,  true,  false, 0, "2.0"});
         node->outputs.push_back({"Out", PinType::Exec,   false, true});
     };
     printError.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string text = "Error";
+        float duration = 2.0f;
         for (const Pin& pin : node.inputs) {
-            if (pin.name == "Text") { text = pin.defaultValue; break; }
+            if (pin.name == "Text") text = pin.defaultValue;
+            else if (pin.name == "Duration" && !pin.defaultValue.empty()) duration = pin.defaultValue.AsFloat();
         }
-        TraceLog(LOG_ERROR, "Print_Error: %s", text.c_str());
+        PrintMessageLog::Get().Add(PrintMessageType::Error, text, duration);
     };
     NodeRegistry::Get().RegisterNode(printError);
 

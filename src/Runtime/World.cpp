@@ -3,6 +3,7 @@
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
 #include "Modules/Stargraph/TimerManager.h"
+#include "PrintMessageLog.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -57,13 +58,14 @@ void World::Tick(float deltaTime) {
 
     ReplicationManager::PreTick();
 
+    TimerManager::Get().Tick(deltaTime);
+    PrintMessageLog::Get().Tick(deltaTime);
+
     for (size_t i = 0; i < actors.size(); i++) {
         actors[i]->Tick(deltaTime);
     }
 
     ReplicationManager::PostTick();
-
-    TimerManager::Get().Tick(deltaTime);
 
     AudioCore::Get().TickMusicStreams();
 
@@ -94,6 +96,7 @@ void World::EndPlay() {
     viewTarget = nullptr;
     ShowCursor();
     AudioCore::Get().StopAndClearMusic();
+    PrintMessageLog::Get().Clear();
 }
 
 void World::FlushDestroyQueue() {

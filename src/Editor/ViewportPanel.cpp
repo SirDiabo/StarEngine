@@ -5,6 +5,7 @@
 #include "Runtime/AssetCache.h"
 #include "Runtime/SceneRenderer.h"
 #include "Runtime/WorldSpawner.h"
+#include "Runtime/PrintMessageLog.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
@@ -429,6 +430,10 @@ void ViewportPanel::RenderScene() {
     }
 
     EndMode3D();
+
+    if (playing) {
+        PrintMessageLog::Get().Draw();
+    }
 }
 
 void ViewportPanel::HandleMapInteraction(Rectangle client) {
@@ -510,7 +515,6 @@ void ViewportPanel::RenderToolbar() {
             if (flying) { flying = false; ShowCursor(); }
             WorldSpawner::SpawnMapActors(starMap);
             World::Get().BeginPlay();
-            if (logPanel) playLogStart = logPanel->GetTotalLogCount();
             }
         btnRight -= 26;
         }
@@ -552,26 +556,6 @@ void ViewportPanel::RenderToolbar() {
     }
 }
 
-void ViewportPanel::RenderPlayLogOverlay(Rectangle client) {
-    if (!logPanel) return;
-    std::vector<LogEntry> entries = logPanel->GetLogsSince(playLogStart);
-    if (entries.empty()) return;
-
-    const int maxLines = 8;
-    int start = (int)entries.size() > maxLines ? (int)entries.size() - maxLines : 0;
-
-    float x = client.x + 8;
-    float y = client.y + 6;
-    for (int i = start; i < (int)entries.size(); i++) {
-        const LogEntry& e = entries[i];
-        Color color = { 210, 210, 210, 230 };
-        if (e.level == LogLevel::Warning) color = { 240, 200, 60, 230 };
-        else if (e.level == LogLevel::Error) color = { 230, 80, 80, 230 };
-        DrawText(e.message.c_str(), (int)x, (int)y, 11, color);
-        y += 14;
-    }
-}
-
 void ViewportPanel::Render() {
     Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
@@ -596,7 +580,6 @@ void ViewportPanel::Render() {
 
     if (playing) {
         DrawRectangleLinesEx(bounds, 3, {60, 180, 60, 255});
-        RenderPlayLogOverlay(client);
     }
     RenderToolbar();
 

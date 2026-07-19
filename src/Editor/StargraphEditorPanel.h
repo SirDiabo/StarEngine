@@ -112,6 +112,8 @@ private:
     char keyPickerSearch[64] = "";
     float keyPickerScroll = 0;
     bool keyPickerJustOpened = false;
+    enum class PinPickerKind { Key, FunctionName };
+    PinPickerKind keyPickerKind = PinPickerKind::Key;
 
     static const float nodeWidth;
     static const float pinHeight;

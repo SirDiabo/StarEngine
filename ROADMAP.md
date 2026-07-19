@@ -496,13 +496,13 @@ x Draw_Circle_3D - Debug sphere visualization
 
 ### 7.22 Async Timer Nodes
 x Add timer system and latent actions
-o Add input "Duration" float to Print nodes and remove the viewport print list limit, allowing them to stack and autoremove themselves using a lifespan
+x Add input "Duration" float to Print nodes
 x Add Delay Node with input exec and "Duration" float and out exec that fires after that timer passed
 x Retriggerable_Delay, a Delay that restarts its countdown when retriggered instead of blocking
 x Stackable_Delay, a Delay where each retrigger runs independently instead of blocking or restarting
 x Delay_Until_Next_Frame, a Delay with no Duration input that always waits exactly one tick
-o Add "Timer by Function Name" that fires custom events and functions. Inputs: "Function Name" string, "Rate" float, "Loop" bool and "Limit to Frame Rate" bool
-o More Timer nodes like "Pause Timer by Function Name", "Resume Timer by Function Name","Clear Timer by Function Name"
+x Add "Timer by Function Name" that fires custom events and functions.
+x Pause_Timer_By_Function_Name, Resume_Timer_By_Function_Name, Clear_Timer_By_Function_Name
 
 ### 7.23 Timer by Event
 o Set Timer by Event binds an actual event delegate instead of a function name string, so it can carry parameters, unlike Timer by Function Name (7.22) which only lists parameterless custom events

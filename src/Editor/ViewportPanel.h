@@ -36,7 +36,6 @@ private:
     void UpdateCamera(Rectangle client);
     void RenderScene();
     void RenderToolbar();
-    void RenderPlayLogOverlay(Rectangle client);
     void HandleMapInteraction(Rectangle client);
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
@@ -57,7 +56,6 @@ private:
 
     bool playing = false;
     LogPanel* logPanel = nullptr;
-    int playLogStart = 0;
 
     bool flying = false;
     bool orbiting = false;
