@@ -2548,6 +2548,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& t : templates) {
         if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
+        if (t.type == "Call_Custom_Event") continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = t.type;

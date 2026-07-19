@@ -355,7 +355,7 @@ x Gamepad Inputs (Facebutton Up/Down/Left/Right, L/R Stick X/Y, Shoulder L/R, Tr
 
 o Functions with inputs and outputs. Have their own graph with input and return node. (user-named, callable from other graphs)
 x Custom Event nodes (Functionally, same as functions but without their own graph and without return node)
-/ Call Custom Event node is exposed in the Add Node menu; only the named custom events it calls should be user-facing
+x Created Custom Events exposed in the Add Node menu
 
 ### 7.2 Flow Control
 x Branch, For_Loop, While_Loop, Sequence, Do_Once, Gate, Flip_Flop, Has_Authority walk their body through the shared exec-chain walker, so chains longer than one node continue and data pins propagate (8)
