@@ -714,7 +714,7 @@ o CI build caching
 
 ## 15. Asset Preview Tab
 Double-clicking a StaticMesh asset opens a dedicated tab: viewport with the mesh,
-import details panel on the right, and Reimport button in the top bar. Not started.
+import details panel on the right, and Reimport button in the top bar.
 
 o Extract reusable ViewportPanel pieces (orbit/pan camera, model/texture cache) for
   shared use between level and preview viewports
@@ -728,5 +728,8 @@ o Extend the same pattern to Texture, Material, Sound, and other asset types
 ---
 
 ## 16. Log Panel
-o Logs saved to a log file on disk (Project/Saved/{date-time.log})
-o Log panel text is selectable and copyable
+x Log Panel in Level Tab
+x Log Panel in Stargraph Editor Tab
+o Add Clear button to both Log Panels
+o Make Log panel text is selectable and copyable
+o Logs saved to a log file on disk (Project/Saved/Logs/{YYYY-MM-DD-hh-mm-ss}.log)
