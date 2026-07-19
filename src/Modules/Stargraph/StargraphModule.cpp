@@ -18,6 +18,7 @@
 #include "Nodes_Save.h"
 #include "Nodes_Utility.h"
 #include "Nodes_Audio.h"
+#include "Nodes_Timers.h"
 
 StargraphModule::StargraphModule() {
     name = "Stargraph";
@@ -33,6 +34,7 @@ bool StargraphModule::Initialize() {
     RegisterSaveNodes();
     RegisterUtilityNodes();
     RegisterAudioNodes();
+    RegisterTimerNodes();
 
     RegisterCameraComponentNodes();
     RegisterMeshComponentNodes();

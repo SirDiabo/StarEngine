@@ -22,3 +22,4 @@ void RegisterComponentNodes();
 void RegisterVariableNodes();
 void RegisterSaveNodes();
 void RegisterUtilityNodes();
+void RegisterTimerNodes();
