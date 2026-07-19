@@ -1,8 +1,13 @@
 #include "StargraphBehavior.h"
 #include "GraphExecutor.h"
+#include "TimerManager.h"
 #include <utility>
 
 StargraphBehavior::StargraphBehavior(Stargraph graph) : graph(std::move(graph)) {
+}
+
+StargraphBehavior::~StargraphBehavior() {
+    TimerManager::Get().ClearAllTimersForOwner(this);
 }
 
 void StargraphBehavior::OnBeginPlay(Actor* owner) {

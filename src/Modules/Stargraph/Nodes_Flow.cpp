@@ -3,17 +3,6 @@
 #include "GraphExecutor.h"
 #include "Runtime/Networking/NetworkBackend.h"
 
-static void RunFromPin(Node& node, Stargraph& graph, ExecutionContext& ctx, const char* pinName) {
-    for (const Pin& p : node.outputs) {
-        if (p.name != pinName) continue;
-        for (const Link& lk : graph.GetLinks()) {
-            if (lk.outputPinId == p.id) {
-                GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(lk.inputPinId), ctx);
-            }
-        }
-    }
-}
-
 void RegisterFlowNodes() {
     NodeTemplate branch;
     branch.type = "Branch";
@@ -30,7 +19,7 @@ void RegisterFlowNodes() {
         for (const Pin& p : node.inputs) {
             if (p.name == "Condition") condition = (p.defaultValue == "true" || p.defaultValue == "1");
         }
-        RunFromPin(node, graph, ctx, condition ? "True" : "False");
+        GraphExecutor::RunFromPin(graph, &node, ctx, condition ? "True" : "False");
     };
     NodeRegistry::Get().RegisterNode(branch);
 
@@ -45,7 +34,7 @@ void RegisterFlowNodes() {
     };
     hasAuthority.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         bool authority = NetworkBackendRegistry::Get().HasAuthority();
-        RunFromPin(node, graph, ctx, authority ? "Authority" : "Remote");
+        GraphExecutor::RunFromPin(graph, &node, ctx, authority ? "Authority" : "Remote");
     };
     NodeRegistry::Get().RegisterNode(hasAuthority);
 
@@ -70,9 +59,9 @@ void RegisterFlowNodes() {
         for (int i = first; i <= last; i++) {
             char buf[64]; snprintf(buf, sizeof(buf), "%d", i);
             for (Pin& p : node.outputs) if (p.name == "Index") p.defaultValue = buf;
-            RunFromPin(node, graph, ctx, "Loop Body");
+            GraphExecutor::RunFromPin(graph, &node, ctx, "Loop Body");
         }
-        RunFromPin(node, graph, ctx, "Completed");
+        GraphExecutor::RunFromPin(graph, &node, ctx, "Completed");
     };
     NodeRegistry::Get().RegisterNode(forLoop);
 
@@ -95,10 +84,10 @@ void RegisterFlowNodes() {
                 if (p.name == "Condition") { condition = (p.defaultValue == "true" || p.defaultValue == "1"); break; }
             }
             if (!condition) break;
-            RunFromPin(node, graph, ctx, "Loop Body");
+            GraphExecutor::RunFromPin(graph, &node, ctx, "Loop Body");
             if (--loopLimit <= 0) break;
         }
-        RunFromPin(node, graph, ctx, "Completed");
+        GraphExecutor::RunFromPin(graph, &node, ctx, "Completed");
     };
     NodeRegistry::Get().RegisterNode(whileLoop);
 
@@ -141,7 +130,7 @@ void RegisterFlowNodes() {
         }
 
         if (!node.flowState) {
-            RunFromPin(node, graph, ctx, "Out");
+            GraphExecutor::RunFromPin(graph, &node, ctx, "Out");
             node.flowState = true;
         }
     };
@@ -164,7 +153,7 @@ void RegisterFlowNodes() {
         }
 
         if (node.flowState) {
-            RunFromPin(node, graph, ctx, "Out");
+            GraphExecutor::RunFromPin(graph, &node, ctx, "Out");
         }
     };
     NodeRegistry::Get().RegisterNode(gate);
@@ -181,7 +170,7 @@ void RegisterFlowNodes() {
     flipFlop.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         node.flowState = !node.flowState;
 
-        RunFromPin(node, graph, ctx, node.flowState ? "True" : "False");
+        GraphExecutor::RunFromPin(graph, &node, ctx, node.flowState ? "True" : "False");
     };
     NodeRegistry::Get().RegisterNode(flipFlop);
 }

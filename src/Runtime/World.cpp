@@ -2,6 +2,7 @@
 #include "Actor.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
+#include "Modules/Stargraph/TimerManager.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -61,6 +62,8 @@ void World::Tick(float deltaTime) {
     }
 
     ReplicationManager::PostTick();
+
+    TimerManager::Get().Tick(deltaTime);
 
     AudioCore::Get().TickMusicStreams();
 

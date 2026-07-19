@@ -110,6 +110,17 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
     }
 }
 
+void GraphExecutor::RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName) {
+    for (const Pin& pin : node->outputs) {
+        if (pin.name != pinName) continue;
+        for (const Link& link : graph.GetLinks()) {
+            if (link.outputPinId == pin.id) {
+                ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx);
+            }
+        }
+    }
+}
+
 static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx) {
     if (ctx.actor != World::Get().GetInputFocus()) return;
 

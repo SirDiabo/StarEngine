@@ -495,7 +495,7 @@ x Draw_Cube - Debug cube visualization
 x Draw_Circle_3D - Debug sphere visualization
 
 ### 7.22 Async Timer Nodes
-o Add timer system and latent actions
+x Add timer system and latent actions
 o Add input "Duration" float to Print nodes and remove the viewport print list limit, allowing them to stack and autoremove themselves using a lifespan
 o Add Delay Node with input exec and "Duration" float and out exec that fires after that timer passed
 o Add "Timer by Function Name" that fires custom events and functions. Inputs: "Function Name" string, "Rate" float, "Loop" bool and "Limit to Frame Rate" bool
@@ -517,6 +517,7 @@ x Variable snapshot/restore around play so runtime writes don't persist to file
 x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
 x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-id-keyed static map, so separate actor instances of the same class no longer share state
 x Stargraph caches nodes tagged by type, built once and invalidated on CreateNode/RemoveNode; FindNodeByType, FindCustomEventByName, and the Event_Tick Input_Key scan all read from it instead of walking every node
+x RunFromPin (follow a named output exec pin and run what's linked) is a public GraphExecutor method shared by flow control nodes and the timer system
 o Wildcard type resolution at runtime
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
 o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds

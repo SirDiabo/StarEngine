@@ -5,6 +5,7 @@
 class StargraphBehavior : public GraphBehavior {
 public:
     explicit StargraphBehavior(Stargraph graph);
+    ~StargraphBehavior() override;
 
     void OnBeginPlay(Actor* owner) override;
     void OnTick(Actor* owner, float deltaTime) override;
