@@ -95,7 +95,11 @@ void RegisterMathNodes() {
                         case '+': r = Vector3Add(aVec, bVec); break;
                         case '-': r = Vector3Subtract(aVec, bVec); break;
                         case '*': r = Vector3Multiply(aVec, bVec); break;
-                        case '/': r = Vector3Divide(aVec, bVec); break;
+                        case '/':
+                            r.x = bVec.x != 0.0f ? aVec.x / bVec.x : 0.0f;
+                            r.y = bVec.y != 0.0f ? aVec.y / bVec.y : 0.0f;
+                            r.z = bVec.z != 0.0f ? aVec.z / bVec.z : 0.0f;
+                            break;
                     }
                 }
                 char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", r.x, r.y, r.z);

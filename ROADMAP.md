@@ -762,7 +762,7 @@ x FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Now O(1) via a
 
 ### 17.3 Medium Priority Bugs
 
-o Vec3Divide has no zero guard (Nodes_Math.cpp:98). Match the scalar != 0 guards to avoid NaN propagation.
+x Vec3Divide has no zero guard (Nodes_Math.cpp:98). Match the scalar != 0 guards to avoid NaN propagation.
 o Get_Variable / Set_Variable hard-typed to Float (Nodes_Variables.cpp). Make the pin a Wildcard resolved from the variable type so non-float variables are not coerced.
 o RunCustomEvent uses a global static recursion depth (GraphExecutor.cpp). Thread depth per execution so one actor's chain does not suppress another's.
 o TimerManager fires timers whose owner/actor may be destroyed (TimerManager.cpp:134). Validate liveness before firing and make timer cleanup mandatory on actor destroy.
