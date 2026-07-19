@@ -522,8 +522,9 @@ x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-i
 x Stargraph caches nodes tagged by type, built once and invalidated on CreateNode/RemoveNode; FindNodeByType, FindCustomEventByName, and the Event_Tick Input_Key scan all read from it instead of walking every node
 x RunFromPin (follow a named output exec pin and run what's linked) is a public GraphExecutor method shared by flow control nodes and the timer system
 o Wildcard type resolution at runtime
+
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
-o Nativization stays off during PIE so graphs stay live-editable while playing; it only applies to packaged builds
+o Nativization stays off during PIE so graphs stay live-editable while playing; Nativization only applies to packaged builds
 o Bytecode compilation as a lower-risk option if profiling shows Stargraph is an actual bottleneck
 
 ---
