@@ -6,6 +6,7 @@
 #include "Core/AssetTypeRegistry.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
+#include "Core/SafeProcess.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
@@ -171,12 +172,14 @@ void Application::RequestRelaunch() {
 
 void Application::Relaunch() {
     fs::path exeDir = GetApplicationDirectory();
+    std::string exeName = "StarEngine";
 #ifdef _WIN32
-    fs::path exePath = exeDir / "StarEngine.exe";
-    std::string cmd = "start \"\" \"" + exePath.string() + "\" \"" + projectPath + "\"";
-#else
-    fs::path exePath = exeDir / "StarEngine";
-    std::string cmd = "\"" + exePath.string() + "\" \"" + projectPath + "\" &";
+    exeName = "StarEngine.exe";
 #endif
-    system(cmd.c_str());
+
+    std::vector<std::string> argv = { (exeDir / exeName).string() };
+    if (!projectPath.empty()) argv.push_back(projectPath);
+
+    std::string log;
+    SafeProcess::Run(argv, log);
 }

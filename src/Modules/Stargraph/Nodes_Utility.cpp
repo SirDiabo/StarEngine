@@ -10,6 +10,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include "Runtime/PointerUtil.h"
 
 static std::string Utf8Encode(int codepoint) {
     std::string out;
@@ -1049,7 +1050,7 @@ void RegisterUtilityNodes() {
     unloadTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         for (const Pin& p : node.inputs) {
             if (p.name == "Texture" && !p.defaultValue.empty()) {
-                Texture2D* tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                Texture2D* tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
                 if (tex) {
                     UnloadTexture(*tex);
                     delete tex;
@@ -1073,7 +1074,7 @@ void RegisterUtilityNodes() {
         Texture2D* tex = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Texture" && !p.defaultValue.empty()) {
-                tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
             }
         }
         int w = tex ? tex->width : 0;
@@ -1101,7 +1102,7 @@ void RegisterUtilityNodes() {
         Vector3 pos = {0, 0, 0};
         Color tint = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
             if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
             if (p.name == "Tint") {
                 float r = 1, g = 1, b = 1;
@@ -1135,7 +1136,7 @@ void RegisterUtilityNodes() {
         float rot = 0.0f;
         Color tint = WHITE;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Texture" && !p.defaultValue.empty()) tex = (Texture2D*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
             if (p.name == "SourcePosition") ReadVec3(p, srcPos.x, srcPos.y, srcPos.z);
             if (p.name == "SourceSize") ReadVec3(p, srcSize.x, srcSize.y, srcSize.z);
             if (p.name == "DestPosition") ReadVec3(p, dstPos.x, dstPos.y, dstPos.z);

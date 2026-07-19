@@ -2,6 +2,7 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 void RegisterMeshComponentNodes() {
     NodeTemplate setStaticMesh;
@@ -21,7 +22,7 @@ void RegisterMeshComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Static Mesh") path = p.defaultValue;
         }
@@ -49,7 +50,7 @@ void RegisterMeshComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Material") path = p.defaultValue;
         }

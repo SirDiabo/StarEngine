@@ -8,6 +8,7 @@
 #include "raylib.h"
 #include <cmath>
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 void RegisterEventNodes() {
     NodeTemplate beginPlay;
@@ -158,7 +159,7 @@ void RegisterEventNodes() {
         std::vector<std::pair<std::string, std::string>> params;
         for (const Pin& p : node.inputs) {
             if (p.name == "Event Name") eventName = p.defaultValue;
-            else if (p.name == "Target" && !p.defaultValue.empty()) target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            else if (p.name == "Target" && !p.defaultValue.empty()) target = StarPointer::FromHex<Actor>(p.defaultValue);
             else if (p.name != "In") params.emplace_back(p.name, p.defaultValue);
         }
         if (eventName.empty() || !target) return;

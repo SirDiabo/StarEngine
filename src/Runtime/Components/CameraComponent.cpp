@@ -5,6 +5,7 @@
 #include "Runtime/World.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "Runtime/PointerUtil.h"
 
 void RegisterCameraComponentNodes() {
     NodeTemplate setCameraFov;
@@ -24,7 +25,7 @@ void RegisterCameraComponentNodes() {
         float fov = 50.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "FOV" && !p.defaultValue.empty()) fov = p.defaultValue.AsFloat();
         }
@@ -50,7 +51,7 @@ void RegisterCameraComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;
@@ -79,7 +80,7 @@ void RegisterCameraComponentNodes() {
         bool ortho = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Orthographic") ortho = (p.defaultValue == "true" || p.defaultValue == "1");
         }
@@ -105,7 +106,7 @@ void RegisterCameraComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;
@@ -128,7 +129,7 @@ void RegisterCameraComponentNodes() {
         Actor* targetActor = World::Get().GetViewTarget();
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
             }
         }
         if (!targetActor) {
@@ -192,7 +193,7 @@ void RegisterCameraComponentNodes() {
         Actor* targetActor = World::Get().GetViewTarget();
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
             }
         }
         if (!targetActor) {
@@ -217,7 +218,7 @@ void RegisterCameraComponentNodes() {
         Actor* targetActor = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
             }
         }
         if (!targetActor) return;

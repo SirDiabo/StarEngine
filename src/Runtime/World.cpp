@@ -87,9 +87,13 @@ void World::Tick(float deltaTime) {
 }
 
 void World::EndPlay() {
-    for (size_t i = 0; i < actors.size(); i++) {
-        actors[i]->EndPlay();
-        DestroyActor(actors[i].get());
+    std::vector<Actor*> current;
+    current.reserve(actors.size());
+    for (const auto& a : actors) current.push_back(a.get());
+
+    for (Actor* actor : current) {
+        actor->EndPlay();
+        DestroyActor(actor);
     }
     FlushDestroyQueue();
     playing = false;

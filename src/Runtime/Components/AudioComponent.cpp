@@ -2,6 +2,7 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 void RegisterAudioComponentNodes() {
     NodeTemplate setSoundPath;
@@ -21,7 +22,7 @@ void RegisterAudioComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Sound Path") path = p.defaultValue;
         }
@@ -49,7 +50,7 @@ void RegisterAudioComponentNodes() {
         float volume = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Volume" && !p.defaultValue.empty()) volume = p.defaultValue.AsFloat();
         }
@@ -77,7 +78,7 @@ void RegisterAudioComponentNodes() {
         bool looping = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Looping") looping = (p.defaultValue == "true" || p.defaultValue == "1");
         }

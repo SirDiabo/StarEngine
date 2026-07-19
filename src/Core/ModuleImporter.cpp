@@ -1,5 +1,6 @@
 #include "ModuleImporter.h"
 #include "ModuleManifest.h"
+#include "SafeProcess.h"
 #include <cstdio>
 #include <filesystem>
 #include <sstream>
@@ -7,29 +8,14 @@
 namespace fs = std::filesystem;
 
 static bool RunCommand(const std::string& cmd, std::string& outOutput) {
-    std::string fullCmd = cmd + " 2>&1";
-    FILE* pipe = nullptr;
-#ifdef _WIN32
-    pipe = _popen(fullCmd.c_str(), "r");
-#else
-    pipe = popen(fullCmd.c_str(), "r");
-#endif
-    if (!pipe) {
-        outOutput = "Failed to start process";
-        return false;
-    }
+    return SafeProcess::Run(SafeProcess::TokenizeCommand(cmd), outOutput) == 0;
+}
 
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        outOutput += buffer;
-    }
-
-#ifdef _WIN32
-    int exitCode = _pclose(pipe);
-#else
-    int exitCode = pclose(pipe);
-#endif
-    return exitCode == 0;
+static bool IsValidRepoId(const std::string& ownerRepo) {
+    size_t slash = ownerRepo.find('/');
+    if (slash == std::string::npos || slash == 0 || slash == ownerRepo.size() - 1) return false;
+    if (ownerRepo.find('/', slash + 1) != std::string::npos) return false;
+    return SafeProcess::IsShellSafe(ownerRepo);
 }
 
 std::string ModuleImporter::GetCatalogUrl() {
@@ -38,8 +24,8 @@ std::string ModuleImporter::GetCatalogUrl() {
 
 bool ModuleImporter::FetchCatalog(std::vector<CatalogEntry>& outEntries, std::string& outError) {
     std::string output;
-    std::string cmd = "curl -fsSL \"" + GetCatalogUrl() + "\"";
-    if (!RunCommand(cmd, output)) {
+    std::vector<std::string> argv = {"curl", "-fsSL", GetCatalogUrl()};
+    if (SafeProcess::Run(argv, output) != 0) {
         outError = "Could not reach the module catalog. Check your connection.";
         return false;
     }
@@ -86,14 +72,13 @@ bool ModuleImporter::FetchCatalog(std::vector<CatalogEntry>& outEntries, std::st
 }
 
 bool ModuleImporter::CloneFromRepository(const std::string& ownerRepo,
-                                          const std::string& projectModulesDir,
-                                          std::string& outError) {
-    size_t slash = ownerRepo.find('/');
-    if (slash == std::string::npos || slash == 0 || slash == ownerRepo.size() - 1) {
-        outError = "Expected a repository in \"owner/repo\" form.";
+                                           const std::string& projectModulesDir,
+                                           std::string& outError) {
+    if (!IsValidRepoId(ownerRepo)) {
+        outError = "Expected a repository in \"owner/repo\" form (letters, digits, . _ - only).";
         return false;
     }
-    std::string repoName = ownerRepo.substr(slash + 1);
+    std::string repoName = ownerRepo.substr(ownerRepo.find('/') + 1);
 
     fs::path destDir = fs::path(projectModulesDir) / repoName;
     if (fs::exists(destDir)) {
@@ -106,8 +91,8 @@ bool ModuleImporter::CloneFromRepository(const std::string& ownerRepo,
 
     std::string url = "https://github.com/" + ownerRepo + ".git";
     std::string output;
-    std::string cmd = "git clone --depth 1 --recurse-submodules \"" + url + "\" \"" + destDir.string() + "\"";
-    if (!RunCommand(cmd, output)) {
+    std::vector<std::string> argv = {"git", "clone", "--depth", "1", "--recurse-submodules", url, destDir.string()};
+    if (SafeProcess::Run(argv, output) != 0) {
         outError = "Clone failed: " + output;
         fs::remove_all(destDir, ec);
         return false;

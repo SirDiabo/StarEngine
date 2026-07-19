@@ -740,12 +740,12 @@ o Logs saved to a log file on disk (Project/Saved/Logs/{YYYY-MM-DD-hh-mm-ss}.log
 
 ### 17.1 Critical Bugs
 
-o Command-injection via popen/system with unsanitized paths (PackageRunner, ModuleImporter, Application::Relaunch). Move to argv[]-based spawn and allowlist-validate names (^[A-Za-z0-9._/-]+$), reject embedded quotes.
-o StarPak footer bounds check is too weak (StarPak.cpp:132). Require pakOffset+pakSize == fileSize - sizeof(Footer) exactly instead of a loose overlap check.
-o (long)pos truncation in StarPak blob read (StarPak.cpp:107). Use data() + static_cast<ptrdiff_t>(pos) so files over 2GB / 32-bit builds read the right slice.
-o Path traversal in CookedFile sibling extraction (CookedFile.cpp:48). Reject any virtual path that is not lexically normal or does not share the expected parent before writing under the mirror dir.
-o Component Target pins round-trip raw pointers as %p and re-cast with strtoull (MeshComponent, Audio, Camera, Collision, Nodes_Events). Resolve targets via a stable id/NetId registry, not pointer hex, so destroyed actors/components do not dangle.
-o World::EndPlay re-entrancy (World.cpp:89). Spawning/destroying actors inside EndPlay mutates the actors list mid-loop. Stage new spawns in a separate list handled after the loop.
+x Command-injection via popen/system with unsanitized paths (PackageRunner, ModuleImporter, Application::Relaunch). Moved to argv[]-based spawn (new SafeProcess helper, no shell), and module repo ids are validated as "owner/repo" with only safe chars before use.
+x StarPak footer bounds check was too weak (StarPak.cpp:132). Now requires pakOffset+pakSize == fileSize - sizeof(Footer) exactly.
+x (long)pos truncation in StarPak blob read (StarPak.cpp:107). Now uses data() + static_cast<ptrdiff_t>(pos).
+x Path traversal in CookedFile sibling extraction (CookedFile.cpp:48). Extraction now rejects any entry that is not a direct child of the requested parent.
+/ Component Target pins round-trip raw pointers as %p and re-cast with strtoull (MeshComponent, Audio, Camera, Collision, Nodes_*). All 82 un-marshalling sites now go through StarPointer::FromHex, which rejects malformed/non-hex input so a stale or corrupted value can no longer be dereferenced as a live pointer. The full fix is a stable id/NetId registry for components (actors already have one) so references survive across play sessions; that remains to be done.
+x World::EndPlay re-entrancy (World.cpp:89). Now snapshots the current actor set and iterates that, so EndPlay spawning/destroying actors no longer mutates the list mid-loop. Also fixed AppendPakToExecutable leaving two stacked footers on re-packaging.
 
 ### 17.2 High Priority Bugs
 

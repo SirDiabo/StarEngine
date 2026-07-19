@@ -46,6 +46,8 @@ namespace {
 
             auto cipherImpl = CreateCookCipher(activeCipher);
             for (const std::string& sibling : activePak.SiblingsOf(virtualPath)) {
+                if (ParentOf(sibling) != parent) continue;
+
                 std::vector<uint8_t> bytes = activePak.ReadEntry(sibling);
                 cipherImpl->Transform(bytes, activeKey);
 

@@ -1,6 +1,7 @@
 #include "PackageRunner.h"
 #include "PackageCooker.h"
 #include "StarPak.h"
+#include "SafeProcess.h"
 #include "Runtime/PackagedGameConfig.h"
 #include <cstdio>
 #include <cstdlib>
@@ -32,28 +33,6 @@ std::string GetEngineRoot() {
 #endif
 }
 
-bool RunCommand(const std::string& cmd, std::string& log) {
-    FILE* pipe = nullptr;
-#ifdef _WIN32
-    pipe = _popen(cmd.c_str(), "r");
-#else
-    pipe = popen(cmd.c_str(), "r");
-#endif
-    if (!pipe) {
-        log += "Failed to start: " + cmd + "\n";
-        return false;
-    }
-
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe)) log += buffer;
-
-#ifdef _WIN32
-    int exitCode = _pclose(pipe);
-#else
-    int exitCode = pclose(pipe);
-#endif
-    return exitCode == 0;
-}
 
 std::string GenerateCipherKey() {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -148,27 +127,45 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
 
     bool isWeb = options.platform == PackagePlatform::Web;
 
-    std::string configureCmd = isWeb ? "emcmake cmake" : "cmake";
-    configureCmd += " -S \"" + engineRoot.string() + "\" -B \"" + buildDir.string() + "\"";
-    configureCmd += " -DSTARENGINE_BUILD_GAME=ON -DCMAKE_BUILD_TYPE=Release";
-    if (!toolchainFile.empty()) configureCmd += " -DCMAKE_TOOLCHAIN_FILE=\"" + toolchainFile + "\"";
-    if (isWeb) configureCmd += " -DPLATFORM=Web";
-    else if (options.renderer == GameRenderer::Software) configureCmd += " -DPLATFORM=RGFW -DOPENGL_VERSION=Software";
-    configureCmd += " 2>&1";
+    std::vector<std::string> configureArgs;
+    if (isWeb) configureArgs.push_back("emcmake");
+    configureArgs.push_back("cmake");
+    configureArgs.push_back("-S");
+    configureArgs.push_back(engineRoot.string());
+    configureArgs.push_back("-B");
+    configureArgs.push_back(buildDir.string());
+    configureArgs.push_back("-DSTARENGINE_BUILD_GAME=ON");
+    configureArgs.push_back("-DCMAKE_BUILD_TYPE=Release");
+    if (!toolchainFile.empty()) {
+        configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile);
+    }
+    if (isWeb) configureArgs.push_back("-DPLATFORM=Web");
+    else if (options.renderer == GameRenderer::Software) {
+        configureArgs.push_back("-DPLATFORM=RGFW");
+        configureArgs.push_back("-DOPENGL_VERSION=Software");
+    }
 
-    result.log += "== Configure ==\n" + configureCmd + "\n";
-    if (!RunCommand(configureCmd, result.log)) {
+    result.log += "== Configure ==\n";
+    for (const auto& a : configureArgs) result.log += a + " ";
+    result.log += "\n";
+    if (SafeProcess::Run(configureArgs, result.log) != 0) {
         result.error = "CMake configure failed. See log.";
         return result;
     }
 
     unsigned int jobs = std::thread::hardware_concurrency();
     if (jobs == 0) jobs = 2;
-    std::string buildCmd = (isWeb ? "emmake cmake" : "cmake");
-    buildCmd += " --build \"" + buildDir.string() + "\" -j" + std::to_string(jobs) + " 2>&1";
+    std::vector<std::string> buildArgs;
+    if (isWeb) buildArgs.push_back("emmake");
+    buildArgs.push_back("cmake");
+    buildArgs.push_back("--build");
+    buildArgs.push_back(buildDir.string());
+    buildArgs.push_back("-j" + std::to_string(jobs));
 
-    result.log += "\n== Build ==\n" + buildCmd + "\n";
-    if (!RunCommand(buildCmd, result.log)) {
+    result.log += "\n== Build ==\n";
+    for (const auto& a : buildArgs) result.log += a + " ";
+    result.log += "\n";
+    if (SafeProcess::Run(buildArgs, result.log) != 0) {
         result.error = "Build failed. See log.";
         return result;
     }

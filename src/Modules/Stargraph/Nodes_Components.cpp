@@ -5,6 +5,7 @@
 #include "Runtime/Components/MeshComponent.h"
 #include "raymath.h"
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 void RegisterComponentNodes() {
     NodeTemplate getComponent;
@@ -49,7 +50,7 @@ void RegisterComponentNodes() {
         Vector3 loc = {0, 0, 0};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Location") ReadVec3(p, loc.x, loc.y, loc.z);
         }
@@ -75,7 +76,7 @@ void RegisterComponentNodes() {
         Vector3 rot = {0, 0, 0};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Rotation") ReadVec3(p, rot.x, rot.y, rot.z);
         }
@@ -101,7 +102,7 @@ void RegisterComponentNodes() {
         Vector3 scl = {1, 1, 1};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
             if (p.name == "Scale") ReadVec3(p, scl.x, scl.y, scl.z);
         }
@@ -123,7 +124,7 @@ void RegisterComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;
@@ -146,7 +147,7 @@ void RegisterComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;
@@ -169,7 +170,7 @@ void RegisterComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;
@@ -193,7 +194,7 @@ void RegisterComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Component*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Component>(p.defaultValue);
             }
         }
         if (!target) return;

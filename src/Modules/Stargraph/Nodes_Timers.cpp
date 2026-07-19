@@ -4,6 +4,7 @@
 #include "TimerManager.h"
 #include "Runtime/Actor.h"
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 static StargraphBehavior* ResolveOwner(ExecutionContext& ctx) {
     if (!ctx.actor) return nullptr;
@@ -14,7 +15,7 @@ static Actor* ResolveTarget(Node& node, ExecutionContext& ctx) {
     Actor* target = ctx.actor;
     for (const Pin& p : node.inputs) {
         if (p.name == "Target" && !p.defaultValue.empty()) {
-            target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            target = StarPointer::FromHex<Actor>(p.defaultValue);
             break;
         }
     }

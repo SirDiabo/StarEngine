@@ -8,6 +8,7 @@
 #include "raymath.h"
 #include <cstdlib>
 #include <fstream>
+#include "Runtime/PointerUtil.h"
 
 void RegisterActorNodes() {
     NodeTemplate getActorLocation;
@@ -23,7 +24,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -49,7 +50,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -76,7 +77,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -103,7 +104,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -130,7 +131,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -157,7 +158,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -184,7 +185,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -213,7 +214,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -241,7 +242,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -269,7 +270,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -345,7 +346,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -372,7 +373,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -398,7 +399,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -424,7 +425,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -451,7 +452,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -476,7 +477,7 @@ void RegisterActorNodes() {
         float scaleValue = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
             if (p.name == "World Direction") ReadVec3(p, dir.x, dir.y, dir.z);
@@ -499,7 +500,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -524,7 +525,7 @@ void RegisterActorNodes() {
         float newSpeed = 600.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
             }
             if (p.name == "New Speed") newSpeed = p.defaultValue.AsFloat();
         }
@@ -548,7 +549,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -572,7 +573,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -596,7 +597,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -617,7 +618,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -643,7 +644,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }
@@ -672,7 +673,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = (Actor*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+                target = StarPointer::FromHex<Actor>(p.defaultValue);
                 break;
             }
         }

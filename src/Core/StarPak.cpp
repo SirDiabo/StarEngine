@@ -104,7 +104,7 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
         entries.push_back(std::move(e));
     }
 
-    blob.assign(buffer.begin() + (long)pos, buffer.end());
+    blob.assign(buffer.begin() + (std::ptrdiff_t)pos, buffer.end());
     return true;
 }
 
@@ -129,7 +129,8 @@ bool Reader::LoadFromExecutable(const std::string& exePath) {
     in.read(reinterpret_cast<char*>(&footer), sizeof(Footer));
     if (!in) return false;
     if (std::memcmp(footer.magic, kFooterMagic, sizeof(kFooterMagic)) != 0) return false;
-    if (footer.pakOffset + footer.pakSize + sizeof(Footer) > (uint64_t)fileSize) return false;
+    if (footer.pakSize == 0 || footer.pakOffset > (uint64_t)fileSize) return false;
+    if (footer.pakOffset + footer.pakSize != (uint64_t)fileSize - sizeof(Footer)) return false;
 
     std::vector<uint8_t> buffer(footer.pakSize);
     in.seekg((std::streamoff)footer.pakOffset);
@@ -168,8 +169,19 @@ bool AppendPakToExecutable(const std::string& exePath, const std::string& pakPat
     pakIn.close();
 
     std::error_code ec;
-    uint64_t pakOffset = (uint64_t)fs::file_size(exePath, ec);
+    uint64_t originalSize = (uint64_t)fs::file_size(exePath, ec);
     if (ec) return false;
+
+    uint64_t pakOffset = originalSize;
+    if (originalSize >= sizeof(Footer)) {
+        std::ifstream peek(exePath, std::ios::binary);
+        peek.seekg((std::streamoff)(originalSize - sizeof(Footer)));
+        Footer existing{};
+        peek.read(reinterpret_cast<char*>(&existing), sizeof(Footer));
+        if (peek && std::memcmp(existing.magic, kFooterMagic, sizeof(kFooterMagic)) == 0) {
+            pakOffset = existing.pakOffset;
+        }
+    }
 
     std::ofstream out(exePath, std::ios::binary | std::ios::app);
     if (!out.is_open()) return false;

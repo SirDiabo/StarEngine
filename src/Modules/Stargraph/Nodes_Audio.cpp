@@ -3,6 +3,7 @@
 #include "Runtime/AudioCore.h"
 #include "raylib.h"
 #include <cstdlib>
+#include "Runtime/PointerUtil.h"
 
 void RegisterAudioNodes() {
     NodeTemplate playSound;
@@ -42,7 +43,7 @@ void RegisterAudioNodes() {
     stopSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Sound* snd = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Sound" && !p.defaultValue.empty()) snd = (Sound*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Sound" && !p.defaultValue.empty()) snd = StarPointer::FromHex<Sound>(p.defaultValue);
         }
         if (snd) StopSound(*snd);
     };
@@ -60,7 +61,7 @@ void RegisterAudioNodes() {
     pauseSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Sound* snd = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Sound" && !p.defaultValue.empty()) snd = (Sound*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Sound" && !p.defaultValue.empty()) snd = StarPointer::FromHex<Sound>(p.defaultValue);
         }
         if (snd) PauseSound(*snd);
     };
@@ -78,7 +79,7 @@ void RegisterAudioNodes() {
     resumeSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Sound* snd = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Sound" && !p.defaultValue.empty()) snd = (Sound*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Sound" && !p.defaultValue.empty()) snd = StarPointer::FromHex<Sound>(p.defaultValue);
         }
         if (snd) ResumeSound(*snd);
     };
@@ -95,7 +96,7 @@ void RegisterAudioNodes() {
     isSoundPlaying.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Sound* snd = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Sound" && !p.defaultValue.empty()) snd = (Sound*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Sound" && !p.defaultValue.empty()) snd = StarPointer::FromHex<Sound>(p.defaultValue);
         }
         bool playing = snd ? IsSoundPlaying(*snd) : false;
         for (Pin& p : node.outputs) if (p.name == "Playing") p.defaultValue = playing ? "true" : "false";
@@ -154,7 +155,7 @@ void RegisterAudioNodes() {
     unloadMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Music* music = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Music" && !p.defaultValue.empty()) music = StarPointer::FromHex<Music>(p.defaultValue);
         }
         AudioCore::Get().UnloadMusicHandle(music);
     };
@@ -172,7 +173,7 @@ void RegisterAudioNodes() {
     playMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Music* music = nullptr;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Music" && !p.defaultValue.empty()) music = StarPointer::FromHex<Music>(p.defaultValue);
         }
         if (music) PlayMusicStream(*music);
     };
@@ -192,7 +193,7 @@ void RegisterAudioNodes() {
         Music* music = nullptr;
         float volume = 1.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Music" && !p.defaultValue.empty()) music = StarPointer::FromHex<Music>(p.defaultValue);
             if (p.name == "Volume") volume = p.defaultValue.AsFloat();
         }
         if (music) SetMusicVolume(*music, volume);
@@ -213,7 +214,7 @@ void RegisterAudioNodes() {
         Music* music = nullptr;
         float position = 0.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Music" && !p.defaultValue.empty()) music = (Music*)strtoull(p.defaultValue.c_str(), nullptr, 16);
+            if (p.name == "Music" && !p.defaultValue.empty()) music = StarPointer::FromHex<Music>(p.defaultValue);
             if (p.name == "Position") position = p.defaultValue.AsFloat();
         }
         if (music) SeekMusicStream(*music, position);
