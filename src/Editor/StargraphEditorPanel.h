@@ -154,6 +154,14 @@ private:
     char compVolumeBuf[32] = "";
     char compFovBuf[32] = "";
 
+    RegistryPickerPopup inputMappingPicker;
+    SearchableListPopup inputKeyPicker;
+    int inputKeyPickerMappingIndex = -1;
+    int inputKeyPickerBindingIndex = -1;
+    int listeningForInputBindingMappingIndex = -1;
+    int listeningForInputBindingIndex = -1;
+    char compInputScaleBuf[8][32] = {};
+
     int lastEventDetailNodeId = -1;
     char eventNameBuf[128] = "";
     int eventActiveField = 0;

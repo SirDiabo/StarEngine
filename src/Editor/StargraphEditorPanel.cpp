@@ -4,6 +4,7 @@
 #include "ViewportPanel.h"
 #include "PropertyFields.h"
 #include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/InputMappingRegistry.h"
 #include "Core/StarAsset.h"
 #include "raygui.h"
 #include "raymath.h"
@@ -801,7 +802,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
-                            || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp);
+                            || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp)
+                            || inputMappingPicker.ContainsPoint(mp) || inputKeyPicker.ContainsPoint(mp);
     const float kSaveColWidth = 24.0f;
 
     if (lastComponentDetailIndex != selectedComponentIndex) {
@@ -827,6 +829,12 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         audioPathPicker.Close();
         savePicker.Close();
         materialSlotPickerIndex = -1;
+        inputMappingPicker.Close();
+        inputKeyPicker.Close();
+        inputKeyPickerMappingIndex = -1;
+        inputKeyPickerBindingIndex = -1;
+        listeningForInputBindingMappingIndex = -1;
+        listeningForInputBindingIndex = -1;
     }
 
     auto saveButton = [&](Rectangle fieldRect, const char* fieldKey) {
@@ -1015,6 +1023,198 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
         y += 24;
+    } else if (comp.componentType == "InputComponent") {
+        static const char* mappingTypeNames[] = {"Bool", "Axis", "Axis2D"};
+
+        DrawText("Mappings", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        Rectangle addMappingBtn = {panel.x + panel.width - 60, y - 2, 52, 16};
+        if (GuiButton(addMappingBtn, "+ Add") && !pickerBlocksInput) {
+            inputMappingPicker.Open({addMappingBtn.x, addMappingBtn.y + addMappingBtn.height}, InputMappingRegistry::Category());
+        }
+        y += 20;
+
+        int scaleSlot = 0;
+        int removeMappingIndex = -1;
+        for (size_t mi = 0; mi < comp.inputMappingNames.size(); mi++) {
+            const std::string& mappingName = comp.inputMappingNames[mi];
+            InputMapping mapping;
+            if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
+
+            Rectangle nameRow = {panel.x + 8, y, panel.width - 16, 18};
+            DrawRectangleRec(nameRow, {38, 38, 42, 255});
+            DrawText(mappingName.c_str(), (int)nameRow.x + 4, (int)nameRow.y + 3, 11, WHITE);
+
+            Rectangle typeBtn = {nameRow.x + nameRow.width - 134, nameRow.y, 52, 18};
+            DrawRectangleRec(typeBtn, {50, 50, 58, 255});
+            DrawText(mappingTypeNames[(int)mapping.type], (int)typeBtn.x + 6, (int)typeBtn.y + 3, 11, {200, 200, 210, 255});
+            if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, typeBtn)) {
+                mapping.type = (InputMappingType)(((int)mapping.type + 1) % 3);
+                InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+            }
+
+            Rectangle addKeyBtn = {nameRow.x + nameRow.width - 78, nameRow.y, 42, 18};
+            DrawRectangleRec(addKeyBtn, {50, 65, 50, 255});
+            DrawText("+ Key", (int)addKeyBtn.x + 4, (int)addKeyBtn.y + 3, 10, WHITE);
+            if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, addKeyBtn)) {
+                inputKeyPickerMappingIndex = (int)mi;
+                inputKeyPickerBindingIndex = -1;
+                inputKeyPicker.Open({addKeyBtn.x, addKeyBtn.y + addKeyBtn.height});
+            }
+
+            Rectangle removeBtn = {nameRow.x + nameRow.width - 32, nameRow.y, 28, 18};
+            DrawRectangleRec(removeBtn, {70, 45, 45, 255});
+            DrawText("x", (int)removeBtn.x + 12, (int)removeBtn.y + 2, 12, WHITE);
+            if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, removeBtn)) {
+                removeMappingIndex = (int)mi;
+            }
+            y += 20;
+
+            int removeBindingIndex = -1;
+            for (size_t bi = 0; bi < mapping.bindings.size(); bi++) {
+                InputMappingBinding& binding = mapping.bindings[bi];
+
+                float rightColW = (mapping.type == InputMappingType::Bool) ? 46.0f :
+                                   (mapping.type == InputMappingType::Axis2D) ? 118.0f : 90.0f;
+                Rectangle keyRect = {panel.x + 16, y, panel.width - 16 - 8 - rightColW, 18};
+                std::string display = binding.key;
+                for (char& c : display) if (c == '_') c = ' ';
+                DrawRectangleRec(keyRect, {35, 35, 40, 255});
+                DrawRectangleLinesEx(keyRect, 1, {60, 60, 70, 255});
+                DrawText(display.c_str(), (int)keyRect.x + 6, (int)keyRect.y + 3, 11, WHITE);
+                if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, keyRect)) {
+                    inputKeyPickerMappingIndex = (int)mi;
+                    inputKeyPickerBindingIndex = (int)bi;
+                    inputKeyPicker.Open({keyRect.x, keyRect.y + keyRect.height});
+                }
+
+                float x = keyRect.x + keyRect.width + 4;
+
+                if (mapping.type != InputMappingType::Bool) {
+                    Rectangle scaleRect = {x, y, 40, 18};
+                    if (scaleSlot < 8) {
+                        if (componentActiveField != 20 + scaleSlot)
+                            snprintf(compInputScaleBuf[scaleSlot], 32, "%.2f", binding.scale);
+                        bool committed = PropertyField::FloatBox(scaleRect, compInputScaleBuf[scaleSlot], 32, 20 + scaleSlot,
+                                                                  componentActiveField, binding.scale, !pickerBlocksInput);
+                        if (committed || componentActiveField == 20 + scaleSlot) {
+                            InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+                        }
+                        scaleSlot++;
+                    }
+                    x += 44;
+                }
+
+                if (mapping.type == InputMappingType::Axis2D) {
+                    Rectangle axisBtn = {x, y, 24, 18};
+                    DrawRectangleRec(axisBtn, {50, 50, 58, 255});
+                    DrawText(binding.axis == 0 ? "X" : "Y", (int)axisBtn.x + 8, (int)axisBtn.y + 3, 11, WHITE);
+                    if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, axisBtn)) {
+                        binding.axis = (binding.axis == 0) ? 1 : 0;
+                        InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+                    }
+                    x += 28;
+                }
+
+                Rectangle listenBtn = {x, y, 22, 18};
+                bool listening = (listeningForInputBindingMappingIndex == (int)mi && listeningForInputBindingIndex == (int)bi);
+                DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : Color{50, 50, 56, 255});
+                DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 10, WHITE);
+                if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, listenBtn)) {
+                    listeningForInputBindingMappingIndex = (int)mi;
+                    listeningForInputBindingIndex = (int)bi;
+                    inputKeyPicker.Close();
+                }
+                x += 26;
+
+                Rectangle removeBindingBtn = {x, y, 18, 18};
+                DrawRectangleRec(removeBindingBtn, {70, 45, 45, 255});
+                DrawText("x", (int)removeBindingBtn.x + 6, (int)removeBindingBtn.y + 2, 11, WHITE);
+                if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, removeBindingBtn)) {
+                    removeBindingIndex = (int)bi;
+                }
+
+                y += 20;
+            }
+
+            if (removeBindingIndex != -1) {
+                mapping.bindings.erase(mapping.bindings.begin() + removeBindingIndex);
+                InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+            }
+
+            y += 4;
+        }
+
+        if (removeMappingIndex != -1) {
+            comp.inputMappingNames.erase(comp.inputMappingNames.begin() + removeMappingIndex);
+            isDirty = true;
+        }
+    }
+
+    // Mapping name picker
+    std::string pickedMappingName;
+    if (comp.componentType == "InputComponent" && inputMappingPicker.Render(pickedMappingName) && !pickedMappingName.empty()) {
+        bool alreadyOwned = std::find(comp.inputMappingNames.begin(), comp.inputMappingNames.end(), pickedMappingName) != comp.inputMappingNames.end();
+        if (!alreadyOwned) {
+            if (!InputMappingRegistry::Get().Find(pickedMappingName)) InputMappingRegistry::Get().SetMapping(pickedMappingName, InputMapping{});
+            comp.inputMappingNames.push_back(pickedMappingName);
+            isDirty = true;
+        }
+    }
+
+    // Key picker for a binding row
+    if (comp.componentType == "InputComponent" && inputKeyPicker.IsOpen()) {
+        std::vector<SearchableListPopup::Entry> keyEntries;
+        for (const std::string& keyName : GetInputKeyNames()) {
+            if (InputKeyIsAnalog(keyName)) continue;
+            std::string category = "Keyboard";
+            if (keyName.rfind("GAMEPAD_", 0) == 0) category = "Gamepad";
+            else if (keyName.find("MOUSE") != std::string::npos) category = "Mouse";
+            std::string label = keyName;
+            for (char& c : label) if (c == '_') c = ' ';
+            keyEntries.push_back({category, keyName, label});
+        }
+
+        std::string pickedKey = inputKeyPicker.Render(keyEntries, panel);
+        if (!pickedKey.empty() && inputKeyPickerMappingIndex >= 0 && inputKeyPickerMappingIndex < (int)comp.inputMappingNames.size()) {
+            const std::string& mappingName = comp.inputMappingNames[inputKeyPickerMappingIndex];
+            InputMapping mapping;
+            if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
+            if (inputKeyPickerBindingIndex >= 0 && inputKeyPickerBindingIndex < (int)mapping.bindings.size()) {
+                mapping.bindings[inputKeyPickerBindingIndex].key = pickedKey;
+            } else {
+                InputMappingBinding newBinding;
+                newBinding.key = pickedKey;
+                mapping.bindings.push_back(newBinding);
+            }
+            InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+        }
+    }
+
+    // Listening for a keyboard press to bind directly
+    if (listeningForInputBindingMappingIndex != -1) {
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            listeningForInputBindingMappingIndex = -1;
+            listeningForInputBindingIndex = -1;
+        } else {
+            int keyCode = GetKeyPressed();
+            if (keyCode != 0) {
+                std::string keyName = InputKeyCodeToName(keyCode);
+                if (!keyName.empty() && listeningForInputBindingMappingIndex < (int)comp.inputMappingNames.size()) {
+                    const std::string& mappingName = comp.inputMappingNames[listeningForInputBindingMappingIndex];
+                    InputMapping mapping;
+                    if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
+                    if (listeningForInputBindingIndex >= 0 && listeningForInputBindingIndex < (int)mapping.bindings.size()) {
+                        mapping.bindings[listeningForInputBindingIndex].key = keyName;
+                        InputMappingRegistry::Get().SetMapping(mappingName, mapping);
+                    }
+                }
+                listeningForInputBindingMappingIndex = -1;
+                listeningForInputBindingIndex = -1;
+            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                listeningForInputBindingMappingIndex = -1;
+                listeningForInputBindingIndex = -1;
+            }
+        }
     }
 
     std::string pickedSaveFile;

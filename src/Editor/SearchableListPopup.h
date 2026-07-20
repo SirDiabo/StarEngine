@@ -14,6 +14,7 @@ public:
     void Open(Vector2 anchorPos, float width = 200.0f, float maxVisibleHeight = 300.0f);
     void Close();
     bool IsOpen() const { return open; }
+    bool ContainsPoint(Vector2 point) const { return open && CheckCollisionPointRec(point, lastRect); }
 
     std::string Render(const std::vector<Entry>& entries, Rectangle boundsArea);
 
@@ -25,4 +26,5 @@ private:
     float maxVisibleHeight = 300.0f;
     float scrollOffset = 0.0f;
     char search[64] = {};
+    Rectangle lastRect{};
 };
