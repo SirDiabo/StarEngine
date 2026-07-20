@@ -698,8 +698,8 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     // Add Component button.
     Rectangle addBtn = {area.x + area.width - 50, y - 2, 44, 16};
     if (GuiButton(addBtn, "+ Add")) {
-        addComponentMenuOpen = !addComponentMenuOpen;
-        addComponentMenuPos  = {addBtn.x, addBtn.y + addBtn.height};
+        if (addComponentMenu.IsOpen()) addComponentMenu.Close();
+        else addComponentMenu.Open({addBtn.x, addBtn.y + addBtn.height});
     }
 
     y += 18;
@@ -751,40 +751,23 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         DrawText("No components", (int)area.x + 8, (int)y, 11, {100, 100, 108, 255});
     }
 
-    // Add Component dropdown menu, listing the known component types.
-    if (addComponentMenuOpen) {
+    if (addComponentMenu.IsOpen()) {
         static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent", "InputComponent" };
-        float menuW = 150.0f;
-        float menuH = (float)(sizeof(componentTypes) / sizeof(componentTypes[0])) * 20.0f + 4.0f;
-        Rectangle menu = {addComponentMenuPos.x - menuW + 44, addComponentMenuPos.y, menuW, menuH};
+        std::vector<SearchableListPopup::Entry> entries;
+        for (const char* typeName : componentTypes) entries.push_back({"Components", typeName, typeName});
 
-        DrawRectangleRec(menu, {45, 45, 50, 255});
-        DrawRectangleLinesEx(menu, 1, {80, 80, 88, 255});
-
-        float my = menu.y + 2;
-        for (const char* typeName : componentTypes) {
-            Rectangle item = {menu.x + 1, my, menu.width - 2, 18};
-            bool hov = CheckCollisionPointRec(mousePos, item);
-            if (hov) DrawRectangleRec(item, {70, 70, 80, 255});
-            DrawText(typeName, (int)item.x + 6, (int)item.y + 3, 11, WHITE);
-
-            if (hov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                ComponentDecl comp;
-                comp.componentType = typeName;
-                comp.name          = typeName;
-                graph.AddComponent(comp);
-                selectedComponentIndex = (int)graph.GetComponents().size() - 1;
-                selectedNodeId = -1;
-                selectedNodeIds.clear();
-                selectedVariableIndex = -1;
-                isDirty = true;
-                addComponentMenuOpen = false;
-            }
-            my += 20.0f;
+        std::string picked = addComponentMenu.Render(entries, area);
+        if (!picked.empty()) {
+            ComponentDecl comp;
+            comp.componentType = picked;
+            comp.name          = picked;
+            graph.AddComponent(comp);
+            selectedComponentIndex = (int)graph.GetComponents().size() - 1;
+            selectedNodeId = -1;
+            selectedNodeIds.clear();
+            selectedVariableIndex = -1;
+            isDirty = true;
         }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, menu) && !CheckCollisionPointRec(mousePos, addBtn))
-            addComponentMenuOpen = false;
     }
 }
 

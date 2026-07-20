@@ -4,6 +4,7 @@
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "AssetPickerPopup.h"
 #include "RegistryPickerPopup.h"
+#include "SearchableListPopup.h"
 #include <string>
 #include <vector>
 
@@ -134,8 +135,7 @@ private:
     bool componentDragActive = false;
 
     int selectedComponentIndex = -1;
-    bool addComponentMenuOpen = false;
-    Vector2 addComponentMenuPos{0, 0};
+    SearchableListPopup addComponentMenu;
 
     AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;

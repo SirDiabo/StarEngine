@@ -80,6 +80,8 @@ x Array-of-fields wrapper (ArrayHeader/ArrayRowControls/ArrayValueRect in Proper
 x Newly activated field seeds its buffer from the source value on the activation frame itself
 x Registry-reference dropdown field (RegistryPickerPopup + NamedListRegistry), project-level
   named lists (Save Files, Languages, etc.) scoped by category string, with inline create-new
+x SearchableListPopup (src/Editor/SearchableListPopup.h/.cpp): category-grouped, searchable,
+  scrollable popup list, extracted from the Add Node menu; Add Component menu now uses it too
 
 ---
 
