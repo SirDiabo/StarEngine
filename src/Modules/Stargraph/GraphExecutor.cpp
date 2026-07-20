@@ -121,7 +121,7 @@ void GraphExecutor::RunFromPin(Stargraph& graph, Node* node, ExecutionContext& c
     }
 }
 
-static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx) {
+static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext& ctx) {
     if (ctx.actor != World::Get().GetInputFocus()) return;
 
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
@@ -183,7 +183,10 @@ static void ProcessInputKey(Node& node, Stargraph& graph, ExecutionContext& ctx)
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
     if (eventType == "Event_Tick") {
         for (Node* node : graph.GetNodesOfType("Input_Key")) {
-            ProcessInputKey(*node, graph, ctx);
+            ProcessHeldEventNode(*node, graph, ctx);
+        }
+        for (Node* node : graph.GetNodesOfType("Input_Mapping")) {
+            ProcessHeldEventNode(*node, graph, ctx);
         }
     }
 

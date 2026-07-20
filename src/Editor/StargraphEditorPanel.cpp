@@ -2732,6 +2732,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     for (const auto& t : templates) {
         if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
         if (t.type == "Call_Custom_Event") continue;
+        if (t.type == "Input_Mapping") continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = t.type;
@@ -2781,6 +2782,24 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
 
         entries.push_back({"Events", "Call_Custom_Event:" + eventName});
+    }
+
+    for (const ComponentDecl& comp : graph.GetComponents()) {
+        if (comp.componentType != "InputComponent") continue;
+        for (const std::string& mappingName : comp.inputMappingNames) {
+            if (mappingName.empty()) continue;
+
+            std::string typeLower = "input_mapping:" + mappingName;
+            for (char& c : typeLower) c = (char)tolower(c);
+            if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
+
+            std::string nodeId = "Input_Mapping:" + mappingName;
+            bool alreadyListed = false;
+            for (const auto& e : entries) if (e.second == nodeId) { alreadyListed = true; break; }
+            if (alreadyListed) continue;
+
+            entries.push_back({"Input", nodeId});
+        }
     }
     std::sort(entries.begin(), entries.end());
 
@@ -2860,11 +2879,20 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 std::string nodeType = entry.second;
                 std::string eventName;
+                std::string mappingName;
                 if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
                     eventName = nodeType.substr(18);
                     nodeType = "Call_Custom_Event";
+                } else if (nodeType.rfind("Input_Mapping:", 0) == 0) {
+                    mappingName = nodeType.substr(14);
+                    nodeType = "Input_Mapping";
                 }
                 Node* node = graph.CreateNode(nodeType);
+                if (!mappingName.empty()) {
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Mapping") { p.defaultValue = mappingName; break; }
+                    }
+                }
                 if (!eventName.empty()) {
                     for (Pin& p : node->inputs) {
                         if (p.name == "Event Name") {
@@ -2932,6 +2960,8 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         std::string entryDisplay = entry.second;
         if (entryDisplay.rfind("Call_Custom_Event:", 0) == 0) {
             entryDisplay = "Event " + entryDisplay.substr(18);
+        } else if (entryDisplay.rfind("Input_Mapping:", 0) == 0) {
+            entryDisplay = "Key " + entryDisplay.substr(14);
         }
         for (char& c : entryDisplay) if (c == '_') c = ' ';
         DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);

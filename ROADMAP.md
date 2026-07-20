@@ -172,17 +172,17 @@ x Load File / Load All nodes, plus Get Saved Variable (read only) and Load Saved
 x Key polling shared between Input_Key and mapping evaluation (PollInputKey)
 x Digital stick-direction and mouse-direction keys added
 x InputMappingRegistry: project-level name -> {type, bindings} store (InputMappings.cfg)
-x InputComponent exists and holds a mapping-name list with no authoring UI yet
-o InputComponent: authored list of named mappings (name, default key) in Details panel
-o Mapping types: Bool (button), Axis (scalar), Axis2D (reuses Vec3, Z unused)
-o Auto-generates graph nodes per mapping (e.g. "Key Jump"), built on existing Input_Key polling
-o Generated nodes scoped to graphs of actor classes that own the relevant InputComponent (extends 5.4 Add Node filtering)
-o Get InputComponent + Override Input node for runtime rebinding
-o Rebind overrides are Save-flaggable (2.10) for persistence across sessions
-o Input Device concept: Keyboard/Mouse always active by default, gamepads added as separate devices once claimed
-o Device claim flow: unclaimed devices listen for any input, first press assigns that device to the next open player slot, only active once an Input Component requests multiple devices
-o Rebind overrides stored per device, giving each local player their own control scheme
-o Mapped input event nodes pick their target Input Component from a details panel field instead of an input pin
+x InputComponent
+x Mapping types: Bool (button), Axis (scalar), Axis2D (reuses Vec3, Z unused), cycled inline per mapping
+x Auto-generates graph nodes per mapping
+o Mapped input event nodes have an input for the input component, that can be chosen through a list as well as connecting a get component node.
+o Input Devices listed and pickable in component details panel:
+  "unclaimed" at top active by default, to be filled when detecting unclaimed input
+  Keyboard/Mouse listed second
+  conected gamepads listed below
+o More Nodes:
+  "Override Input" Node, that lists all mappings and lets you choose what to overwrite them with for runtime rebinding
+  "Register Unclaimed Input" (For when a key is detected from a input device that isnt claimed yet, to automatically fill up unclaimed input components.) 
 o Multiple Input Components per actor, one per device, once multi-component-per-type support exists (13.5)
 
 ### 2.12 Component Hierarchy
