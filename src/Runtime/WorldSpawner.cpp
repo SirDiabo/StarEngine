@@ -5,6 +5,7 @@
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/CameraComponent.h"
+#include "Components/InputComponent.h"
 #include "Components/SceneComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
@@ -54,6 +55,10 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                     camera->fov = decl.cameraFov;
                     camera->orthographic = decl.cameraOrthographic;
                     comp = camera;
+                } else if (decl.componentType == "InputComponent") {
+                    auto* input = new InputComponent();
+                    input->mappingNames = decl.inputMappingNames;
+                    comp = input;
                 } else {
                     comp = new SceneComponent();
                 }

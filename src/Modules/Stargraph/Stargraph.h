@@ -194,6 +194,9 @@ struct ComponentDecl {
     float cameraFov = 50.0f;
     bool cameraOrthographic = false;
 
+    // InputComponent
+    std::vector<std::string> inputMappingNames;
+
     // SaveFileRegistry
     std::unordered_map<std::string, std::string> savableFields;
 };

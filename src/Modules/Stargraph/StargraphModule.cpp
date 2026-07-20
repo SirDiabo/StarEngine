@@ -7,6 +7,7 @@
 #include "Runtime/Components/MeshComponent.h"
 #include "Runtime/Components/CollisionComponent.h"
 #include "Runtime/Components/AudioComponent.h"
+#include "Runtime/Components/InputComponent.h"
 #include "Stargraph.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Nodes_Events.h"
@@ -40,6 +41,7 @@ bool StargraphModule::Initialize() {
     RegisterMeshComponentNodes();
     RegisterCollisionComponentNodes();
     RegisterAudioComponentNodes();
+    RegisterInputComponentNodes();
     
     RegisterAssetType();
     return true;

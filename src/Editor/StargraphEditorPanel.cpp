@@ -753,7 +753,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 
     // Add Component dropdown menu, listing the known component types.
     if (addComponentMenuOpen) {
-        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent" };
+        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent", "InputComponent" };
         float menuW = 150.0f;
         float menuH = (float)(sizeof(componentTypes) / sizeof(componentTypes[0])) * 20.0f + 4.0f;
         Rectangle menu = {addComponentMenuPos.x - menuW + 44, addComponentMenuPos.y, menuW, menuH};

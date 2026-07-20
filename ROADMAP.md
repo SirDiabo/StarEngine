@@ -170,6 +170,7 @@ x Load File / Load All nodes, plus Get Saved Variable (read only) and Load Saved
 x Key polling shared between Input_Key and mapping evaluation (PollInputKey)
 x Digital stick-direction and mouse-direction keys added
 x InputMappingRegistry: project-level name -> {type, bindings} store (InputMappings.cfg)
+x InputComponent exists and holds a mapping-name list with no authoring UI yet
 o InputComponent: authored list of named mappings (name, default key) in Details panel
 o Mapping types: Bool (button), Axis (scalar), Axis2D (reuses Vec3, Z unused)
 o Auto-generates graph nodes per mapping (e.g. "Key Jump"), built on existing Input_Key polling

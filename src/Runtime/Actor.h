@@ -5,6 +5,7 @@
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/CameraComponent.h"
+#include "Components/InputComponent.h"
 #include "raylib.h"
 #include <vector>
 #include <cstdint>
@@ -70,6 +71,7 @@ public:
     CollisionComponent* GetCollisionComponent() const { return collisionComponent; }
     AudioComponent* GetAudioComponent() const { return audioComponent; }
     CameraComponent* GetCameraComponent() const { return cameraComponent; }
+    InputComponent* GetInputComponent() const { return inputComponent; }
 
 protected:
     virtual void OnBeginPlay() {}
@@ -84,5 +86,6 @@ private:
     CollisionComponent* collisionComponent = nullptr;
     AudioComponent* audioComponent = nullptr;
     CameraComponent* cameraComponent = nullptr;
+    InputComponent* inputComponent = nullptr;
     uint32_t netId = 0;
 };

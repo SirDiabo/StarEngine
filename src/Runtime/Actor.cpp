@@ -167,6 +167,8 @@ void Actor::AddComponent(Component* component) {
         audioComponent = ac;
     } else if (CameraComponent* cc = dynamic_cast<CameraComponent*>(component)) {
         cameraComponent = cc;
+    } else if (InputComponent* ic = dynamic_cast<InputComponent*>(component)) {
+        inputComponent = ic;
     }
 }
 
@@ -178,6 +180,7 @@ void Actor::RemoveComponent(Component* component) {
         if (collisionComponent == component) collisionComponent = nullptr;
         if (audioComponent == component) audioComponent = nullptr;
         if (cameraComponent == component) cameraComponent = nullptr;
+        if (inputComponent == component) inputComponent = nullptr;
         components.erase(it);
         delete component;
     }

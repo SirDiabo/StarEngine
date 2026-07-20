@@ -287,6 +287,10 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "Volume=" << comp.volume << "\n";
         out << "CameraFOV=" << comp.cameraFov << "\n";
         out << "CameraOrthographic=" << (comp.cameraOrthographic ? "true" : "false") << "\n";
+        out << "InputMappingCount=" << comp.inputMappingNames.size() << "\n";
+        for (size_t m = 0; m < comp.inputMappingNames.size(); m++) {
+            out << "InputMapping" << m << "=" << comp.inputMappingNames[m] << "\n";
+        }
         {
             std::string savable;
             for (const auto& kv : comp.savableFields) {
@@ -476,6 +480,13 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Volume")) comp.volume = std::stof(*v);
             if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = std::stof(*v);
             if (const std::string* v = FindEntry(section, "CameraOrthographic")) comp.cameraOrthographic = (*v == "true");
+            if (const std::string* v = FindEntry(section, "InputMappingCount")) {
+                int count = std::stoi(*v);
+                for (int m = 0; m < count; m++) {
+                    if (const std::string* mv = FindEntry(section, "InputMapping" + std::to_string(m)))
+                        comp.inputMappingNames.push_back(*mv);
+                }
+            }
             if (const std::string* v = FindEntry(section, "SavableFields")) {
                 std::stringstream ss(*v);
                 std::string entry;
