@@ -2,6 +2,8 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
+#include "Runtime/Actor.h"
+#include "Runtime/PointerUtil.h"
 #include <cstdio>
 
 void RegisterInputComponentNodes() {
@@ -12,6 +14,7 @@ void RegisterInputComponentNodes() {
     inputMapping.isEvent = true;
     inputMapping.hideFromContextMenu = true; // listed per mapping name, see RenderNodeContextMenu
     inputMapping.createPins = [](Node* node) {
+        node->inputs.push_back({"Component", PinType::Object, true, false, 0, ""});
         node->inputs.push_back({"Mapping", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Triggered", PinType::Exec, false, true});
         node->outputs.push_back({"Started", PinType::Exec, false, true});
@@ -22,8 +25,20 @@ void RegisterInputComponentNodes() {
         node->outputs.push_back({"Input Time", PinType::Float, false, true});
     };
     inputMapping.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string componentRef;
         std::string mappingName;
-        for (const Pin& p : node.inputs) if (p.name == "Mapping") mappingName = p.defaultValue;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Component") componentRef = p.defaultValue;
+            else if (p.name == "Mapping") mappingName = p.defaultValue;
+        }
+
+        Component* target = nullptr;
+        if (!componentRef.empty()) {
+            target = StarPointer::FromHex<Component>(componentRef);
+            if (!target && ctx.actor) target = ctx.actor->FindComponentByName(componentRef);
+        }
+        if (!target && ctx.actor) target = ctx.actor->GetInputComponent();
+        if (!dynamic_cast<InputComponent*>(target)) return;
 
         const InputMapping* mapping = InputMappingRegistry::Get().Find(mappingName);
 

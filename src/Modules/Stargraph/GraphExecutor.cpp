@@ -127,6 +127,7 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
     if (!tmpl || !tmpl->execute) return;
 
+    GraphExecutor::PropagateDataPins(graph, &node, ctx);
     tmpl->execute(node, graph, ctx);
 
     bool held = false;
