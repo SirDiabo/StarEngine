@@ -113,7 +113,7 @@ private:
     char keyPickerSearch[64] = "";
     float keyPickerScroll = 0;
     bool keyPickerJustOpened = false;
-    enum class PinPickerKind { Key, FunctionName, ComponentRef };
+    enum class PinPickerKind { Key, FunctionName, ComponentRef, MappingName };
     PinPickerKind keyPickerKind = PinPickerKind::Key;
 
     static const float nodeWidth;
@@ -156,6 +156,7 @@ private:
 
     RegistryPickerPopup inputMappingPicker;
     SearchableListPopup inputKeyPicker;
+    SearchableListPopup inputDevicePicker;
     int inputKeyPickerMappingIndex = -1;
     int inputKeyPickerBindingIndex = -1;
     int listeningForInputBindingMappingIndex = -1;

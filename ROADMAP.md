@@ -175,14 +175,11 @@ x InputMappingRegistry: project-level name -> {type, bindings} store (InputMappi
 x InputComponent
 x Mapping types: Bool (button), Axis (scalar), Axis2D (reuses Vec3, Z unused), cycled inline per mapping
 x Auto-generates graph nodes per mapping
-x Mapped input event nodes have a Component input pin, pickable from a dropdown of the actor's Input Components or connectable from a Get Component node
-o Input Devices listed and pickable in component details panel:
-  "unclaimed" at top active by default, to be filled when detecting unclaimed input
-  Keyboard/Mouse listed second
-  Connected Gamepads listed below
-o More Nodes:
-  "Override Input" Node, that lists all mappings and lets you choose what to overwrite them with for runtime rebinding
-  "Register Unclaimed Input" (For when a key is detected from a input device that isnt claimed yet, to automatically fill up unclaimed input components.) 
+x Mapped input event nodes have a Component input pin
+x Input Devices listed and pickable in component details panel
+x More Nodes:
+  "Override Input" rebinds a mapping at runtime
+  "Register Unclaimed Input" polls Keyboard+Mouse then each connected gamepad not already claimed by another actor's InputComponent
 o Multiple Input Components per actor, one per device, once multi-component-per-type support exists (13.5)
 
 ### 2.12 Component Hierarchy

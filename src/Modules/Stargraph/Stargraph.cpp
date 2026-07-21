@@ -291,6 +291,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         for (size_t m = 0; m < comp.inputMappingNames.size(); m++) {
             out << "InputMapping" << m << "=" << comp.inputMappingNames[m] << "\n";
         }
+        out << "InputDevice=" << comp.inputDevice << "\n";
         {
             std::string savable;
             for (const auto& kv : comp.savableFields) {
@@ -487,6 +488,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                         comp.inputMappingNames.push_back(*mv);
                 }
             }
+            if (const std::string* v = FindEntry(section, "InputDevice")) comp.inputDevice = *v;
             if (const std::string* v = FindEntry(section, "SavableFields")) {
                 std::stringstream ss(*v);
                 std::string entry;

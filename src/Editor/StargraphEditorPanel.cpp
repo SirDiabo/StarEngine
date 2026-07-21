@@ -5,6 +5,7 @@
 #include "PropertyFields.h"
 #include "Modules/Stargraph/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
+#include "Core/NamedListRegistry.h"
 #include "Core/StarAsset.h"
 #include "raygui.h"
 #include "raymath.h"
@@ -34,6 +35,10 @@ static std::vector<std::string> GetInputComponentNames(Stargraph& graph) {
         if (comp.componentType == "InputComponent") names.push_back(comp.name);
     }
     return names;
+}
+
+static std::vector<std::string> GetProjectInputMappingNames() {
+    return NamedListRegistry::Get().GetList(InputMappingRegistry::Category());
 }
 
 const float StargraphEditorPanel::nodeWidth      = 190.0f;
@@ -811,7 +816,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
                             || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp)
-                            || inputMappingPicker.ContainsPoint(mp) || inputKeyPicker.ContainsPoint(mp);
+                            || inputMappingPicker.ContainsPoint(mp) || inputKeyPicker.ContainsPoint(mp)
+                            || inputDevicePicker.ContainsPoint(mp);
     const float kSaveColWidth = 24.0f;
 
     if (lastComponentDetailIndex != selectedComponentIndex) {
@@ -839,6 +845,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         materialSlotPickerIndex = -1;
         inputMappingPicker.Close();
         inputKeyPicker.Close();
+        inputDevicePicker.Close();
         inputKeyPickerMappingIndex = -1;
         inputKeyPickerBindingIndex = -1;
         listeningForInputBindingMappingIndex = -1;
@@ -1034,6 +1041,15 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     } else if (comp.componentType == "InputComponent") {
         static const char* mappingTypeNames[] = {"Bool", "Axis", "Axis2D"};
 
+        DrawText("Device", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        Rectangle deviceBtn = {panel.x + 60, y - 2, panel.width - 68, 16};
+        DrawRectangleRec(deviceBtn, {50, 50, 58, 255});
+        DrawText(comp.inputDevice.c_str(), (int)deviceBtn.x + 6, (int)deviceBtn.y + 3, 11, {200, 200, 210, 255});
+        if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, deviceBtn)) {
+            inputDevicePicker.Open({deviceBtn.x, deviceBtn.y + deviceBtn.height}, deviceBtn.width);
+        }
+        y += 22;
+
         DrawText("Mappings", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         Rectangle addMappingBtn = {panel.x + panel.width - 60, y - 2, 52, 16};
         if (GuiButton(addMappingBtn, "+ Add") && !pickerBlocksInput) {
@@ -1158,6 +1174,24 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
     }
 
+    // Device picker
+    if (comp.componentType == "InputComponent" && inputDevicePicker.IsOpen()) {
+        std::vector<SearchableListPopup::Entry> deviceEntries;
+        deviceEntries.push_back({"Devices", "Unclaimed", "Unclaimed"});
+        deviceEntries.push_back({"Devices", "Keyboard+Mouse", "Keyboard+Mouse"});
+        for (int i = 0; i < 4; i++) {
+            if (!IsGamepadAvailable(i)) continue;
+            std::string name = "Gamepad " + std::to_string(i);
+            deviceEntries.push_back({"Devices", name, name});
+        }
+
+        std::string pickedDevice = inputDevicePicker.Render(deviceEntries, panel);
+        if (!pickedDevice.empty() && pickedDevice != comp.inputDevice) {
+            comp.inputDevice = pickedDevice;
+            isDirty = true;
+        }
+    }
+
     // Mapping name picker
     std::string pickedMappingName;
     if (comp.componentType == "InputComponent" && inputMappingPicker.Render(pickedMappingName) && !pickedMappingName.empty()) {
@@ -1198,7 +1232,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
     }
 
-    // Listening for a keyboard press to bind directly
+    // Listening for a keyboard press to bind directly, same keyboard-only capture as Input_Key's listen button.
     if (listeningForInputBindingMappingIndex != -1) {
         if (IsKeyPressed(KEY_ESCAPE)) {
             listeningForInputBindingMappingIndex = -1;
@@ -2309,7 +2343,8 @@ void StargraphEditorPanel::RenderGraph() {
                         pin.defaultValue = bval ? "true" : "false";
                         isDirty = true;
                     }
-                } else if (node.type == "Input_Key" && pin.name == "Key") {
+                } else if ((node.type == "Input_Key" && pin.name == "Key") ||
+                           (node.type == "Override_Input" && pin.name == "New Key")) {
                     float listenBtnW = 22;
                     Rectangle textRect = {fieldRect.x, fieldRect.y, fieldRect.width - listenBtnW - 4, fieldRect.height};
                     Rectangle listenBtn = {fieldRect.x + fieldRect.width - listenBtnW, fieldRect.y, listenBtnW, fieldRect.height};
@@ -2335,6 +2370,7 @@ void StargraphEditorPanel::RenderGraph() {
                             keyPickerOpen = false;
                             keyPickerPinId = 0;
                         } else if (CheckCollisionPointRec(mousePos, textRect)) {
+                            keyPickerKind = PinPickerKind::Key;
                             keyPickerPinId = pin.id;
                             keyPickerPos = {textRect.x, textRect.y + textRect.height};
                             keyPickerWidth = fieldRect.width;
@@ -2365,9 +2401,9 @@ void StargraphEditorPanel::RenderGraph() {
                         editingPinId = 0;
                         listeningForKeyPinId = 0;
                     }
-                } else if (node.type == "Input_Mapping" && pin.name == "Component") {
+                } else if (pin.name == "Component" && pin.type == PinType::Object) {
                     if (!keyPickerOpen || keyPickerPinId != pin.id) {
-                        std::string display = pin.defaultValue.empty() ? "self" : pin.defaultValue;
+                        std::string display = pin.defaultValue.empty() ? "Auto" : pin.defaultValue;
                         for (char& c : display) if (c == '_') c = ' ';
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
@@ -2376,6 +2412,27 @@ void StargraphEditorPanel::RenderGraph() {
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect)) {
                         keyPickerKind = PinPickerKind::ComponentRef;
+                        keyPickerPinId = pin.id;
+                        keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
+                        keyPickerWidth = fieldRect.width;
+                        snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
+                        keyPickerScroll = 0;
+                        keyPickerJustOpened = true;
+                        keyPickerOpen = true;
+                        editingPinId = 0;
+                        listeningForKeyPinId = 0;
+                    }
+                } else if (node.type == "Override_Input" && pin.name == "Mapping") {
+                    if (!keyPickerOpen || keyPickerPinId != pin.id) {
+                        std::string display = pin.defaultValue;
+                        for (char& c : display) if (c == '_') c = ' ';
+                        DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                        DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                        DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                    }
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect)) {
+                        keyPickerKind = PinPickerKind::MappingName;
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
                         keyPickerWidth = fieldRect.width;
@@ -3020,9 +3077,13 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     }
     if (!targetPin) { keyPickerOpen = false; keyPickerPinId = 0; return; }
 
-    std::vector<std::string> allKeys = (keyPickerKind == PinPickerKind::FunctionName)
-        ? GetParameterlessCustomEventNames(graph)
-        : (keyPickerKind == PinPickerKind::ComponentRef) ? GetInputComponentNames(graph) : GetInputKeyNames();
+    std::vector<std::string> allKeys;
+    switch (keyPickerKind) {
+        case PinPickerKind::FunctionName:  allKeys = GetParameterlessCustomEventNames(graph); break;
+        case PinPickerKind::ComponentRef:  allKeys = GetInputComponentNames(graph); break;
+        case PinPickerKind::MappingName:   allKeys = GetProjectInputMappingNames(); break;
+        default:                           allKeys = GetInputKeyNames(); break;
+    }
 
     std::vector<int> filtered;
     std::string searchLower = keyPickerSearch;

@@ -65,7 +65,7 @@ InputMappingRegistry& InputMappingRegistry::Get() {
 
 void InputMappingRegistry::Load(const std::string& projectRoot) {
     mappings.clear();
-    filePath = (fs::path(projectRoot) / "Saved" / "InputMappings.cfg").string();
+    filePath = (fs::path(projectRoot) / "InputMappings.cfg").string();
 
     std::unordered_map<std::string, std::string> raw;
     if (!LayoutSerializer::Load(filePath, raw)) return;
@@ -98,4 +98,8 @@ void InputMappingRegistry::SetMapping(const std::string& name, const InputMappin
 void InputMappingRegistry::Remove(const std::string& name) {
     mappings.erase(name);
     Save();
+}
+
+void InputMappingRegistry::SetMappingRuntime(const std::string& name, const InputMapping& mapping) {
+    mappings[name] = mapping;
 }

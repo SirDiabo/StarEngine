@@ -1,6 +1,7 @@
 #include "InputKeyNames.h"
 #include "raylib.h"
 #include <cmath>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 
@@ -78,7 +79,7 @@ bool InputKeyIsAnalog(const std::string& name) {
     return false;
 }
 
-bool PollInputKey(const std::string& keyName, float& outAxis) {
+bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) {
     outAxis = 0.0f;
     bool held = false;
 
@@ -108,7 +109,7 @@ bool PollInputKey(const std::string& keyName, float& outAxis) {
     } else if (keyName == "MOUSE_RIGHT") {
         held = GetMouseDelta().x > 0.0f;
     } else if (keyName.rfind("GAMEPAD_", 0) == 0) {
-        const int pad = 0;
+        const int pad = gamepadIndex;
         bool avail = IsGamepadAvailable(pad);
         if (keyName == "GAMEPAD_FACE_UP")         held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP);
         else if (keyName == "GAMEPAD_FACE_DOWN")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
@@ -144,4 +145,18 @@ bool PollInputKey(const std::string& keyName, float& outAxis) {
     }
 
     return held;
+}
+
+bool InputKeyBelongsToDevice(const std::string& keyName, const std::string& device, int& outGamepadIndex) {
+    bool isGamepadKey = keyName.rfind("GAMEPAD_", 0) == 0;
+
+    if (device == "Keyboard+Mouse") return !isGamepadKey;
+
+    if (device.rfind("Gamepad ", 0) == 0) {
+        if (!isGamepadKey) return false;
+        outGamepadIndex = atoi(device.c_str() + 8);
+        return true;
+    }
+
+    return false; // Unclaimed, or unrecognized device: no input
 }

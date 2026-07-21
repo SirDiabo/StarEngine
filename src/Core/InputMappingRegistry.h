@@ -29,6 +29,8 @@ public:
     void SetMapping(const std::string& name, const InputMapping& mapping);
     void Remove(const std::string& name);
 
+    void SetMappingRuntime(const std::string& name, const InputMapping& mapping);
+
 private:
     std::string filePath;
     std::unordered_map<std::string, InputMapping> mappings;

@@ -58,6 +58,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 } else if (decl.componentType == "InputComponent") {
                     auto* input = new InputComponent();
                     input->mappingNames = decl.inputMappingNames;
+                    input->device = decl.inputDevice;
                     comp = input;
                 } else {
                     comp = new SceneComponent();

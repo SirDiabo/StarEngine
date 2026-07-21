@@ -196,6 +196,7 @@ struct ComponentDecl {
 
     // InputComponent
     std::vector<std::string> inputMappingNames;
+    std::string inputDevice = "Unclaimed";
 
     // SaveFileRegistry
     std::unordered_map<std::string, std::string> savableFields;
