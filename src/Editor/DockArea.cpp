@@ -1,6 +1,7 @@
 #include "DockArea.h"
 #include "raylib.h"
 #include "raygui.h"
+#include "Core/SafeParse.h"
 #include <algorithm>
 #include <cstdio>
 
@@ -532,7 +533,7 @@ static std::unique_ptr<DockNode> LoadNode(
     if (it == in.end()) return nullptr;
 
     auto node  = std::make_unique<DockNode>();
-    node->type = (DockNode::Type)std::stoi(it->second);
+    node->type = (DockNode::Type)SafeParse::ToInt(it->second);
 
     if (node->IsLeaf()) {
         auto itTabs = in.find(prefix + ".tabs");
@@ -547,10 +548,10 @@ static std::unique_ptr<DockNode> LoadNode(
             }
         }
         auto itTab = in.find(prefix + ".activeTab");
-        if (itTab != in.end()) node->activeTab = std::stoi(itTab->second);
+        if (itTab != in.end()) node->activeTab = SafeParse::ToInt(itTab->second);
     } else {
         auto itR = in.find(prefix + ".splitRatio");
-        if (itR != in.end()) node->splitRatio = std::stof(itR->second);
+        if (itR != in.end()) node->splitRatio = SafeParse::ToFloat(itR->second);
         node->first  = LoadNode(in, prefix + ".0");
         node->second = LoadNode(in, prefix + ".1");
     }

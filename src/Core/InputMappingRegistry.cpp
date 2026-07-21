@@ -1,5 +1,6 @@
 #include "InputMappingRegistry.h"
 #include "LayoutSerializer.h"
+#include "SafeParse.h"
 #include <filesystem>
 #include <sstream>
 
@@ -49,8 +50,8 @@ InputMapping DecodeMapping(const std::string& raw) {
 
         InputMappingBinding binding;
         binding.key   = entry.substr(0, c1);
-        binding.scale = std::stof(entry.substr(c1 + 1, c2 - c1 - 1));
-        binding.axis  = std::stoi(entry.substr(c2 + 1));
+        binding.scale = SafeParse::ToFloat(entry.substr(c1 + 1, c2 - c1 - 1));
+        binding.axis  = SafeParse::ToInt(entry.substr(c2 + 1));
         mapping.bindings.push_back(binding);
     }
     return mapping;

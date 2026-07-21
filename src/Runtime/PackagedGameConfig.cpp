@@ -1,4 +1,5 @@
 #include "PackagedGameConfig.h"
+#include "Core/SafeParse.h"
 #include <fstream>
 #include <sstream>
 
@@ -14,8 +15,8 @@ bool PackagedGameConfig::LoadFromText(const std::string& text, PackagedGameConfi
         std::string value = line.substr(sep + 1);
 
         if (key == "name") out.name = value;
-        else if (key == "targetWidth") out.targetWidth = std::stoi(value);
-        else if (key == "targetHeight") out.targetHeight = std::stoi(value);
+        else if (key == "targetWidth") out.targetWidth = SafeParse::ToInt(value);
+        else if (key == "targetHeight") out.targetHeight = SafeParse::ToInt(value);
         else if (key == "defaultMap") out.defaultMap = value;
         else if (key == "renderer") out.renderer = value;
         else if (key == "cipher") out.cipher = value;

@@ -26,6 +26,10 @@ Actor* World::SpawnActor(const std::string& className, const std::string& name) 
 }
 
 void World::DestroyActor(Actor* actor) {
+    if (!actor) return;
+    for (Actor* pending : pendingDestroy) {
+        if (pending == actor) return;
+    }
     pendingDestroy.push_back(actor);
 }
 

@@ -11,7 +11,7 @@ class GraphExecutor {
 public:
     static void Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx = {});
     static void PropagateDataPins(Stargraph& graph, Node* node, ExecutionContext& ctx);
-    static void ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionContext& ctx);
+    static void ExecuteLinkedNodes(Stargraph& graph, Node* startNode, ExecutionContext& ctx, int enteredPinId = 0);
 
     static void RunCustomEvent(Stargraph& graph, const std::string& eventName, ExecutionContext ctx,
                                 const std::vector<std::pair<std::string, std::string>>& params = {});
@@ -19,6 +19,6 @@ public:
     static void RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName);
 
 private:
-    static Node* FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName = "Out");
+    static Node* FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName = "Out", int* outPinId = nullptr);
     static void ExecuteFromNode(Stargraph& graph, Node* startNode, ExecutionContext& ctx);
 };

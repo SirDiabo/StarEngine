@@ -1,6 +1,7 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
 #include "Core/CookedFile.h"
+#include "Core/SafeParse.h"
 #include <fstream>
 #include <sstream>
 
@@ -446,7 +447,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
 
     for (const ParsedSection& section : sections) {
         if (section.name == "Stargraph") {
-            if (const std::string* v = FindEntry(section, "Version")) formatVersion = std::stoi(*v);
+            if (const std::string* v = FindEntry(section, "Version")) formatVersion = SafeParse::ToInt(*v);
             if (const std::string* v = FindEntry(section, "Name")) assetName = *v;
             if (const std::string* v = FindEntry(section, "ParentClass")) parentClass = *v;
         } else if (section.name != "Components" && section.name.rfind("Component", 0) == 0) {
@@ -454,18 +455,18 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "Type")) comp.componentType = *v;
             if (const std::string* v = FindEntry(section, "Name")) comp.name = *v;
             if (const std::string* v = FindEntry(section, "Parent")) comp.parentName = *v;
-            if (const std::string* v = FindEntry(section, "PosX")) comp.posX = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "PosY")) comp.posY = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "PosZ")) comp.posZ = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "RotX")) comp.rotX = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "RotY")) comp.rotY = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "RotZ")) comp.rotZ = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "PosX")) comp.posX = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "PosY")) comp.posY = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "PosZ")) comp.posZ = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "RotX")) comp.rotX = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "RotY")) comp.rotY = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "RotZ")) comp.rotZ = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "Mesh")) comp.meshAssetPath = *v;
             if (const std::string* v = FindEntry(section, "MaterialCount")) {
-                int count = std::stoi(*v);
+                int count = SafeParse::ToInt(*v);
                 if (count > 0) comp.materialAssetPaths.resize((size_t)count);
                 for (int m = 0; m < count; m++) {
                     if (const std::string* mv = FindEntry(section, "Material" + std::to_string(m)))
@@ -473,16 +474,16 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                 }
             }
             if (const std::string* v = FindEntry(section, "CollisionShape")) comp.collisionShape = *v;
-            if (const std::string* v = FindEntry(section, "CollisionRadius")) comp.collisionRadius = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "CollisionHeight")) comp.collisionHeight = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "CollisionRadius")) comp.collisionRadius = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "CollisionHeight")) comp.collisionHeight = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "Sound")) comp.soundAssetPath = *v;
             if (const std::string* v = FindEntry(section, "AutoPlay")) comp.autoPlay = (*v == "true");
             if (const std::string* v = FindEntry(section, "Looping")) comp.looping = (*v == "true");
-            if (const std::string* v = FindEntry(section, "Volume")) comp.volume = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "Volume")) comp.volume = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "CameraOrthographic")) comp.cameraOrthographic = (*v == "true");
             if (const std::string* v = FindEntry(section, "InputMappingCount")) {
-                int count = std::stoi(*v);
+                int count = SafeParse::ToInt(*v);
                 for (int m = 0; m < count; m++) {
                     if (const std::string* mv = FindEntry(section, "InputMapping" + std::to_string(m)))
                         comp.inputMappingNames.push_back(*mv);
@@ -505,8 +506,8 @@ bool Stargraph::LoadFromFile(const std::string& path) {
 
             Node* node = CreateNode(*typeValue);
             if (const std::string* v = FindEntry(section, "Title")) node->title = *v;
-            if (const std::string* v = FindEntry(section, "PosX")) node->posX = std::stof(*v);
-            if (const std::string* v = FindEntry(section, "PosY")) node->posY = std::stof(*v);
+            if (const std::string* v = FindEntry(section, "PosX")) node->posX = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "PosY")) node->posY = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "Replication")) node->eventReplication = ReplicationModeFromString(*v);
             if (const std::string* v = FindEntry(section, "Reliable")) node->eventReliable = (*v == "true");
 
@@ -562,7 +563,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "IsArray")) var.isArray = (*v == "true");
             if (var.isArray) {
                 int count = 0;
-                if (const std::string* v = FindEntry(section, "ArrayCount")) count = std::stoi(*v);
+                if (const std::string* v = FindEntry(section, "ArrayCount")) count = SafeParse::ToInt(*v);
                 var.arrayValues.reserve(count > 0 ? (size_t)count : 0);
                 for (int e = 0; e < count; e++) {
                     std::string key = "Element" + std::to_string(e);
@@ -587,8 +588,8 @@ bool Stargraph::LoadFromFile(const std::string& path) {
         const std::string* toPinStr = FindEntry(section, "ToPin");
         if (!fromNodeStr || !fromPinStr || !toNodeStr || !toPinStr) continue;
 
-        int fromIndex = std::stoi(*fromNodeStr);
-        int toIndex = std::stoi(*toNodeStr);
+        int fromIndex = SafeParse::ToInt(*fromNodeStr);
+        int toIndex = SafeParse::ToInt(*toNodeStr);
         if (fromIndex < 0 || fromIndex >= (int)createdNodes.size()) continue;
         if (toIndex < 0 || toIndex >= (int)createdNodes.size()) continue;
 
