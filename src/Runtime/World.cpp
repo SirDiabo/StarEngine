@@ -109,10 +109,13 @@ void World::EndPlay() {
 }
 
 void World::FlushDestroyQueue() {
-    for (Actor* actor : pendingDestroy) {
+    std::vector<Actor*> toDestroy;
+    toDestroy.swap(pendingDestroy);
+
+    for (Actor* actor : toDestroy) {
+        if (actor->hasBegunPlay) actor->EndPlay();
         actors.erase(std::remove_if(actors.begin(), actors.end(),
             [actor](const std::unique_ptr<Actor>& a) { return a.get() == actor; }),
             actors.end());
     }
-    pendingDestroy.clear();
 }

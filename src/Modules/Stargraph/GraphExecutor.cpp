@@ -5,7 +5,6 @@
 #include "Runtime/World.h"
 #include <cstdlib>
 #include <vector>
-#include <unordered_map>
 
 static void ResolveWildcardPins(Stargraph& graph, Node* node) {
     bool hasWildcard = false;
@@ -138,11 +137,8 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
         }
     }
 
-    static std::unordered_map<std::string, bool> prevHeld;
-    bool wasHeld = false;
-    auto it = prevHeld.find(node.id);
-    if (it != prevHeld.end()) wasHeld = it->second;
-    prevHeld[node.id] = held;
+    bool wasHeld = node.heldPrevState;
+    node.heldPrevState = held;
 
     if (!held && wasHeld) {
         for (const Pin& outPin : node.outputs) {

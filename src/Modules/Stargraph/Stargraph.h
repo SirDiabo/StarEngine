@@ -142,6 +142,9 @@ struct Node {
 
     // Runtime-only flow control state
     bool flowState = false;
+
+    // Runtime-only held-input edge state
+    bool heldPrevState = false;
 };
 
 struct Link {
