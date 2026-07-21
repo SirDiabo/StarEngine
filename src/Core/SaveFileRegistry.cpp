@@ -11,7 +11,7 @@ SaveFileRegistry& SaveFileRegistry::Get() {
 
 void SaveFileRegistry::Load(const std::string& projectRoot) {
     encryptedFlags.clear();
-    filePath = (fs::path(projectRoot) / "SaveFileSettings.cfg").string();
+    filePath = (fs::path(projectRoot) / "Saved" / "SaveFileSettings.cfg").string();
 
     std::unordered_map<std::string, std::string> raw;
     if (!LayoutSerializer::Load(filePath, raw)) return;

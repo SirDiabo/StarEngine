@@ -13,7 +13,7 @@ NamedListRegistry& NamedListRegistry::Get() {
 
 void NamedListRegistry::Load(const std::string& projectRoot) {
     lists.clear();
-    filePath = (fs::path(projectRoot) / "Registries.cfg").string();
+    filePath = (fs::path(projectRoot) / "Saved" / "Registries.cfg").string();
 
     std::unordered_map<std::string, std::string> raw;
     if (!LayoutSerializer::Load(filePath, raw)) return;
