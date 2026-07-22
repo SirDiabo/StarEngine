@@ -673,7 +673,7 @@ x Class-graph cache invalidated on save so edited components reflect immediately
 o Reimport on source file change
 o Mesh/texture/material thumbnail preview in content browser
 o Content-browser drag-and-drop target inside StargraphEditorPanel
-o Multiple components of same type on one actor; convenience accessors for most recently added
+x Multiple components of same type on one actor; convenience accessors for most recently added
 o Physics/collision response (CollisionComponent is authorable/visual but no movement/overlap)
 
 ### 13.6 Skeletal Mesh and Animations

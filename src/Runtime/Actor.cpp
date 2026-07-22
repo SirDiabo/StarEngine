@@ -76,10 +76,10 @@ void Actor::Tick(float deltaTime) {
     if (useControlPitch) rotation.x = controlRotation.x;
     if (useControlRoll)  rotation.z = controlRotation.z;
 
-    if (cameraComponent) {
-        if (cameraComponent->useControlYaw)   cameraComponent->rotation.y = controlRotation.y - rotation.y;
-        if (cameraComponent->useControlPitch) cameraComponent->rotation.x = controlRotation.x - rotation.x;
-        if (cameraComponent->useControlRoll)  cameraComponent->rotation.z = controlRotation.z - rotation.z;
+    if (CameraComponent* cam = GetCameraComponent()) {
+        if (cam->useControlYaw)   cam->rotation.y = controlRotation.y - rotation.y;
+        if (cam->useControlPitch) cam->rotation.x = controlRotation.x - rotation.x;
+        if (cam->useControlRoll)  cam->rotation.z = controlRotation.z - rotation.z;
     }
 
     float moveLenSq = pendingMovementInput.x * pendingMovementInput.x
@@ -159,28 +159,12 @@ Vector3 Actor::GetComponentWorldRotation(Component* comp) const {
 void Actor::AddComponent(Component* component) {
     components.push_back(component);
     component->parent = GetRootComponent();
-    if (MeshComponent* mc = dynamic_cast<MeshComponent*>(component)) {
-        meshComponent = mc;
-    } else if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(component)) {
-        collisionComponent = cc;
-    } else if (AudioComponent* ac = dynamic_cast<AudioComponent*>(component)) {
-        audioComponent = ac;
-    } else if (CameraComponent* cc = dynamic_cast<CameraComponent*>(component)) {
-        cameraComponent = cc;
-    } else if (InputComponent* ic = dynamic_cast<InputComponent*>(component)) {
-        inputComponent = ic;
-    }
 }
 
 void Actor::RemoveComponent(Component* component) {
     auto it = std::find(components.begin(), components.end(), component);
     if (it != components.end()) {
         if (rootComponent == component) rootComponent = nullptr;
-        if (meshComponent == component) meshComponent = nullptr;
-        if (collisionComponent == component) collisionComponent = nullptr;
-        if (audioComponent == component) audioComponent = nullptr;
-        if (cameraComponent == component) cameraComponent = nullptr;
-        if (inputComponent == component) inputComponent = nullptr;
         components.erase(it);
         delete component;
     }

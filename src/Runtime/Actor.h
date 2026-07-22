@@ -67,11 +67,11 @@ public:
     Component* GetRootComponent();
     const std::vector<Component*>& GetComponents() const { return components; }
     Component* FindComponentByName(const std::string& name) const;
-    MeshComponent* GetMeshComponent() const { return meshComponent; }
-    CollisionComponent* GetCollisionComponent() const { return collisionComponent; }
-    AudioComponent* GetAudioComponent() const { return audioComponent; }
-    CameraComponent* GetCameraComponent() const { return cameraComponent; }
-    InputComponent* GetInputComponent() const { return inputComponent; }
+    MeshComponent* GetMeshComponent() const { return FindComponentOfType<MeshComponent>(); }
+    CollisionComponent* GetCollisionComponent() const { return FindComponentOfType<CollisionComponent>(); }
+    AudioComponent* GetAudioComponent() const { return FindComponentOfType<AudioComponent>(); }
+    CameraComponent* GetCameraComponent() const { return FindComponentOfType<CameraComponent>(); }
+    InputComponent* GetInputComponent() const { return FindComponentOfType<InputComponent>(); }
 
 protected:
     virtual void OnBeginPlay() {}
@@ -79,13 +79,17 @@ protected:
     virtual void OnEndPlay() {}
 
 private:
+    // Most recently added component wins, matches old slot behavior.
+    template<typename T>
+    T* FindComponentOfType() const {
+        for (auto it = components.rbegin(); it != components.rend(); ++it) {
+            if (T* match = dynamic_cast<T*>(*it)) return match;
+        }
+        return nullptr;
+    }
+
     GraphBehavior* graphBehavior = nullptr;
     std::vector<Component*> components;
     Component* rootComponent = nullptr;
-    MeshComponent* meshComponent = nullptr;
-    CollisionComponent* collisionComponent = nullptr;
-    AudioComponent* audioComponent = nullptr;
-    CameraComponent* cameraComponent = nullptr;
-    InputComponent* inputComponent = nullptr;
     uint32_t netId = 0;
 };
