@@ -128,6 +128,14 @@ inline void ReadVec3(const Pin& p, float& x, float& y, float& z) {
     x = v.x; y = v.y; z = v.z;
 }
 
+inline bool ReadBool(const Pin& p) {
+    return p.defaultValue.AsBool();
+}
+
+inline float ReadFloat(const Pin& p) {
+    return p.defaultValue.AsFloat();
+}
+
 struct Node {
     std::string id;
     std::string type;

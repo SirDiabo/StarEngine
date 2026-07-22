@@ -20,6 +20,7 @@
 #include "Nodes_Utility.h"
 #include "Nodes_Audio.h"
 #include "Nodes_Timers.h"
+#include "Nodes_Collision.h"
 
 StargraphModule::StargraphModule() {
     name = "Stargraph";
@@ -40,6 +41,7 @@ bool StargraphModule::Initialize() {
     RegisterCameraComponentNodes();
     RegisterMeshComponentNodes();
     RegisterCollisionComponentNodes();
+    RegisterCollisionNodes();
     RegisterAudioComponentNodes();
     RegisterInputComponentNodes();
     

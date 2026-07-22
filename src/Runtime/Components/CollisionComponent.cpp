@@ -1,7 +1,6 @@
 #include "CollisionComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
-#include <cstdlib>
 #include "Runtime/PointerUtil.h"
 
 void RegisterCollisionComponentNodes() {

@@ -1269,18 +1269,25 @@ void RegisterUtilityNodes() {
         node->inputs.push_back({"Point", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"RecPosition", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"RecSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"DrawDebug", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
     };
     checkCollisionPointRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 point = {0, 0, 0}, recPos = {0, 0, 0}, recSize = {100, 100, 0};
+        bool drawDebug = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Point") ReadVec3(p, point.x, point.y, point.z);
             if (p.name == "RecPosition") ReadVec3(p, recPos.x, recPos.y, recPos.z);
             if (p.name == "RecSize") ReadVec3(p, recSize.x, recSize.y, recSize.z);
+            if (p.name == "DrawDebug") drawDebug = p.defaultValue.AsBool();
         }
         Rectangle rec = {recPos.x, recPos.y, recSize.x, recSize.y};
         bool colliding = CheckCollisionPointRec({point.x, point.y}, rec);
         for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+        if (drawDebug) {
+            DrawRectangleLines((int)recPos.x, (int)recPos.y, (int)recSize.x, (int)recSize.y, GREEN);
+            DrawCircleLines((int)point.x, (int)point.y, 3.0f, YELLOW);
+        }
     };
     NodeRegistry::Get().RegisterNode(checkCollisionPointRec);
 
@@ -1293,20 +1300,31 @@ void RegisterUtilityNodes() {
         node->inputs.push_back({"RecASize", PinType::Vec3, true, false, 0, "100,100,0"});
         node->inputs.push_back({"RecBPosition", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"RecBSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"DrawDebug", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
     };
     checkCollisionRecs.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
+        bool drawDebug = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "RecAPosition") ReadVec3(p, aPos.x, aPos.y, aPos.z);
             if (p.name == "RecASize") ReadVec3(p, aSize.x, aSize.y, aSize.z);
             if (p.name == "RecBPosition") ReadVec3(p, bPos.x, bPos.y, bPos.z);
             if (p.name == "RecBSize") ReadVec3(p, bSize.x, bSize.y, bSize.z);
+            if (p.name == "DrawDebug") drawDebug = p.defaultValue.AsBool();
         }
         Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
         Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};
         bool colliding = CheckCollisionRecs(recA, recB);
         for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+        if (drawDebug) {
+            DrawRectangleLines((int)aPos.x, (int)aPos.y, (int)aSize.x, (int)aSize.y, GREEN);
+            DrawRectangleLines((int)bPos.x, (int)bPos.y, (int)bSize.x, (int)bSize.y, BLUE);
+            if (colliding) {
+                Rectangle overlap = GetCollisionRec(recA, recB);
+                DrawRectangleLines((int)overlap.x, (int)overlap.y, (int)overlap.width, (int)overlap.height, RED);
+            }
+        }
     };
     NodeRegistry::Get().RegisterNode(checkCollisionRecs);
 
@@ -1319,19 +1337,27 @@ void RegisterUtilityNodes() {
         node->inputs.push_back({"RadiusA", PinType::Float, true, false, 0, "50.0"});
         node->inputs.push_back({"CenterB", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"RadiusB", PinType::Float, true, false, 0, "50.0"});
+        node->inputs.push_back({"DrawDebug", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Colliding", PinType::Boolean, false, true});
     };
     checkCollisionCircles.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 centerA = {0, 0, 0}, centerB = {0, 0, 0};
         float radiusA = 50.0f, radiusB = 50.0f;
+        bool drawDebug = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "CenterA") ReadVec3(p, centerA.x, centerA.y, centerA.z);
             if (p.name == "RadiusA") radiusA = p.defaultValue.AsFloat();
             if (p.name == "CenterB") ReadVec3(p, centerB.x, centerB.y, centerB.z);
             if (p.name == "RadiusB") radiusB = p.defaultValue.AsFloat();
+            if (p.name == "DrawDebug") drawDebug = p.defaultValue.AsBool();
         }
         bool colliding = CheckCollisionCircles({centerA.x, centerA.y}, radiusA, {centerB.x, centerB.y}, radiusB);
         for (Pin& p : node.outputs) if (p.name == "Colliding") p.defaultValue = colliding ? "true" : "false";
+        if (drawDebug) {
+            DrawCircleLines((int)centerA.x, (int)centerA.y, radiusA, GREEN);
+            DrawCircleLines((int)centerB.x, (int)centerB.y, radiusB, BLUE);
+            DrawLine((int)centerA.x, (int)centerA.y, (int)centerB.x, (int)centerB.y, GRAY);
+        }
     };
     NodeRegistry::Get().RegisterNode(checkCollisionCircles);
 
@@ -1344,16 +1370,19 @@ void RegisterUtilityNodes() {
         node->inputs.push_back({"RecASize", PinType::Vec3, true, false, 0, "100,100,0"});
         node->inputs.push_back({"RecBPosition", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"RecBSize", PinType::Vec3, true, false, 0, "100,100,0"});
+        node->inputs.push_back({"DrawDebug", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Position", PinType::Vec3, false, true});
         node->outputs.push_back({"Size", PinType::Vec3, false, true});
     };
     getCollisionRec.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 aPos = {0, 0, 0}, aSize = {100, 100, 0}, bPos = {0, 0, 0}, bSize = {100, 100, 0};
+        bool drawDebug = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "RecAPosition") ReadVec3(p, aPos.x, aPos.y, aPos.z);
             if (p.name == "RecASize") ReadVec3(p, aSize.x, aSize.y, aSize.z);
             if (p.name == "RecBPosition") ReadVec3(p, bPos.x, bPos.y, bPos.z);
             if (p.name == "RecBSize") ReadVec3(p, bSize.x, bSize.y, bSize.z);
+            if (p.name == "DrawDebug") drawDebug = p.defaultValue.AsBool();
         }
         Rectangle recA = {aPos.x, aPos.y, aSize.x, aSize.y};
         Rectangle recB = {bPos.x, bPos.y, bSize.x, bSize.y};
@@ -1368,6 +1397,11 @@ void RegisterUtilityNodes() {
                 snprintf(buf, sizeof(buf), "%g,%g,0", overlap.width, overlap.height);
                 p.defaultValue = buf;
             }
+        }
+        if (drawDebug) {
+            DrawRectangleLines((int)aPos.x, (int)aPos.y, (int)aSize.x, (int)aSize.y, GREEN);
+            DrawRectangleLines((int)bPos.x, (int)bPos.y, (int)bSize.x, (int)bSize.y, BLUE);
+            DrawRectangleLines((int)overlap.x, (int)overlap.y, (int)overlap.width, (int)overlap.height, RED);
         }
     };
     NodeRegistry::Get().RegisterNode(getCollisionRec);

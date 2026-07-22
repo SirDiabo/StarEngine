@@ -10,6 +10,8 @@
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
+#include "Runtime/Components/CameraComponent.h"
+#include "Modules/Stargraph/Nodes_Collision.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
@@ -90,6 +92,8 @@ bool Application::Initialize(int argc, char* argv[]) {
     }
 
     ModuleManager::Get().InitializeAll();
+
+    SetCollisionDebugEnabled(true);
 
     editor->RestoreState();
 

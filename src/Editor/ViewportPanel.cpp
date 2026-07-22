@@ -2,6 +2,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Modules/Stargraph/Nodes_Collision.h"
 #include "Runtime/AssetCache.h"
 #include "Runtime/SceneRenderer.h"
 #include "Runtime/WorldSpawner.h"
@@ -428,6 +429,8 @@ void ViewportPanel::RenderScene() {
             }
         }
     }
+
+    DrawAndClearCollisionDebug();
 
     EndMode3D();
 
