@@ -1,5 +1,6 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
+#include "ComponentFields.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
 #include <fstream>
@@ -274,25 +275,26 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "ScaleX=" << comp.scaleX << "\n";
         out << "ScaleY=" << comp.scaleY << "\n";
         out << "ScaleZ=" << comp.scaleZ << "\n";
-        out << "Mesh=" << comp.meshAssetPath << "\n";
-        out << "MaterialCount=" << comp.materialAssetPaths.size() << "\n";
-        for (size_t m = 0; m < comp.materialAssetPaths.size(); m++) {
-            out << "Material" << m << "=" << comp.materialAssetPaths[m] << "\n";
+        for (const ComponentFieldDesc& f : GetComponentFields()) {
+            if (f.componentType != comp.componentType) continue;
+            switch (f.type) {
+                case ComponentFieldType::String:
+                    out << f.key << "=" << (comp.*f.stringField) << "\n";
+                    break;
+                case ComponentFieldType::Float:
+                    out << f.key << "=" << (comp.*f.floatField) << "\n";
+                    break;
+                case ComponentFieldType::Bool:
+                    out << f.key << "=" << ((comp.*f.boolField) ? "true" : "false") << "\n";
+                    break;
+                case ComponentFieldType::StringArray: {
+                    const auto& arr = comp.*f.stringArrayField;
+                    out << f.key << "Count=" << arr.size() << "\n";
+                    for (size_t m = 0; m < arr.size(); m++) out << f.key << m << "=" << arr[m] << "\n";
+                    break;
+                }
+            }
         }
-        out << "CollisionShape=" << comp.collisionShape << "\n";
-        out << "CollisionRadius=" << comp.collisionRadius << "\n";
-        out << "CollisionHeight=" << comp.collisionHeight << "\n";
-        out << "Sound=" << comp.soundAssetPath << "\n";
-        out << "AutoPlay=" << (comp.autoPlay ? "true" : "false") << "\n";
-        out << "Looping=" << (comp.looping ? "true" : "false") << "\n";
-        out << "Volume=" << comp.volume << "\n";
-        out << "CameraFOV=" << comp.cameraFov << "\n";
-        out << "CameraOrthographic=" << (comp.cameraOrthographic ? "true" : "false") << "\n";
-        out << "InputMappingCount=" << comp.inputMappingNames.size() << "\n";
-        for (size_t m = 0; m < comp.inputMappingNames.size(); m++) {
-            out << "InputMapping" << m << "=" << comp.inputMappingNames[m] << "\n";
-        }
-        out << "InputDevice=" << comp.inputDevice << "\n";
         {
             std::string savable;
             for (const auto& kv : comp.savableFields) {
@@ -464,32 +466,32 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "Mesh")) comp.meshAssetPath = *v;
-            if (const std::string* v = FindEntry(section, "MaterialCount")) {
-                int count = SafeParse::ToInt(*v);
-                if (count > 0) comp.materialAssetPaths.resize((size_t)count);
-                for (int m = 0; m < count; m++) {
-                    if (const std::string* mv = FindEntry(section, "Material" + std::to_string(m)))
-                        comp.materialAssetPaths[m] = *mv;
+            for (const ComponentFieldDesc& f : GetComponentFields()) {
+                if (f.componentType != comp.componentType) continue;
+                switch (f.type) {
+                    case ComponentFieldType::String:
+                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.stringField = *v;
+                        break;
+                    case ComponentFieldType::Float:
+                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.floatField = SafeParse::ToFloat(*v);
+                        break;
+                    case ComponentFieldType::Bool:
+                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.boolField = (*v == "true");
+                        break;
+                    case ComponentFieldType::StringArray: {
+                        if (const std::string* v = FindEntry(section, std::string(f.key) + "Count")) {
+                            int count = SafeParse::ToInt(*v);
+                            auto& arr = comp.*f.stringArrayField;
+                            if (count > 0) arr.resize((size_t)count);
+                            for (int m = 0; m < count; m++) {
+                                if (const std::string* mv = FindEntry(section, f.key + std::to_string(m)))
+                                    arr[(size_t)m] = *mv;
+                            }
+                        }
+                        break;
+                    }
                 }
             }
-            if (const std::string* v = FindEntry(section, "CollisionShape")) comp.collisionShape = *v;
-            if (const std::string* v = FindEntry(section, "CollisionRadius")) comp.collisionRadius = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "CollisionHeight")) comp.collisionHeight = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "Sound")) comp.soundAssetPath = *v;
-            if (const std::string* v = FindEntry(section, "AutoPlay")) comp.autoPlay = (*v == "true");
-            if (const std::string* v = FindEntry(section, "Looping")) comp.looping = (*v == "true");
-            if (const std::string* v = FindEntry(section, "Volume")) comp.volume = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "CameraFOV")) comp.cameraFov = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "CameraOrthographic")) comp.cameraOrthographic = (*v == "true");
-            if (const std::string* v = FindEntry(section, "InputMappingCount")) {
-                int count = SafeParse::ToInt(*v);
-                for (int m = 0; m < count; m++) {
-                    if (const std::string* mv = FindEntry(section, "InputMapping" + std::to_string(m)))
-                        comp.inputMappingNames.push_back(*mv);
-                }
-            }
-            if (const std::string* v = FindEntry(section, "InputDevice")) comp.inputDevice = *v;
             if (const std::string* v = FindEntry(section, "SavableFields")) {
                 std::stringstream ss(*v);
                 std::string entry;
