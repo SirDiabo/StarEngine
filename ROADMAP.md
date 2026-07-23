@@ -182,7 +182,7 @@ x Input Devices listed and pickable in component details panel
 x More Nodes:
   "Override Input" rebinds a mapping at runtime
   "Register Unclaimed Input" polls Keyboard+Mouse then each connected gamepad not already claimed by another actor's InputComponent
-o Multiple Input Components per actor, one per device, once multi-component-per-type support exists (13.5)
+o Multiple Input Components per actor, one per input device
 
 ### 2.12 Component Hierarchy
 x Component::parent consulted for world transform composition (Actor::GetComponentWorldTransform walks the parent chain, used everywhere a component's world position/rotation is computed)
@@ -206,7 +206,7 @@ x Content browser icon for .staractor files
 x AssetInfo, AssetTypeRegistry
 o Asset registry persistence (scan and cache on project load)
 o Asset reimport on source file change
-o Asset cooking pipeline (for eventual game packaging)
+o Asset cooking pipeline (for game packaging)
 
 ### 3.3 Scene Format (StarMap)
 x StarMap file format (.starmap) with actor instance records
