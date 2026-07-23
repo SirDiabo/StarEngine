@@ -1,0 +1,721 @@
+#include "StargraphEditorPanel.h"
+#include "PropertyFields.h"
+#include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/InputMappingRegistry.h"
+#include "Core/NamedListRegistry.h"
+#include "Core/SaveFileRegistry.h"
+#include "raygui.h"
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+
+static std::vector<std::string> GetParameterlessCustomEventNames(Stargraph& graph) {
+    std::vector<std::string> names;
+    for (Node* node : graph.GetNodesOfType("Custom_Event")) {
+        if (node->outputs.size() == 1) names.push_back(node->title);
+    }
+    return names;
+}
+
+static std::vector<std::string> GetInputComponentNames(Stargraph& graph) {
+    std::vector<std::string> names;
+    for (const ComponentDecl& comp : graph.GetComponents()) {
+        if (comp.componentType == "InputComponent") names.push_back(comp.name);
+    }
+    return names;
+}
+
+static std::vector<std::string> GetProjectInputMappingNames() {
+    return NamedListRegistry::Get().GetList(InputMappingRegistry::Category());
+}
+
+void StargraphEditorPanel::RenderLeftPanel() {
+    float topY = bounds.y + toolbarHeight + componentOutlinerHeight;
+    Rectangle panel = {bounds.x, topY, leftPanelWidth, bounds.height - toolbarHeight - componentOutlinerHeight};
+    DrawRectangleRec(panel, {30, 30, 33, 255});
+    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+
+    Vector2 mousePos = GetMousePosition();
+    float y = panel.y + 8;
+
+    auto sectionHeader = [&](const char* label) {
+        DrawText(label, (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+        y += 18;
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        y += 6;
+    };
+
+    sectionHeader("Graphs");
+    DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
+    DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, WHITE);
+    y += 22;
+
+    y += 8;
+    sectionHeader("Functions");
+
+    y += 8;
+    sectionHeader("Variables");
+
+    std::vector<Variable>& vars = graph.GetVariables();
+    for (size_t i = 0; i < vars.size(); i++) {
+        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
+        bool isSelected = (selectedVariableIndex == (int)i);
+
+        DrawRectangleRec(row, isSelected ? Color{55, 60, 80, 255} : Color{42, 42, 48, 255});
+        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(vars[i].type));
+
+        if (renamingVariableIndex == (int)i) {
+            std::string nameOut = vars[i].name;
+            if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
+                                          sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
+                vars[i].name = nameOut;
+                renamingVariableIndex = -1;
+                variableNameActiveField = 0;
+                isDirty = true;
+            } else if (IsKeyPressed(KEY_ESCAPE)) {
+                renamingVariableIndex = -1;
+                variableNameActiveField = 0;
+            }
+        } else {
+            std::string label = vars[i].name + (vars[i].isArray ? " []" : "");
+            DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+
+            if (CheckCollisionPointRec(mousePos, row)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    selectedVariableIndex = (int)i;
+                    selectedComponentIndex = -1;
+                    selectedNodeId = -1;
+                    selectedNodeIds.clear();
+                    varContextMenuOpen = false;
+                    variableDragIndex = (int)i;
+                    variableDragActive = false;
+                    variableDragPos = mousePos;
+                }
+                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                    selectedVariableIndex = (int)i;
+                    selectedComponentIndex = -1;
+                    varContextMenuOpen = true;
+                    varContextMenuIndex = (int)i;
+                }
+            }
+        }
+
+        if (variableDragIndex >= 0 && variableDragIndex < (int)vars.size() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float dx = mousePos.x - variableDragPos.x;
+            float dy = mousePos.y - variableDragPos.y;
+            if (!variableDragActive && (dx*dx + dy*dy > 25)) {
+                variableDragActive = true;
+            }
+        }
+
+        if (isSelected && IsKeyPressed(KEY_DELETE)) {
+            vars.erase(vars.begin() + i);
+            selectedVariableIndex = -1;
+            isDirty = true;
+            break;
+        }
+
+        y += 22;
+    }
+
+    if (addingVariable) {
+        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
+        DrawRectangleRec(row, {42, 42, 48, 255});
+        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
+
+        std::string nameOut = varNameBuffer;
+        if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
+                                      sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
+            if (!nameOut.empty()) {
+                Variable v;
+                v.name = nameOut;
+                v.type = PinType::Boolean;
+                graph.AddVariable(v);
+                selectedVariableIndex = (int)graph.GetVariables().size() - 1;
+                isDirty = true;
+            }
+            addingVariable = false;
+            variableNameActiveField = 0;
+        } else if (IsKeyPressed(KEY_ESCAPE)) {
+            addingVariable = false;
+            variableNameActiveField = 0;
+        }
+        y += 22;
+    }
+
+    Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
+    GuiButton(addBtn, "+ Variable");
+    
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
+        snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
+        PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
+        addingVariable = true;
+        variableNameActiveField = 1;
+    }
+
+    if (varContextMenuOpen) {
+        Rectangle popup = {panel.x + leftPanelWidth, 0, 110, 50};
+        for (size_t i = 0; i < vars.size(); i++) {
+            if ((int)i == varContextMenuIndex) {
+                popup.y = panel.y + 8 + 24 + 22 + 8 + 24 + 8 + 24 + 8 + 24 + (float)i * 22 - 4;
+                break;
+            }
+        }
+
+        DrawRectangleRec(popup, {55, 55, 60, 255});
+        DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+
+        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
+        GuiButton(renameBtn, "Rename");
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, renameBtn)) {
+            snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
+            PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
+            renamingVariableIndex = varContextMenuIndex;
+            variableNameActiveField = 1;
+            varContextMenuOpen = false;
+        }
+        if (GuiButton({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
+            vars.erase(vars.begin() + varContextMenuIndex);
+            selectedVariableIndex = -1;
+            varContextMenuOpen = false;
+            isDirty = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            varContextMenuOpen = false;
+        }
+    }
+}
+
+void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField) {
+    if (varArrayBufs.size() != var.arrayValues.size()) {
+        varArrayBufs.resize(var.arrayValues.size());
+    }
+
+    PropertyField::ArrayAction action;
+
+    Rectangle headerRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
+    PropertyField::ArrayHeader(headerRect, "Elements", (int)var.arrayValues.size(), action);
+    y += PropertyField::ArrayRowHeight() + 4;
+
+    for (size_t i = 0; i < var.arrayValues.size(); i++) {
+        Rectangle rowRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
+        Rectangle valueRect = PropertyField::ArrayValueRect(rowRect);
+        int fieldId = 10 + (int)i * 4; // 4 id slots per element; Vec3Row needs 3
+
+        std::string elem = var.arrayValues[i];
+        bool changed = false;
+
+        switch (var.type) {
+            case PinType::Boolean: {
+                bool bval = (elem == "true" || elem == "1");
+                Rectangle boolRect = {valueRect.x, valueRect.y, 18, valueRect.height};
+                if (PropertyField::BoolBox(boolRect, bval)) {
+                    elem = bval ? "true" : "false";
+                    changed = true;
+                }
+                DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 11, WHITE);
+                break;
+            }
+            case PinType::Integer: {
+                int ival = atoi(elem.c_str());
+                if (PropertyField::IntBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                           fieldId, activeField, ival)) {
+                    elem = std::to_string(ival);
+                    changed = true;
+                }
+                break;
+            }
+            case PinType::Float: {
+                float fval = (float)atof(elem.c_str());
+                if (PropertyField::FloatBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                             fieldId, activeField, fval)) {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%.2f", fval);
+                    elem = buf;
+                    changed = true;
+                }
+                break;
+            }
+            case PinType::Vec3: {
+                float vx = 0, vy = 0, vz = 0;
+                sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                if (PropertyField::Vec3Row(valueRect, varArrayBufs[i].text[0], varArrayBufs[i].text[1],
+                                            varArrayBufs[i].text[2], fieldId, activeField, vx, vy, vz)) {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+                    elem = buf;
+                    changed = true;
+                }
+                break;
+            }
+            default: {
+                std::string strVal = elem;
+                if (PropertyField::StringBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
+                                              fieldId, activeField, strVal, true, "(empty)")) {
+                    elem = strVal;
+                    changed = true;
+                }
+                break;
+            }
+        }
+
+        if (changed) {
+            var.arrayValues[i] = elem;
+            isDirty = true;
+        }
+
+        PropertyField::ArrayRowControls(rowRect, (int)i, (int)var.arrayValues.size(), action);
+        y += PropertyField::ArrayRowHeight() + 3;
+    }
+
+    if (action.addClicked) {
+        std::string def = var.DefaultElementText();
+        var.arrayValues.push_back(def);
+
+        ArrayElemBuf buf;
+        if (var.type == PinType::Vec3) {
+            float vx = 0, vy = 0, vz = 0;
+            sscanf(def.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+            snprintf(buf.text[0], sizeof(buf.text[0]), "%.2f", vx);
+            snprintf(buf.text[1], sizeof(buf.text[1]), "%.2f", vy);
+            snprintf(buf.text[2], sizeof(buf.text[2]), "%.2f", vz);
+        } else {
+            snprintf(buf.text[0], sizeof(buf.text[0]), "%s", def.c_str());
+        }
+        varArrayBufs.push_back(buf);
+        isDirty = true;
+    } else if (action.removeIndex >= 0 && action.removeIndex < (int)var.arrayValues.size()) {
+        var.arrayValues.erase(var.arrayValues.begin() + action.removeIndex);
+        if (action.removeIndex < (int)varArrayBufs.size())
+            varArrayBufs.erase(varArrayBufs.begin() + action.removeIndex);
+        isDirty = true;
+        activeField = 0;
+    } else if (action.moveUpIndex > 0 && action.moveUpIndex < (int)var.arrayValues.size()) {
+        std::swap(var.arrayValues[action.moveUpIndex], var.arrayValues[action.moveUpIndex - 1]);
+        if (action.moveUpIndex < (int)varArrayBufs.size())
+            std::swap(varArrayBufs[action.moveUpIndex], varArrayBufs[action.moveUpIndex - 1]);
+        isDirty = true;
+        activeField = 0;
+    } else if (action.moveDownIndex >= 0 && action.moveDownIndex + 1 < (int)var.arrayValues.size()) {
+        std::swap(var.arrayValues[action.moveDownIndex], var.arrayValues[action.moveDownIndex + 1]);
+        if (action.moveDownIndex + 1 < (int)varArrayBufs.size())
+            std::swap(varArrayBufs[action.moveDownIndex], varArrayBufs[action.moveDownIndex + 1]);
+        isDirty = true;
+        activeField = 0;
+    }
+}
+
+void StargraphEditorPanel::RenderRightPanel() {
+    Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight,
+                       rightPanelWidth, bounds.height - toolbarHeight};
+    DrawRectangleRec(panel, {30, 30, 33, 255});
+    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+
+    float y = panel.y + 8;
+
+    if (showSelfActorDetails) {
+        DrawText(graph.assetName.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        y += 20;
+        DrawText("Actor properties", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        return;
+    }
+
+    std::vector<ComponentDecl>& comps = graph.GetComponents();
+    if (selectedComponentIndex >= 0 && selectedComponentIndex < (int)comps.size()) {
+        RenderComponentDetails(panel, y);
+        return;
+    }
+
+    std::vector<Variable>& vars = graph.GetVariables();
+    if (selectedVariableIndex >= 0 && selectedVariableIndex < (int)vars.size()) {
+        Variable& var = vars[selectedVariableIndex];
+
+        DrawText("Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static char varNameEditBuf[128] = "";
+        static char varValBuffer[128] = "";
+        static char varIntBuf[32] = "";
+        static char varFloatBuf[32] = "";
+        static char varVecBuf[3][32] = {"", "", ""};
+        static int lastDetailIndex = -1;
+        static int activeField = 0; // 0=none 1=name 2..4=value
+
+        auto refreshValueBuffers = [&]() {
+            switch (var.type) {
+                case PinType::Integer:
+                    snprintf(varIntBuf, sizeof(varIntBuf), "%d", atoi(var.value.c_str()));
+                    break;
+                case PinType::Float:
+                    snprintf(varFloatBuf, sizeof(varFloatBuf), "%.2f", atof(var.value.c_str()));
+                    break;
+                case PinType::Vec3: {
+                    float vx = 0, vy = 0, vz = 0;
+                    sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                    snprintf(varVecBuf[0], 32, "%.2f", vx);
+                    snprintf(varVecBuf[1], 32, "%.2f", vy);
+                    snprintf(varVecBuf[2], 32, "%.2f", vz);
+                    break;
+                }
+                default:
+                    snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
+                    break;
+            }
+
+            varArrayBufs.resize(var.arrayValues.size());
+            for (size_t i = 0; i < var.arrayValues.size(); i++) {
+                const std::string& elem = var.arrayValues[i];
+                switch (var.type) {
+                    case PinType::Vec3: {
+                        float vx = 0, vy = 0, vz = 0;
+                        sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", vx);
+                        snprintf(varArrayBufs[i].text[1], sizeof(varArrayBufs[i].text[1]), "%.2f", vy);
+                        snprintf(varArrayBufs[i].text[2], sizeof(varArrayBufs[i].text[2]), "%.2f", vz);
+                        break;
+                    }
+                    case PinType::Integer:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%d", atoi(elem.c_str()));
+                        break;
+                    case PinType::Float:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", atof(elem.c_str()));
+                        break;
+                    default:
+                        snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%s", elem.c_str());
+                        break;
+                }
+            }
+        };
+
+        if (lastDetailIndex != selectedVariableIndex) {
+            snprintf(varNameEditBuf, sizeof(varNameEditBuf), "%s", var.name.c_str());
+            refreshValueBuffers();
+            lastDetailIndex = selectedVariableIndex;
+            activeField = 0;
+            savePicker.Close();
+        }
+
+        Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+        std::string varName = var.name;
+        if (PropertyField::StringBox(nameRect, varNameEditBuf, sizeof(varNameEditBuf), 1, activeField, varName)) {
+            var.name = varName;
+            isDirty = true;
+        }
+        y += 24;
+
+        DrawText("Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object","Wildcard"};
+        int typeIndex = (int)var.type;
+        if (typeIndex < 0 || typeIndex > 8) typeIndex = 2;
+
+        Rectangle typeRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style typeStyle;
+        DrawRectangleRec(typeRect, typeStyle.box);
+        DrawRectangleLinesEx(typeRect, 1, typeStyle.border);
+        DrawText(typeNames[typeIndex], (int)typeRect.x + 4, (int)typeRect.y + 3, 11, typeStyle.text);
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), typeRect)) {
+            int next = typeIndex + 1;
+            if (next < 2 || next > 7) next = 2;
+            var.type = (PinType)next;
+            switch (var.type) {
+                case PinType::Boolean: var.value = "false"; break;
+                case PinType::Integer: var.value = "0"; break;
+                case PinType::Float:   var.value = "0.00"; break;
+                case PinType::Vec3:    var.value = "0.00,0.00,0.00"; break;
+                default:               var.value = ""; break;
+            }
+            var.arrayValues.clear();
+            varArrayBufs.clear();
+            refreshValueBuffers();
+            isDirty = true;
+            activeField = 0;
+        }
+        y += 24;
+
+        DrawText("Array", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        {
+            Rectangle arrayCheckRect = {panel.x + 8, y, 18, 18};
+            bool isArr = var.isArray;
+            if (PropertyField::BoolBox(arrayCheckRect, isArr)) {
+                var.isArray = isArr;
+                if (var.isArray) {
+                    var.arrayValues.clear();
+                    var.arrayValues.push_back(var.value.empty() ? var.DefaultElementText() : var.value);
+                } else {
+                    var.value = var.arrayValues.empty() ? var.DefaultElementText() : var.arrayValues.front();
+                    var.arrayValues.clear();
+                }
+                varArrayBufs.clear();
+                refreshValueBuffers();
+                isDirty = true;
+                activeField = 0;
+            }
+            DrawText(isArr ? "true" : "false", (int)arrayCheckRect.x + 24, (int)arrayCheckRect.y + 2, 12, WHITE);
+        }
+        y += 24;
+
+        DrawText("Default Value", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        if (var.isArray) {
+            RenderVariableArrayEditor(panel, y, var, activeField);
+        } else if (var.type == PinType::Boolean) {
+            bool bval = (var.value == "true" || var.value == "1");
+            Rectangle boolRect = {panel.x + 8, y, 18, 18};
+            if (PropertyField::BoolBox(boolRect, bval)) {
+                var.value = bval ? "true" : "false";
+                isDirty = true;
+            }
+            DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 12, WHITE);
+        } else if (var.type == PinType::Integer) {
+            Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+            int ival = atoi(var.value.c_str());
+            if (PropertyField::IntBox(r, varIntBuf, sizeof(varIntBuf), 2, activeField, ival)) {
+                var.value = std::to_string(ival);
+                isDirty = true;
+            }
+        } else if (var.type == PinType::Float) {
+            Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+            float fval = (float)atof(var.value.c_str());
+            if (PropertyField::FloatBox(r, varFloatBuf, sizeof(varFloatBuf), 2, activeField, fval)) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.2f", fval);
+                var.value = buf;
+                isDirty = true;
+            }
+        } else if (var.type == PinType::Vec3) {
+            Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
+            float vx = 0, vy = 0, vz = 0;
+            sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+            if (PropertyField::Vec3Row(row, varVecBuf[0], varVecBuf[1], varVecBuf[2], 2, activeField,
+                                        vx, vy, vz)) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+                var.value = buf;
+                isDirty = true;
+            }
+        } else {
+            Rectangle valRect = {panel.x + 8, y, panel.width - 16, 18};
+            std::string varValue = var.value;
+            if (PropertyField::StringBox(valRect, varValBuffer, sizeof(varValBuffer), 2, activeField, varValue,
+                                          true, "(empty)")) {
+                var.value = varValue;
+                isDirty = true;
+            }
+        }
+        y += 26;
+
+        DrawText("Replication", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+
+        static const char* replNames[] = {"Local", "Replicated", "Server Only"};
+        Rectangle replRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style replStyle;
+        DrawRectangleRec(replRect, replStyle.box);
+        DrawRectangleLinesEx(replRect, 1, replStyle.border);
+        DrawText(replNames[(int)var.replication], (int)replRect.x + 4, (int)replRect.y + 3, 11, replStyle.text);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), replRect)) {
+            var.replication = (ReplicationMode)(((int)var.replication + 1) % 3);
+            isDirty = true;
+        }
+        y += 26;
+
+        DrawText("Save File", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        Rectangle saveRect = {panel.x + 8, y, panel.width - 16, 18};
+        PropertyField::Style saveStyle;
+        DrawRectangleRec(saveRect, saveStyle.box);
+        DrawRectangleLinesEx(saveRect, 1, saveStyle.border);
+        std::string saveLabel = var.saveFile.empty() ? "None" : var.saveFile;
+        DrawText(saveLabel.c_str(), (int)saveRect.x + 4, (int)saveRect.y + 3, 11, saveStyle.text);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), saveRect) && !savePicker.IsOpen()) {
+            saveTargetFieldKey.clear();
+            savePicker.Open({saveRect.x, saveRect.y + saveRect.height}, SaveFileRegistry::Category());
+        }
+        std::string pickedSaveFile;
+        if (savePicker.Render(pickedSaveFile)) {
+            var.saveFile = pickedSaveFile;
+            isDirty = true;
+        }
+        return;
+    }
+
+    if (selectedNodeId == -1) {
+        DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, {100, 100, 110, 255});
+        return;
+    }
+
+    Node* selectedNode = graph.FindNodeById(selectedNodeId);
+    if (selectedNode && selectedNode->type == "Custom_Event") {
+        RenderCustomEventDetails(panel, y, *selectedNode);
+        return;
+    }
+    if (selectedNode && selectedNode->type == "Call_Custom_Event") {
+        RenderCallCustomEventDetails(panel, y, *selectedNode);
+        return;
+    }
+
+    for (const Node& node : graph.GetNodes()) {
+        if (std::stoi(node.id) != selectedNodeId) continue;
+
+        DrawText(node.title.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        y += 20;
+        DrawText(node.type.c_str(), (int)panel.x + 8, (int)y, 11, {120, 120, 130, 255});
+        y += 18;
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        y += 8;
+        for (const Pin& pin : node.inputs) {
+            if (pin.type == PinType::Exec) continue;
+            if (pin.name == "Variable_Name") continue;
+            if (pin.name == "Component_Name") continue;
+            DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+            y += 14;
+            if ((node.type == "Play_Sound" || node.type == "Load_Music") && pin.name == "Path") {
+                Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+                DrawRectangleRec(r, {38, 38, 42, 255});
+                DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+                std::string pathLabel = pin.defaultValue.empty() ? "None" : std::filesystem::path((std::string)pin.defaultValue).stem().string();
+                DrawText(pathLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
+                    audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
+                }
+                std::string pickedPath;
+                if (audioPathPicker.Render(pickedPath)) {
+                    Pin* editablePin = graph.FindPin(pin.id);
+                    if (editablePin) {
+                        editablePin->defaultValue = pickedPath;
+                        isDirty = true;
+                    }
+                }
+                y += 22;
+            } else {
+                DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
+                         (int)panel.x + 12, (int)y, 11, WHITE);
+                y += 16;
+            }
+        }
+        break;
+    }
+}
+
+void StargraphEditorPanel::RenderKeyPickerPopup() {
+    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
+                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
+
+    Pin* targetPin = nullptr;
+    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+        for (Pin& pin : node.inputs) {
+            if (pin.id == keyPickerPinId) { targetPin = &pin; break; }
+        }
+        if (targetPin) break;
+    }
+    if (!targetPin) { keyPickerOpen = false; keyPickerPinId = 0; return; }
+
+    std::vector<std::string> allKeys;
+    switch (keyPickerKind) {
+        case PinPickerKind::FunctionName:  allKeys = GetParameterlessCustomEventNames(graph); break;
+        case PinPickerKind::ComponentRef:  allKeys = GetInputComponentNames(graph); break;
+        case PinPickerKind::MappingName:   allKeys = GetProjectInputMappingNames(); break;
+        default:                           allKeys = GetInputKeyNames(); break;
+    }
+
+    std::vector<int> filtered;
+    std::string searchLower = keyPickerSearch;
+    for (char& c : searchLower) c = (char)tolower(c);
+    for (size_t i = 0; i < allKeys.size(); i++) {
+        std::string display;
+        for (char c : allKeys[i]) {
+            display += (c == '_') ? ' ' : (char)tolower(c);
+        }
+        if (searchLower.empty() || display.find(searchLower) != std::string::npos) {
+            filtered.push_back((int)i);
+        }
+    }
+
+    float menuW = keyPickerWidth;
+    float itemH = 20.0f;
+    float searchH = 26.0f;
+    float maxVisibleH = 220.0f;
+    float listH = std::min((float)filtered.size() * itemH + 4.0f, maxVisibleH);
+    float menuH = searchH + listH;
+
+    float popupX = keyPickerPos.x;
+    float popupY = keyPickerPos.y;
+    if (popupX + menuW > graphArea.x + graphArea.width) popupX = graphArea.x + graphArea.width - menuW;
+    if (popupY + menuH > graphArea.y + graphArea.height) popupY = graphArea.y + graphArea.height - menuH;
+    if (popupX < graphArea.x) popupX = graphArea.x;
+    if (popupY < graphArea.y) popupY = graphArea.y;
+
+    Rectangle popup = {popupX, popupY, menuW, menuH};
+    Vector2 mp = GetMousePosition();
+
+    if (keyPickerJustOpened) {
+        keyPickerJustOpened = false;
+    } else {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, popup)) {
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            return;
+        }
+        if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            return;
+        }
+    }
+
+    DrawRectangleRec(popup, {44, 44, 50, 255});
+    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+
+    Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
+    GuiTextBox(searchRect, keyPickerSearch, sizeof(keyPickerSearch), true);
+
+    Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
+    if (CheckCollisionPointRec(mp, listArea)) {
+        float wheel = GetMouseWheelMove();
+        keyPickerScroll -= wheel * itemH * 2;
+    }
+    float maxScroll = (float)filtered.size() * itemH + 4.0f - listH;
+    if (maxScroll < 0) maxScroll = 0;
+    if (keyPickerScroll < 0) keyPickerScroll = 0;
+    if (keyPickerScroll > maxScroll) keyPickerScroll = maxScroll;
+
+    float y = popup.y + searchH + 4 - keyPickerScroll;
+    BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
+    for (int idx : filtered) {
+        Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
+        bool hover = CheckCollisionPointRec(mp, btn);
+        if (hover) DrawRectangleRec(btn, {65, 65, 85, 255});
+
+        std::string display;
+        for (char c : allKeys[idx]) {
+            if (c == '_') display += ' ';
+            else display += c;
+        }
+        DrawText(display.c_str(), (int)btn.x + 6, (int)btn.y + 4, 11, WHITE);
+
+        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            targetPin->defaultValue = allKeys[idx];
+            isDirty = true;
+            keyPickerOpen = false;
+            keyPickerPinId = 0;
+            break;
+        }
+        y += itemH;
+    }
+    EndScissorMode();
+
+    if ((float)filtered.size() * itemH + 4.0f > listH) {
+        float scrollRatio = (maxScroll > 0) ? keyPickerScroll / maxScroll : 0;
+        float barH = (listH / ((float)filtered.size() * itemH + 4.0f)) * listH;
+        float barY = listArea.y + scrollRatio * (listH - barH);
+        DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
+    }
+}
+

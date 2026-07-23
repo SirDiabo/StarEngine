@@ -91,6 +91,7 @@ x SearchableListPopup (src/Editor/SearchableListPopup.h/.cpp): category-grouped,
 x Object base class (name, id)
 x Actor (transform, BeginPlay/Tick/EndPlay)
 x Property reflection system (PropertyList, PropertyHandle)
+x ComponentDecl field table (ComponentFields.h/.cpp) drives Stargraph save/load, one entry per field instead of matching write and read code
 
 ### 2.2 Coordinate System and Units
 x Unit scale: 1 unit = 1 centimeter
@@ -522,6 +523,7 @@ x StargraphBehavior passes actor pointer and deltaTime from World::Tick
 x Variable snapshot/restore around play so runtime writes don't persist to file
 x Pin::defaultValue is a PinValue (string-like, drop-in compatible) with a cached typed interpretation (float/int/vec3); numeric round-trips (atof/atoi/sscanf) replaced with cached accessors app-wide; data propagation skips the copy (and cache invalidation) when a value is unchanged frame to frame
 x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-id-keyed static map, so separate actor instances of the same class no longer share state
+x GraphExecutor::EnteredViaPin(node, ctx, pinName) is the formal way for a multi-exec-input node to tell which input it was reached through, replacing hand-rolled pin id lookups in Gate/Do_Once
 x Stargraph caches nodes tagged by type, built once and invalidated on CreateNode/RemoveNode; FindNodeByType, FindCustomEventByName, and the Event_Tick Input_Key scan all read from it instead of walking every node
 x RunFromPin (follow a named output exec pin and run what's linked) is a public GraphExecutor method shared by flow control nodes and the timer system
 o Wildcard type resolution at runtime
