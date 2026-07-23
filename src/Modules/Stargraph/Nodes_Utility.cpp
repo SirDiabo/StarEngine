@@ -920,6 +920,7 @@ void RegisterUtilityNodes() {
     drawBillboard.moduleName = "Stargraph";
     drawBillboard.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
         node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"Size", PinType::Float, true, false, 0, "100.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -927,7 +928,9 @@ void RegisterUtilityNodes() {
     drawBillboard.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 pos = {0, 0, 0};
         float size = 100.0f;
+        Texture2D* tex = nullptr;
         for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
             if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
             if (p.name == "Size") size = p.defaultValue.AsFloat();
         }
@@ -952,7 +955,8 @@ void RegisterUtilityNodes() {
             cam.fovy = 50.0f;
             cam.projection = CAMERA_PERSPECTIVE;
         }
-        DrawBillboard(cam, Texture2D{}, pos, size, WHITE);
+        if (!tex) return;
+        DrawBillboard(cam, *tex, pos, size, WHITE);
     };
     NodeRegistry::Get().RegisterNode(drawBillboard);
 
@@ -962,6 +966,7 @@ void RegisterUtilityNodes() {
     drawBillboardPro.moduleName = "Stargraph";
     drawBillboardPro.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
         node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"Size", PinType::Vec3, true, false, 0, "100,100,0"});
         node->inputs.push_back({"Rotation", PinType::Float, true, false, 0, "0.0"});
@@ -973,7 +978,9 @@ void RegisterUtilityNodes() {
         Vector3 size = {100, 100, 0};
         float rot = 0.0f;
         Color tint = WHITE;
+        Texture2D* tex = nullptr;
         for (const Pin& p : node.inputs) {
+            if (p.name == "Texture" && !p.defaultValue.empty()) tex = StarPointer::FromHex<Texture2D>(p.defaultValue);
             if (p.name == "Position") ReadVec3(p, pos.x, pos.y, pos.z);
             if (p.name == "Size") ReadVec3(p, size.x, size.y, size.z);
             if (p.name == "Rotation") rot = p.defaultValue.AsFloat();
@@ -1004,10 +1011,11 @@ void RegisterUtilityNodes() {
             cam.fovy = 50.0f;
             cam.projection = CAMERA_PERSPECTIVE;
         }
-        Rectangle rec = {0, 0, 0, 0};
+        if (!tex) return;
+        Rectangle rec = {0, 0, (float)tex->width, (float)tex->height};
         Vector2 billboardSize = {size.x, size.y};
         Vector2 origin = {billboardSize.x * 0.5f, billboardSize.y * 0.5f};
-        DrawBillboardPro(cam, Texture2D{}, rec, pos, {0, 1, 0}, billboardSize, origin, rot, tint);
+        DrawBillboardPro(cam, *tex, rec, pos, {0, 1, 0}, billboardSize, origin, rot, tint);
     };
     NodeRegistry::Get().RegisterNode(drawBillboardPro);
 
@@ -1025,15 +1033,21 @@ void RegisterUtilityNodes() {
         std::string path;
         for (const Pin& p : node.inputs) if (p.name == "Path") path = p.defaultValue;
         if (path.empty() || !FileExists(path.c_str())) return;
-        Texture2D loaded = LoadTexture(path.c_str());
-        if (loaded.id == 0) return;
-        Texture2D* tex = new Texture2D(loaded);
+
         for (Pin& p : node.outputs) {
-            if (p.name == "Texture") {
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%p", (void*)tex);
-                p.defaultValue = buf;
+            if (p.name != "Texture") continue;
+            if (!p.defaultValue.empty()) {
+                if (Texture2D* old = StarPointer::FromHex<Texture2D>(p.defaultValue)) {
+                    UnloadTexture(*old);
+                    delete old;
+                }
             }
+            Texture2D loaded = LoadTexture(path.c_str());
+            if (loaded.id == 0) { p.defaultValue = ""; return; }
+            Texture2D* tex = new Texture2D(loaded);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%p", (void*)tex);
+            p.defaultValue = buf;
         }
     };
     NodeRegistry::Get().RegisterNode(loadTexture);

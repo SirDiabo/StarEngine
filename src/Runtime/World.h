@@ -19,6 +19,7 @@ public:
     bool IsPlaying() const { return playing; }
 
     const std::vector<std::unique_ptr<Actor>>& GetActors() const { return actors; }
+    bool IsActorValid(Actor* actor) const;
 
     Actor* GetViewTarget() const { return viewTarget; }
     void SetViewTarget(Actor* actor);

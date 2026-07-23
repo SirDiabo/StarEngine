@@ -112,6 +112,12 @@ void World::EndPlay() {
     PrintMessageLog::Get().Clear();
 }
 
+bool World::IsActorValid(Actor* actor) const {
+    if (!actor) return false;
+    for (const auto& a : actors) if (a.get() == actor) return true;
+    return false;
+}
+
 void World::FlushDestroyQueue() {
     std::vector<Actor*> toDestroy;
     toDestroy.swap(pendingDestroy);

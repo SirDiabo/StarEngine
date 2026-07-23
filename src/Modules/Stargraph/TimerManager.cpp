@@ -1,6 +1,7 @@
 #include "TimerManager.h"
 #include "StargraphBehavior.h"
 #include "GraphExecutor.h"
+#include "Runtime/World.h"
 #include "raylib.h"
 #include <algorithm>
 
@@ -100,6 +101,11 @@ void TimerManager::Tick(float deltaTime) {
         std::string functionName;
     };
     std::vector<FireEvent> firing;
+
+    World& world = World::Get();
+    timers.erase(std::remove_if(timers.begin(), timers.end(), [&world](const PendingTimer& t) {
+        return t.actor && !world.IsActorValid(t.actor);
+    }), timers.end());
 
     // Decrement pass
     size_t count = timers.size();

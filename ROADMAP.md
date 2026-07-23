@@ -772,13 +772,13 @@ x FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Now O(1) via a
 
 x Vec3Divide has no zero guard (Nodes_Math.cpp:98). Match the scalar != 0 guards to avoid NaN propagation.
 o Get_Variable / Set_Variable hard-typed to Float (Nodes_Variables.cpp). Make the pin a Wildcard resolved from the variable type so non-float variables are not coerced.
-o RunCustomEvent uses a global static recursion depth (GraphExecutor.cpp). Thread depth per execution so one actor's chain does not suppress another's.
-o TimerManager fires timers whose owner/actor may be destroyed (TimerManager.cpp:134). Validate liveness before firing and make timer cleanup mandatory on actor destroy.
+x RunCustomEvent used a global static recursion depth shared by every actor (GraphExecutor.cpp). Now Stargraph::customEventDepth, one counter per graph instance.
+x TimerManager fired timers whose target actor could be destroyed via a Target pin (TimerManager.cpp). World::IsActorValid now drops those timers before they fire.
 o ProcessInputKey previous-held map grows unbounded (GraphExecutor.cpp:140). Store previous-held on the node as runtime state or clear entries on graph destroy.
 o Get_Game_Time accumulates a global gameTime per call (Nodes_Utility.cpp:121). Keep game time in World and read it.
 o ContentBrowserPanel scans the filesystem every frame (ScanCurrentFolder). Cache entries and refresh on navigate/import.
 o AppendPakToExecutable does not strip an existing STARPAKF footer before re-appending (StarPak.cpp:179, PackageRunner.cpp:191). Truncate prior footer so re-packaging leaves one.
-o Loaded_Texture leaks / Dangling on per-frame re-eval, and Draw_Billboard passes an empty Texture2D (Nodes_Utility.cpp:1029/954/1009). Dedupe by path and require a valid texture input.
+x Load_Texture leaked its previous texture on re-trigger, and Draw_Billboard/Draw_Billboard_Pro had no Texture input at all (Nodes_Utility.cpp). Both fixed.
 o SaveFileFormat applies XOR blindly with no marker (SaveFileFormat.cpp:54). Store an encryption marker and rename the cipher to "obfuscation" where it gates save integrity.
 o PackageCooker keeps a broken absolute Source= on dead external links (PackageCooker.cpp:93). Warn/error instead of shipping a missing-path reference.
 o ViewportPanel drop with a zero-sized render target produces NaN world coords. Early-out when renderTargetWidth/Height <= 0.

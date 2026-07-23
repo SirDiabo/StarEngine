@@ -256,6 +256,7 @@ public:
     std::string assetName;
     std::string parentClass = "Actor";
     int formatVersion = 1;
+    int customEventDepth = 0;
 
 private:
     std::deque<Node> nodes;

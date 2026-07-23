@@ -235,8 +235,7 @@ void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, Execution
 
 void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventName, ExecutionContext ctx,
                                     const std::vector<std::pair<std::string, std::string>>& params) {
-    static int depth = 0;
-    if (depth > 32) return; // guard against event chains calling each other recursively forever
+    if (graph.customEventDepth > 32) return;
 
     Node* eventNode = graph.FindCustomEventByName(eventName);
     if (!eventNode) return;
@@ -247,9 +246,9 @@ void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventNam
         }
     }
 
-    depth++;
+    graph.customEventDepth++;
     ExecuteFromNode(graph, eventNode, ctx);
-    depth--;
+    graph.customEventDepth--;
 }
 
 Node* GraphExecutor::FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName, int* outPinId) {
