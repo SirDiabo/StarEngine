@@ -18,6 +18,8 @@ public:
 
     static void RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName);
 
+    static bool EnteredViaPin(const Node& node, const ExecutionContext& ctx, const std::string& pinName);
+
 private:
     static Node* FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName = "Out", int* outPinId = nullptr);
     static void ExecuteFromNode(Stargraph& graph, Node* startNode, ExecutionContext& ctx);

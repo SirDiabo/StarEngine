@@ -265,3 +265,10 @@ Node* GraphExecutor::FollowExecLink(Stargraph& graph, Node* fromNode, const std:
     }
     return nullptr;
 }
+
+bool GraphExecutor::EnteredViaPin(const Node& node, const ExecutionContext& ctx, const std::string& pinName) {
+    for (const Pin& pin : node.inputs) {
+        if (pin.name == pinName) return ctx.enteredExecPin == pin.id;
+    }
+    return false;
+}

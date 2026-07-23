@@ -123,10 +123,7 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     doOnce.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        int resetPinId = 0;
-        for (const Pin& p : node.inputs) if (p.name == "Reset") resetPinId = p.id;
-
-        if (resetPinId != 0 && ctx.enteredExecPin == resetPinId) {
+        if (GraphExecutor::EnteredViaPin(node, ctx, "Reset")) {
             node.flowState = false;
             return;
         }
@@ -149,14 +146,8 @@ void RegisterFlowNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     gate.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        int openPinId = 0, closePinId = 0;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Open") openPinId = p.id;
-            if (p.name == "Close") closePinId = p.id;
-        }
-
-        if (openPinId != 0 && ctx.enteredExecPin == openPinId) { node.flowState = true; return; }
-        if (closePinId != 0 && ctx.enteredExecPin == closePinId) { node.flowState = false; return; }
+        if (GraphExecutor::EnteredViaPin(node, ctx, "Open"))  { node.flowState = true;  return; }
+        if (GraphExecutor::EnteredViaPin(node, ctx, "Close")) { node.flowState = false; return; }
 
         if (node.flowState) {
             GraphExecutor::RunFromPin(graph, &node, ctx, "Out");
