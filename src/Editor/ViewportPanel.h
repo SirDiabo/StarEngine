@@ -77,7 +77,5 @@ private:
     float savedOrbitRadius = 800.0f;
     Vector3 savedCameraTarget{0, 0, 0};
 
-    std::unordered_map<std::string, Stargraph> classGraphCache;
-
     static const float toolbarHeight;
 };

@@ -14,4 +14,5 @@ struct ComponentFieldDesc {
     std::vector<std::string> ComponentDecl::* stringArrayField = nullptr;
 };
 
+// Add fields here.
 const std::vector<ComponentFieldDesc>& GetComponentFields();

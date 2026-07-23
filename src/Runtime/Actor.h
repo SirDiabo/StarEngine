@@ -79,7 +79,7 @@ protected:
     virtual void OnEndPlay() {}
 
 private:
-    // Most recently added component wins, matches old slot behavior.
+    // Most recently added wins.
     template<typename T>
     T* FindComponentOfType() const {
         for (auto it = components.rbegin(); it != components.rend(); ++it) {

@@ -18,6 +18,7 @@ public:
 
     static void RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName);
 
+    // Checks which pin fired.
     static bool EnteredViaPin(const Node& node, const ExecutionContext& ctx, const std::string& pinName);
 
 private:

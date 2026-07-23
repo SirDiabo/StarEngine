@@ -106,6 +106,7 @@ x Runtime spawn/destroy actor via graph nodes
 x Full component system (mesh, collision, audio components)
 x Components declared on a StarActor class are instantiated as runtime Component
   objects when the class is spawned into the World (PIE), not just the ad hoc mesh path
+x StargraphAssetCache (Modules/Stargraph) parses each class .stargraph once per session instead of once per spawn, shared by WorldSpawner and ViewportPanel
 
 ### 2.4 Module System
 x Module base class and ModuleManager
@@ -248,6 +249,8 @@ o Unsaved changes indicator in title bar
 ---
 
 ## 5. Graph Editor (Stargraph)
+
+x StargraphEditorPanel split into StargraphEditorPanel.cpp (lifecycle, toolbar), _Graph.cpp (canvas, pins, links, context menu), _Details.cpp (component/event details), _Panels.cpp (left/right panels, key picker), same class, one header
 
 ### 5.1 Graph Rendering
 x Dark canvas with dot grid (fixed screen size regardless of zoom)

@@ -9,6 +9,7 @@
 #include "Components/SceneComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Modules/Stargraph/StargraphAssetCache.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -20,9 +21,8 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
 
     if (!inst.graphAssetPath.empty()) {
-        Stargraph loadedGraph;
-        if (loadedGraph.LoadFromFile(inst.graphAssetPath)) {
-            auto* behavior = new StargraphBehavior(loadedGraph);
+        if (const Stargraph* cachedGraph = StargraphAssetCache::Get().GetOrLoad(inst.graphAssetPath)) {
+            auto* behavior = new StargraphBehavior(*cachedGraph);
             actor->SetGraphBehavior(behavior);
 
             std::unordered_map<std::string, Component*> componentsByName;

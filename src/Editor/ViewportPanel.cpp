@@ -8,6 +8,7 @@
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "LogPanel.h"
@@ -46,20 +47,11 @@ ViewportPanel::~ViewportPanel() {
 }
 
 const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
-    auto it = classGraphCache.find(graphAssetPath);
-    if (it != classGraphCache.end()) return &it->second;
-
-    if (graphAssetPath.empty() || !fs::exists(graphAssetPath)) return nullptr;
-
-    Stargraph graph;
-    if (!graph.LoadFromFile(graphAssetPath)) return nullptr;
-
-    auto inserted = classGraphCache.emplace(graphAssetPath, std::move(graph));
-    return &inserted.first->second;
+    return StargraphAssetCache::Get().GetOrLoad(graphAssetPath);
 }
 
 void ViewportPanel::InvalidateClassGraph(const std::string& graphAssetPath) {
-    classGraphCache.erase(graphAssetPath);
+    StargraphAssetCache::Get().Invalidate(graphAssetPath);
 }
 
 void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
@@ -125,7 +117,7 @@ void ViewportPanel::LoadMap(const std::string& path) {
     mapLoaded = true;
     mapDirty = false;
     selectedActorIndex = -1;
-    classGraphCache.clear();
+    StargraphAssetCache::Get().Clear();
 }
 
 void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenPos) {
