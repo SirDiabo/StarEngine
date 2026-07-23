@@ -91,7 +91,7 @@ x SearchableListPopup (src/Editor/SearchableListPopup.h/.cpp): category-grouped,
 x Object base class (name, id)
 x Actor (transform, BeginPlay/Tick/EndPlay)
 x Property reflection system (PropertyList, PropertyHandle)
-x ComponentDecl field table (ComponentFields.h/.cpp) drives Stargraph save/load, one entry per field instead of matching write and read code
+x ComponentDecl field table (ComponentFields.h/.cpp) drives Stargraph save/load and WorldSpawner spawn-time construction, one entry per field/type instead of matching write, read, and spawn code
 
 ### 2.2 Coordinate System and Units
 x Unit scale: 1 unit = 1 centimeter

@@ -1,15 +1,12 @@
 #include "WorldSpawner.h"
 #include "World.h"
 #include "Actor.h"
-#include "Components/MeshComponent.h"
-#include "Components/CollisionComponent.h"
-#include "Components/AudioComponent.h"
-#include "Components/CameraComponent.h"
-#include "Components/InputComponent.h"
 #include "Components/SceneComponent.h"
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
+#include "Modules/Stargraph/ComponentFields.h"
+#include "Components/MeshComponent.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -30,38 +27,13 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
 
             for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
                 Component* comp = nullptr;
-                if (decl.componentType == "MeshComponent") {
-                    auto* mesh = new MeshComponent();
-                    mesh->SetMeshPath(decl.meshAssetPath);
-                    mesh->SetMaterialPaths(decl.materialAssetPaths);
-                    comp = mesh;
-                } else if (decl.componentType == "CollisionComponent") {
-                    auto* collision = new CollisionComponent();
-                    collision->shapeType = decl.collisionShape == "Sphere" ? CollisionComponent::Sphere
-                                         : decl.collisionShape == "Capsule" ? CollisionComponent::Capsule
-                                         : CollisionComponent::Box;
-                    collision->radius = decl.collisionRadius;
-                    collision->height = decl.collisionHeight;
-                    comp = collision;
-                } else if (decl.componentType == "AudioComponent") {
-                    auto* audio = new AudioComponent();
-                    audio->soundPath = decl.soundAssetPath;
-                    audio->autoPlay = decl.autoPlay;
-                    audio->looping = decl.looping;
-                    audio->volume = decl.volume;
-                    comp = audio;
-                } else if (decl.componentType == "CameraComponent") {
-                    auto* camera = new CameraComponent();
-                    camera->fov = decl.cameraFov;
-                    camera->orthographic = decl.cameraOrthographic;
-                    comp = camera;
-                } else if (decl.componentType == "InputComponent") {
-                    auto* input = new InputComponent();
-                    input->mappingNames = decl.inputMappingNames;
-                    input->device = decl.inputDevice;
-                    comp = input;
-                } else {
-                    comp = new SceneComponent();
+                for (const ComponentTypeDesc& td : GetComponentTypes()) {
+                    if (decl.componentType == td.componentType) { comp = td.factory(); break; }
+                }
+                if (!comp) comp = new SceneComponent();
+
+                for (const ComponentFieldDesc& fd : GetComponentFields()) {
+                    if (decl.componentType == fd.componentType && fd.applyToComponent) fd.applyToComponent(*comp, decl);
                 }
 
                 comp->position = {decl.posX, decl.posY, decl.posZ};
