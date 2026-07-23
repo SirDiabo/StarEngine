@@ -7,10 +7,12 @@
 #include <vector>
 
 static void ResolveWildcardPins(Stargraph& graph, Node* node) {
+    if (node->wildcardResolved) return;
+
     bool hasWildcard = false;
     for (const Pin& pin : node->inputs)  if (pin.isWildcard) hasWildcard = true;
     for (const Pin& pin : node->outputs) if (pin.isWildcard) hasWildcard = true;
-    if (!hasWildcard) return;
+    if (!hasWildcard) { node->wildcardResolved = true; return; }
 
     PinType resolvedType = PinType::None;
 
@@ -48,6 +50,8 @@ static void ResolveWildcardPins(Stargraph& graph, Node* node) {
 
     for (Pin& pin : node->inputs)  if (pin.isWildcard) pin.type = finalType;
     for (Pin& pin : node->outputs) if (pin.isWildcard) pin.type = finalType;
+
+    if (finalType != PinType::Wildcard) node->wildcardResolved = true;
 }
 
 static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx, std::vector<int>& visiting) {

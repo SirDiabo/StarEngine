@@ -529,7 +529,7 @@ x Do_Once, Gate, and Flip_Flop keep state on Node::flowState instead of a node-i
 x GraphExecutor::EnteredViaPin(node, ctx, pinName) is the formal way for a multi-exec-input node to tell which input it was reached through, replacing hand-rolled pin id lookups in Gate/Do_Once
 x Stargraph caches nodes tagged by type, built once and invalidated on CreateNode/RemoveNode; FindNodeByType, FindCustomEventByName, and the Event_Tick Input_Key scan all read from it instead of walking every node
 x RunFromPin (follow a named output exec pin and run what's linked) is a public GraphExecutor method shared by flow control nodes and the timer system
-o Wildcard type resolution at runtime
+x Wildcard type resolution at runtime
 
 o Compile step validates the graph (stale references, unresolved wildcards, unreachable nodes) before anything else; nativizing to C++ is a later, separate step for hot graphs
 o Nativization stays off during PIE so graphs stay live-editable while playing; Nativization only applies to packaged builds
@@ -765,7 +765,7 @@ x Global raygui text-edit state shared across all panels (PropertyFields.cpp:23)
 x Unvalidated std::stoi/std::stof on untrusted files throws and aborts load (StarMap.cpp, StarAsset.cpp, Project.cpp). Replaced with SafeParse::ToInt/ToFloat (std::from_chars + default on failure).
 x Unsynchronized statics touched from backend threads (NetIdRegistry, lastSyncedValue, GenerateObjectId, NetworkBackendRegistry::active). NetIdRegistry and lastSyncedValue are now mutex-guarded, GenerateObjectId uses std::atomic, and the active backend is a std::atomic.
 x WorldSpawner reuses nextNetId from 1 on each SpawnMapActors call (WorldSpawner.cpp:90). Net ids now come from a persistent World allocator reset only on BeginPlay, so re-spawns never reuse a live actor's id.
-/ GraphExecutor wildcard type resolution is O(nodes x pins x links) every frame (GraphExecutor.cpp:222, Nodes_Math). Not yet cached; resolveWildcardPins still rescans links/nodes per call. FindNodeByPinId is now O(1) via a pinId->node map (see below), which removes the dominant lookup cost on the exec chain.
+x GraphExecutor wildcard type resolution caches a resolved type so steady-state ticks skip the rescan
 x FindNodeByPinId linear scan per link traversal (Stargraph.cpp). Now O(1) via a pinId -> node map built with the existing type cache and invalidated on graph mutation.
 
 ### 17.3 Medium Priority Bugs
