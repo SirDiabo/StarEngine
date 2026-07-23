@@ -153,5 +153,16 @@ bool ModuleImporter::CopyFromDisk(const std::string& manifestPath,
         outError = "Import failed: " + ec.message();
         return false;
     }
+
+    if (fs::exists(destDir / ".git")) {
+        std::string gitOutput;
+        std::vector<std::string> gitArgs = {"git", "-C", destDir.string(), "submodule", "update", "--init", "--recursive"};
+        int rc = SafeProcess::Run(gitArgs, gitOutput);
+        if (rc != 0) {
+            outError = "Imported, but failed to init submodules (git rc=" + std::to_string(rc) + "): " + gitOutput;
+            return false;
+        }
+    }
+
     return true;
 }
