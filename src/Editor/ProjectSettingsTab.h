@@ -19,8 +19,6 @@ private:
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
 
-    char widthBuf[16]  = "";
-    char heightBuf[16] = "";
     char renderScaleBuf[16] = "";
     char newSaveFileBuf[64] = "";
     std::string newSaveFileName;

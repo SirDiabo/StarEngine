@@ -15,8 +15,7 @@ bool PackagedGameConfig::LoadFromText(const std::string& text, PackagedGameConfi
         std::string value = line.substr(sep + 1);
 
         if (key == "name") out.name = value;
-        else if (key == "targetWidth") out.targetWidth = SafeParse::ToInt(value);
-        else if (key == "targetHeight") out.targetHeight = SafeParse::ToInt(value);
+        else if (key == "renderScale") out.renderScale = SafeParse::ToFloat(value);
         else if (key == "defaultMap") out.defaultMap = value;
         else if (key == "renderer") out.renderer = value;
         else if (key == "cipher") out.cipher = value;
@@ -37,8 +36,7 @@ bool PackagedGameConfig::LoadFromFile(const std::string& path, PackagedGameConfi
 std::string PackagedGameConfig::ToText() const {
     std::ostringstream out;
     out << "name=" << name << "\n";
-    out << "targetWidth=" << targetWidth << "\n";
-    out << "targetHeight=" << targetHeight << "\n";
+    out << "renderScale=" << renderScale << "\n";
     out << "defaultMap=" << defaultMap << "\n";
     out << "renderer=" << renderer << "\n";
     out << "cipher=" << cipher << "\n";

@@ -13,6 +13,7 @@
 #include "Runtime/AudioCore.h"
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules/Rendering/RenderPipeline.h"
+#include "Core/RenderSettings.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -61,11 +62,16 @@ int main(int argc, char* argv[]) {
     SavePaths::SetPackagedGameName(config.name);
     if (!ModuleManager::Get().InitializeAll()) return 1;
 
-    InitWindow(config.targetWidth, config.targetHeight, config.name.c_str());
+    RenderSettings::Get().SetRenderScale(config.renderScale);
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(1280, 720, config.name.c_str());
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
 
-    RenderTexture2D renderTarget = LoadRenderTexture(config.targetWidth, config.targetHeight);
+    RenderTexture2D renderTarget{};
+    int renderTargetWidth = 0;
+    int renderTargetHeight = 0;
 
     fs::path iconPath = exeDir / "icon.png";
     if (fs::exists(iconPath)) {
@@ -124,17 +130,36 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        if ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER)) {
+            ToggleBorderlessWindowed();
+        }
+
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
+        int scaledWidth = (int)(screenWidth * RenderSettings::Get().GetRenderScale());
+        int scaledHeight = (int)(screenHeight * RenderSettings::Get().GetRenderScale());
+        if (scaledWidth < 1) scaledWidth = 1;
+        if (scaledHeight < 1) scaledHeight = 1;
+
+        if (scaledWidth != renderTargetWidth || scaledHeight != renderTargetHeight) {
+            if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
+            renderTarget = LoadRenderTexture(scaledWidth, scaledHeight);
+            SetTextureFilter(renderTarget.texture, TEXTURE_FILTER_POINT);
+            renderTargetWidth = scaledWidth;
+            renderTargetHeight = scaledHeight;
+        }
+
         RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255}, false);
 
         BeginDrawing();
         ClearBackground(BLACK);
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
-        Rectangle dest = {0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()};
+        Rectangle dest = {0, 0, (float)screenWidth, (float)screenHeight};
         DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
         EndDrawing();
     }
 
-    UnloadRenderTexture(renderTarget);
+    if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
     World::Get().EndPlay();
     AssetCache::Get().Clear();
     AudioCore::Get().CloseDevice();

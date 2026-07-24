@@ -12,8 +12,6 @@ GameRenderer GameRendererFromName(const std::string& name);
 
 struct ProjectSettings {
     std::string name;
-    int targetWidth = 640;
-    int targetHeight = 480;
     std::string defaultMapPath;
     GameRenderer renderer = GameRenderer::Hardware;
     std::vector<std::string> disabledModules;

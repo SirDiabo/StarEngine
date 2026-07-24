@@ -3,6 +3,7 @@
 #include "StarPak.h"
 #include "SafeProcess.h"
 #include "Runtime/PackagedGameConfig.h"
+#include "RenderSettings.h"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -206,8 +207,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
 
     PackagedGameConfig bootConfig;
     bootConfig.name = settings.name;
-    bootConfig.targetWidth = settings.targetWidth;
-    bootConfig.targetHeight = settings.targetHeight;
+    bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
     bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
     bootConfig.renderer = rendererKey;
     bootConfig.cipher = CookCipherName(options.cipher);

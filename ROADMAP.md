@@ -651,7 +651,7 @@ x Project Settings UI: "Shading Type" dropdown (Unlit / Projected Blob Shadows),
 x Shared RenderPipeline::Render(camera, target) entry point with an ordered pass list (Shadow, Color, Post-process), each pass bool-gated, disabled passes cost nothing
 x Route ViewportPanel through RenderPipeline::Render instead of its raw BeginMode3D/DrawWorldActors/EndMode3D
 x Give GameMain.cpp a render target and route it through RenderPipeline::Render too, so editor and packaged game share one code path
-o Remove targetWidth/targetHeight window-size setting, replace with "Render Scale" percentage of the actual window/display size
+x Remove targetWidth/targetHeight window-size setting, replace with "Render Scale" percentage of the actual window/display size
 o StarMaterial gains a Lit/Unlit flag
 o Shading Type = Unlit forces every material unlit; Lit/Unlit dropdown is blacked out in the Details panel and Material Editor when project Shading Type is Unlit
 o Shading Type = Projected Blob Shadows enables lighting and the shadow pass

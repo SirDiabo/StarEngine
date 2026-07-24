@@ -7,6 +7,7 @@
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Modules/Rendering/RenderPipeline.h"
+#include "Core/RenderSettings.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/StarAsset.h"
@@ -44,6 +45,7 @@ void ViewportPanel::Initialize() {
 
 ViewportPanel::~ViewportPanel() {
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
+    if (pieRenderTarget.id != 0) UnloadRenderTexture(pieRenderTarget);
 }
 
 const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
@@ -109,6 +111,15 @@ void ViewportPanel::EnsureRenderTarget(int width, int height) {
     renderTarget = LoadRenderTexture(width, height);
     renderTargetWidth = width;
     renderTargetHeight = height;
+}
+
+void ViewportPanel::EnsurePieRenderTarget(int width, int height) {
+    if (width == pieRenderTargetWidth && height == pieRenderTargetHeight) return;
+    if (pieRenderTarget.id != 0) UnloadRenderTexture(pieRenderTarget);
+    pieRenderTarget = LoadRenderTexture(width, height);
+    SetTextureFilter(pieRenderTarget.texture, TEXTURE_FILTER_POINT);
+    pieRenderTargetWidth = width;
+    pieRenderTargetHeight = height;
 }
 
 void ViewportPanel::LoadMap(const std::string& path) {
@@ -561,8 +572,19 @@ void ViewportPanel::Render() {
         Color clearColor = {28, 28, 30, 255};
 
         if (playing) {
-            RenderPipeline::Render(camera, renderTarget, clearColor, true);
+            float scale = RenderSettings::Get().GetRenderScale();
+            int pieWidth = (int)(clientWidth * scale);
+            int pieHeight = (int)(clientHeight * scale);
+            if (pieWidth < 1) pieWidth = 1;
+            if (pieHeight < 1) pieHeight = 1;
+            EnsurePieRenderTarget(pieWidth, pieHeight);
+
+            RenderPipeline::Render(camera, pieRenderTarget, clearColor, true);
+
             BeginTextureMode(renderTarget);
+            Rectangle pieSource = {0, 0, (float)pieRenderTarget.texture.width, -(float)pieRenderTarget.texture.height};
+            Rectangle pieDest = {0, 0, (float)clientWidth, (float)clientHeight};
+            DrawTexturePro(pieRenderTarget.texture, pieSource, pieDest, {0, 0}, 0.0f, WHITE);
             BeginMode3D(camera);
             DrawAndClearCollisionDebug();
             EndMode3D();

@@ -3,8 +3,7 @@
 
 struct PackagedGameConfig {
     std::string name;
-    int targetWidth = 640;
-    int targetHeight = 480;
+    float renderScale = 1.0f;
     std::string defaultMap;
     std::string renderer;
     std::string cipher;

@@ -34,6 +34,7 @@ public:
 
 private:
     void EnsureRenderTarget(int width, int height);
+    void EnsurePieRenderTarget(int width, int height);
     void UpdateCamera(Rectangle client);
     void RenderScene();
     void RenderToolbar();
@@ -47,6 +48,10 @@ private:
     RenderTexture2D renderTarget{};
     int renderTargetWidth = 0;
     int renderTargetHeight = 0;
+
+    RenderTexture2D pieRenderTarget{};
+    int pieRenderTargetWidth = 0;
+    int pieRenderTargetHeight = 0;
 
     StarMap starMap;
     std::string mapPath;

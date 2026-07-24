@@ -20,8 +20,6 @@ void ProjectSettingsTab::Initialize() {
 
 void ProjectSettingsTab::RefreshFromProject() {
     const ProjectSettings& settings = Project::Get().GetSettings();
-    snprintf(widthBuf, sizeof(widthBuf), "%d", settings.targetWidth);
-    snprintf(heightBuf, sizeof(heightBuf), "%d", settings.targetHeight);
     snprintf(renderScaleBuf, sizeof(renderScaleBuf), "%.2f", RenderSettings::Get().GetRenderScale() * 100.0f);
     activeField = 0;
     newSaveFileBuf[0] = '\0';
@@ -139,21 +137,6 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     }
     fy += 20;
     DrawText("Percentage of the window resolution the 3D scene renders at, upscaled with nearest-neighbor.",
-              (int)fx, (int)fy, 10, {110, 110, 118, 255});
-    fy += 24;
-
-    DrawText("Target Resolution", (int)fx, (int)fy, 11, {140, 140, 150, 255});
-    fy += 14;
-    float colW = fw / 2.0f;
-    float boxW = colW - 18.0f;
-    Rectangle widthRow  = {fx + 16, fy, boxW, 20};
-    Rectangle heightRow = {fx + colW + 16, fy, boxW, 20};
-    DrawText("W", (int)fx, (int)widthRow.y + 4, 11, {150, 150, 160, 255});
-    DrawText("H", (int)(fx + colW), (int)heightRow.y + 4, 11, {150, 150, 160, 255});
-    PropertyField::IntBox(widthRow, widthBuf, sizeof(widthBuf), 1, activeField, settings.targetWidth);
-    PropertyField::IntBox(heightRow, heightBuf, sizeof(heightBuf), 2, activeField, settings.targetHeight);
-    fy += 20;
-    DrawText("Resolution of the window opened by a packaged game. Does not affect the editor viewport.",
               (int)fx, (int)fy, 10, {110, 110, 118, 255});
     fy += 24;
 
