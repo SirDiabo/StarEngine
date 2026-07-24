@@ -655,10 +655,10 @@ x Remove targetWidth/targetHeight window-size setting, replace with "Render Scal
 x StarMaterial gains a Lit/Unlit flag
 x Shading Type = Unlit forces every material unlit; Lit/Unlit checkbox is blacked out in the Material Editor when project Shading Type is Unlit
 o Shading Type = Projected Blob Shadows enables lighting and the shadow pass
-o Point, Rectangle, Spot, and Global light source components
-o Sun (directional) light source component
+x Point, Rectangle, Spot, and Global light source components
+x Sun (directional) light source component
 o Simple per-vertex lit shading model, no per-pixel lighting, kept as cheap as possible
-o Light source components authored the same way as other components (ComponentDecl entry, Details panel, ComponentFields table entry)
+x Light source components authored the same way as other components (ComponentDecl entry, Details panel, ComponentFields table entry)
 o Blob shadow: soft circular decal projected onto the receiving surface beneath a caster
 o Blob shadow stretches/offsets based on the nearest light source's direction
 o Per-mesh-component toggle to opt a caster out of casting a blob shadow

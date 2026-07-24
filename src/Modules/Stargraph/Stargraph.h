@@ -208,6 +208,16 @@ struct ComponentDecl {
     float cameraFov = 50.0f;
     bool cameraOrthographic = false;
 
+    // LightComponent
+    std::string lightType = "Point";
+    float lightColorR = 1.0f, lightColorG = 1.0f, lightColorB = 1.0f;
+    float lightIntensity = 1.0f;
+    float lightRadius = 500.0f;
+    float lightInnerConeAngle = 25.0f;
+    float lightOuterConeAngle = 35.0f;
+    float lightWidth = 100.0f;
+    float lightHeight = 100.0f;
+
     // InputComponent
     std::vector<std::string> inputMappingNames;
     std::string inputDevice = "Unclaimed";

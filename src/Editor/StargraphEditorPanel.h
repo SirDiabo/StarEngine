@@ -153,6 +153,13 @@ private:
     char compSoundBuf[256] = "";
     char compVolumeBuf[32] = "";
     char compFovBuf[32] = "";
+    char compLightColorBuf[3][32] = {"", "", ""};
+    char compLightIntensityBuf[32] = "";
+    char compLightRadiusBuf[32] = "";
+    char compLightInnerConeBuf[32] = "";
+    char compLightOuterConeBuf[32] = "";
+    char compLightWidthBuf[32] = "";
+    char compLightHeightBuf[32] = "";
 
     RegistryPickerPopup inputMappingPicker;
     SearchableListPopup inputKeyPicker;

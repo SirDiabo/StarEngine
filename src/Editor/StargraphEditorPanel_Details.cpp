@@ -75,7 +75,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     }
 
     if (addComponentMenu.IsOpen()) {
-        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent", "InputComponent" };
+        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent", "LightComponent", "InputComponent" };
         std::vector<SearchableListPopup::Entry> entries;
         for (const char* typeName : componentTypes) entries.push_back({"Components", typeName, typeName});
 
@@ -145,6 +145,15 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
         snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
         snprintf(compFovBuf, sizeof(compFovBuf), "%.2f", comp.cameraFov);
+        snprintf(compLightColorBuf[0], 32, "%.2f", comp.lightColorR);
+        snprintf(compLightColorBuf[1], 32, "%.2f", comp.lightColorG);
+        snprintf(compLightColorBuf[2], 32, "%.2f", comp.lightColorB);
+        snprintf(compLightIntensityBuf, sizeof(compLightIntensityBuf), "%.2f", comp.lightIntensity);
+        snprintf(compLightRadiusBuf, sizeof(compLightRadiusBuf), "%.2f", comp.lightRadius);
+        snprintf(compLightInnerConeBuf, sizeof(compLightInnerConeBuf), "%.2f", comp.lightInnerConeAngle);
+        snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", comp.lightOuterConeAngle);
+        snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", comp.lightWidth);
+        snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", comp.lightHeight);
         lastComponentDetailIndex = selectedComponentIndex;
         componentActiveField = 0;
         componentMeshPicker.Close();
@@ -347,6 +356,34 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
         y += 24;
+    } else if (comp.componentType == "LightComponent") {
+        DrawText("Light Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        y += 14;
+        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, comp.lightType.c_str())) {
+            if (comp.lightType == "Point") comp.lightType = "Rectangle";
+            else if (comp.lightType == "Rectangle") comp.lightType = "Spot";
+            else if (comp.lightType == "Spot") comp.lightType = "Global";
+            else if (comp.lightType == "Global") comp.lightType = "Sun";
+            else comp.lightType = "Point";
+            isDirty = true;
+        }
+        y += 24;
+
+        vec3Row("Light Color", compLightColorBuf, 16, comp.lightColorR, comp.lightColorG, comp.lightColorB, "Light Color");
+        y += 2;
+        floatField("Intensity", compLightIntensityBuf, sizeof(compLightIntensityBuf), 19, comp.lightIntensity, "Intensity");
+
+        if (comp.lightType != "Global" && comp.lightType != "Sun") {
+            floatField("Radius", compLightRadiusBuf, sizeof(compLightRadiusBuf), 20, comp.lightRadius, "Radius");
+        }
+        if (comp.lightType == "Spot") {
+            floatField("Inner Cone Angle", compLightInnerConeBuf, sizeof(compLightInnerConeBuf), 21, comp.lightInnerConeAngle, "Inner Cone Angle");
+            floatField("Outer Cone Angle", compLightOuterConeBuf, sizeof(compLightOuterConeBuf), 22, comp.lightOuterConeAngle, "Outer Cone Angle");
+        }
+        if (comp.lightType == "Rectangle") {
+            floatField("Width", compLightWidthBuf, sizeof(compLightWidthBuf), 23, comp.lightWidth, "Width");
+            floatField("Height", compLightHeightBuf, sizeof(compLightHeightBuf), 24, comp.lightHeight, "Height");
+        }
     } else if (comp.componentType == "InputComponent") {
         static const char* mappingTypeNames[] = {"Bool", "Axis", "Axis2D"};
 
@@ -749,4 +786,3 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
         y += 16;
     }
 }
-

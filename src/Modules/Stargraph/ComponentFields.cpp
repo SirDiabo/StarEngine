@@ -3,6 +3,7 @@
 #include "Runtime/Components/CollisionComponent.h"
 #include "Runtime/Components/AudioComponent.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Runtime/Components/LightComponent.h"
 #include "Runtime/Components/InputComponent.h"
 
 namespace {
@@ -86,6 +87,34 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
         Bln("CameraComponent", "CameraOrthographic", &ComponentDecl::cameraOrthographic,
             [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).orthographic = d.cameraOrthographic; }),
 
+        Str("LightComponent", "LightType", &ComponentDecl::lightType,
+            [](Component& c, const ComponentDecl& d) {
+                auto& lc = static_cast<LightComponent&>(c);
+                lc.lightType = d.lightType == "Rectangle" ? LightComponent::Rectangle
+                              : d.lightType == "Spot"      ? LightComponent::Spot
+                              : d.lightType == "Global"    ? LightComponent::Global
+                              : d.lightType == "Sun"       ? LightComponent::Sun
+                                                            : LightComponent::Point;
+            }),
+        Flt("LightComponent", "LightColorR", &ComponentDecl::lightColorR,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.x = d.lightColorR; }),
+        Flt("LightComponent", "LightColorG", &ComponentDecl::lightColorG,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.y = d.lightColorG; }),
+        Flt("LightComponent", "LightColorB", &ComponentDecl::lightColorB,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.z = d.lightColorB; }),
+        Flt("LightComponent", "LightIntensity", &ComponentDecl::lightIntensity,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).intensity = d.lightIntensity; }),
+        Flt("LightComponent", "LightRadius", &ComponentDecl::lightRadius,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).radius = d.lightRadius; }),
+        Flt("LightComponent", "LightInnerConeAngle", &ComponentDecl::lightInnerConeAngle,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).innerConeAngle = d.lightInnerConeAngle; }),
+        Flt("LightComponent", "LightOuterConeAngle", &ComponentDecl::lightOuterConeAngle,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).outerConeAngle = d.lightOuterConeAngle; }),
+        Flt("LightComponent", "LightWidth", &ComponentDecl::lightWidth,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).width = d.lightWidth; }),
+        Flt("LightComponent", "LightHeight", &ComponentDecl::lightHeight,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).height = d.lightHeight; }),
+
         StrArr("InputComponent", "InputMapping", &ComponentDecl::inputMappingNames,
             [](Component& c, const ComponentDecl& d) { static_cast<InputComponent&>(c).mappingNames = d.inputMappingNames; }),
         Str("InputComponent", "InputDevice", &ComponentDecl::inputDevice,
@@ -100,6 +129,7 @@ const std::vector<ComponentTypeDesc>& GetComponentTypes() {
         { "CollisionComponent", []() -> Component* { return new CollisionComponent(); } },
         { "AudioComponent",     []() -> Component* { return new AudioComponent(); } },
         { "CameraComponent",    []() -> Component* { return new CameraComponent(); } },
+        { "LightComponent",     []() -> Component* { return new LightComponent(); } },
         { "InputComponent",     []() -> Component* { return new InputComponent(); } },
     };
     return table;
