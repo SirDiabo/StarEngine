@@ -645,8 +645,8 @@ o collision shapes component for overlap events
 o PhysicsComponent: Velocity, gravity scale, mass, drag, linear/angular dampening, etc.
 
 ### 13.4 Rendering Module
-o Rendering module skeleton (src/Modules/Rendering), module-gated like other modules
-o RenderSettings struct (Shading Type, Render Scale) persisted via LayoutSerializer to its own project config file
+x Rendering module skeleton (src/Modules/Rendering), module-gated like other modules
+x RenderSettings struct (Shading Type, Render Scale) persisted via LayoutSerializer to its own project config file
 o Project Settings UI: "Shading Type" dropdown (Unlit / Projected Blob Shadows), "Render Scale" percentage
 o Shared RenderPipeline::Render(camera, target) entry point with an ordered pass list (Shadow, Color, Post-process), each pass bool-gated, disabled passes cost nothing
 o Route ViewportPanel through RenderPipeline::Render instead of its raw BeginMode3D/DrawWorldActors/EndMode3D

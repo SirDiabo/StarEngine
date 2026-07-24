@@ -4,6 +4,7 @@
 #include "NamedListRegistry.h"
 #include "SaveFileRegistry.h"
 #include "InputMappingRegistry.h"
+#include "RenderSettings.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -106,6 +107,7 @@ bool Project::Load(const std::string& path) {
     NamedListRegistry::Get().Load(rootPath);
     SaveFileRegistry::Get().Load(rootPath);
     InputMappingRegistry::Get().Load(rootPath);
+    RenderSettings::Get().Load(rootPath);
 
     std::error_code ec;
     fs::create_directories(fs::path(GetModulesDirectory()), ec);
