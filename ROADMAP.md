@@ -648,7 +648,7 @@ o PhysicsComponent: Velocity, gravity scale, mass, drag, linear/angular dampenin
 x Rendering module skeleton (src/Modules/Rendering), module-gated like other modules
 x RenderSettings struct (Shading Type, Render Scale) persisted via LayoutSerializer to its own project config file
 x Project Settings UI: "Shading Type" dropdown (Unlit / Projected Blob Shadows), "Render Scale" percentage
-o Shared RenderPipeline::Render(camera, target) entry point with an ordered pass list (Shadow, Color, Post-process), each pass bool-gated, disabled passes cost nothing
+x Shared RenderPipeline::Render(camera, target) entry point with an ordered pass list (Shadow, Color, Post-process), each pass bool-gated, disabled passes cost nothing
 o Route ViewportPanel through RenderPipeline::Render instead of its raw BeginMode3D/DrawWorldActors/EndMode3D
 o Give GameMain.cpp a render target and route it through RenderPipeline::Render too, so editor and packaged game share one code path
 o Remove targetWidth/targetHeight window-size setting, replace with "Render Scale" percentage of the actual window/display size
