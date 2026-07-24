@@ -4,9 +4,9 @@
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
 #include "Runtime/AssetCache.h"
-#include "Runtime/SceneRenderer.h"
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/PrintMessageLog.h"
+#include "Modules/Rendering/RenderPipeline.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/StarAsset.h"
@@ -376,59 +376,49 @@ void ViewportPanel::RenderScene() {
 
     BeginMode3D(camera);
 
-    if (!playing) {
-        DrawGrid(40, 100.0f);
-    }
+    DrawGrid(40, 100.0f);
 
-    if (playing) {
-        SceneRenderer::DrawWorldActors(true);
-    } else {
-        const auto& instances = starMap.GetInstances();
-        for (size_t i = 0; i < instances.size(); i++) {
-            const ActorInstance& inst = instances[i];
-            Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-            Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
-            Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
-            bool selected = (selectedActorIndex == (int)i);
-            Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
+    const auto& instances = starMap.GetInstances();
+    for (size_t i = 0; i < instances.size(); i++) {
+        const ActorInstance& inst = instances[i];
+        Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+        Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
+        Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
+        bool selected = (selectedActorIndex == (int)i);
+        Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
 
-            if (!inst.graphAssetPath.empty()) {
-                const Stargraph* classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
-                bool drewAnyMesh = false;
+        if (!inst.graphAssetPath.empty()) {
+            const Stargraph* classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
+            bool drewAnyMesh = false;
 
-                if (classGraph) {
-                    for (const ComponentDecl& comp : classGraph->GetComponents()) {
-                        Vector3 compPos, compRot, compScale;
-                        ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
-                                                   compPos, compRot, compScale);
+            if (classGraph) {
+                for (const ComponentDecl& comp : classGraph->GetComponents()) {
+                    Vector3 compPos, compRot, compScale;
+                    ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
+                                               compPos, compRot, compScale);
 
-                        if (comp.componentType == "MeshComponent") {
-                            DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPaths, compPos, compRot,
-                                                compScale, selected, fallbackColor);
-                            drewAnyMesh = true;
-                        } else if (comp.componentType == "CollisionComponent" && selected) {
-                            DrawCollisionShape(comp, compPos, compRot, {90, 200, 255, 200});
-                        }
+                    if (comp.componentType == "MeshComponent") {
+                        DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPaths, compPos, compRot,
+                                            compScale, selected, fallbackColor);
+                        drewAnyMesh = true;
+                    } else if (comp.componentType == "CollisionComponent" && selected) {
+                        DrawCollisionShape(comp, compPos, compRot, {90, 200, 255, 200});
                     }
                 }
-
-                if (!drewAnyMesh) {
-                    Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
-                    DrawInstanceOrMesh("", {}, pos, rot, boxSize, false, fallbackColor);
-                }
-            } else {
-                DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
             }
+
+            if (!drewAnyMesh) {
+                Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
+                DrawInstanceOrMesh("", {}, pos, rot, boxSize, false, fallbackColor);
+            }
+        } else {
+            DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
         }
     }
 
     DrawAndClearCollisionDebug();
 
     EndMode3D();
-
-    if (playing) {
-        PrintMessageLog::Get().Draw();
-    }
 }
 
 void ViewportPanel::HandleMapInteraction(Rectangle client) {
@@ -568,10 +558,22 @@ void ViewportPanel::Render() {
         UpdateCamera(client);
         HandleMapInteraction(client);
 
-        BeginTextureMode(renderTarget);
-        ClearBackground({28, 28, 30, 255});
-        RenderScene();
-        EndTextureMode();
+        Color clearColor = {28, 28, 30, 255};
+
+        if (playing) {
+            RenderPipeline::Render(camera, renderTarget, clearColor, true);
+            BeginTextureMode(renderTarget);
+            BeginMode3D(camera);
+            DrawAndClearCollisionDebug();
+            EndMode3D();
+            PrintMessageLog::Get().Draw();
+            EndTextureMode();
+        } else {
+            BeginTextureMode(renderTarget);
+            ClearBackground(clearColor);
+            RenderScene();
+            EndTextureMode();
+        }
 
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
         DrawTextureRec(renderTarget.texture, source, {client.x, client.y}, WHITE);

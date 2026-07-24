@@ -9,10 +9,10 @@
 #include "Runtime/Actor.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/WorldSpawner.h"
-#include "Runtime/SceneRenderer.h"
 #include "Runtime/AssetCache.h"
 #include "Runtime/AudioCore.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Modules/Rendering/RenderPipeline.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -64,6 +64,8 @@ int main(int argc, char* argv[]) {
     InitWindow(config.targetWidth, config.targetHeight, config.name.c_str());
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
+
+    RenderTexture2D renderTarget = LoadRenderTexture(config.targetWidth, config.targetHeight);
 
     fs::path iconPath = exeDir / "icon.png";
     if (fs::exists(iconPath)) {
@@ -122,14 +124,17 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255}, false);
+
         BeginDrawing();
-        ClearBackground({20, 20, 20, 255});
-        BeginMode3D(camera);
-        SceneRenderer::DrawWorldActors(false);
-        EndMode3D();
+        ClearBackground(BLACK);
+        Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
+        Rectangle dest = {0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()};
+        DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
         EndDrawing();
     }
 
+    UnloadRenderTexture(renderTarget);
     World::Get().EndPlay();
     AssetCache::Get().Clear();
     AudioCore::Get().CloseDevice();
