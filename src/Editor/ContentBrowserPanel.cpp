@@ -1,6 +1,7 @@
 #include "ContentBrowserPanel.h"
 #include "Core/Project.h"
 #include "Core/StarMaterial.h"
+#include "Core/RenderSettings.h"
 #include "Core/Module.h"
 #include "Core/EmbeddedAssets.h"
 #include "NativeFileDialog.h"
@@ -207,7 +208,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
 
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp);
-    Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 100, 220, 200};
+    Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 111, 220, 222};
 
     DrawRectangleRec({bounds.x, bounds.y, bounds.width, bounds.height}, {0, 0, 0, 120});
     DrawRectangleRec(box, {45, 45, 50, 255});
@@ -237,6 +238,14 @@ void ContentBrowserPanel::RenderMaterialEditor() {
 
     DrawRectangleRec({box.x + box.width - 34, y - 34, 24, 24}, materialEditorData.baseColor);
     DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, {90, 90, 98, 255});
+
+    bool shadingAllowsLit = RenderSettings::Get().GetShadingType() != ShadingType::Unlit;
+    Color litLabelColor = shadingAllowsLit ? Color{160, 160, 170, 255} : Color{90, 90, 95, 255};
+    DrawText("Lit", (int)box.x + 8, (int)y, 11, litLabelColor);
+    GuiSetState(shadingAllowsLit ? STATE_NORMAL : STATE_DISABLED);
+    PropertyField::BoolBox({box.x + box.width - 42, y - 2, 18, 18}, materialEditorData.lit);
+    GuiSetState(STATE_NORMAL);
+    y += 22;
 
     DrawText("Texture", (int)box.x + 8, (int)y, 11, {160, 160, 170, 255});
     y += 14;

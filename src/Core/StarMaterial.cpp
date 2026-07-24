@@ -12,6 +12,7 @@ bool StarMaterial::SaveToFile(const std::string& path) const {
     out << "ColorB=" << (int)baseColor.b << "\n";
     out << "ColorA=" << (int)baseColor.a << "\n";
     out << "Texture=" << textureAssetPath << "\n";
+    out << "Lit=" << (lit ? 1 : 0) << "\n";
 
     return true;
 }
@@ -36,6 +37,7 @@ bool StarMaterial::LoadFromFile(const std::string& path, StarMaterial& outMateri
         else if (key == "ColorB") outMaterial.baseColor.b = (unsigned char)atoi(value.c_str());
         else if (key == "ColorA") outMaterial.baseColor.a = (unsigned char)atoi(value.c_str());
         else if (key == "Texture") outMaterial.textureAssetPath = value;
+        else if (key == "Lit") outMaterial.lit = atoi(value.c_str()) != 0;
     }
 
     return true;
