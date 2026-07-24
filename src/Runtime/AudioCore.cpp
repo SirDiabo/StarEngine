@@ -44,7 +44,7 @@ Sound* AudioCore::GetOrLoadCookedSound(const std::string& soundAssetPath) {
     StarAsset asset;
     if (!StarAsset::LoadFromFile(soundAssetPath, asset) || asset.assetType != "Sound") return nullptr;
 
-    std::string resolved = CookedFile::Open(asset.sourcePath);
+    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
     if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
 
     Sound loaded = LoadSound(resolved.c_str());
@@ -68,7 +68,7 @@ Music* AudioCore::GetOrLoadCookedMusic(const std::string& musicAssetPath) {
     StarAsset asset;
     if (!StarAsset::LoadFromFile(musicAssetPath, asset) || asset.assetType != "Sound") return nullptr;
 
-    std::string resolved = CookedFile::Open(asset.sourcePath);
+    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
     if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
     Music loaded = LoadMusicStream(resolved.c_str());
     if (loaded.frameCount == 0) return nullptr;

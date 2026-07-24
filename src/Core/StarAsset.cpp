@@ -6,8 +6,8 @@
 #include <fstream>
 
 std::string StarAsset::ResolveSourcePath() const {
-    if (!sourcePath.empty() && std::filesystem::exists(sourcePath)) return sourcePath;
     if (!vendoredSourcePath.empty()) return vendoredSourcePath;
+    if (!sourcePath.empty() && std::filesystem::exists(sourcePath)) return sourcePath;
     return sourcePath;
 }
 

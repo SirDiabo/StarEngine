@@ -194,7 +194,7 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
 
     StarAsset asset;
     StarAsset::LoadFromFile(assetPath, asset);
-    fs::path src = asset.sourcePath.empty() ? fs::path(assetPath) : fs::path(asset.sourcePath);
+    fs::path src = asset.ResolveSourcePath().empty() ? fs::path(assetPath) : fs::path(asset.ResolveSourcePath());
     std::string baseName = src.stem().string();
 
     ActorInstance inst;

@@ -9,19 +9,21 @@ AssetCache& AssetCache::Get() {
 }
 
 Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
-    auto it = meshCache.find(sourceMeshPath);
+    std::string normalized = CookedFile::Open(sourceMeshPath);
+    if (normalized.empty()) normalized = sourceMeshPath;
+
+    auto it = meshCache.find(normalized);
     if (it != meshCache.end()) return &it->second;
 
-    std::string resolved = CookedFile::Open(sourceMeshPath);
-    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+    if (normalized.empty() || !FileExists(normalized.c_str())) return nullptr;
 
-    Model model = LoadModel(resolved.c_str());
+    Model model = LoadModel(normalized.c_str());
     if (model.meshCount == 0) {
         UnloadModel(model);
         return nullptr;
     }
 
-    auto inserted = meshCache.emplace(sourceMeshPath, model);
+    auto inserted = meshCache.emplace(normalized, model);
     return &inserted.first->second;
 }
 
@@ -63,7 +65,10 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
 }
 
 void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
-    auto it = meshCache.find(sourceMeshPath);
+    std::string normalized = CookedFile::Open(sourceMeshPath);
+    if (normalized.empty()) normalized = sourceMeshPath;
+
+    auto it = meshCache.find(normalized);
     if (it == meshCache.end()) return;
     UnloadModel(it->second);
     meshCache.erase(it);
