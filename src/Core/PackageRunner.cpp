@@ -193,6 +193,18 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
         return result;
     }
 
+    const ProjectSettings& settings = Project::Get().GetSettings();
+    if (!settings.name.empty()) {
+        std::string renamedFilename = settings.name;
+        if (options.platform == PackagePlatform::Windows) renamedFilename += ".exe";
+        fs::path renamedPath = fs::path(options.outputDir) / renamedFilename;
+        if (renamedPath != outputExe) {
+            std::error_code renameEc;
+            fs::rename(outputExe, renamedPath, renameEc);
+            if (!renameEc) outputExe = renamedPath;
+        }
+    }
+
     fs::path defaultIcon = engineRoot / "Assets" / "logo.png";
     if (fs::exists(defaultIcon)) {
         fs::copy_file(defaultIcon, fs::path(options.outputDir) / "icon.png",
@@ -202,8 +214,6 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
 
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
     std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();
-
-    const ProjectSettings& settings = Project::Get().GetSettings();
 
     PackagedGameConfig bootConfig;
     bootConfig.name = settings.name;
