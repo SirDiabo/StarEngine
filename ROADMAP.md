@@ -644,12 +644,31 @@ o Server/Multicast nodes available but not default
 o collision shapes component for overlap events
 o PhysicsComponent: Velocity, gravity scale, mass, drag, linear/angular dampening, etc.
 
-### 13.4 Rendering Module 
-o Simple light sources (Point, Rectangle, Spot, Sun, Global)
-o Generating shadow maps option
-o Runtime shadow maps (stencil, no tracing)
-o PSX vertex snapping, affine texture mapping options
-o Render scale, color palette post-process, vhs pixel smear and scan lines
+### 13.4 Rendering Module
+o Rendering module skeleton (src/Modules/Rendering), module-gated like other modules
+o RenderSettings struct (Shading Type, Render Scale) persisted via LayoutSerializer to its own project config file
+o Project Settings UI: "Shading Type" dropdown (Unlit / Projected Blob Shadows), "Render Scale" percentage
+o Shared RenderPipeline::Render(camera, target) entry point with an ordered pass list (Shadow, Color, Post-process), each pass bool-gated, disabled passes cost nothing
+o Route ViewportPanel through RenderPipeline::Render instead of its raw BeginMode3D/DrawWorldActors/EndMode3D
+o Give GameMain.cpp a render target and route it through RenderPipeline::Render too, so editor and packaged game share one code path
+o Remove targetWidth/targetHeight window-size setting, replace with "Render Scale" percentage of the actual window/display size
+o StarMaterial gains a Lit/Unlit flag
+o Shading Type = Unlit forces every material unlit; Lit/Unlit dropdown is blacked out in the Details panel and Material Editor when project Shading Type is Unlit
+o Shading Type = Projected Blob Shadows enables lighting and the shadow pass
+o Point, Rectangle, Spot, and Global light source components
+o Sun (directional) light source component
+o Simple per-vertex lit shading model, no per-pixel lighting, kept as cheap as possible
+o Light source components authored the same way as other components (ComponentDecl entry, Details panel, ComponentFields table entry)
+o Blob shadow: soft circular decal projected onto the receiving surface beneath a caster
+o Blob shadow stretches/offsets based on the nearest light source's direction
+o Per-mesh-component toggle to opt a caster out of casting a blob shadow
+o Shadow pass only runs when Shading Type is Projected Blob Shadows (or Stencil, later)
+o Profile and optimize the render loop; target thousands of fps on modern hardware with the Rendering module enabled, smooth on Raspberry-Pi-class hardware
+o Stencil shadow volumes as a third Shading Type option (extrude silhouette edges, increment/decrement stencil), later
+o PSX vertex snapping option, later
+o Affine texture mapping option, later
+o Color palette post-process, later
+o VHS pixel smear and scan lines post-process, later
 
 ### 13.5 Meshes Module
 x Meshes module (src/Modules/Meshes) registers module-gated StaticMesh (.starasset),
@@ -668,6 +687,18 @@ x PIE instantiates full declared component set (Mesh/Collision/Audio) on spawn
 x Model cache keyed by source path, shared between edit-mode and PIE
 x Texture cache keyed by .startex asset path
 x StarMaterial: flat color + optional diffuse texture, unlit, edited inline in Content Browser
+o Design pass: material graph node/pin schema, a data-only DAG with no exec flow, unlike Stargraph
+o Decide whether the Material graph canvas reuses Stargraph's graph rendering/drag/wire code or is a standalone lightweight canvas
+o .starmat format becomes a serialized node graph (small graph asset, same spirit as .stargraph) instead of flat baseColor/texture fields
+o Material Editor Tab: opens on double-click of a .starmat, graph canvas plus a live preview mesh (sphere/plane) rendered under the current pipeline
+o Merged Texture node: asset picker + sample + optional exposed parameter name in one node, no separate Texture Object/Sample/Parameter split
+o Per-channel outputs on the Texture node (R, G, B, A, RGB) for channel isolation
+o Scalar and Vector/Color parameter nodes, optionally exposed by name for Material Instances
+o Basic math nodes (Add, Multiply, Lerp, etc.) as graph expressions need them
+o Material Result output node (Base Color, Emissive, Opacity), kept minimal, no PBR params (no Normal/Roughness/Metallic), matches the fixed-function retro look
+o Material's Lit/Unlit flag feeds the same Shading Type gating as the Rendering module above
+o Graph edits generate GLSL source and recompile immediately on save/apply, no async cook step
+o Material Instances (later): override a base material's exposed parameters at runtime without recompiling its shader
 x MeshComponent carries Static Mesh + Material references; no direct .mtl edit needed
 x Position/Rotation/Scale, Static Mesh, Material editable in Details panel for instances
 x Component details editable in StargraphEditorPanel right panel
