@@ -4,6 +4,7 @@
 #include "Core/Project.h"
 #include "Core/NamedListRegistry.h"
 #include "Core/SaveFileRegistry.h"
+#include "Core/RenderSettings.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -21,11 +22,13 @@ void ProjectSettingsTab::RefreshFromProject() {
     const ProjectSettings& settings = Project::Get().GetSettings();
     snprintf(widthBuf, sizeof(widthBuf), "%d", settings.targetWidth);
     snprintf(heightBuf, sizeof(heightBuf), "%d", settings.targetHeight);
+    snprintf(renderScaleBuf, sizeof(renderScaleBuf), "%.2f", RenderSettings::Get().GetRenderScale() * 100.0f);
     activeField = 0;
     newSaveFileBuf[0] = '\0';
     newSaveFileName.clear();
     mapPicker.Close();
     rendererPopup.Close();
+    shadingTypePopup.Close();
 }
 
 static std::string MapDisplayName(const std::string& path) {
@@ -98,6 +101,46 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     if (rendererPopup.Render(rendererChoice)) {
         settings.renderer = rendererChoice == 1 ? GameRenderer::Software : GameRenderer::Hardware;
     }
+
+    DrawText("Shading Type", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    fy += 14;
+    Rectangle shadingRow = {fx, fy, fw, 20};
+    DrawRectangleRec(shadingRow, {26, 26, 28, 255});
+    DrawRectangleLinesEx(shadingRow, 1, {55, 55, 60, 255});
+    ShadingType shadingType = RenderSettings::Get().GetShadingType();
+    std::string shadingLabel = shadingType == ShadingType::ProjectedBlobShadows
+        ? "Projected Blob Shadows" : "Unlit";
+    DrawText(shadingLabel.c_str(), (int)shadingRow.x + 6, (int)shadingRow.y + 4, 12, WHITE);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, shadingRow) && !shadingTypePopup.IsOpen()) {
+        shadingTypePopup.Open({shadingRow.x, shadingRow.y + shadingRow.height}, fw, {
+            {"Unlit", true, ""},
+            {"Projected Blob Shadows", true, ""},
+        });
+    }
+    fy += 20;
+    DrawText("Unlit runs no lighting or shadow pass at all, the cheapest option.",
+              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+    fy += 24;
+    int shadingChoice = 0;
+    if (shadingTypePopup.Render(shadingChoice)) {
+        RenderSettings::Get().SetShadingType(shadingChoice == 1 ? ShadingType::ProjectedBlobShadows : ShadingType::Unlit);
+    }
+
+    DrawText("Render Scale", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    fy += 14;
+    Rectangle scaleRow = {fx, fy, 100.0f, 20};
+    float renderScalePct = RenderSettings::Get().GetRenderScale() * 100.0f;
+    float prevRenderScalePct = renderScalePct;
+    PropertyField::FloatBox(scaleRow, renderScaleBuf, sizeof(renderScaleBuf), 4, activeField, renderScalePct);
+    DrawText("%", (int)scaleRow.x + 106, (int)scaleRow.y + 4, 12, {150, 150, 160, 255});
+    if (renderScalePct != prevRenderScalePct) {
+        if (renderScalePct < 10.0f) renderScalePct = 10.0f;
+        RenderSettings::Get().SetRenderScale(renderScalePct / 100.0f);
+    }
+    fy += 20;
+    DrawText("Percentage of the window resolution the 3D scene renders at, upscaled with nearest-neighbor.",
+              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+    fy += 24;
 
     DrawText("Target Resolution", (int)fx, (int)fy, 11, {140, 140, 150, 255});
     fy += 14;

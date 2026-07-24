@@ -49,6 +49,6 @@ void RenderSettings::SetShadingType(ShadingType value) {
 }
 
 void RenderSettings::SetRenderScale(float value) {
-    renderScale = value;
+    renderScale = value < 0.1f ? 0.1f : value;
     Save();
 }
