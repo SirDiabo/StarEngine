@@ -192,6 +192,7 @@ struct ComponentDecl {
     // MeshComponent
     std::string meshAssetPath;
     std::vector<std::string> materialAssetPaths;
+    bool meshCastsShadow = true;
 
     // CollisionComponent
     std::string collisionShape = "Box";

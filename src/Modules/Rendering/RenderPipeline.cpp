@@ -12,10 +12,9 @@ void Render(Camera3D camera, RenderTexture2D target, Color clearColor, bool show
 
     bool renderingEnabled = ModuleManager::Get().IsModuleEnabled("Rendering");
 
-    if (renderingEnabled && ShadowPass::Enabled()) ShadowPass::Run();
-
     BeginMode3D(camera);
     ColorPass::Run(camera, showPlaceholders);
+    if (renderingEnabled && ShadowPass::Enabled()) ShadowPass::Run();
     EndMode3D();
 
     if (renderingEnabled && PostProcessPass::Enabled()) PostProcessPass::Run(target);

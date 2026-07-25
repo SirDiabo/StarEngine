@@ -310,6 +310,10 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 isDirty = true;
             }
         }
+
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Casts Shadow", &comp.meshCastsShadow)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Casts Shadow");
+        y += 24;
     } else if (comp.componentType == "CollisionComponent") {
         DrawText("Shape", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
         y += 14;

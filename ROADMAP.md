@@ -654,15 +654,15 @@ x Give GameMain.cpp a render target and route it through RenderPipeline::Render 
 x Remove targetWidth/targetHeight window-size setting, replace with "Render Scale" percentage of the actual window/display size
 x StarMaterial gains a Lit/Unlit flag
 x Shading Type = Unlit forces every material unlit; Lit/Unlit checkbox is blacked out in the Material Editor when project Shading Type is Unlit
-o Shading Type = Projected Blob Shadows enables lighting and the shadow pass
+x Shading Type = Projected Blob Shadows enables lighting and the shadow pass
 x Point, Rectangle, Spot, and Global light source components
 x Sun (directional) light source component
-o Simple per-vertex lit shading model, no per-pixel lighting, kept as cheap as possible
+x Simple per-vertex lit shading model, no per-pixel lighting, kept as cheap as possible
 x Light source components authored the same way as other components (ComponentDecl entry, Details panel, ComponentFields table entry)
-o Blob shadow: soft circular decal projected onto the receiving surface beneath a caster
-o Blob shadow stretches/offsets based on the nearest light source's direction
-o Per-mesh-component toggle to opt a caster out of casting a blob shadow
-o Shadow pass only runs when Shading Type is Projected Blob Shadows (or Stencil, later)
+x Blob shadow: soft circular decal projected onto the receiving surface beneath a caster
+x Blob shadow stretches/offsets based on the nearest light source's direction
+x Per-mesh-component toggle to opt a caster out of casting a blob shadow
+x Shadow pass only runs when Shading Type is Projected Blob Shadows (or Stencil, later)
 o Profile and optimize the render loop; target thousands of fps on modern hardware with the Rendering module enabled, smooth on Raspberry-Pi-class hardware
 o Stencil shadow volumes as a third Shading Type option (extrude silhouette edges, increment/decrement stencil), later
 o PSX vertex snapping option, later

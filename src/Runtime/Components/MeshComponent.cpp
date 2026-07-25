@@ -67,6 +67,7 @@ void RegisterMeshComponentNodes() {
 void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddString("Static Mesh", &meshPath);
+    outProperties.AddBool("Casts Shadow", &castsShadow);
 }
 
 void MeshComponent::Update(float deltaTime) {

@@ -8,6 +8,7 @@ class MeshComponent : public SceneComponent {
 public:
     std::string meshPath;
     std::vector<std::string> materialPaths; // parallel to the mesh asset's material slots
+    bool castsShadow = true;
 
     const char* GetClassName() const override { return "MeshComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
