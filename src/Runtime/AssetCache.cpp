@@ -2,6 +2,7 @@
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/CookedFile.h"
+#include "Modules/Rendering/ShadingModel.h"
 
 AssetCache& AssetCache::Get() {
     static AssetCache instance;
@@ -49,10 +50,12 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
 
     for (int i = 0; i < model->materialCount; i++) {
         Color color = WHITE;
+        bool lit = false;
         if ((size_t)i < materialPaths.size() && !materialPaths[i].empty()) {
             StarMaterial material;
             if (StarMaterial::LoadFromFile(materialPaths[i], material)) {
                 color = material.baseColor;
+                lit = material.lit;
                 if (!material.textureAssetPath.empty()) {
                     if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material.textureAssetPath)) {
                         model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
@@ -61,6 +64,8 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
             }
         }
         model->materials[i].maps[MATERIAL_MAP_DIFFUSE].color = color;
+        model->materials[i].shader = (lit && ShadingModel::ShouldUseLitShading())
+            ? ShadingModel::GetLitShader() : ShadingModel::GetDefaultShader();
     }
 }
 
