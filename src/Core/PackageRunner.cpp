@@ -218,6 +218,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     PackagedGameConfig bootConfig;
     bootConfig.name = settings.name;
     bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
+    bootConfig.shadingType = ShadingTypeName(RenderSettings::Get().GetShadingType());
+    bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
     bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
     bootConfig.renderer = rendererKey;
     bootConfig.cipher = CookCipherName(options.cipher);

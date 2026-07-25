@@ -63,6 +63,8 @@ int main(int argc, char* argv[]) {
     if (!ModuleManager::Get().InitializeAll()) return 1;
 
     RenderSettings::Get().SetRenderScale(config.renderScale);
+    RenderSettings::Get().SetShadingType(ShadingTypeFromName(config.shadingType));
+    RenderSettings::Get().SetLightingQuality(LightingQualityFromName(config.lightingQuality));
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, config.name.c_str());

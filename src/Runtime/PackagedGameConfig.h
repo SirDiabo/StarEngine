@@ -4,6 +4,8 @@
 struct PackagedGameConfig {
     std::string name;
     float renderScale = 1.0f;
+    std::string shadingType;
+    std::string lightingQuality;
     std::string defaultMap;
     std::string renderer;
     std::string cipher;
