@@ -124,6 +124,32 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
         RenderSettings::Get().SetShadingType(shadingChoice == 1 ? ShadingType::ProjectedBlobShadows : ShadingType::Unlit);
     }
 
+    bool lightingEnabled = shadingType != ShadingType::Unlit;
+    Color lightingLabelColor = lightingEnabled ? Color{140, 140, 150, 255} : Color{80, 80, 85, 255};
+    DrawText("Lighting Quality", (int)fx, (int)fy, 11, lightingLabelColor);
+    fy += 14;
+    Rectangle lightingRow = {fx, fy, fw, 20};
+    DrawRectangleRec(lightingRow, {26, 26, 28, 255});
+    DrawRectangleLinesEx(lightingRow, 1, {55, 55, 60, 255});
+    LightingQuality lightingQuality = RenderSettings::Get().GetLightingQuality();
+    std::string lightingLabel = lightingQuality == LightingQuality::PerPixel ? "Per Pixel" : "Per Vertex";
+    DrawText(lightingLabel.c_str(), (int)lightingRow.x + 6, (int)lightingRow.y + 4, 12,
+              lightingEnabled ? WHITE : Color{120, 120, 125, 255});
+    if (lightingEnabled && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, lightingRow) && !lightingQualityPopup.IsOpen()) {
+        lightingQualityPopup.Open({lightingRow.x, lightingRow.y + lightingRow.height}, fw, {
+            {"Per Vertex", true, ""},
+            {"Per Pixel", true, ""},
+        });
+    }
+    fy += 20;
+    DrawText("Per Vertex is cheap but can look faceted on low-poly meshes. Per Pixel costs more, looks smoother.",
+              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+    fy += 24;
+    int lightingChoice = 0;
+    if (lightingQualityPopup.Render(lightingChoice)) {
+        RenderSettings::Get().SetLightingQuality(lightingChoice == 1 ? LightingQuality::PerPixel : LightingQuality::PerVertex);
+    }
+
     DrawText("Render Scale", (int)fx, (int)fy, 11, {140, 140, 150, 255});
     fy += 14;
     Rectangle scaleRow = {fx, fy, 100.0f, 20};

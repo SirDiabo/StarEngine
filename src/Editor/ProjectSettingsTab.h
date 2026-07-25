@@ -18,6 +18,7 @@ private:
     AssetPickerPopup mapPicker;
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
+    ChoicePopup lightingQualityPopup;
 
     char renderScaleBuf[16] = "";
     char newSaveFileBuf[64] = "";

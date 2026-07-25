@@ -127,6 +127,9 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     }
     if (inst.materialAssetPaths.size() != meshSlots.size()) inst.materialAssetPaths.resize(meshSlots.size());
 
+    GuiCheckBox({x + 8, y, 18, 18}, "Casts Shadow", &inst.castsShadow);
+    y += 24;
+
     if (meshSlots.empty()) {
         DrawText("No material slots", (int)x + 8, (int)y, 10, {110, 110, 118, 255});
         y += 18;

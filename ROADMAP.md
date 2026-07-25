@@ -657,7 +657,8 @@ x Shading Type = Unlit forces every material unlit; Lit/Unlit checkbox is blacke
 x Shading Type = Projected Blob Shadows enables lighting and the shadow pass
 x Point, Rectangle, Spot, and Global light source components
 x Sun (directional) light source component
-x Simple per-vertex lit shading model, no per-pixel lighting, kept as cheap as possible
+x Per-vertex lit shading model by default, kept as cheap as possible
+x Lighting Quality project setting (Per Vertex / Per Pixel) for meshes too low-poly for vertex lighting to look right
 x Light source components authored the same way as other components (ComponentDecl entry, Details panel, ComponentFields table entry)
 x Blob shadow: soft circular decal projected onto the receiving surface beneath a caster
 x Blob shadow stretches/offsets based on the nearest light source's direction

@@ -25,6 +25,7 @@ bool StarMap::SaveToFile(const std::string& path) const {
         out << "Class=" << inst.className << "\n";
         out << "Graph=" << inst.graphAssetPath << "\n";
         out << "Mesh=" << inst.meshAssetPath << "\n";
+        out << "CastsShadow=" << (inst.castsShadow ? "true" : "false") << "\n";
         out << "MaterialCount=" << inst.materialAssetPaths.size() << "\n";
         for (size_t m = 0; m < inst.materialAssetPaths.size(); m++) {
             out << "Material" << m << "=" << inst.materialAssetPaths[m] << "\n";
@@ -91,6 +92,7 @@ bool StarMap::LoadFromFile(const std::string& path) {
             if (const std::string* v = Find(section, "Class"))  inst.className = *v;
             if (const std::string* v = Find(section, "Graph"))  inst.graphAssetPath = *v;
             if (const std::string* v = Find(section, "Mesh"))   inst.meshAssetPath = *v;
+            if (const std::string* v = Find(section, "CastsShadow")) inst.castsShadow = (*v == "true");
             if (const std::string* v = Find(section, "MaterialCount")) {
                 int count = SafeParse::ToInt(*v);
                 if (count > 0) inst.materialAssetPaths.resize((size_t)count);

@@ -6,27 +6,13 @@
 #include "Runtime/Components/LightComponent.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include <string>
 
 namespace {
 
 const int kMaxLights = 4;
 
-const char* kLitVertexShader = R"glsl(
-#version 330
-
-in vec3 vertexPosition;
-in vec2 vertexTexCoord;
-in vec3 vertexNormal;
-in vec4 vertexColor;
-
-uniform mat4 mvp;
-uniform mat4 matModel;
-uniform mat4 matNormal;
-
-out vec2 fragTexCoord;
-out vec4 fragColor;
-out vec3 fragLight;
-
+const char* kLightingGLSL = R"glsl(
 #define MAX_LIGHTS 4
 #define LIGHT_POINT 0
 #define LIGHT_RECTANGLE 1
@@ -48,13 +34,7 @@ struct Light {
 uniform Light lights[MAX_LIGHTS];
 uniform int lightCount;
 
-void main() {
-    fragTexCoord = vertexTexCoord;
-    fragColor = vertexColor;
-
-    vec3 worldPos = vec3(matModel * vec4(vertexPosition, 1.0));
-    vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
-
+vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal) {
     vec3 accum = vec3(0.0);
     for (int i = 0; i < lightCount; i++) {
         if (lights[i].type == LIGHT_GLOBAL) {
@@ -85,23 +65,36 @@ void main() {
         float ndotl = max(dot(worldNormal, toLight), 0.0);
         accum += lights[i].color * lights[i].intensity * ndotl * atten;
     }
-
-    fragLight = accum;
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    return accum;
 }
 )glsl";
 
-const char* kLitFragmentShader = R"glsl(
+const char* kAttribsAndVaryings = R"glsl(
 #version 330
 
-in vec2 fragTexCoord;
-in vec4 fragColor;
-in vec3 fragLight;
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
 
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matNormal;
+
+out vec2 fragTexCoord;
+out vec4 fragColor;
+)glsl";
+
+const char* kSampleAndOutput = R"glsl(
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
 out vec4 finalColor;
+)glsl";
+
+// PerVertex
+const char* kFragmentPassthrough = R"glsl(
+in vec3 fragLight;
 
 void main() {
     vec4 texelColor = texture(texture0, fragTexCoord);
@@ -109,32 +102,93 @@ void main() {
 }
 )glsl";
 
+// PerPixel
+const char* kVertexPassthrough = R"glsl(
+out vec3 fragWorldPos;
+out vec3 fragWorldNormal;
+
+void main() {
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    fragWorldPos = vec3(matModel * vec4(vertexPosition, 1.0));
+    fragWorldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+std::string BuildPerVertexVS() {
+    return std::string(kAttribsAndVaryings) + "out vec3 fragLight;\n" + kLightingGLSL + R"glsl(
+void main() {
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+
+    vec3 worldPos = vec3(matModel * vec4(vertexPosition, 1.0));
+    vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
+
+    fragLight = ComputeLighting(worldPos, worldNormal);
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+}
+
+std::string BuildPerVertexFS() {
+    return std::string("#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\n") + kSampleAndOutput + kFragmentPassthrough;
+}
+
+std::string BuildPerPixelVS() {
+    return std::string(kAttribsAndVaryings) + kVertexPassthrough;
+}
+
+std::string BuildPerPixelFS() {
+    return std::string("#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\nin vec3 fragWorldPos;\nin vec3 fragWorldNormal;\n")
+        + kSampleAndOutput + kLightingGLSL + R"glsl(
+void main() {
+    vec3 lightAccum = ComputeLighting(fragWorldPos, normalize(fragWorldNormal));
+    vec4 texelColor = texture(texture0, fragTexCoord);
+    finalColor = texelColor * colDiffuse * fragColor * vec4(lightAccum, 1.0);
+}
+)glsl";
+}
+
 struct LightLocs {
     int type = -1, position = -1, direction = -1, color = -1;
     int intensity = -1, radius = -1, innerCos = -1, outerCos = -1;
 };
 
-Shader litShader = {0};
-bool litShaderLoaded = false;
-int lightCountLoc = -1;
-LightLocs lightLocs[kMaxLights];
+struct LitVariant {
+    Shader shader = {0};
+    bool loaded = false;
+    int lightCountLoc = -1;
+    LightLocs lightLocs[kMaxLights];
 
-void EnsureLitShaderLoaded() {
-    if (litShaderLoaded) return;
-
-    litShader = LoadShaderFromMemory(kLitVertexShader, kLitFragmentShader);
-    lightCountLoc = GetShaderLocation(litShader, "lightCount");
-    for (int i = 0; i < kMaxLights; i++) {
-        lightLocs[i].type      = GetShaderLocation(litShader, TextFormat("lights[%d].type", i));
-        lightLocs[i].position  = GetShaderLocation(litShader, TextFormat("lights[%d].position", i));
-        lightLocs[i].direction = GetShaderLocation(litShader, TextFormat("lights[%d].direction", i));
-        lightLocs[i].color     = GetShaderLocation(litShader, TextFormat("lights[%d].color", i));
-        lightLocs[i].intensity = GetShaderLocation(litShader, TextFormat("lights[%d].intensity", i));
-        lightLocs[i].radius    = GetShaderLocation(litShader, TextFormat("lights[%d].radius", i));
-        lightLocs[i].innerCos  = GetShaderLocation(litShader, TextFormat("lights[%d].innerCos", i));
-        lightLocs[i].outerCos  = GetShaderLocation(litShader, TextFormat("lights[%d].outerCos", i));
+    void EnsureLoaded(const std::string& vs, const std::string& fs) {
+        if (loaded) return;
+        shader = LoadShaderFromMemory(vs.c_str(), fs.c_str());
+        lightCountLoc = GetShaderLocation(shader, "lightCount");
+        for (int i = 0; i < kMaxLights; i++) {
+            lightLocs[i].type      = GetShaderLocation(shader, TextFormat("lights[%d].type", i));
+            lightLocs[i].position  = GetShaderLocation(shader, TextFormat("lights[%d].position", i));
+            lightLocs[i].direction = GetShaderLocation(shader, TextFormat("lights[%d].direction", i));
+            lightLocs[i].color     = GetShaderLocation(shader, TextFormat("lights[%d].color", i));
+            lightLocs[i].intensity = GetShaderLocation(shader, TextFormat("lights[%d].intensity", i));
+            lightLocs[i].radius    = GetShaderLocation(shader, TextFormat("lights[%d].radius", i));
+            lightLocs[i].innerCos  = GetShaderLocation(shader, TextFormat("lights[%d].innerCos", i));
+            lightLocs[i].outerCos  = GetShaderLocation(shader, TextFormat("lights[%d].outerCos", i));
+        }
+        loaded = true;
     }
-    litShaderLoaded = true;
+};
+
+LitVariant vertexVariant;
+LitVariant pixelVariant;
+
+LitVariant& ActiveVariant() {
+    if (RenderSettings::Get().GetLightingQuality() == LightingQuality::PerPixel) {
+        pixelVariant.EnsureLoaded(BuildPerPixelVS(), BuildPerPixelFS());
+        return pixelVariant;
+    }
+    vertexVariant.EnsureLoaded(BuildPerVertexVS(), BuildPerVertexFS());
+    return vertexVariant;
 }
 
 Vector3 DirectionFromRotation(Vector3 rot) {
@@ -151,8 +205,7 @@ bool ShadingModel::ShouldUseLitShading() {
 }
 
 Shader& ShadingModel::GetLitShader() {
-    EnsureLitShaderLoaded();
-    return litShader;
+    return ActiveVariant().shader;
 }
 
 Shader ShadingModel::GetDefaultShader() {
@@ -164,7 +217,7 @@ Shader ShadingModel::GetDefaultShader() {
 
 void ShadingModel::UpdateLightUniforms() {
     if (!ShouldUseLitShading()) return;
-    EnsureLitShaderLoaded();
+    LitVariant& variant = ActiveVariant();
 
     int count = 0;
     for (const auto& actor : World::Get().GetActors()) {
@@ -183,19 +236,19 @@ void ShadingModel::UpdateLightUniforms() {
             float innerCos = cosf(lc->innerConeAngle * DEG2RAD);
             float outerCos = cosf(lc->outerConeAngle * DEG2RAD);
 
-            const LightLocs& locs = lightLocs[count];
-            SetShaderValue(litShader, locs.type, &type, SHADER_UNIFORM_INT);
-            SetShaderValue(litShader, locs.position, pos, SHADER_UNIFORM_VEC3);
-            SetShaderValue(litShader, locs.direction, dirArr, SHADER_UNIFORM_VEC3);
-            SetShaderValue(litShader, locs.color, color, SHADER_UNIFORM_VEC3);
-            SetShaderValue(litShader, locs.intensity, &lc->intensity, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(litShader, locs.radius, &lc->radius, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(litShader, locs.innerCos, &innerCos, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(litShader, locs.outerCos, &outerCos, SHADER_UNIFORM_FLOAT);
+            const LightLocs& locs = variant.lightLocs[count];
+            SetShaderValue(variant.shader, locs.type, &type, SHADER_UNIFORM_INT);
+            SetShaderValue(variant.shader, locs.position, pos, SHADER_UNIFORM_VEC3);
+            SetShaderValue(variant.shader, locs.direction, dirArr, SHADER_UNIFORM_VEC3);
+            SetShaderValue(variant.shader, locs.color, color, SHADER_UNIFORM_VEC3);
+            SetShaderValue(variant.shader, locs.intensity, &lc->intensity, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(variant.shader, locs.radius, &lc->radius, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(variant.shader, locs.innerCos, &innerCos, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(variant.shader, locs.outerCos, &outerCos, SHADER_UNIFORM_FLOAT);
 
             count++;
         }
     }
 
-    SetShaderValue(litShader, lightCountLoc, &count, SHADER_UNIFORM_INT);
+    SetShaderValue(variant.shader, variant.lightCountLoc, &count, SHADER_UNIFORM_INT);
 }

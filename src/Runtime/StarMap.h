@@ -8,6 +8,7 @@ struct ActorInstance {
     std::string graphAssetPath;
     std::string meshAssetPath;
     std::vector<std::string> materialAssetPaths;
+    bool castsShadow = true;
     float posX = 0, posY = 0, posZ = 0;
     float rotX = 0, rotY = 0, rotZ = 0;
     float scaleX = 1, scaleY = 1, scaleZ = 1;

@@ -58,6 +58,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
         auto* meshComp = new MeshComponent();
         meshComp->SetMeshPath(inst.meshAssetPath);
         meshComp->SetMaterialPaths(inst.materialAssetPaths);
+        meshComp->castsShadow = inst.castsShadow;
         actor->AddComponent(meshComp);
     }
 
