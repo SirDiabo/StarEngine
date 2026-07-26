@@ -69,25 +69,25 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
-    float nodeX = graphArea.x + node.posX * zoom + scroll.x;
-    float nodeY = graphArea.y + node.posY * zoom + scroll.y;
-    float nodeH = GetNodeHeight(node) * zoom;
+    float nodeX = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
+    float nodeY = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
+    float nodeH = GetNodeHeight(node) * canvasState.zoom;
 
     if (IsPrimitiveNode(node)) {
-        float scaledRadius = pinRadius * zoom;
+        float scaledRadius = pinRadius * canvasState.zoom;
         if (pin.isInput) {
             return {nodeX + scaledRadius + 2, nodeY + nodeH * 0.5f};
         } else {
-            return {nodeX + nodeWidth * zoom - scaledRadius - 6, nodeY + nodeH * 0.5f};
+            return {nodeX + nodeWidth * canvasState.zoom - scaledRadius - 6, nodeY + nodeH * 0.5f};
         }
     }
 
-    float scaledPinHeight = pinHeight * zoom;
-    float y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
+    float scaledPinHeight = pinHeight * canvasState.zoom;
+    float y = nodeY + headerHeight * canvasState.zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.inputs) {
         if (p.name == "Variable_Name") continue;
         if (p.name == "Component_Name") continue;
-        if (p.id == pin.id) return {nodeX + pinRadius * zoom + 2, y};
+        if (p.id == pin.id) return {nodeX + pinRadius * canvasState.zoom + 2, y};
         y += scaledPinHeight;
         if (p.type != PinType::Exec) {
             bool linked = false;
@@ -97,9 +97,9 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
             if (!linked) y += scaledPinHeight;
         }
     }
-    y = nodeY + headerHeight * zoom + scaledPinHeight * 0.5f;
+    y = nodeY + headerHeight * canvasState.zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.outputs) {
-        if (p.id == pin.id) return {nodeX + nodeWidth * zoom - pinRadius * zoom - 2, y};
+        if (p.id == pin.id) return {nodeX + nodeWidth * canvasState.zoom - pinRadius * canvasState.zoom - 2, y};
         y += scaledPinHeight;
     }
     return {0, 0};
@@ -340,8 +340,9 @@ void StargraphEditorPanel::PasteNodes() {
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
-    float rawX = (mousePos.x - graphArea.x - scroll.x) / zoom;
-    float rawY = (mousePos.y - graphArea.y - scroll.y) / zoom;
+    Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea, mousePos);
+    float rawX = rawWorld.x;
+    float rawY = rawWorld.y;
     const float gridSnap = 16.0f;
 
     struct ClipNode {
@@ -529,9 +530,9 @@ Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
                             bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
-        float nx = graphArea.x + node.posX * zoom + scroll.x;
-        float ny = graphArea.y + node.posY * zoom + scroll.y;
-        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth * zoom, GetNodeHeight(node) * zoom})) return &node;
+        float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
+        float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
+        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth * canvasState.zoom, GetNodeHeight(node) * canvasState.zoom})) return &node;
     }
     return nullptr;
 }
@@ -557,7 +558,7 @@ void StargraphEditorPanel::RenderWireInProgress() {
             }
         }
 
-        DrawLineBezier(fromPos, mousePos, 2.0f, wireColor);
+        GraphCanvas::DrawWire(fromPos, mousePos, 2.0f, wireColor);
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) CancelLink();
@@ -594,32 +595,9 @@ void StargraphEditorPanel::RenderGraph() {
         }
     }
 
-    float wheel = GetMouseWheelMove();
-    if (wheel != 0 && CheckCollisionPointRec(mousePos, graphArea) && !nodeMenuOpen && !keyPickerOpen) {
-        float newZoom = zoom + wheel * 0.1f;
-        newZoom = fmax(0.1f, fmin(3.0f, newZoom));
-        
-        Vector2 mouseBeforeZoom = {
-            (mousePos.x - graphArea.x - scroll.x) / zoom,
-            (mousePos.y - graphArea.y - scroll.y) / zoom
-        };
-        zoom = newZoom;
-        scroll.x = mousePos.x - graphArea.x - mouseBeforeZoom.x * zoom;
-        scroll.y = mousePos.y - graphArea.y - mouseBeforeZoom.y * zoom;
-    }
+    GraphCanvas::UpdatePanZoom(canvasState, graphArea, mousePos, !nodeMenuOpen && !keyPickerOpen);
 
-    DrawRectangleRec(graphArea, {24, 24, 26, 255});
-
-    const float gridPitch = 16.0f;
-    float stepX = gridPitch * zoom;
-    float stepY = gridPitch * zoom;
-    float startX = fmod(scroll.x, stepX) + graphArea.x;
-    float startY = fmod(scroll.y, stepY) + graphArea.y;
-    for (float gx = startX; gx < graphArea.x + graphArea.width; gx += stepX) {
-        for (float gy = startY; gy < graphArea.y + graphArea.height; gy += stepY) {
-            DrawPixel((int)gx, (int)gy, {55, 55, 60, 255});
-        }
-    }
+    GraphCanvas::DrawGrid(graphArea, canvasState.scroll, canvasState.zoom);
 
     BeginScissorMode((int)graphArea.x, (int)graphArea.y, (int)graphArea.width, (int)graphArea.height);
 
@@ -636,34 +614,16 @@ void StargraphEditorPanel::RenderGraph() {
         Vector2 to   = GetPinPos(*inNode, *inPin);
         Color wireColor = GetPinColor(outPin->type);
 
-        bool hovered = false;
-        if (IsKeyDown(KEY_LEFT_ALT)) {
-            Vector2 mid = {(from.x + to.x) * 0.5f, (from.y + to.y) * 0.5f};
-            if (CheckCollisionPointCircle(mousePos, mid, 8.0f) ||
-                Vector2Distance(mousePos, from) < 12.0f ||
-                Vector2Distance(mousePos, to)   < 12.0f) {
-                hovered = true;
-            }
-            
-            for (float t = 0.0f; t <= 1.0f; t += 0.1f) {
-                float cx1 = from.x + (to.x - from.x) * 0.5f;
-                float cy1 = from.y;
-                float cx2 = cx1;
-                float cy2 = to.y;
-                float bx = (1-t)*(1-t)*(1-t)*from.x + 3*(1-t)*(1-t)*t*cx1 + 3*(1-t)*t*t*cx2 + t*t*t*to.x;
-                float by = (1-t)*(1-t)*(1-t)*from.y + 3*(1-t)*(1-t)*t*cy1 + 3*(1-t)*t*t*cy2 + t*t*t*to.y;
-                if (CheckCollisionPointCircle(mousePos, {bx, by}, 7.0f)) { hovered = true; break; }
-            }
-        }
+        bool hovered = IsKeyDown(KEY_LEFT_ALT) && GraphCanvas::IsPointNearWire(mousePos, from, to);
 
         if (hovered) {
-            DrawLineBezier(from, to, 3.0f, {255, 80, 80, 255});
+            GraphCanvas::DrawWire(from, to, 3.0f, {255, 80, 80, 255});
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 RemoveSpecificLink(link.outputPinId, link.inputPinId);
                 break;
             }
         } else {
-            DrawLineBezier(from, to, 2.0f, wireColor);
+            GraphCanvas::DrawWire(from, to, 2.0f, wireColor);
         }
     }
 
@@ -671,12 +631,12 @@ void StargraphEditorPanel::RenderGraph() {
 
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         int nodeIdInt = std::stoi(node.id);
-        float nx = graphArea.x + node.posX * zoom + scroll.x;
-        float ny = graphArea.y + node.posY * zoom + scroll.y;
-        float scaledNodeWidth = nodeWidth * zoom;
-        float scaledHeaderHeight = headerHeight * zoom;
-        float scaledPinHeight = pinHeight * zoom;
-        float nh = GetNodeHeight(node) * zoom;
+        float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
+        float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
+        float scaledNodeWidth = nodeWidth * canvasState.zoom;
+        float scaledHeaderHeight = headerHeight * canvasState.zoom;
+        float scaledPinHeight = pinHeight * canvasState.zoom;
+        float nh = GetNodeHeight(node) * canvasState.zoom;
         bool inMulti = false;
         for (int sid : selectedNodeIds) if (sid == nodeIdInt) { inMulti = true; break; }
         bool isSelected = (selectedNodeId == nodeIdInt) || inMulti;
@@ -685,11 +645,11 @@ void StargraphEditorPanel::RenderGraph() {
         Rectangle headerBounds = {nx, ny, scaledNodeWidth, scaledHeaderHeight};
         
         if (IsPrimitiveNode(node)) {
-            float scaledHeight = GetPrimitiveNodeHeight() * zoom;
+            float scaledHeight = GetPrimitiveNodeHeight() * canvasState.zoom;
             nodeBounds = {nx, ny, scaledNodeWidth, scaledHeight};
             headerBounds = nodeBounds;
             
-            float scaledRadius = pinRadius * zoom;
+            float scaledRadius = pinRadius * canvasState.zoom;
             const Pin* outputPin = nullptr;
             for (const Pin& p : node.outputs) {
                 if (p.name == "Value" || p.name == "Component") { outputPin = &p; break; }
@@ -731,7 +691,7 @@ void StargraphEditorPanel::RenderGraph() {
             
             std::string displayTitle = node.title;
             for (char& c : displayTitle) if (c == '_') c = ' ';
-            DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
+            DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen) {
@@ -766,11 +726,11 @@ void StargraphEditorPanel::RenderGraph() {
             }
             
             if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                float rawX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
-                float rawY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
-                const float gridSnap = 16.0f;
-                float snappedX = roundf(rawX / gridSnap) * gridSnap;
-                float snappedY = roundf(rawY / gridSnap) * gridSnap;
+                Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea,
+                    {mousePos.x - nodeDragOffset.x, mousePos.y - nodeDragOffset.y});
+                Vector2 snapped = GraphCanvas::SnapToGrid(rawWorld);
+                float snappedX = snapped.x;
+                float snappedY = snapped.y;
                 float deltaX = snappedX - node.posX;
                 float deltaY = snappedY - node.posY;
                 node.posX = snappedX;
@@ -782,8 +742,9 @@ void StargraphEditorPanel::RenderGraph() {
                         if (oid == nodeIdInt) continue;
                         for (int sid : selectedNodeIds) {
                             if (sid == oid) {
-                                other.posX = roundf((other.posX + deltaX) / gridSnap) * gridSnap;
-                                other.posY = roundf((other.posY + deltaY) / gridSnap) * gridSnap;
+                                Vector2 otherSnapped = GraphCanvas::SnapToGrid({other.posX + deltaX, other.posY + deltaY});
+                                other.posX = otherSnapped.x;
+                                other.posY = otherSnapped.y;
                                 break;
                             }
                         }
@@ -801,20 +762,20 @@ void StargraphEditorPanel::RenderGraph() {
                              isSelected ? Color{100, 160, 230, 255} : Color{65, 65, 75, 255});
         std::string displayTitle = node.title;
         for (char& c : displayTitle) if (c == '_') c = ' ';
-        DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * zoom), WHITE);
+        DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
 
         float inputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
             Pin& pin = node.inputs[i];
             if (pin.name == "Variable_Name") continue;
             if (pin.name == "Component_Name") continue;
-            Vector2 pinPos = {nx + pinRadius * zoom + 2, inputY};
+            Vector2 pinPos = {nx + pinRadius * canvasState.zoom + 2, inputY};
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == pin.id) { linked = true; break; }
 
-            float scaledRadius = pinRadius * zoom;
+            float scaledRadius = pinRadius * canvasState.zoom;
 
             if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
             else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
@@ -852,10 +813,10 @@ void StargraphEditorPanel::RenderGraph() {
             inputY += scaledPinHeight;
 
             if (!linked) {
-                float fieldX = nx + pinRadius * zoom + 18;
+                float fieldX = nx + pinRadius * canvasState.zoom + 18;
                 float fieldRightMax = nx + scaledNodeWidth * 0.62f;
                 float fieldW = fieldRightMax - fieldX;
-                if (fieldW < 40 * zoom) fieldW = 40 * zoom;
+                if (fieldW < 40 * canvasState.zoom) fieldW = 40 * canvasState.zoom;
                 Rectangle fieldRect = {fieldX, inputY - scaledPinHeight * 0.5f, fieldW, scaledPinHeight - 2};
 
                 if (pin.type == PinType::Boolean) {
@@ -999,13 +960,13 @@ void StargraphEditorPanel::RenderGraph() {
         float outputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.outputs.size(); i++) {
             const Pin& pin = node.outputs[i];
-            Vector2 pinPos = {nx + scaledNodeWidth - pinRadius * zoom - 2, outputY};
+            Vector2 pinPos = {nx + scaledNodeWidth - pinRadius * canvasState.zoom - 2, outputY};
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
             for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == pin.id) { linked = true; break; }
 
-            float scaledRadius = pinRadius * zoom;
+            float scaledRadius = pinRadius * canvasState.zoom;
 
             if (linked) DrawCircleV(pinPos, scaledRadius, pinColor);
             else { DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255}); DrawCircleLinesV(pinPos, scaledRadius, pinColor); }
@@ -1014,7 +975,7 @@ void StargraphEditorPanel::RenderGraph() {
                 float textW = (float)MeasureText(pin.name.c_str(), 12);
                 DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 12), (int)outputY - 8, 12, LIGHTGRAY);
             }
-            outputY += pinHeight * zoom;
+            outputY += pinHeight * canvasState.zoom;
 
 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
@@ -1065,11 +1026,11 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
 
         if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            float rawX = (mousePos.x - graphArea.x - scroll.x - nodeDragOffset.x) / zoom;
-            float rawY = (mousePos.y - graphArea.y - scroll.y - nodeDragOffset.y) / zoom;
-            const float gridSnap = 16.0f;
-            float snappedX = roundf(rawX / gridSnap) * gridSnap;
-            float snappedY = roundf(rawY / gridSnap) * gridSnap;
+            Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea,
+                {mousePos.x - nodeDragOffset.x, mousePos.y - nodeDragOffset.y});
+            Vector2 snapped = GraphCanvas::SnapToGrid(rawWorld);
+            float snappedX = snapped.x;
+            float snappedY = snapped.y;
             float deltaX = snappedX - node.posX;
             float deltaY = snappedY - node.posY;
             node.posX = snappedX;
@@ -1081,8 +1042,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     if (oid == nodeIdInt) continue;
                     for (int sid : selectedNodeIds) {
                         if (sid == oid) {
-                            other.posX = roundf((other.posX + deltaX) / gridSnap) * gridSnap;
-                            other.posY = roundf((other.posY + deltaY) / gridSnap) * gridSnap;
+                            Vector2 otherSnapped = GraphCanvas::SnapToGrid({other.posX + deltaX, other.posY + deltaY});
+                            other.posX = otherSnapped.x;
+                            other.posY = otherSnapped.y;
                             break;
                         }
                     }
@@ -1093,12 +1055,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     }
 
     if (boxSelecting) {
-        float minX = (boxSelectStart.x < boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
-        float minY = (boxSelectStart.y < boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
-        float maxX = (boxSelectStart.x > boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
-        float maxY = (boxSelectStart.y > boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
-        DrawRectangleLinesEx({minX, minY, maxX - minX, maxY - minY}, 1, {100, 160, 230, 200});
-        DrawRectangleRec({minX, minY, maxX - minX, maxY - minY}, {100, 160, 230, 30});
+        Rectangle box = GraphCanvas::NormalizeBox(boxSelectStart, boxSelectEnd);
+        DrawRectangleLinesEx(box, 1, {100, 160, 230, 200});
+        DrawRectangleRec(box, {100, 160, 230, 30});
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
@@ -1107,10 +1066,10 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             bool hitPin = false;
             for (const Node& node : graph.GetNodes()) {
                 for (const Pin& pin : node.inputs) {
-                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * zoom + 4)) { hitPin = true; break; }
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * canvasState.zoom + 4)) { hitPin = true; break; }
                 }
                 for (const Pin& pin : node.outputs) {
-                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * zoom + 4)) { hitPin = true; break; }
+                    if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * canvasState.zoom + 4)) { hitPin = true; break; }
                 }
                 if (hitPin) break;
             }
@@ -1200,11 +1159,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     }
                 }
 
-                float rawVX = (mp.x - graphArea.x - scroll.x) / zoom;
-                float rawVY = (mp.y - graphArea.y - scroll.y) / zoom;
-                const float gridSnap = 16.0f;
-                node->posX = roundf(rawVX / gridSnap) * gridSnap;
-                node->posY = roundf(rawVY / gridSnap) * gridSnap;
+                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
+                node->posX = snapped.x;
+                node->posY = snapped.y;
                 isDirty = true;
             }
             variableDragActive = false;
@@ -1234,11 +1191,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 for (Pin& p : node->inputs) {
                     if (p.name == "Component_Name") p.defaultValue = comp.name;
                 }
-                float rawVX = (mp.x - graphArea.x - scroll.x) / zoom;
-                float rawVY = (mp.y - graphArea.y - scroll.y) / zoom;
-                const float gridSnap = 16.0f;
-                node->posX = roundf(rawVX / gridSnap) * gridSnap;
-                node->posY = roundf(rawVY / gridSnap) * gridSnap;
+                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
+                node->posX = snapped.x;
+                node->posY = snapped.y;
                 isDirty = true;
             }
             componentDragActive = false;
@@ -1247,20 +1202,6 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     } else if (componentDragIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         componentDragActive = false;
         componentDragIndex = -1;
-    }
-
-    // Pan Graph
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea)) {
-        panning = true; panStart = mousePos; scrollAtPanStart = scroll; didPan = false;
-    }
-    if (panning) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-            scroll.x = scrollAtPanStart.x + (mousePos.x - panStart.x);
-            scroll.y = scrollAtPanStart.y + (mousePos.y - panStart.y);
-            if (panStart != mousePos) {
-                didPan = true;
-            }
-        } else panning = false;
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen) {
@@ -1279,18 +1220,14 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         boxSelectEnd = mousePos;
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             boxSelecting = false;
-            float minX = (boxSelectStart.x < boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
-            float minY = (boxSelectStart.y < boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
-            float maxX = (boxSelectStart.x > boxSelectEnd.x) ? boxSelectStart.x : boxSelectEnd.x;
-            float maxY = (boxSelectStart.y > boxSelectEnd.y) ? boxSelectStart.y : boxSelectEnd.y;
-            Rectangle sel = {minX, minY, maxX - minX, maxY - minY};
+            Rectangle sel = GraphCanvas::NormalizeBox(boxSelectStart, boxSelectEnd);
             if (sel.width > 4 || sel.height > 4) {
                 if (!IsKeyDown(KEY_LEFT_CONTROL)) selectedNodeIds.clear();
                 for (const Node& node : graph.GetNodes()) {
-                    float nx2 = graphArea.x + node.posX * zoom + scroll.x;
-                    float ny2 = graphArea.y + node.posY * zoom + scroll.y;
-                    float nw2 = nodeWidth * zoom;
-                    float nh2 = GetNodeHeight(node) * zoom;
+                    float nx2 = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
+                    float ny2 = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
+                    float nw2 = nodeWidth * canvasState.zoom;
+                    float nh2 = GetNodeHeight(node) * canvasState.zoom;
                     if (CheckCollisionRecs(sel, {nx2, ny2, nw2, nh2})) {
                         int nid = std::stoi(node.id);
                         bool found = false;
@@ -1304,7 +1241,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen) {
-        if (!didPan) {
+        if (!canvasState.didPan) {
         filterCompatibleWithPin = -1;
         nodeMenuOpen = true;
         nodeMenuJustOpened = true;
@@ -1525,11 +1462,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                         for (const std::string& n : toRemove) graph.RemoveDynamicPin(*node, false, n);
                     }
                 }
-                float rawNX = (nodeMenuPos.x - graphArea.x - scroll.x) / zoom;
-                float rawNY = (nodeMenuPos.y - graphArea.y - scroll.y) / zoom;
-                const float gridSnap = 16.0f;
-                node->posX = roundf(rawNX / gridSnap) * gridSnap;
-                node->posY = roundf(rawNY / gridSnap) * gridSnap;
+                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, nodeMenuPos));
+                node->posX = snapped.x;
+                node->posY = snapped.y;
 
                 if (filterCompatibleWithPin != -1) {
                     const Pin* fromPin = nullptr;

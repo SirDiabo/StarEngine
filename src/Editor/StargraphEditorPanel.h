@@ -2,6 +2,7 @@
 #include "Core/Panel.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
+#include "GraphCanvas.h"
 #include "AssetPickerPopup.h"
 #include "RegistryPickerPopup.h"
 #include "SearchableListPopup.h"
@@ -62,11 +63,7 @@ private:
     bool isOpen = false;
     bool isDirty = false;
 
-    Vector2 scroll{0, 0};
-    bool panning = false;
-    Vector2 panStart{0, 0};
-    Vector2 scrollAtPanStart{0, 0};
-    float zoom = 1.0f;
+    GraphCanvas::PanZoomState canvasState;
 
     int selectedNodeId = -1;
     std::vector<int> selectedNodeIds;
@@ -87,7 +84,6 @@ private:
     int filterCompatibleWithPin = -1;
     float nodeMenuScrollOffset = 0;
     char nodeMenuSearch[64] = "";
-    bool didPan = false;
 
     int editingPinId = 0;
     char editBuffer[256] = "";

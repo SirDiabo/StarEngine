@@ -215,6 +215,10 @@ Shader ShadingModel::GetDefaultShader() {
     return shader;
 }
 
+const char* ShadingModel::GetLightingGLSL() {
+    return kLightingGLSL;
+}
+
 void ShadingModel::UpdateLightUniforms() {
     if (!ShouldUseLitShading()) return;
     LitVariant& variant = ActiveVariant();

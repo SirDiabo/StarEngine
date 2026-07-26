@@ -32,8 +32,8 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     keyPickerPinId = 0;
     keyPickerSearch[0] = '\0';
     audioPathPicker.Close();
-    scroll = {0, 0};
-    didPan = false;
+    canvasState.scroll = {0, 0};
+    canvasState.didPan = false;
     variableDragActive = false;
     variableDragIndex = -1;
     componentDragActive = false;

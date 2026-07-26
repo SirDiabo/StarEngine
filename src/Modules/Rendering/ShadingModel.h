@@ -8,4 +8,6 @@ namespace ShadingModel {
     Shader GetDefaultShader();
 
     void UpdateLightUniforms();
+
+    const char* GetLightingGLSL();
 }

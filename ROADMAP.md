@@ -686,20 +686,6 @@ x Edit-mode viewport renders actual model (raylib LoadModel/DrawModel) with fall
 x Edit-mode viewport renders declared components for StarActor instances
 x PIE instantiates full declared component set (Mesh/Collision/Audio) on spawn
 x Model cache keyed by source path, shared between edit-mode and PIE
-x Texture cache keyed by .startex asset path
-x StarMaterial: flat color + optional diffuse texture, unlit, edited inline in Content Browser
-o Design pass: material graph node/pin schema, a data-only DAG with no exec flow, unlike Stargraph
-o Decide whether the Material graph canvas reuses Stargraph's graph rendering/drag/wire code or is a standalone lightweight canvas
-o .starmat format becomes a serialized node graph (small graph asset, same spirit as .stargraph) instead of flat baseColor/texture fields
-o Material Editor Tab: opens on double-click of a .starmat, graph canvas plus a live preview mesh (sphere/plane) rendered under the current pipeline
-o Merged Texture node: asset picker + sample + optional exposed parameter name in one node, no separate Texture Object/Sample/Parameter split
-o Per-channel outputs on the Texture node (R, G, B, A, RGB) for channel isolation
-o Scalar and Vector/Color parameter nodes, optionally exposed by name for Material Instances
-o Basic math nodes (Add, Multiply, Lerp, etc.) as graph expressions need them
-o Material Result output node (Base Color, Emissive, Opacity), kept minimal, no PBR params (no Normal/Roughness/Metallic), matches the fixed-function retro look
-o Material's Lit/Unlit flag feeds the same Shading Type gating as the Rendering module above
-o Graph edits generate GLSL source and recompile immediately on save/apply, no async cook step
-o Material Instances (later): override a base material's exposed parameters at runtime without recompiling its shader
 x MeshComponent carries Static Mesh + Material references; no direct .mtl edit needed
 x Position/Rotation/Scale, Static Mesh, Material editable in Details panel for instances
 x Component details editable in StargraphEditorPanel right panel
