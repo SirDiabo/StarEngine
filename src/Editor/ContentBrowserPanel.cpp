@@ -156,7 +156,7 @@ void ContentBrowserPanel::CancelPendingCreate() {
 
 void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const std::string& assetType,
                                             const std::string& extension) {
-    std::string result = AssetImporter::Cook(srcPath, assetType, extension);
+    std::string result = AssetImporter::Cook(srcPath, assetType, extension, GetCurrentFolderPath());
     if (!result.empty()) {
         importStatus = "Imported " + fs::path(result).stem().string();
     } else {
@@ -164,16 +164,10 @@ void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const st
     }
 }
 
-void ContentBrowserPanel::ImportAssetAuto() {
+void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     static const std::vector<std::string> meshExts  = {".obj", ".gltf", ".glb", ".iqm"};
     static const std::vector<std::string> texExts   = {".png", ".jpg", ".jpeg", ".bmp"};
     static const std::vector<std::string> soundExts = {".wav"};
-
-    std::string path = NativeFileDialog::OpenFile(
-        "Import Asset", "",
-        "Mesh, Texture or Sound (obj, gltf, glb, iqm, png, jpg, bmp, wav)",
-        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp;*.wav");
-    if (path.empty()) return;
 
     std::string ext = fs::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -187,6 +181,24 @@ void ContentBrowserPanel::ImportAssetAuto() {
     } else {
         importStatus = "Import failed: unrecognized file type " + ext;
     }
+}
+
+void ContentBrowserPanel::ImportAssetAuto() {
+    std::string path = NativeFileDialog::OpenFile(
+        "Import Asset", "",
+        "Mesh, Texture or Sound (obj, gltf, glb, iqm, png, jpg, bmp, wav)",
+        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp;*.wav");
+    if (path.empty()) return;
+    ImportPathAuto(path);
+}
+
+void ContentBrowserPanel::HandleFileDrop() {
+    if (!IsFileDropped()) return;
+    FilePathList dropped = LoadDroppedFiles();
+    for (unsigned int i = 0; i < dropped.count; i++) {
+        ImportPathAuto(dropped.paths[i]);
+    }
+    UnloadDroppedFiles(dropped);
 }
 
 void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
@@ -291,6 +303,10 @@ void ContentBrowserPanel::Render() {
                                 ModuleManager::Get().IsModuleEnabled("Stargraph");
     const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem;
 
+    if (importEnabled && !gridInputBlocked && CheckCollisionPointRec(mousePos, client)) {
+        HandleFileDrop();
+    }
+
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
     DrawRectangleRec(pathBar, {30, 30, 34, 255});
@@ -324,6 +340,8 @@ void ContentBrowserPanel::Render() {
 
     BeginScissorMode((int)gridArea.x, (int)gridArea.y, (int)gridArea.width, (int)gridArea.height);
 
+    int dropTargetFolderIndex = -1;
+
     for (size_t i = 0; i < entries.size(); i++) {
         int col = (int)i % cols;
         int row = (int)i / cols;
@@ -334,13 +352,21 @@ void ContentBrowserPanel::Render() {
         Rectangle iconRect  = {tx + 4, ty + 4, tileSize - 8, tileSize - 22};
         Rectangle labelRect = {tx, ty + tileSize - 18, tileSize, 18};
 
+        if (draggingAsset && entries[i].isFolder && CheckCollisionPointRec(mousePos, tileRect)) {
+            dropTargetFolderIndex = (int)i;
+        }
+
         bool isSelected = (selectedIndex == (int)i);
         Color tileBg = isSelected ? Color{60, 80, 120, 255} : Color{48, 48, 54, 255};
         if (CheckCollisionPointRec(mousePos, tileRect) && !isSelected)
             tileBg = {55, 55, 62, 255};
+        if (draggingAsset && (int)i == dropTargetFolderIndex)
+            tileBg = {70, 110, 80, 255};
 
         DrawRectangleRounded(tileRect, 0.1f, 4, tileBg);
         if (isSelected) DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {100, 140, 220, 255});
+        if (draggingAsset && (int)i == dropTargetFolderIndex)
+            DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {110, 200, 130, 255});
 
         Texture2D icon = GetIconForEntry(entries[i]);
         if (icon.id != 0) {
@@ -418,7 +444,20 @@ void ContentBrowserPanel::Render() {
             DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, {90, 150, 210, 255});
             DrawText(label.c_str(), (int)mousePos.x + 28, (int)mousePos.y + 1, 12, WHITE);
         } else {
-            if (onAssetDragged) onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
+            if (dropTargetFolderIndex != -1) {
+                fs::path destFolder = fs::path(GetCurrentFolderPath()) / entries[dropTargetFolderIndex].fullDiskName;
+                fs::path destPath = destFolder / fs::path(dragEntryPath).filename();
+                std::error_code ec;
+                if (fs::exists(destPath, ec)) {
+                    importStatus = "Move failed: " + destPath.filename().string() + " already exists there";
+                } else {
+                    fs::rename(dragEntryPath, destPath, ec);
+                    importStatus = !ec ? "Moved " + destPath.stem().string()
+                                        : "Move failed: " + ec.message();
+                }
+            } else if (onAssetDragged) {
+                onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
+            }
             draggingAsset = false;
             dragEntryIndex = -1;
         }

@@ -39,6 +39,8 @@ private:
     void CookImportedAsset(const std::string& srcPath, const std::string& assetType,
                             const std::string& extension);
     void ImportAssetAuto();
+    void ImportPathAuto(const std::string& path);
+    void HandleFileDrop();
 
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
     void LoadIcons();

@@ -7,6 +7,12 @@ AssetTypeRegistry& AssetTypeRegistry::Get() {
 }
 
 void AssetTypeRegistry::RegisterType(const AssetTypeInfo& info) {
+    for (AssetTypeInfo& existing : types) {
+        if (existing.extension == info.extension) {
+            existing = info;
+            return;
+        }
+    }
     types.push_back(info);
 }
 

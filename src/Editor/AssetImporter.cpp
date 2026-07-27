@@ -82,7 +82,8 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
 
 namespace AssetImporter {
 
-std::string Cook(const std::string& srcPath, const std::string& assetType, const std::string& extension) {
+std::string Cook(const std::string& srcPath, const std::string& assetType, const std::string& extension,
+                  const std::string& targetFolder) {
     fs::path src(srcPath);
     std::error_code ec;
     fs::path absoluteSrc = fs::absolute(src, ec);
@@ -90,7 +91,7 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
 
     std::string assetName = absoluteSrc.stem().string();
     fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
-    fs::path folder = contentRoot;
+    fs::path folder = targetFolder.empty() ? contentRoot : fs::path(targetFolder);
     fs::path target = UniqueTargetPath(folder, assetName, extension);
 
     StarAsset asset;
