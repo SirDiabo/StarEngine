@@ -101,7 +101,7 @@ void DetailsPanel::Render() {
 
 void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& y, float w) {
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = meshPicker.ContainsPoint(mp) || materialPicker.ContainsPoint(mp);
+    bool anyPickerOpen = meshPicker.IsOpen() || materialPicker.IsOpen();
 
     DrawText("Mesh Component", (int)x + 8, (int)y, 12, {180, 200, 230, 255});
     y += 18;
@@ -112,7 +112,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     DrawRectangleRec(meshRow, {30, 30, 32, 255});
     DrawRectangleLinesEx(meshRow, 1, {65, 65, 75, 255});
     DrawText(AssetDisplayName(inst.meshAssetPath).c_str(), (int)meshRow.x + 4, (int)meshRow.y + 3, 11, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, meshRow) && !pickerBlocksInput) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, meshRow) && !anyPickerOpen) {
         materialPicker.Close();
         meshPicker.Open({meshRow.x, meshRow.y + meshRow.height}, ".starasset");
     }
@@ -127,7 +127,10 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     }
     if (inst.materialAssetPaths.size() != meshSlots.size()) inst.materialAssetPaths.resize(meshSlots.size());
 
-    GuiCheckBox({x + 8, y, 18, 18}, "Casts Shadow", &inst.castsShadow);
+    bool castsShadow = inst.castsShadow;
+    if (GuiCheckBox({x + 8, y, 18, 18}, "Casts Shadow", &castsShadow) && !anyPickerOpen) {
+        inst.castsShadow = castsShadow;
+    }
     y += 24;
 
     if (meshSlots.empty()) {
@@ -146,7 +149,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
         DrawText(slotName.c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 10, {150, 150, 160, 255});
         std::string matLabel = AssetDisplayName(inst.materialAssetPaths[i]);
         DrawText(matLabel.c_str(), (int)(matRow.x + matRow.width * 0.5f), (int)matRow.y + 3, 10, WHITE);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !pickerBlocksInput) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !anyPickerOpen) {
             meshPicker.Close();
             materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
             materialSlotPickerIndex = (int)i;

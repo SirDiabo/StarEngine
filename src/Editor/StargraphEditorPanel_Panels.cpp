@@ -82,12 +82,11 @@ void StargraphEditorPanel::RenderLeftPanel() {
             DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
 
             if (CheckCollisionPointRec(mousePos, row)) {
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     selectedVariableIndex = (int)i;
                     selectedComponentIndex = -1;
                     selectedNodeId = -1;
                     selectedNodeIds.clear();
-                    varContextMenuOpen = false;
                     variableDragIndex = (int)i;
                     variableDragActive = false;
                     variableDragPos = mousePos;
@@ -147,7 +146,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
     Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
     GuiButton(addBtn, "+ Variable");
     
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
+    if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
         snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
         PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
         addingVariable = true;
@@ -418,7 +417,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         DrawRectangleLinesEx(typeRect, 1, typeStyle.border);
         DrawText(typeNames[typeIndex], (int)typeRect.x + 4, (int)typeRect.y + 3, 11, typeStyle.text);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), typeRect)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), typeRect) && !savePicker.IsOpen()) {
             int next = typeIndex + 1;
             if (next < 2 || next > 7) next = 2;
             var.type = (PinType)next;
@@ -520,7 +519,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         DrawRectangleRec(replRect, replStyle.box);
         DrawRectangleLinesEx(replRect, 1, replStyle.border);
         DrawText(replNames[(int)var.replication], (int)replRect.x + 4, (int)replRect.y + 3, 11, replStyle.text);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), replRect)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), replRect) && !savePicker.IsOpen()) {
             var.replication = (ReplicationMode)(((int)var.replication + 1) % 3);
             isDirty = true;
         }
@@ -718,4 +717,3 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
     }
 }
-

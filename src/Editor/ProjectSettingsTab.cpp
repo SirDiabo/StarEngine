@@ -39,6 +39,8 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
 
     ProjectSettings& settings = Project::Get().GetSettings();
     Vector2 mp = GetMousePosition();
+    const bool anyPopupOpen = mapPicker.IsOpen() || rendererPopup.IsOpen() ||
+                               shadingTypePopup.IsOpen() || lightingQualityPopup.IsOpen();
 
     float fx = x + 16;
     float fy = y + 16;
@@ -64,7 +66,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     DrawRectangleRec(mapRow, {26, 26, 28, 255});
     DrawRectangleLinesEx(mapRow, 1, {55, 55, 60, 255});
     DrawText(MapDisplayName(settings.defaultMapPath).c_str(), (int)mapRow.x + 6, (int)mapRow.y + 4, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, mapRow) && !mapPicker.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, mapRow) && !anyPopupOpen) {
         mapPicker.Open({mapRow.x, mapRow.y + mapRow.height}, ".starmap");
     }
     fy += 20;
@@ -85,7 +87,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     std::string rendererLabel = settings.renderer == GameRenderer::Software
         ? "Software (CPU, no GPU required)" : "Hardware (OpenGL)";
     DrawText(rendererLabel.c_str(), (int)rendererRow.x + 6, (int)rendererRow.y + 4, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !rendererPopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !anyPopupOpen) {
         rendererPopup.Open({rendererRow.x, rendererRow.y + rendererRow.height}, fw, {
             {"Hardware (OpenGL)", true, ""},
             {"Software (CPU, no GPU required)", true, ""},
@@ -109,7 +111,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     std::string shadingLabel = shadingType == ShadingType::ProjectedBlobShadows
         ? "Projected Blob Shadows" : "Unlit";
     DrawText(shadingLabel.c_str(), (int)shadingRow.x + 6, (int)shadingRow.y + 4, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, shadingRow) && !shadingTypePopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, shadingRow) && !anyPopupOpen) {
         shadingTypePopup.Open({shadingRow.x, shadingRow.y + shadingRow.height}, fw, {
             {"Unlit", true, ""},
             {"Projected Blob Shadows", true, ""},
@@ -135,7 +137,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     std::string lightingLabel = lightingQuality == LightingQuality::PerPixel ? "Per Pixel" : "Per Vertex";
     DrawText(lightingLabel.c_str(), (int)lightingRow.x + 6, (int)lightingRow.y + 4, 12,
               lightingEnabled ? WHITE : Color{120, 120, 125, 255});
-    if (lightingEnabled && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, lightingRow) && !lightingQualityPopup.IsOpen()) {
+    if (lightingEnabled && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, lightingRow) && !anyPopupOpen) {
         lightingQualityPopup.Open({lightingRow.x, lightingRow.y + lightingRow.height}, fw, {
             {"Per Vertex", true, ""},
             {"Per Pixel", true, ""},

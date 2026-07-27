@@ -289,6 +289,7 @@ void ContentBrowserPanel::Render() {
     Vector2 mousePos = GetMousePosition();
     const bool importEnabled = ModuleManager::Get().IsModuleEnabled("Meshes") ||
                                 ModuleManager::Get().IsModuleEnabled("Stargraph");
+    const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem;
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
@@ -297,7 +298,7 @@ void ContentBrowserPanel::Render() {
     float pathLabelX = pathBar.x + 6;
     if (importEnabled) {
         Rectangle importBtn = {pathBar.x + 2, pathBar.y + 2, 18, 18};
-        if (GuiButton(importBtn, "+")) ImportAssetAuto();
+        if (GuiButton(importBtn, "+") && !gridInputBlocked) ImportAssetAuto();
         pathLabelX = importBtn.x + importBtn.width + 6;
     }
 
@@ -307,7 +308,7 @@ void ContentBrowserPanel::Render() {
     if (!currentRelativeFolder.empty()) {
         int backW = MeasureText("< Back", 12) + 12;
         Rectangle backBtn = {client.x + client.width - backW - 4, client.y + 2, (float)backW, 18};
-        if (GuiButton(backBtn, "< Back")) NavigateUp();
+        if (GuiButton(backBtn, "< Back") && !gridInputBlocked) NavigateUp();
     }
 
     Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
@@ -360,7 +361,7 @@ void ContentBrowserPanel::Render() {
         int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
         DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, WHITE);
 
-        if (CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (!gridInputBlocked && CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float currentTime = (float)GetTime();
             if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
                 if (entries[i].isFolder) {
@@ -425,7 +426,7 @@ void ContentBrowserPanel::Render() {
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) dragEntryIndex = -1;
 
-    if (!contextMenuOpen && !isCreatingNewItem &&
+    if (!contextMenuOpen && !isCreatingNewItem && !materialEditorOpen &&
         IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, gridArea)) {
         contextMenuOpen = true;
         contextMenuJustOpened = true;

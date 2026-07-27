@@ -90,7 +90,7 @@ void ImportDetailsPanel::Render() {
     Rectangle importBtn = {box.x + boxWidth - 154, box.y + boxHeight - 28, 70, 22};
     Rectangle skipBtn = {box.x + boxWidth - 80, box.y + boxHeight - 28, 70, 22};
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = materialPicker.ContainsPoint(mp);
+    bool pickerBlocksInput = materialPicker.IsOpen();
     if (GuiButton(importBtn, "Import") && !pickerBlocksInput) {
         SaveToAsset();
         Close();
@@ -123,7 +123,7 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
     if (modal) DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, {200, 210, 230, 255});
 
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = materialPicker.ContainsPoint(mp);
+    bool pickerBlocksInput = materialPicker.IsOpen();
     float y = box.y + (modal ? 30 : 8);
 
     bool isMesh = (assetType == "StaticMesh");

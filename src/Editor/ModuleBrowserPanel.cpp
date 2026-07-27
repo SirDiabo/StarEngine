@@ -34,7 +34,7 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
         DrawRectangleLinesEx(checkRect, 1, {90, 90, 96, 255});
     } else {
         bool toggled = enabled;
-        if (GuiCheckBox(checkRect, "", &toggled)) {
+        if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen()) {
             ModuleManager::Get().SetModuleEnabled(moduleName, toggled);
         }
     }

@@ -32,6 +32,8 @@ void PackageTab::Render(float x, float y, float width, float height) {
     float fx = x + 16;
     float fy = y + 16;
     float fw = width - 32 > 460.0f ? 460.0f : width - 32;
+    const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
+                               cipherPopup.IsOpen() || formatPopup.IsOpen();
 
     DrawText("Package Project", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 26;
@@ -44,7 +46,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     DrawRectangleLinesEx(platformRow, 1, {55, 55, 60, 255});
     const PackagePlatformInfo& selectedPlatform = platforms[selectedPlatformIndex];
     DrawText(selectedPlatform.displayName.c_str(), (int)platformRow.x + 6, (int)platformRow.y + 5, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, platformRow) && !platformPopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, platformRow) && !anyPopupOpen) {
         std::vector<ChoiceOption> options;
         for (const auto& p : platforms) options.push_back({p.displayName, p.available, p.unavailableReason});
         platformPopup.Open({platformRow.x, platformRow.y + platformRow.height}, fw, options);
@@ -60,7 +62,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     std::string rendererLabel = renderer == GameRenderer::Software
         ? "Software (CPU, no GPU required)" : "Hardware (OpenGL)";
     DrawText(rendererLabel.c_str(), (int)rendererRow.x + 6, (int)rendererRow.y + 5, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !rendererPopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !anyPopupOpen) {
         rendererPopup.Open({rendererRow.x, rendererRow.y + rendererRow.height}, fw, {
             {"Hardware (OpenGL)", true, ""},
             {"Software (CPU, no GPU required)", true, ""},
@@ -78,7 +80,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     DrawRectangleRec(cipherRow, {26, 26, 28, 255});
     DrawRectangleLinesEx(cipherRow, 1, {55, 55, 60, 255});
     DrawText(CookCipherDisplayName(cipher).c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, cipherRow) && !cipherPopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, cipherRow) && !anyPopupOpen) {
         std::vector<ChoiceOption> options;
         for (CookCipher c : AllCookCiphers()) options.push_back({CookCipherDisplayName(c), true, ""});
         cipherPopup.Open({cipherRow.x, cipherRow.y + cipherRow.height}, fw, options);
@@ -97,7 +99,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     std::string formatLabel = format == PackageFormat::LooseFolder
         ? "Loose Content folder (debug)" : "Single file (.starpak embedded)";
     DrawText(formatLabel.c_str(), (int)formatRow.x + 6, (int)formatRow.y + 5, 12, WHITE);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, formatRow) && !formatPopup.IsOpen()) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, formatRow) && !anyPopupOpen) {
         formatPopup.Open({formatRow.x, formatRow.y + formatRow.height}, fw, {
             {"Single file (.starpak embedded)", true, ""},
             {"Loose Content folder (debug)", true, ""},
@@ -117,7 +119,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     DrawRectangleLinesEx(outputRow, 1, {55, 55, 60, 255});
     DrawText(outputDir.c_str(), (int)outputRow.x + 6, (int)outputRow.y + 5, 11, {200, 200, 205, 255});
     Rectangle browseButton = {outputRow.x + outputRow.width + 6, fy, browseWidth, 22};
-    if (GuiButton(browseButton, "Browse...")) {
+    if (GuiButton(browseButton, "Browse...") && !anyPopupOpen) {
         std::string chosen = NativeFileDialog::OpenFolder("Choose Output Folder", outputDir);
         if (!chosen.empty()) outputDir = chosen;
     }
@@ -127,7 +129,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
     if (!platformReady) GuiDisable();
-    if (GuiButton(packageButton, "Package")) {
+    if (GuiButton(packageButton, "Package") && !anyPopupOpen) {
         RunPackage();
     }
     if (!platformReady) GuiEnable();
