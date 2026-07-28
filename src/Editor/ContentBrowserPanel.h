@@ -3,6 +3,7 @@
 #include "Core/AssetTypeRegistry.h"
 #include "Core/StarMaterial.h"
 #include "AssetPickerPopup.h"
+#include "ConfirmPopup.h"
 #include "raylib.h"
 #include <string>
 #include <vector>
@@ -42,6 +43,16 @@ private:
     void ImportPathAuto(const std::string& path);
     void HandleFileDrop();
 
+    void OpenEntry(const ContentEntry& entry);
+    void BeginRename(const ContentEntry& entry);
+    void ConfirmRename();
+    void CancelRename();
+    void DuplicateEntry(const std::string& fullPath, bool isFolder);
+    void CopyToClipboard(const std::string& fullPath, bool isFolder);
+    void PasteFromClipboard();
+    void RequestDelete(const std::string& fullPath, bool isFolder, const std::string& displayName);
+    void RevealInExplorer(const std::string& fullPath, bool isFolder);
+
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
     void LoadIcons();
     void UnloadIcons();
@@ -56,6 +67,26 @@ private:
     bool contextMenuOpen = false;
     bool contextMenuJustOpened = false;
     Vector2 contextMenuPos{0, 0};
+
+    bool itemContextMenuOpen = false;
+    bool itemContextMenuJustOpened = false;
+    Vector2 itemContextMenuPos{0, 0};
+    std::string contextTargetPath;
+    std::string contextTargetDisplayName;
+    std::string contextTargetExtension;
+    bool contextTargetIsFolder = false;
+
+    bool isRenamingItem = false;
+    std::string renamingOriginalDiskName;
+    std::string renamingExtension;
+    bool renamingIsFolder = false;
+
+    std::string clipboardPath;
+    bool clipboardIsFolder = false;
+
+    ConfirmPopup deleteConfirm;
+    std::string pendingDeletePath;
+    bool pendingDeleteIsFolder = false;
 
     bool draggingAsset = false;
     int dragEntryIndex = -1;

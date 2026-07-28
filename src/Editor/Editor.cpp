@@ -14,6 +14,7 @@
 #include "AssetPickerPopup.h"
 #include "RegistryPickerPopup.h"
 #include "ChoicePopup.h"
+#include "ConfirmPopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
 #include "Core/LayoutSerializer.h"
@@ -130,6 +131,7 @@ void Editor::Render() {
     AssetPickerPopup::FlushDeferredDraws();
     RegistryPickerPopup::FlushDeferredDraws();
     ChoicePopup::FlushDeferredDraws();
+    ConfirmPopup::FlushDeferredDraws();
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {

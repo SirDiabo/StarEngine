@@ -4,6 +4,8 @@
 #include "Core/RenderSettings.h"
 #include "Core/Module.h"
 #include "Core/EmbeddedAssets.h"
+#include "Core/OSTrash.h"
+#include "Core/SafeProcess.h"
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
@@ -108,6 +110,140 @@ void ContentBrowserPanel::NavigateUp() {
     size_t sep = currentRelativeFolder.find_last_of('/');
     currentRelativeFolder = (sep == std::string::npos) ? "" : currentRelativeFolder.substr(0, sep);
     selectedIndex = -1;
+}
+
+void ContentBrowserPanel::OpenEntry(const ContentEntry& entry) {
+    if (entry.isFolder) {
+        NavigateInto(entry.displayName);
+    } else if (entry.extension == ".starmat") {
+        fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;
+        OpenMaterialEditor(fullPath.string());
+    } else if (onAssetOpened) {
+        fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;
+        onAssetOpened(fullPath.string(), entry.extension);
+    }
+}
+
+void ContentBrowserPanel::BeginRename(const ContentEntry& entry) {
+    isRenamingItem = true;
+    renamingOriginalDiskName = entry.fullDiskName;
+    renamingExtension = entry.extension;
+    renamingIsFolder = entry.isFolder;
+    std::string stem = entry.isFolder ? entry.fullDiskName : fs::path(entry.fullDiskName).stem().string();
+    snprintf(nameBuffer, sizeof(nameBuffer), "%s", stem.c_str());
+    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
+    itemContextMenuOpen = false;
+}
+
+void ContentBrowserPanel::ConfirmRename() {
+    std::string typedName = nameBuffer;
+    if (typedName.empty()) return;
+
+    fs::path folder = GetCurrentFolderPath();
+    fs::path oldPath = folder / renamingOriginalDiskName;
+    fs::path newPath = renamingIsFolder ? (folder / typedName) : (folder / (typedName + renamingExtension));
+
+    bool success = true;
+    if (newPath != oldPath) {
+        std::error_code ec;
+        if (fs::exists(newPath, ec)) {
+            importStatus = "Rename failed: " + newPath.filename().string() + " already exists";
+            success = false;
+        } else {
+            fs::rename(oldPath, newPath, ec);
+            if (ec) {
+                importStatus = "Rename failed: " + ec.message();
+                success = false;
+            }
+        }
+    }
+    if (success) isRenamingItem = false;
+}
+
+void ContentBrowserPanel::CancelRename() {
+    isRenamingItem = false;
+}
+
+void ContentBrowserPanel::DuplicateEntry(const std::string& fullPath, bool isFolder) {
+    fs::path src(fullPath);
+    fs::path folder = src.parent_path();
+    std::string stem = isFolder ? src.filename().string() : src.stem().string();
+    std::string ext = isFolder ? "" : src.extension().string();
+
+    fs::path dest;
+    int suffix = 1;
+    std::error_code ec;
+    do {
+        std::string candidate = stem + " (" + std::to_string(suffix) + ")" + ext;
+        dest = folder / candidate;
+        suffix++;
+    } while (fs::exists(dest, ec));
+
+    if (isFolder) {
+        fs::copy(src, dest, fs::copy_options::recursive, ec);
+    } else {
+        fs::copy_file(src, dest, ec);
+    }
+    importStatus = ec ? ("Duplicate failed: " + ec.message()) : ("Duplicated " + dest.stem().string());
+}
+
+void ContentBrowserPanel::CopyToClipboard(const std::string& fullPath, bool isFolder) {
+    clipboardPath = fullPath;
+    clipboardIsFolder = isFolder;
+    importStatus = "Copied " + fs::path(fullPath).filename().string();
+}
+
+void ContentBrowserPanel::PasteFromClipboard() {
+    if (clipboardPath.empty()) return;
+    std::error_code existsEc;
+    if (!fs::exists(clipboardPath, existsEc)) {
+        importStatus = "Paste failed: source no longer exists";
+        clipboardPath.clear();
+        return;
+    }
+
+    fs::path src(clipboardPath);
+    fs::path folder = GetCurrentFolderPath();
+    std::string stem = clipboardIsFolder ? src.filename().string() : src.stem().string();
+    std::string ext = clipboardIsFolder ? "" : src.extension().string();
+
+    fs::path dest = folder / (stem + ext);
+    std::error_code ec;
+    int suffix = 1;
+    while (fs::exists(dest, ec)) {
+        std::string candidate = stem + " (" + std::to_string(suffix) + ")" + ext;
+        dest = folder / candidate;
+        suffix++;
+    }
+
+    if (clipboardIsFolder) {
+        fs::copy(src, dest, fs::copy_options::recursive, ec);
+    } else {
+        fs::copy_file(src, dest, ec);
+    }
+    importStatus = ec ? ("Paste failed: " + ec.message()) : ("Pasted " + dest.stem().string());
+}
+
+void ContentBrowserPanel::RequestDelete(const std::string& fullPath, bool isFolder, const std::string& displayName) {
+    pendingDeletePath = fullPath;
+    pendingDeleteIsFolder = isFolder;
+    std::string kind = isFolder ? "folder" : "item";
+    deleteConfirm.Open("Move " + kind + " \"" + displayName + "\" to the trash?", "Delete");
+    itemContextMenuOpen = false;
+}
+
+void ContentBrowserPanel::RevealInExplorer(const std::string& fullPath, bool isFolder) {
+    fs::path target = isFolder ? fs::path(fullPath) : fs::path(fullPath).parent_path();
+    std::string log;
+    std::vector<std::string> argv;
+#ifdef _WIN32
+    argv = {"explorer", target.string()};
+#elif defined(__APPLE__)
+    argv = {"open", target.string()};
+#else
+    argv = {"xdg-open", target.string()};
+#endif
+    SafeProcess::Run(argv, log);
 }
 
 void ContentBrowserPanel::BeginCreateFolder() {
@@ -301,7 +437,8 @@ void ContentBrowserPanel::Render() {
     Vector2 mousePos = GetMousePosition();
     const bool importEnabled = ModuleManager::Get().IsModuleEnabled("Meshes") ||
                                 ModuleManager::Get().IsModuleEnabled("Stargraph");
-    const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem;
+    const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem ||
+                                   itemContextMenuOpen || isRenamingItem || deleteConfirm.IsOpen();
 
     if (importEnabled && !gridInputBlocked && CheckCollisionPointRec(mousePos, client)) {
         HandleFileDrop();
@@ -341,6 +478,7 @@ void ContentBrowserPanel::Render() {
     BeginScissorMode((int)gridArea.x, (int)gridArea.y, (int)gridArea.width, (int)gridArea.height);
 
     int dropTargetFolderIndex = -1;
+    bool rightClickConsumedByEntry = false;
 
     for (size_t i = 0; i < entries.size(); i++) {
         int col = (int)i % cols;
@@ -380,25 +518,26 @@ void ContentBrowserPanel::Render() {
                               iconRect.width * 0.5f, iconRect.height * 0.6f}, iconColor);
         }
 
-        DrawRectangleRec(labelRect, {35, 35, 40, 0});
-        std::string label = entries[i].displayName;
-        int labelW = MeasureText(label.c_str(), 10);
-        if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
-        int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
-        DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, WHITE);
+        bool renamingThis = isRenamingItem && entries[i].fullDiskName == renamingOriginalDiskName;
+
+        if (!renamingThis) {
+            DrawRectangleRec(labelRect, {35, 35, 40, 0});
+            std::string label = entries[i].displayName;
+            int labelW = MeasureText(label.c_str(), 10);
+            if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
+            int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
+            DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, WHITE);
+        } else {
+            GuiTextBox({labelRect.x + 2, labelRect.y, labelRect.width - 4, labelRect.height},
+                       nameBuffer, sizeof(nameBuffer), true);
+            if (IsKeyPressed(KEY_ENTER)) ConfirmRename();
+            if (IsKeyPressed(KEY_ESCAPE)) CancelRename();
+        }
 
         if (!gridInputBlocked && CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float currentTime = (float)GetTime();
             if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
-                if (entries[i].isFolder) {
-                    NavigateInto(entries[i].displayName);
-                } else if (entries[i].extension == ".starmat") {
-                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
-                    OpenMaterialEditor(fullPath.string());
-                } else if (onAssetOpened) {
-                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
-                    onAssetOpened(fullPath.string(), entries[i].extension);
-                }
+                OpenEntry(entries[i]);
             } else {
                 selectedIndex = (int)i;
                 if (!entries[i].isFolder) {
@@ -411,6 +550,19 @@ void ContentBrowserPanel::Render() {
             }
             lastEntryClickTime = currentTime;
             lastEntryClickIndex = (int)i;
+        }
+
+        if (!gridInputBlocked && CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            selectedIndex = (int)i;
+            fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
+            contextTargetPath = fullPath.string();
+            contextTargetDisplayName = entries[i].displayName;
+            contextTargetExtension = entries[i].extension;
+            contextTargetIsFolder = entries[i].isFolder;
+            itemContextMenuOpen = true;
+            itemContextMenuJustOpened = true;
+            itemContextMenuPos = mousePos;
+            rightClickConsumedByEntry = true;
         }
 
         if (!entries[i].isFolder && dragEntryIndex == (int)i && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -465,7 +617,8 @@ void ContentBrowserPanel::Render() {
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) dragEntryIndex = -1;
 
-    if (!contextMenuOpen && !isCreatingNewItem && !materialEditorOpen &&
+    if (!contextMenuOpen && !isCreatingNewItem && !materialEditorOpen && !itemContextMenuOpen &&
+        !isRenamingItem && !rightClickConsumedByEntry &&
         IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, gridArea)) {
         contextMenuOpen = true;
         contextMenuJustOpened = true;
@@ -509,7 +662,116 @@ void ContentBrowserPanel::Render() {
         }
     }
 
-    // Import status
+    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
+        IsKeyPressed(KEY_DELETE)) {
+        const ContentEntry& entry = entries[selectedIndex];
+        fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;
+        RequestDelete(fullPath.string(), entry.isFolder, entry.displayName);
+    }
+
+    if (itemContextMenuOpen) {
+        bool showReimport = !contextTargetIsFolder &&
+            (contextTargetExtension == ".starasset" || contextTargetExtension == ".startex" ||
+             contextTargetExtension == ".starsound");
+        bool showPaste = !clipboardPath.empty();
+
+        std::vector<std::string> items = {"Open", "Rename", "Duplicate", "Copy"};
+        if (showPaste) items.push_back("Paste");
+        items.push_back("Copy Path");
+        if (showReimport) items.push_back("Reimport");
+        items.push_back("View in Explorer");
+        items.push_back("Delete");
+
+        float menuHeight = 26.0f * (float)items.size() + 4.0f;
+        float popupX = itemContextMenuPos.x;
+        float popupY = itemContextMenuPos.y;
+        if (popupX + 150 > bounds.x + bounds.width)  popupX = bounds.x + bounds.width - 150;
+        if (popupY + menuHeight > bounds.y + bounds.height) popupY = bounds.y + bounds.height - menuHeight;
+        if (popupX < bounds.x) popupX = bounds.x;
+        if (popupY < bounds.y) popupY = bounds.y;
+        Rectangle popup = {popupX, popupY, 150, menuHeight};
+
+        if (itemContextMenuJustOpened) {
+            itemContextMenuJustOpened = false;
+        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            itemContextMenuOpen = false;
+        }
+
+        if (itemContextMenuOpen) {
+            DrawRectangleRec(popup, {55, 55, 60, 255});
+            DrawRectangleLinesEx(popup, 1, {85, 85, 90, 255});
+
+            for (size_t i = 0; i < items.size(); i++) {
+                Rectangle btn = {popup.x + 4, popup.y + 4 + (float)i * 26, popup.width - 8, 22};
+                if (!GuiButton(btn, items[i].c_str())) continue;
+
+                if (items[i] == "Open") {
+                    ContentEntry target;
+                    target.displayName = contextTargetDisplayName;
+                    target.fullDiskName = contextTargetIsFolder ? contextTargetDisplayName
+                                                                  : fs::path(contextTargetPath).filename().string();
+                    target.isFolder = contextTargetIsFolder;
+                    target.extension = contextTargetExtension;
+                    OpenEntry(target);
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Rename") {
+                    ContentEntry target;
+                    target.displayName = contextTargetDisplayName;
+                    target.fullDiskName = contextTargetIsFolder ? contextTargetDisplayName
+                                                                  : fs::path(contextTargetPath).filename().string();
+                    target.isFolder = contextTargetIsFolder;
+                    target.extension = contextTargetExtension;
+                    BeginRename(target);
+                } else if (items[i] == "Duplicate") {
+                    DuplicateEntry(contextTargetPath, contextTargetIsFolder);
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Copy") {
+                    CopyToClipboard(contextTargetPath, contextTargetIsFolder);
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Paste") {
+                    PasteFromClipboard();
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Copy Path") {
+                    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+                    std::error_code ec;
+                    fs::path rel = fs::relative(contextTargetPath, contentRoot, ec);
+                    std::string virtualPath = "Content/" + (ec ? contextTargetPath : rel.generic_string());
+                    SetClipboardText(virtualPath.c_str());
+                    importStatus = "Copied path to clipboard";
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Reimport") {
+                    std::string result = AssetImporter::Reimport(contextTargetPath);
+                    importStatus = result.empty() ? "Reimport failed" : "Reimported " + contextTargetDisplayName;
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "View in Explorer") {
+                    RevealInExplorer(contextTargetPath, contextTargetIsFolder);
+                    itemContextMenuOpen = false;
+                } else if (items[i] == "Delete") {
+                    RequestDelete(contextTargetPath, contextTargetIsFolder, contextTargetDisplayName);
+                }
+                break;
+            }
+        }
+    }
+
+    bool deleteConfirmed = false;
+    if (deleteConfirm.Render(deleteConfirmed)) {
+        if (deleteConfirmed) {
+            std::string trashError;
+            if (OSTrash::MoveToTrash(pendingDeletePath, trashError)) {
+                importStatus = pendingDeleteIsFolder ? "Moved folder to trash" : "Moved to trash";
+                if (selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
+                    fs::path(GetCurrentFolderPath()) / entries[selectedIndex].fullDiskName == fs::path(pendingDeletePath)) {
+                    selectedIndex = -1;
+                }
+            } else {
+                importStatus = "Delete failed: " + trashError;
+            }
+        }
+        pendingDeletePath.clear();
+    }
+
+
     if (!importStatus.empty()) {
         DrawText(importStatus.c_str(), (int)client.x + 8, (int)(client.y + client.height - 16), 11,
                   {150, 200, 150, 255});
