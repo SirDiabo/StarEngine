@@ -5,7 +5,6 @@
 #include <utility>
 #include <vector>
 
-// A single replicated variable changing value
 struct ReplicatedPropertyUpdate {
     uint32_t netId = 0;
     std::string variableName;

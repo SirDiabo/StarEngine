@@ -15,7 +15,6 @@ static std::string WinOpenDialog(const std::string& title, const std::string& de
     if (!defaultName.empty())
         strncpy_s(path, defaultName.c_str(), MAX_PATH - 1);
 
-    // Build null-separated filter string: "Description\0*.ext\0\0"
     char filter[256] = {};
     int pos = 0;
     for (char c : filterDesc) filter[pos++] = c;
