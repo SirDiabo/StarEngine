@@ -57,6 +57,43 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
     return headerHeight + rows * pinHeight + 6;
 }
 
+float StargraphEditorPanel::GetNodeWidth(const Node& node) const {
+    std::string displayTitle = node.title;
+    for (char& c : displayTitle) if (c == '_') c = ' ';
+    float titleW = (float)MeasureText(displayTitle.c_str(), 13);
+
+    if (IsPrimitiveNode(node)) {
+        float needed = 16.0f + titleW + pinRadius * 2.0f + 16.0f;
+        return minNodeWidth > needed ? minNodeWidth : needed;
+    }
+
+    float maxInputLabelW = 0.0f;
+    for (const Pin& pin : node.inputs) {
+        if (pin.name == "Variable_Name") continue;
+        if (pin.name == "Component_Name") continue;
+        if (pin.type == PinType::Exec) continue;
+        float w = (float)MeasureText(pin.name.c_str(), 12);
+        if (w > maxInputLabelW) maxInputLabelW = w;
+    }
+
+    float maxOutputLabelW = 0.0f;
+    for (const Pin& pin : node.outputs) {
+        float w = (float)MeasureText(pin.name.c_str(), 12);
+        if (w > maxOutputLabelW) maxOutputLabelW = w;
+    }
+
+    float rowNeeded = 0.0f;
+    if (maxInputLabelW > 0.0f || maxOutputLabelW > 0.0f) {
+        rowNeeded = (pinRadius * 2.0f + 20.0f) + maxInputLabelW + 24.0f +
+                    maxOutputLabelW + (pinRadius * 2.0f + 12.0f);
+    }
+
+    float titleNeeded = 16.0f + titleW;
+
+    float needed = rowNeeded > titleNeeded ? rowNeeded : titleNeeded;
+    return minNodeWidth > needed ? minNodeWidth : needed;
+}
+
 bool StargraphEditorPanel::IsPrimitiveNode(const Node& node) const {
     return node.type == "Get_Variable" || node.type == "Get_Component" || node.type == "Get_Saved_Variable";
 }
@@ -78,7 +115,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
         if (pin.isInput) {
             return {nodeX + scaledRadius + 2, nodeY + nodeH * 0.5f};
         } else {
-            return {nodeX + nodeWidth * canvasState.zoom - scaledRadius - 6, nodeY + nodeH * 0.5f};
+            return {nodeX + GetNodeWidth(node) * canvasState.zoom - scaledRadius - 6, nodeY + nodeH * 0.5f};
         }
     }
 
@@ -99,7 +136,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     }
     y = nodeY + headerHeight * canvasState.zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.outputs) {
-        if (p.id == pin.id) return {nodeX + nodeWidth * canvasState.zoom - pinRadius * canvasState.zoom - 2, y};
+        if (p.id == pin.id) return {nodeX + GetNodeWidth(node) * canvasState.zoom - pinRadius * canvasState.zoom - 2, y};
         y += scaledPinHeight;
     }
     return {0, 0};
@@ -532,7 +569,7 @@ Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
         float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
-        if (CheckCollisionPointRec(pos, {nx, ny, nodeWidth * canvasState.zoom, GetNodeHeight(node) * canvasState.zoom})) return &node;
+        if (CheckCollisionPointRec(pos, {nx, ny, GetNodeWidth(node) * canvasState.zoom, GetNodeHeight(node) * canvasState.zoom})) return &node;
     }
     return nullptr;
 }
@@ -633,7 +670,7 @@ void StargraphEditorPanel::RenderGraph() {
         int nodeIdInt = std::stoi(node.id);
         float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
         float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
-        float scaledNodeWidth = nodeWidth * canvasState.zoom;
+        float scaledNodeWidth = GetNodeWidth(node) * canvasState.zoom;
         float scaledHeaderHeight = headerHeight * canvasState.zoom;
         float scaledPinHeight = pinHeight * canvasState.zoom;
         float nh = GetNodeHeight(node) * canvasState.zoom;
@@ -1226,7 +1263,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 for (const Node& node : graph.GetNodes()) {
                     float nx2 = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
                     float ny2 = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
-                    float nw2 = nodeWidth * canvasState.zoom;
+                    float nw2 = GetNodeWidth(node) * canvasState.zoom;
                     float nh2 = GetNodeHeight(node) * canvasState.zoom;
                     if (CheckCollisionRecs(sel, {nx2, ny2, nw2, nh2})) {
                         int nid = std::stoi(node.id);

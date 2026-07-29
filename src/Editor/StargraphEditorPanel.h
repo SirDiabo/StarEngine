@@ -53,6 +53,7 @@ private:
     Color GetPinColor(PinType type) const;
     Color GetNodeHeaderColor(const Node& node) const;
     float GetNodeHeight(const Node& node) const;
+    float GetNodeWidth(const Node& node) const;
     Node* GetNodeAtPos(Vector2 pos);
 
     bool IsPrimitiveNode(const Node& node) const;
@@ -112,7 +113,7 @@ private:
     enum class PinPickerKind { Key, FunctionName, ComponentRef, MappingName };
     PinPickerKind keyPickerKind = PinPickerKind::Key;
 
-    static const float nodeWidth;
+    static const float minNodeWidth;
     static const float pinHeight;
     static const float pinRadius;
     static const float headerHeight;

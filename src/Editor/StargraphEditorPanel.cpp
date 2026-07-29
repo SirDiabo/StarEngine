@@ -2,7 +2,7 @@
 #include "ViewportPanel.h"
 #include "raygui.h"
 
-const float StargraphEditorPanel::nodeWidth      = 190.0f;
+const float StargraphEditorPanel::minNodeWidth   = 160.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
 const float StargraphEditorPanel::pinRadius      = 5.0f;
 const float StargraphEditorPanel::headerHeight   = 26.0f;
