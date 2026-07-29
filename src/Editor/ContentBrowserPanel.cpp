@@ -669,6 +669,11 @@ void ContentBrowserPanel::Render() {
         RequestDelete(fullPath.string(), entry.isFolder, entry.displayName);
     }
 
+    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
+        IsKeyPressed(KEY_F2)) {
+        BeginRename(entries[selectedIndex]);
+    }
+
     if (itemContextMenuOpen) {
         bool showReimport = !contextTargetIsFolder &&
             (contextTargetExtension == ".starasset" || contextTargetExtension == ".startex" ||
