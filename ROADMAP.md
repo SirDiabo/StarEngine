@@ -83,6 +83,14 @@ x Registry-reference dropdown field (RegistryPickerPopup + NamedListRegistry), p
 x SearchableListPopup (src/Editor/SearchableListPopup.h/.cpp): category-grouped, searchable,
   scrollable popup list, extracted from the Add Node menu; Add Component menu now uses it too
 
+### 1.10 Shared UI Theme and Interaction Primitives
+x UIPalette single struct of color attributes
+x swappable palette at runtime between Dark and Light presets
+x UIWidget::Interact consolidates hover/press/click Rectangle state
+x UIWidget::Button/IconButton/Panel/SelectableBg draw from UIPalette
+o Editor Settings tab/panel exposing the Dark/Light toggle to the user
+o Migrate existing CheckCollisionPointRec and GuiButton call sites onto UIWidget
+
 ---
 
 ## 2. Engine Architecture
