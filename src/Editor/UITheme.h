@@ -38,6 +38,7 @@ struct UIPalette {
 
     Color accent;
     Color danger;
+    Color dangerBg;
     Color success;
 };
 

@@ -15,6 +15,6 @@ bool Button(Rectangle r, const char* label, bool enabled = true);
 bool IconButton(Rectangle r, const char* label, bool enabled = true);
 
 void Panel(Rectangle r);
-Color SelectableBg(bool hovered, bool selected);
+Color SelectableBg(bool hovered, bool selected, Color idle);
 
 }

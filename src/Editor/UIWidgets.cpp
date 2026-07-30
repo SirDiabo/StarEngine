@@ -50,10 +50,10 @@ void Panel(Rectangle r) {
     DrawRectangleLinesEx(r, 1, theme.panelBorder);
 }
 
-Color SelectableBg(bool hovered, bool selected) {
+Color SelectableBg(bool hovered, bool selected, Color idle) {
     const UIPalette& theme = UITheme::Get();
     if (selected) return theme.surfaceSelected;
-    return hovered ? theme.surfaceHover : theme.panelBg;
+    return hovered ? theme.surfaceHover : idle;
 }
 
 }

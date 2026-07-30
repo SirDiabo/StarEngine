@@ -1,4 +1,6 @@
 #include "SearchableListPopup.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cctype>
@@ -79,8 +81,8 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
         return "";
     }
 
-    DrawRectangleRec(popup, {44, 44, 50, 255});
-    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+    DrawRectangleRec(popup, UITheme::Get().panelBg);
+    DrawRectangleLinesEx(popup, 1, UITheme::Get().panelBorder);
 
     Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
     GuiTextBox(searchRect, search, sizeof(search), true);
@@ -100,22 +102,23 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
     std::string clickedId;
     std::string lastCategory;
     float y = popup.y + searchH + 4 - scrollOffset;
+    const UIPalette& theme = UITheme::Get();
     for (const Entry& e : filtered) {
         if (e.category != lastCategory) {
             if (!lastCategory.empty()) {
-                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {70, 70, 80, 255});
+                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, theme.panelBorder);
             }
             lastCategory = e.category;
-            DrawText(e.category.c_str(), (int)popup.x + 8, (int)y + 4, 11, {150, 165, 195, 255});
+            DrawText(e.category.c_str(), (int)popup.x + 8, (int)y + 4, 11, theme.accent);
             y += categoryHeaderH;
         }
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
         if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
-            DrawRectangleRec(btn, {65, 65, 85, 255});
+            DrawRectangleRec(btn, theme.surfaceHover);
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clickedId = e.id;
         }
-        DrawText(e.label.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
+        DrawText(e.label.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, theme.textPrimary);
         y += itemH;
     }
 

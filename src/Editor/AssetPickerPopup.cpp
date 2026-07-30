@@ -1,5 +1,7 @@
 #include "AssetPickerPopup.h"
 #include "Core/Project.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include <filesystem>
 #include <algorithm>
@@ -42,8 +44,7 @@ bool AssetPickerPopup::Render(std::string& outPath) {
 
     Rectangle areaCopy = area;
     deferredDraws.push_back([areaCopy]() {
-        DrawRectangleRec(areaCopy, {45, 45, 50, 255});
-        DrawRectangleLinesEx(areaCopy, 1, {80, 80, 88, 255});
+        UIWidget::Panel(areaCopy);
     });
 
     float y = area.y + 2;
@@ -51,8 +52,9 @@ bool AssetPickerPopup::Render(std::string& outPath) {
     Rectangle noneItem = {area.x + 1, y, area.width - 2, 18};
     bool noneHovered = CheckCollisionPointRec(mousePos, noneItem);
     deferredDraws.push_back([noneItem, noneHovered]() {
-        if (noneHovered) DrawRectangleRec(noneItem, {70, 70, 80, 255});
-        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, {180, 180, 190, 255});
+        const UIPalette& theme = UITheme::Get();
+        if (noneHovered) DrawRectangleRec(noneItem, theme.surfaceHover);
+        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, theme.textSecondary);
     });
     if (noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         outPath.clear();
@@ -66,8 +68,9 @@ bool AssetPickerPopup::Render(std::string& outPath) {
         bool hovered = CheckCollisionPointRec(mousePos, item);
         std::string name = displayNames[i];
         deferredDraws.push_back([item, hovered, name]() {
-            if (hovered) DrawRectangleRec(item, {70, 70, 80, 255});
-            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, WHITE);
+            const UIPalette& theme = UITheme::Get();
+            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
+            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, theme.textPrimary);
         });
 
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -82,7 +85,7 @@ bool AssetPickerPopup::Render(std::string& outPath) {
         float emptyY = y;
         float emptyX = area.x;
         deferredDraws.push_back([emptyX, emptyY]() {
-            DrawText("(no matching assets)", (int)emptyX + 6, (int)emptyY, 10, {110, 110, 118, 255});
+            DrawText("(no matching assets)", (int)emptyX + 6, (int)emptyY, 10, UITheme::Get().textSecondary);
         });
     }
 

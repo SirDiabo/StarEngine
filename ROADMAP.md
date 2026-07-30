@@ -89,7 +89,8 @@ x swappable palette at runtime between Dark and Light presets
 x UIWidget::Interact consolidates hover/press/click Rectangle state
 x UIWidget::Button/IconButton/Panel/SelectableBg draw from UIPalette
 o Editor Settings tab/panel exposing the Dark/Light toggle to the user
-o Migrate existing CheckCollisionPointRec and GuiButton call sites onto UIWidget
+x DockArea and the popup family migrated onto UITheme/UIWidget
+o Remaining CheckCollisionPointRec and GuiButton call sites migrated onto UIWidget
 
 ---
 

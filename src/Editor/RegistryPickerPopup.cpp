@@ -1,5 +1,7 @@
 #include "RegistryPickerPopup.h"
 #include "Core/NamedListRegistry.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 
 std::vector<std::function<void()>> RegistryPickerPopup::deferredDraws;
@@ -28,8 +30,7 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
 
     Rectangle areaCopy = area;
     deferredDraws.push_back([areaCopy]() {
-        DrawRectangleRec(areaCopy, {45, 45, 50, 255});
-        DrawRectangleLinesEx(areaCopy, 1, {80, 80, 88, 255});
+        UIWidget::Panel(areaCopy);
     });
 
     float y = area.y + 2;
@@ -38,8 +39,9 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
     Rectangle noneItem = {area.x + 1, y, area.width - 2, 18};
     bool noneHovered = !creating && CheckCollisionPointRec(mousePos, noneItem);
     deferredDraws.push_back([noneItem, noneHovered]() {
-        if (noneHovered) DrawRectangleRec(noneItem, {70, 70, 80, 255});
-        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, {180, 180, 190, 255});
+        const UIPalette& theme = UITheme::Get();
+        if (noneHovered) DrawRectangleRec(noneItem, theme.surfaceHover);
+        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, theme.textSecondary);
     });
     if (!creating && noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         outVal.clear();
@@ -54,8 +56,9 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
         bool hovered = !creating && CheckCollisionPointRec(mousePos, item);
         std::string name = entries[i];
         deferredDraws.push_back([item, hovered, name]() {
-            if (hovered) DrawRectangleRec(item, {70, 70, 80, 255});
-            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, WHITE);
+            const UIPalette& theme = UITheme::Get();
+            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
+            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, theme.textPrimary);
         });
 
         if (!creating && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -81,8 +84,9 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
     } else {
         bool newHovered = CheckCollisionPointRec(mousePos, newItem);
         deferredDraws.push_back([newItem, newHovered]() {
-            if (newHovered) DrawRectangleRec(newItem, {70, 70, 80, 255});
-            DrawText("+ New...", (int)newItem.x + 6, (int)newItem.y + 3, 11, {140, 190, 140, 255});
+            const UIPalette& theme = UITheme::Get();
+            if (newHovered) DrawRectangleRec(newItem, theme.surfaceHover);
+            DrawText("+ New...", (int)newItem.x + 6, (int)newItem.y + 3, 11, theme.success);
         });
         if (newHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             creating = true;

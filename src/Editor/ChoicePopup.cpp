@@ -1,4 +1,6 @@
 #include "ChoicePopup.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 
 std::vector<std::function<void()>> ChoicePopup::deferredDraws;
 
@@ -27,8 +29,7 @@ bool ChoicePopup::Render(int& outIndex) {
 
     Rectangle areaCopy = area;
     deferredDraws.push_back([areaCopy]() {
-        DrawRectangleRec(areaCopy, {45, 45, 50, 255});
-        DrawRectangleLinesEx(areaCopy, 1, {80, 80, 88, 255});
+        UIWidget::Panel(areaCopy);
     });
 
     float y = area.y + 2;
@@ -42,8 +43,9 @@ bool ChoicePopup::Render(int& outIndex) {
         std::string reason = opt.disabledReason;
         bool enabled = opt.enabled;
         deferredDraws.push_back([item, hovered, label, reason, enabled]() {
-            if (hovered) DrawRectangleRec(item, {70, 70, 80, 255});
-            Color textColor = enabled ? WHITE : Color{120, 120, 128, 255};
+            const UIPalette& theme = UITheme::Get();
+            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
+            Color textColor = enabled ? theme.textPrimary : theme.buttonDisabledText;
             DrawText(label.c_str(), (int)item.x + 6, (int)item.y + 3, 11, textColor);
             if (!enabled && !reason.empty()) {
                 DrawText(reason.c_str(), (int)item.x + 6, (int)item.y + 17, 9, {110, 110, 118, 255});

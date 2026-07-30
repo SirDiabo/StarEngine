@@ -33,6 +33,7 @@ static UIPalette MakeDarkPalette() {
 
     p.accent = {100, 160, 230, 255};
     p.danger = {190, 70, 70, 255};
+    p.dangerBg = {160, 55, 55, 255};
     p.success = {40, 160, 75, 255};
     return p;
 }
@@ -70,6 +71,7 @@ static UIPalette MakeLightPalette() {
 
     p.accent = {50, 110, 200, 255};
     p.danger = {195, 70, 70, 255};
+    p.dangerBg = {175, 60, 60, 255};
     p.success = {50, 140, 80, 255};
     return p;
 }

@@ -1,4 +1,5 @@
 #include "ConfirmPopup.h"
+#include "UITheme.h"
 
 std::vector<std::function<void()>> ConfirmPopup::deferredDraws;
 
@@ -33,20 +34,22 @@ bool ConfirmPopup::Render(bool& outConfirmed) {
     std::string msgCopy = message;
     std::string confirmLabelCopy = confirmLabel;
     deferredDraws.push_back([sw, sh, areaCopy, msgCopy, cancelBtn, confirmBtn, cancelHovered, confirmHovered, confirmLabelCopy]() {
+        const UIPalette& theme = UITheme::Get();
+
         DrawRectangle(0, 0, (int)sw, (int)sh, {0, 0, 0, 130});
-        DrawRectangleRounded(areaCopy, 0.08f, 6, {42, 42, 48, 255});
-        DrawRectangleRoundedLinesEx(areaCopy, 0.08f, 6, 1.5f, {95, 95, 105, 255});
+        DrawRectangleRounded(areaCopy, 0.08f, 6, theme.panelBg);
+        DrawRectangleRoundedLinesEx(areaCopy, 0.08f, 6, 1.5f, theme.panelBorder);
 
         int textW = MeasureText(msgCopy.c_str(), 13);
-        DrawText(msgCopy.c_str(), (int)(areaCopy.x + (areaCopy.width - textW) * 0.5f), (int)areaCopy.y + 18, 13, WHITE);
+        DrawText(msgCopy.c_str(), (int)(areaCopy.x + (areaCopy.width - textW) * 0.5f), (int)areaCopy.y + 18, 13, theme.textPrimary);
 
-        DrawRectangleRec(cancelBtn, cancelHovered ? Color{70, 70, 78, 255} : Color{55, 55, 62, 255});
-        DrawRectangleLinesEx(cancelBtn, 1, {90, 90, 98, 255});
+        DrawRectangleRec(cancelBtn, cancelHovered ? theme.buttonHover : theme.buttonBg);
+        DrawRectangleLinesEx(cancelBtn, 1, theme.buttonBorder);
         int cw = MeasureText("Cancel", 12);
-        DrawText("Cancel", (int)(cancelBtn.x + (cancelBtn.width - cw) * 0.5f), (int)cancelBtn.y + 6, 12, WHITE);
+        DrawText("Cancel", (int)(cancelBtn.x + (cancelBtn.width - cw) * 0.5f), (int)cancelBtn.y + 6, 12, theme.buttonText);
 
-        DrawRectangleRec(confirmBtn, confirmHovered ? Color{190, 70, 70, 255} : Color{160, 55, 55, 255});
-        DrawRectangleLinesEx(confirmBtn, 1, {210, 90, 90, 255});
+        DrawRectangleRec(confirmBtn, confirmHovered ? theme.danger : theme.dangerBg);
+        DrawRectangleLinesEx(confirmBtn, 1, theme.danger);
         int fw = MeasureText(confirmLabelCopy.c_str(), 12);
         DrawText(confirmLabelCopy.c_str(), (int)(confirmBtn.x + (confirmBtn.width - fw) * 0.5f), (int)confirmBtn.y + 6, 12, WHITE);
     });

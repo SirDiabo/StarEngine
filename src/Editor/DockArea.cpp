@@ -1,21 +1,11 @@
 #include "DockArea.h"
 #include "raylib.h"
 #include "raygui.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "Core/SafeParse.h"
 #include <algorithm>
 #include <cstdio>
-
-static const Color COLOR_TAB_BAR      = { 35, 35, 38, 255 };
-static const Color COLOR_TAB_ACTIVE   = { 55, 55, 62, 255 };
-static const Color COLOR_TAB_HOVER    = { 45, 45, 50, 255 };
-static const Color COLOR_TAB_TEXT     = { 200, 200, 200, 255 };
-static const Color COLOR_SPLITTER     = { 28, 28, 30, 255 };
-static const Color COLOR_SPLITTER_HOV = { 80, 120, 200, 255 };
-static const Color COLOR_DROP_ZONE    = { 60, 120, 220, 80 };
-static const Color COLOR_DROP_BORDER  = { 80, 150, 255, 200 };
-static const Color COLOR_FLOAT_HEADER = { 48, 48, 54, 255 };
-static const Color COLOR_FLOAT_BORDER = { 80, 80, 90, 255 };
-static const Color COLOR_PANEL_BG     = { 38, 38, 42, 255 };
 
 static const float FLOAT_HEADER_H = 22.0f;
 static const float DRAG_THRESHOLD = 6.0f;
@@ -81,23 +71,21 @@ void DockArea::RenderOverlays() {
         Panel* p = fp.panel;
         if (!p || !p->IsVisible()) continue;
 
+        const UIPalette& theme = UITheme::Get();
+
         Rectangle full    = fp.bounds;
         Rectangle header  = { full.x, full.y, full.width, FLOAT_HEADER_H };
         Rectangle content = { full.x, full.y + FLOAT_HEADER_H,
                                full.width, full.height - FLOAT_HEADER_H };
 
-        DrawRectangleRec(full, COLOR_PANEL_BG);
-        DrawRectangleLinesEx(full, 1, COLOR_FLOAT_BORDER);
-        DrawRectangleRec(header, COLOR_FLOAT_HEADER);
+        UIWidget::Panel(full);
+        DrawRectangleRec(header, theme.buttonBg);
         DrawText(p->GetName(), (int)header.x + 8,
-                 (int)(header.y + (header.height - 11) / 2.0f), 11, COLOR_TAB_TEXT);
+                 (int)(header.y + (header.height - 11) / 2.0f), 11, theme.tabText);
 
         Rectangle closeRect = { full.x + full.width - 20, full.y + 3, 16, 16 };
         bool closeHov = CheckCollisionPointRec(mouse, closeRect);
-        if (closeHov) DrawRectangleRec(closeRect, { 180, 60, 60, 200 });
-        DrawText("x", (int)closeRect.x + 3, (int)closeRect.y + 2, 10,
-                 closeHov ? WHITE : Color{ 130, 130, 130, 255 });
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && closeHov)
+        if (UIWidget::IconButton(closeRect, "x"))
             p->SetVisible(false);
 
         if (!dragging && !pendingDrag) {
@@ -152,8 +140,8 @@ void DockArea::RenderOverlays() {
             Rectangle tabBar = { target->bounds.x, target->bounds.y,
                                  target->bounds.width, DOCK_TAB_HEIGHT };
             if (CheckCollisionPointRec(mouse, tabBar)) {
-                DrawRectangleRec(tabBar, COLOR_DROP_ZONE);
-                DrawRectangleLinesEx(tabBar, 2, COLOR_DROP_BORDER);
+                DrawRectangleRec(tabBar, UITheme::Get().dropZone);
+                DrawRectangleLinesEx(tabBar, 2, UITheme::Get().dropBorder);
             } else {
                 DropZone zone = GetDropZone(target->bounds, mouse);
                 if (zone != DropZone::None)
@@ -196,8 +184,10 @@ void DockArea::RenderNode(DockNode* node) {
 // Tab bar
 
 void DockArea::RenderTabBar(DockNode* node) {
+    const UIPalette& theme = UITheme::Get();
+
     Rectangle bar = { node->bounds.x, node->bounds.y, node->bounds.width, DOCK_TAB_HEIGHT };
-    DrawRectangleRec(bar, COLOR_TAB_BAR);
+    DrawRectangleRec(bar, theme.tabBar);
 
     Vector2 mouse = GetMousePosition();
     float tabX = bar.x;
@@ -213,30 +203,27 @@ void DockArea::RenderTabBar(DockNode* node) {
         bool hovered = CheckCollisionPointRec(mouse, tabRect);
         bool active  = (i == node->activeTab);
 
-        DrawRectangleRec(tabRect, active ? COLOR_TAB_ACTIVE : (hovered ? COLOR_TAB_HOVER : COLOR_TAB_BAR));
+        DrawRectangleRec(tabRect, UIWidget::SelectableBg(hovered, active, theme.tabBar));
         DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 1), (int)tabRect.width, 1,
-                      active ? Color{ 80, 140, 255, 255 } : Color{ 55, 55, 60, 255 });
+                      active ? theme.accent : Color{ 55, 55, 60, 255 });
         DrawText(pname.c_str(), (int)(tabX + tabPad),
-                 (int)(bar.y + (bar.height - 11) / 2.0f), 11, COLOR_TAB_TEXT);
+                 (int)(bar.y + (bar.height - 11) / 2.0f), 11, theme.tabText);
 
         Rectangle closeRect = { tabX + tabW - closeW - 3, bar.y + (bar.height - closeW) / 2.0f, closeW, closeW };
         bool closeHov = CheckCollisionPointRec(mouse, closeRect);
-        if (closeHov) DrawRectangleRec(closeRect, { 180, 60, 60, 200 });
-        DrawText("x", (int)closeRect.x + 3, (int)closeRect.y + 2, 10,
-                 closeHov ? WHITE : Color{ 130, 130, 130, 255 });
+        bool closeClicked = UIWidget::IconButton(closeRect, "x");
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointRec(mouse, closeRect)) {
-                SetPanelVisible(pname, false);
-                if (node->activeTab >= (int)node->panelNames.size())
-                    node->activeTab = (int)node->panelNames.size() - 1;
-            } else if (hovered && !dragging && !pendingDrag) {
-                node->activeTab   = i;
-                pendingDrag       = true;
-                pendingDragPanel  = pname;
-                pendingDragNode   = node;
-                pendingDragOrigin = mouse;
-            }
+        if (closeClicked) {
+            SetPanelVisible(pname, false);
+            if (node->activeTab >= (int)node->panelNames.size())
+                node->activeTab = (int)node->panelNames.size() - 1;
+        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hovered && !closeHov &&
+                   !dragging && !pendingDrag) {
+            node->activeTab   = i;
+            pendingDrag       = true;
+            pendingDragPanel  = pname;
+            pendingDragNode   = node;
+            pendingDragOrigin = mouse;
         }
 
         tabX += tabW;
@@ -259,7 +246,8 @@ void DockArea::RenderSplitter(DockNode* node) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, splitter);
 
-    DrawRectangleRec(splitter, (hovered || activeSplitter == node) ? COLOR_SPLITTER_HOV : COLOR_SPLITTER);
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleRec(splitter, (hovered || activeSplitter == node) ? theme.splitterHover : theme.splitter);
 
     if ((hovered || activeSplitter == node) && !dragging && !pendingDrag)
         SetMouseCursor(horiz ? MOUSE_CURSOR_RESIZE_EW : MOUSE_CURSOR_RESIZE_NS);
@@ -463,8 +451,8 @@ void DockArea::DrawDropHighlight(DockNode* target, DropZone zone) const {
         case DropZone::Center: h = c; break;
         default: return;
     }
-    DrawRectangleRec(h, COLOR_DROP_ZONE);
-    DrawRectangleLinesEx(h, 2, COLOR_DROP_BORDER);
+    DrawRectangleRec(h, UITheme::Get().dropZone);
+    DrawRectangleLinesEx(h, 2, UITheme::Get().dropBorder);
 }
 
 // Visibility
