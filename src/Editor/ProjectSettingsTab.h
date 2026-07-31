@@ -2,6 +2,7 @@
 #include "EditorTab.h"
 #include "AssetPickerPopup.h"
 #include "ChoicePopup.h"
+#include "SettingsSwitcher.h"
 #include <string>
 
 class MenuBar;
@@ -14,6 +15,13 @@ public:
 
 private:
     void RefreshFromProject();
+
+    void RenderGeneralCategory(Rectangle area);
+    void RenderMapsCategory(Rectangle area);
+    void RenderRenderingCategory(Rectangle area);
+    void RenderSaveFilesCategory(Rectangle area);
+
+    SettingsSwitcher switcher;
 
     AssetPickerPopup mapPicker;
     ChoicePopup rendererPopup;

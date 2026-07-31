@@ -4,6 +4,7 @@
 #include "StargraphEditorTab.h"
 #include "AssetPreviewTab.h"
 #include "ProjectSettingsTab.h"
+#include "EditorSettingsTab.h"
 #include "PackageTab.h"
 #include "MenuBar.h"
 #include "ProjectBrowser.h"
@@ -248,6 +249,25 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
     }
 }
 
+void Editor::OpenEditorSettingsTab() {
+    for (int i = 0; i < (int)editorTabs.size(); i++) {
+        if (dynamic_cast<EditorSettingsTab*>(editorTabs[i].get())) {
+            editorTabs[activeEditorTab]->OnDeactivated();
+            activeEditorTab = i;
+            editorTabs[activeEditorTab]->OnActivated();
+            editorTabs[activeEditorTab]->BuildMenus(menuBar);
+            return;
+        }
+    }
+    auto* tab = new EditorSettingsTab();
+    tab->Initialize();
+    editorTabs.emplace_back(tab);
+    editorTabs[activeEditorTab]->OnDeactivated();
+    activeEditorTab = (int)editorTabs.size() - 1;
+    editorTabs[activeEditorTab]->OnActivated();
+    editorTabs[activeEditorTab]->BuildMenus(menuBar);
+}
+
 void Editor::OpenProjectSettingsTab() {
     for (int i = 0; i < (int)editorTabs.size(); i++) {
         if (dynamic_cast<ProjectSettingsTab*>(editorTabs[i].get())) {
@@ -301,6 +321,7 @@ void Editor::OpenDefaultMapIfSet() {
 }
 
 void Editor::HandleEditMenuAction(const std::string& item) {
+    if (item == "Editor Settings")  OpenEditorSettingsTab();
     if (item == "Project Settings") OpenProjectSettingsTab();
 }
 

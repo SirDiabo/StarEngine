@@ -15,11 +15,11 @@ namespace fs = std::filesystem;
 void ProjectSettingsTab::Initialize() {
     title     = "Project Settings";
     permanent = false;
+    switcher.SetCategories({ "General", "Maps", "Rendering", "Save Files" });
     RefreshFromProject();
 }
 
 void ProjectSettingsTab::RefreshFromProject() {
-    const ProjectSettings& settings = Project::Get().GetSettings();
     snprintf(renderScaleBuf, sizeof(renderScaleBuf), "%.2f", RenderSettings::Get().GetRenderScale() * 100.0f);
     activeField = 0;
     newSaveFileBuf[0] = '\0';
@@ -35,16 +35,23 @@ static std::string MapDisplayName(const std::string& path) {
 }
 
 void ProjectSettingsTab::Render(float x, float y, float width, float height) {
-    DrawRectangleRec({x, y, width, height}, {32, 32, 35, 255});
+    Rectangle content = switcher.Render({x, y, width, height});
 
+    switch (switcher.Selected()) {
+        case 0: RenderGeneralCategory(content);   break;
+        case 1: RenderMapsCategory(content);       break;
+        case 2: RenderRenderingCategory(content);  break;
+        case 3: RenderSaveFilesCategory(content);  break;
+        default: break;
+    }
+}
+
+void ProjectSettingsTab::RenderGeneralCategory(Rectangle area) {
     ProjectSettings& settings = Project::Get().GetSettings();
-    Vector2 mp = GetMousePosition();
-    const bool anyPopupOpen = mapPicker.IsOpen() || rendererPopup.IsOpen() ||
-                               shadingTypePopup.IsOpen() || lightingQualityPopup.IsOpen();
 
-    float fx = x + 16;
-    float fy = y + 16;
-    float fw = width - 32 > 420.0f ? 420.0f : width - 32;
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
 
     DrawText("General", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 24;
@@ -56,6 +63,16 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     DrawRectangleLinesEx(nameRow, 1, {55, 55, 60, 255});
     DrawText(settings.name.c_str(), (int)nameRow.x + 6, (int)nameRow.y + 4, 12, {150, 150, 158, 255});
     fy += 34;
+}
+
+void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {
+    ProjectSettings& settings = Project::Get().GetSettings();
+    Vector2 mp = GetMousePosition();
+    const bool anyPopupOpen = mapPicker.IsOpen();
+
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
 
     DrawText("Maps", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 24;
@@ -75,6 +92,17 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     fy += 24;
     std::string pickedMap;
     if (mapPicker.Render(pickedMap)) settings.defaultMapPath = pickedMap;
+}
+
+void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
+    Vector2 mp = GetMousePosition();
+    const bool anyPopupOpen = rendererPopup.IsOpen() || shadingTypePopup.IsOpen() || lightingQualityPopup.IsOpen();
+
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
+
+    ProjectSettings& settings = Project::Get().GetSettings();
 
     DrawText("Rendering", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 24;
@@ -167,6 +195,12 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     DrawText("Percentage of the window resolution the 3D scene renders at, upscaled with nearest-neighbor.",
               (int)fx, (int)fy, 10, {110, 110, 118, 255});
     fy += 24;
+}
+
+void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
 
     DrawText("Save Files", (int)fx, (int)fy, 14, {180, 200, 230, 255});
     fy += 24;

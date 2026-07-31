@@ -88,9 +88,15 @@ x UIPalette single struct of color attributes
 x swappable palette at runtime between Dark and Light presets
 x UIWidget::Interact consolidates hover/press/click Rectangle state
 x UIWidget::Button/IconButton/Panel/SelectableBg draw from UIPalette
-o Editor Settings tab/panel exposing the Dark/Light toggle to the user
+x Editor Settings tab exposing the Dark/Light toggle
 x DockArea and the popup family migrated onto UITheme/UIWidget
 o Remaining CheckCollisionPointRec and GuiButton call sites migrated onto UIWidget
+
+### 1.11 Editor Settings and Project Settings Categorization
+x SettingsSwitcher reusable category sidebar plus content area
+x EditorSettingsTab with a Style category holding the Dark/Light toggle
+x ProjectSettingsTab split into General, Maps, Rendering, and Save Files categories
+o Additional Editor Settings categories beyond Style
 
 ---
 
