@@ -1,5 +1,7 @@
 #include "AboutPanel.h"
 #include "Core/EmbeddedAssets.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <string>
@@ -25,6 +27,8 @@ void AboutPanel::Close() {
 void AboutPanel::Render() {
     if (!open) return;
 
+    const UIPalette& theme = UITheme::Get();
+
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
     float boxW = 360.0f;
@@ -32,8 +36,7 @@ void AboutPanel::Render() {
     Rectangle box = { screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH };
 
     DrawRectangle(0, 0, (int)screenW, (int)screenH, {0, 0, 0, 140});
-    DrawRectangleRec(box, {40, 40, 46, 255});
-    DrawRectangleLinesEx(box, 1, {80, 80, 90, 255});
+    UIWidget::Panel(box);
 
     float y = box.y + 16;
     float cx = box.x + boxW * 0.5f;
@@ -50,20 +53,20 @@ void AboutPanel::Render() {
     const char* projectName = "StarEngine";
     int fontSize = 20;
     int textW = MeasureText(projectName, fontSize);
-    DrawText(projectName, (int)(cx - textW * 0.5f), (int)y, fontSize, {200, 210, 230, 255});
+    DrawText(projectName, (int)(cx - textW * 0.5f), (int)y, fontSize, theme.sectionHeader);
     y += 32;
 
     const char* madeBy = "Made by SirDiabo";
     fontSize = 12;
     textW = MeasureText(madeBy, fontSize);
-    DrawText(madeBy, (int)(cx - textW * 0.5f), (int)y, fontSize, {160, 170, 190, 255});
+    DrawText(madeBy, (int)(cx - textW * 0.5f), (int)y, fontSize, theme.textSecondary);
     y += 24;
 
     Vector2 mp = GetMousePosition();
 
     Rectangle githubRow = { box.x + 20, y, boxW - 40, 20 };
-    DrawRectangleRec(githubRow, {30, 30, 32, 255});
-    DrawRectangleLinesEx(githubRow, 1, {55, 55, 60, 255});
+    DrawRectangleRec(githubRow, theme.fieldBg);
+    DrawRectangleLinesEx(githubRow, 1, theme.fieldBorder);
     DrawText("GitHub: SirDiabo/StarEngine", (int)(githubRow.x + 6), (int)(githubRow.y + 4), 11, {120, 160, 255, 255});
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, githubRow)) {
         OpenURL("https://github.com/SirDiabo/StarEngine");
@@ -71,8 +74,8 @@ void AboutPanel::Render() {
     y += 26;
 
     Rectangle kofiRow = { box.x + 20, y, boxW - 40, 20 };
-    DrawRectangleRec(kofiRow, {30, 30, 32, 255});
-    DrawRectangleLinesEx(kofiRow, 1, {55, 55, 60, 255});
+    DrawRectangleRec(kofiRow, theme.fieldBg);
+    DrawRectangleLinesEx(kofiRow, 1, theme.fieldBorder);
     DrawText("Support: ko-fi.com/sirdiabo", (int)(kofiRow.x + 6), (int)(kofiRow.y + 4), 11, {255, 160, 120, 255});
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, kofiRow)) {
         OpenURL("https://ko-fi.com/sirdiabo");
@@ -80,7 +83,7 @@ void AboutPanel::Render() {
     y += 30;
 
     Rectangle closeBtn = { box.x + boxW - 70, box.y + boxH - 32, 50, 22 };
-    if (GuiButton(closeBtn, "Close")) {
+    if (UIWidget::Button(closeBtn, "Close")) {
         Close();
     }
 

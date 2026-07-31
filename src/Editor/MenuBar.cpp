@@ -1,13 +1,10 @@
 #include "MenuBar.h"
 #include "Core/EmbeddedAssets.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 
-static const Color COLOR_MENUBAR_BG = { 45, 45, 48, 255 };
-static const Color COLOR_MENU_POPUP = { 55, 55, 60, 255 };
-static const Color COLOR_MENU_HOVER = { 70, 70, 80, 255 };
-static const Color COLOR_MENU_SEP   = { 75, 75, 80, 255 };
-static const Color COLOR_MENU_TEXT  = { 210, 210, 210, 255 };
 static const float MENU_ITEM_H      = 22.0f;
 static const float MENU_POPUP_W     = 160.0f;
 static const float MENU_BTN_PAD     = 10.0f;
@@ -42,8 +39,10 @@ float MenuBar::GetMenuButtonX(int index) const {
 
 // Draw the bar background and buttons. Input handling for button clicks lives here.
 void MenuBar::RenderBar() {
+    const UIPalette& theme = UITheme::Get();
+
     int screenW = GetScreenWidth();
-    DrawRectangleRec({ 0, 0, (float)screenW, menuBarHeight }, COLOR_MENUBAR_BG);
+    DrawRectangleRec({ 0, 0, (float)screenW, menuBarHeight }, theme.tabBar);
 
     if (logoLoaded && logo.id != 0) {
         float iconSize = menuBarHeight - 4.0f;
@@ -62,8 +61,8 @@ void MenuBar::RenderBar() {
 
         bool hovered = CheckCollisionPointRec(mouse, btn);
         if (hovered || activeMenu == i)
-            DrawRectangleRec(btn, COLOR_MENU_HOVER);
-        DrawText(label.c_str(), (int)(offsetX + MENU_BTN_PAD), 4, 11, COLOR_MENU_TEXT);
+            DrawRectangleRec(btn, theme.surfaceHover);
+        DrawText(label.c_str(), (int)(offsetX + MENU_BTN_PAD), 4, 11, theme.textPrimary);
 
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             activeMenu = (activeMenu == i) ? -1 : i;
@@ -76,6 +75,7 @@ void MenuBar::RenderBar() {
 void MenuBar::RenderPopup() {
     if (activeMenu < 0 || activeMenu >= (int)menus.size()) return;
 
+    const UIPalette& theme = UITheme::Get();
     Vector2 mouse = GetMousePosition();
     const MenuEntry& entry = menus[activeMenu];
 
@@ -102,8 +102,7 @@ void MenuBar::RenderPopup() {
         if (activeMenu < 0) return;
     }
 
-    DrawRectangleRec(popup, COLOR_MENU_POPUP);
-    DrawRectangleLinesEx(popup, 1, { 80, 80, 88, 255 });
+    UIWidget::Panel(popup);
 
     float iy = popupY + 2;
     for (int index = 0; index < (int)entry.items.size(); index++) {
@@ -111,20 +110,20 @@ void MenuBar::RenderPopup() {
         if (item == "---") {
             DrawLine((int)(popupX + 4), (int)(iy + MENU_ITEM_H / 2),
                      (int)(popupX + MENU_POPUP_W - 4), (int)(iy + MENU_ITEM_H / 2),
-                     COLOR_MENU_SEP);
+                     theme.panelBorder);
             iy += MENU_ITEM_H;
             continue;
         }
         Rectangle row = { popupX + 1, iy, MENU_POPUP_W - 2, MENU_ITEM_H };
         bool rowHov = CheckCollisionPointRec(mouse, row);
-        if (rowHov) DrawRectangleRec(row, COLOR_MENU_HOVER);
+        if (rowHov) DrawRectangleRec(row, theme.surfaceHover);
 
         float textX = popupX + 8;
         if (!entry.checked.empty() && index < (int)entry.checked.size() && entry.checked[index]) {
-            DrawText("x", (int)(popupX + 8), (int)(iy + 5), 11, COLOR_MENU_TEXT);
+            DrawText("x", (int)(popupX + 8), (int)(iy + 5), 11, theme.textPrimary);
             textX = popupX + 8 + MENU_CHECK_W;
         }
-        DrawText(item.c_str(), (int)textX, (int)(iy + 5), 11, COLOR_MENU_TEXT);
+        DrawText(item.c_str(), (int)textX, (int)(iy + 5), 11, theme.textPrimary);
 
         if (rowHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (entry.label == "File") {

@@ -1,6 +1,8 @@
 #include "ImportDetailsPanel.h"
 #include "Core/StarAsset.h"
 #include "PropertyFields.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include <cstdio>
 #include <cstdlib>
@@ -82,8 +84,7 @@ void ImportDetailsPanel::Render() {
     Rectangle box = {screenW * 0.5f - boxWidth * 0.5f, screenH * 0.5f - boxHeight * 0.5f, boxWidth, boxHeight};
 
     DrawRectangle(0, 0, (int)screenW, (int)screenH, {0, 0, 0, 140});
-    DrawRectangleRec(box, {40, 40, 46, 255});
-    DrawRectangleLinesEx(box, 1, {80, 80, 90, 255});
+    UIWidget::Panel(box);
 
     RenderBody(box, boxWidth, true);
 
@@ -91,11 +92,11 @@ void ImportDetailsPanel::Render() {
     Rectangle skipBtn = {box.x + boxWidth - 80, box.y + boxHeight - 28, 70, 22};
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialPicker.IsOpen();
-    if (GuiButton(importBtn, "Import") && !pickerBlocksInput) {
+    if (UIWidget::Button(importBtn, "Import") && !pickerBlocksInput) {
         SaveToAsset();
         Close();
     }
-    if (GuiButton(skipBtn, "Skip") && !pickerBlocksInput) {
+    if (UIWidget::Button(skipBtn, "Skip") && !pickerBlocksInput) {
         Close();
     }
 }
@@ -103,10 +104,10 @@ void ImportDetailsPanel::Render() {
 void ImportDetailsPanel::RenderInline(Rectangle area) {
     if (!open || !inlinePanel) return;
 
-    DrawRectangleRec(area, {38, 38, 42, 255});
-    DrawRectangleLinesEx(area, 1, {65, 65, 70, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(area);
 
-    DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, {200, 210, 230, 255});
+    DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, theme.sectionHeader);
     Rectangle inner = {area.x, area.y + 24, area.width, area.height - 24};
 
     int prevActiveField = activeField;
@@ -119,8 +120,10 @@ void ImportDetailsPanel::RenderInline(Rectangle area) {
 }
 
 void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
+    const UIPalette& theme = UITheme::Get();
+
     std::string title = "Import Options - " + fs::path(assetPath).stem().string();
-    if (modal) DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, {200, 210, 230, 255});
+    if (modal) DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, theme.sectionHeader);
 
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialPicker.IsOpen();
@@ -129,7 +132,7 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
     bool isMesh = (assetType == "StaticMesh");
 
     auto vec3Row = [&](const char* label, char bufs[3][32], int firstFieldId) {
-        DrawText(label, (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
+        DrawText(label, (int)box.x + 10, (int)y, 11, theme.sectionHeader);
         y += 16;
         Rectangle row = {box.x + 10, y, boxWidth - 20, 18};
         float vx = (float)atof(bufs[0]), vy = (float)atof(bufs[1]), vz = (float)atof(bufs[2]);
@@ -144,20 +147,20 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
         vec3Row("Scale", scaleBuf, 7);
 
         if (materialSlots.empty()) {
-            DrawText("No material slots (plain .obj, no mtllib)", (int)box.x + 10, (int)y, 10, {140, 140, 150, 255});
+            DrawText("No material slots (plain .obj, no mtllib)", (int)box.x + 10, (int)y, 10, theme.textSecondary);
             y += 20;
         } else {
-            DrawText("Materials", (int)box.x + 10, (int)y, 11, {180, 200, 230, 255});
+            DrawText("Materials", (int)box.x + 10, (int)y, 11, theme.sectionHeader);
             y += 14;
             for (size_t i = 0; i < materialSlots.size(); i++) {
                 Rectangle rowRect = {box.x + 10, y, boxWidth - 20, 18};
-                DrawRectangleRec(rowRect, {30, 30, 32, 255});
-                DrawRectangleLinesEx(rowRect, 1, {65, 65, 75, 255});
+                DrawRectangleRec(rowRect, theme.fieldBg);
+                DrawRectangleLinesEx(rowRect, 1, theme.fieldBorder);
                 std::string slotName = materialSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : materialSlots[i].usemtlName;
-                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 3, 10, {150, 150, 160, 255});
+                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 3, 10, theme.textSecondary);
                 std::string matLabel = materialSlots[i].materialPath.empty() ? "None" :
                     fs::path(materialSlots[i].materialPath).stem().string();
-                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 3, 10, WHITE);
+                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 3, 10, theme.textPrimary);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
                     materialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
                     materialSlotPickerIndex = (int)i;
@@ -173,7 +176,7 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
             }
         }
     } else {
-        DrawText("No import options for this asset type yet.", (int)box.x + 10, (int)y, 11, {150, 150, 160, 255});
+        DrawText("No import options for this asset type yet.", (int)box.x + 10, (int)y, 11, theme.textSecondary);
         y += 24;
     }
 }

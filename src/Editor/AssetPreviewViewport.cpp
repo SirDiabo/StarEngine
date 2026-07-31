@@ -1,6 +1,7 @@
 #include "AssetPreviewViewport.h"
 #include "Runtime/AssetCache.h"
 #include "Core/StarMaterial.h"
+#include "UITheme.h"
 #include "raymath.h"
 #include "rlgl.h"
 #include <filesystem>
@@ -199,7 +200,8 @@ void AssetPreviewViewport::Render(float x, float y, float width, float height) {
         DrawTextureRec(renderTarget.texture, source, {client.x, client.y}, WHITE);
     }
 
-    DrawRectangleLinesEx(client, 1, {70, 70, 75, 255});
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleLinesEx(client, 1, theme.panelBorder);
 
     if (flying) {
         const char* hint = "WASD fly  Q/E up/down  Scroll=speed  Release RMB to exit";
@@ -210,6 +212,6 @@ void AssetPreviewViewport::Render(float x, float y, float width, float height) {
         const char* msg = "Source file missing. Reimport to fix.";
         int tw = MeasureText(msg, 12);
         DrawText(msg, (int)(client.x + client.width / 2 - tw / 2),
-                 (int)(client.y + client.height / 2), 12, {220, 100, 100, 255});
+                 (int)(client.y + client.height / 2), 12, theme.danger);
     }
 }

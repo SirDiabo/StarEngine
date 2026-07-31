@@ -19,6 +19,8 @@
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
 #include "Core/LayoutSerializer.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -31,13 +33,6 @@ namespace fs = std::filesystem;
 
 const float Editor::EDITOR_TAB_BAR_H = 28.0f;
 const float Editor::MENU_BAR_H       = 20.0f;
-
-static const Color COLOR_EDITOR_TAB_BAR  = { 30, 30, 33, 255 };
-static const Color COLOR_EDITOR_TAB_ACT  = { 50, 50, 58, 255 };
-static const Color COLOR_EDITOR_TAB_HOV  = { 40, 40, 46, 255 };
-static const Color COLOR_EDITOR_TAB_IDLE = { 30, 30, 33, 255 };
-static const Color COLOR_EDITOR_TAB_TEXT = { 200, 200, 210, 255 };
-static const Color COLOR_EDITOR_TAB_LINE = { 70, 120, 220, 255 };
 
 Editor::~Editor() {
     SaveLayout();
@@ -136,8 +131,10 @@ void Editor::Render() {
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {
+    const UIPalette& theme = UITheme::Get();
+
     Rectangle bar = { x, y, width, EDITOR_TAB_BAR_H };
-    DrawRectangleRec(bar, COLOR_EDITOR_TAB_BAR);
+    DrawRectangleRec(bar, theme.tabBar);
 
     Vector2 mouse = GetMousePosition();
     float tabX = x + 4;
@@ -156,20 +153,21 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
         bool active  = (i == activeEditorTab);
 
         // Beveled editor tab style (trapezoid approximated with a rectangle + indicator line).
-        DrawRectangleRec(tabRect, active ? COLOR_EDITOR_TAB_ACT : (hovered ? COLOR_EDITOR_TAB_HOV : COLOR_EDITOR_TAB_IDLE));
+        DrawRectangleRec(tabRect, UIWidget::SelectableBg(hovered, active, theme.tabBar));
         if (active)
-            DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 2), (int)tabRect.width, 2, COLOR_EDITOR_TAB_LINE);
+            DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 2), (int)tabRect.width, 2, theme.accent);
 
-        DrawText(title.c_str(), (int)(tabX + tabPad), (int)(y + (EDITOR_TAB_BAR_H - 12) / 2.0f + 1), 12, COLOR_EDITOR_TAB_TEXT);
+        DrawText(title.c_str(), (int)(tabX + tabPad), (int)(y + (EDITOR_TAB_BAR_H - 12) / 2.0f + 1), 12, theme.tabText);
 
         // Close button for non-permanent tabs.
+        bool closeClicked = false;
+        bool closeHov = false;
         if (!tab->IsPermanent()) {
             Rectangle closeRect = { tabX + tabW - closeW - 3, y + (EDITOR_TAB_BAR_H - closeW) / 2.0f, closeW, closeW };
-            bool closeHov = CheckCollisionPointRec(mouse, closeRect);
-            if (closeHov) DrawRectangleRec(closeRect, { 180, 60, 60, 200 });
-            DrawText("x", (int)closeRect.x + 3, (int)closeRect.y + 2, 10, closeHov ? WHITE : Color{ 120, 120, 120, 255 });
+            closeClicked = UIWidget::IconButton(closeRect, "x");
+            closeHov = CheckCollisionPointRec(mouse, closeRect);
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && closeHov) {
+            if (closeClicked) {
                 editorTabs.erase(editorTabs.begin() + i);
                 if (activeEditorTab >= (int)editorTabs.size())
                     activeEditorTab = (int)editorTabs.size() - 1;
@@ -179,7 +177,7 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
             }
         }
 
-        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && activeEditorTab != i) {
+        if (hovered && !closeHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && activeEditorTab != i) {
             editorTabs[activeEditorTab]->OnDeactivated();
             activeEditorTab = i;
             editorTabs[activeEditorTab]->OnActivated();
@@ -190,7 +188,7 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
     }
 
     // Separator line at bottom of tab bar.
-    DrawLine((int)x, (int)(y + EDITOR_TAB_BAR_H - 1), (int)(x + width), (int)(y + EDITOR_TAB_BAR_H - 1), { 22, 22, 25, 255 });
+    DrawLine((int)x, (int)(y + EDITOR_TAB_BAR_H - 1), (int)(x + width), (int)(y + EDITOR_TAB_BAR_H - 1), theme.splitter);
 }
 
 void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& extension) {

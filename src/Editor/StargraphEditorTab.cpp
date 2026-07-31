@@ -2,6 +2,7 @@
 #include "StargraphEditorPanel.h"
 #include "LogPanel.h"
 #include "MenuBar.h"
+#include "UITheme.h"
 #include "raylib.h"
 #include <filesystem>
 #include <algorithm>
@@ -10,8 +11,6 @@ namespace fs = std::filesystem;
 
 static const float LOG_MIN_H      = 60.0f;
 static const float SPLITTER_H     = 4.0f;
-static const Color SPLITTER_COL   = { 28, 28, 30, 255 };
-static const Color SPLITTER_HOV   = { 80, 120, 200, 255 };
 
 StargraphEditorTab::StargraphEditorTab(const std::string& path)
     : assetPath(path) {
@@ -42,7 +41,7 @@ void StargraphEditorTab::Render(float x, float y, float width, float height) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, splitter);
 
-    DrawRectangleRec(splitter, (hovered || resizingSplitter) ? SPLITTER_HOV : SPLITTER_COL);
+    DrawRectangleRec(splitter, (hovered || resizingSplitter) ? UITheme::Get().splitterHover : UITheme::Get().splitter);
 
     if ((hovered || resizingSplitter) && !resizingSplitter)
         SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);

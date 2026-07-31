@@ -92,7 +92,9 @@ x Editor Settings tab exposing the Dark/Light toggle
 x DockArea and the popup family migrated onto UITheme/UIWidget
 x UIPalette sectionHeader field for the recurring pale-blue subsection label color
 x ContentBrowserPanel, ViewportPanel, DetailsPanel, OutlinerPanel, ModuleBrowserPanel migrated onto UITheme/UIWidget
-o Remaining CheckCollisionPointRec and GuiButton call sites migrated onto UIWidget
+x MenuBar, Editor tab bar, and the small utility panels migrated onto UITheme/UIWidget
+x ProjectSettingsTab fully migrated onto UITheme/UIWidget
+o Remaining Stargraph panel group (StargraphEditorPanel_Graph/_Details/_Panels) migrated onto UIWidget
 
 ### 1.11 Editor Settings and Project Settings Categorization
 x SettingsSwitcher reusable category sidebar plus content area

@@ -1,4 +1,6 @@
 #include "LogPanel.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raylib.h"
 
 void LogPanel::Initialize() {
@@ -23,16 +25,16 @@ std::vector<LogEntry> LogPanel::GetLogsSince(int fromCount) const {
 }
 
 static Color LogEntryColor(LogLevel level) {
+    const UIPalette& theme = UITheme::Get();
     switch (level) {
         case LogLevel::Warning: return { 240, 200, 60, 255 };
-        case LogLevel::Error:   return { 230, 80, 80, 255 };
-        default:                return { 200, 200, 200, 255 };
+        case LogLevel::Error:   return theme.danger;
+        default:                return theme.textPrimary;
     }
 }
 
 void LogPanel::Render() {
-    DrawRectangleRec(bounds, { 40, 40, 40, 255 });
-    DrawRectangleLinesEx(bounds, 1, { 80, 80, 80, 255 });
+    UIWidget::Panel(bounds);
 
     float lineHeight = 15.0f;
     float padding = 4.0f;

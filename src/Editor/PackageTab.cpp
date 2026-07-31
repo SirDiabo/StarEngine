@@ -2,6 +2,8 @@
 #include "MenuBar.h"
 #include "NativeFileDialog.h"
 #include "Core/PackageRunner.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -26,7 +28,8 @@ static Rectangle SelectRow(float x, float y, float w, float h) {
 }
 
 void PackageTab::Render(float x, float y, float width, float height) {
-    DrawRectangleRec({x, y, width, height}, {32, 32, 35, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel({x, y, width, height});
 
     Vector2 mp = GetMousePosition();
     float fx = x + 16;
@@ -35,17 +38,17 @@ void PackageTab::Render(float x, float y, float width, float height) {
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
                                cipherPopup.IsOpen() || formatPopup.IsOpen();
 
-    DrawText("Package Project", (int)fx, (int)fy, 14, {180, 200, 230, 255});
+    DrawText("Package Project", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 26;
 
     // Platform
-    DrawText("Platform", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    DrawText("Platform", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle platformRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(platformRow, {26, 26, 28, 255});
-    DrawRectangleLinesEx(platformRow, 1, {55, 55, 60, 255});
+    DrawRectangleRec(platformRow, theme.fieldBg);
+    DrawRectangleLinesEx(platformRow, 1, theme.fieldBorder);
     const PackagePlatformInfo& selectedPlatform = platforms[selectedPlatformIndex];
-    DrawText(selectedPlatform.displayName.c_str(), (int)platformRow.x + 6, (int)platformRow.y + 5, 12, WHITE);
+    DrawText(selectedPlatform.displayName.c_str(), (int)platformRow.x + 6, (int)platformRow.y + 5, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, platformRow) && !anyPopupOpen) {
         std::vector<ChoiceOption> options;
         for (const auto& p : platforms) options.push_back({p.displayName, p.available, p.unavailableReason});
@@ -54,14 +57,14 @@ void PackageTab::Render(float x, float y, float width, float height) {
     fy += 30;
 
     // Renderer
-    DrawText("Renderer", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    DrawText("Renderer", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle rendererRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(rendererRow, {26, 26, 28, 255});
-    DrawRectangleLinesEx(rendererRow, 1, {55, 55, 60, 255});
+    DrawRectangleRec(rendererRow, theme.fieldBg);
+    DrawRectangleLinesEx(rendererRow, 1, theme.fieldBorder);
     std::string rendererLabel = renderer == GameRenderer::Software
         ? "Software (CPU, no GPU required)" : "Hardware (OpenGL)";
-    DrawText(rendererLabel.c_str(), (int)rendererRow.x + 6, (int)rendererRow.y + 5, 12, WHITE);
+    DrawText(rendererLabel.c_str(), (int)rendererRow.x + 6, (int)rendererRow.y + 5, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rendererRow) && !anyPopupOpen) {
         rendererPopup.Open({rendererRow.x, rendererRow.y + rendererRow.height}, fw, {
             {"Hardware (OpenGL)", true, ""},
@@ -70,16 +73,16 @@ void PackageTab::Render(float x, float y, float width, float height) {
     }
     fy += 20;
     DrawText("Saved with the project. Only changes how packaged games render; the editor always uses Hardware.",
-              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+              (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
     // Encryption
-    DrawText("Content Encryption", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    DrawText("Content Encryption", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle cipherRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(cipherRow, {26, 26, 28, 255});
-    DrawRectangleLinesEx(cipherRow, 1, {55, 55, 60, 255});
-    DrawText(CookCipherDisplayName(cipher).c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12, WHITE);
+    DrawRectangleRec(cipherRow, theme.fieldBg);
+    DrawRectangleLinesEx(cipherRow, 1, theme.fieldBorder);
+    DrawText(CookCipherDisplayName(cipher).c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, cipherRow) && !anyPopupOpen) {
         std::vector<ChoiceOption> options;
         for (CookCipher c : AllCookCiphers()) options.push_back({CookCipherDisplayName(c), true, ""});
@@ -87,18 +90,18 @@ void PackageTab::Render(float x, float y, float width, float height) {
     }
     fy += 20;
     DrawText("A fresh key is generated for every package. XOR deters casual inspection, it is not secure.",
-              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+              (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
     // Format
-    DrawText("Packaging Format", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    DrawText("Packaging Format", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle formatRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(formatRow, {26, 26, 28, 255});
-    DrawRectangleLinesEx(formatRow, 1, {55, 55, 60, 255});
+    DrawRectangleRec(formatRow, theme.fieldBg);
+    DrawRectangleLinesEx(formatRow, 1, theme.fieldBorder);
     std::string formatLabel = format == PackageFormat::LooseFolder
         ? "Loose Content folder (debug)" : "Single file (.starpak embedded)";
-    DrawText(formatLabel.c_str(), (int)formatRow.x + 6, (int)formatRow.y + 5, 12, WHITE);
+    DrawText(formatLabel.c_str(), (int)formatRow.x + 6, (int)formatRow.y + 5, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, formatRow) && !anyPopupOpen) {
         formatPopup.Open({formatRow.x, formatRow.y + formatRow.height}, fw, {
             {"Single file (.starpak embedded)", true, ""},
@@ -107,19 +110,19 @@ void PackageTab::Render(float x, float y, float width, float height) {
     }
     fy += 20;
     DrawText("Single file ships one exe with no loose Content/ folder. Loose folder is faster to re-package for testing.",
-              (int)fx, (int)fy, 10, {110, 110, 118, 255});
+              (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
     // Output folder
-    DrawText("Output Folder", (int)fx, (int)fy, 11, {140, 140, 150, 255});
+    DrawText("Output Folder", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     float browseWidth = 70.0f;
     Rectangle outputRow = SelectRow(fx, fy, fw - browseWidth - 6, 22);
-    DrawRectangleRec(outputRow, {26, 26, 28, 255});
-    DrawRectangleLinesEx(outputRow, 1, {55, 55, 60, 255});
-    DrawText(outputDir.c_str(), (int)outputRow.x + 6, (int)outputRow.y + 5, 11, {200, 200, 205, 255});
+    DrawRectangleRec(outputRow, theme.fieldBg);
+    DrawRectangleLinesEx(outputRow, 1, theme.fieldBorder);
+    DrawText(outputDir.c_str(), (int)outputRow.x + 6, (int)outputRow.y + 5, 11, theme.textPrimary);
     Rectangle browseButton = {outputRow.x + outputRow.width + 6, fy, browseWidth, 22};
-    if (GuiButton(browseButton, "Browse...") && !anyPopupOpen) {
+    if (UIWidget::Button(browseButton, "Browse...") && !anyPopupOpen) {
         std::string chosen = NativeFileDialog::OpenFolder("Choose Output Folder", outputDir);
         if (!chosen.empty()) outputDir = chosen;
     }
@@ -128,27 +131,25 @@ void PackageTab::Render(float x, float y, float width, float height) {
     // Package button
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
-    if (!platformReady) GuiDisable();
-    if (GuiButton(packageButton, "Package") && !anyPopupOpen) {
+    if (UIWidget::Button(packageButton, "Package", platformReady) && !anyPopupOpen) {
         RunPackage();
     }
-    if (!platformReady) GuiEnable();
     fy += 36;
 
     if (!platformReady) {
         DrawText(("Cannot package for this platform: " + selectedPlatform.unavailableReason).c_str(),
-                  (int)fx, (int)fy, 10, {200, 120, 110, 255});
+                  (int)fx, (int)fy, 10, theme.danger);
         fy += 18;
     }
 
     if (hasResult) {
-        Color resultColor = lastSuccess ? Color{130, 210, 140, 255} : Color{220, 110, 100, 255};
+        Color resultColor = lastSuccess ? theme.success : theme.danger;
         DrawText(resultMessage.c_str(), (int)fx, (int)fy, 12, resultColor);
         fy += 18;
 
         Rectangle logBox = {fx, fy, fw, 140};
-        DrawRectangleRec(logBox, {20, 20, 22, 255});
-        DrawRectangleLinesEx(logBox, 1, {55, 55, 60, 255});
+        DrawRectangleRec(logBox, theme.fieldBg);
+        DrawRectangleLinesEx(logBox, 1, theme.fieldBorder);
 
         std::vector<std::string> lines;
         std::string current;
@@ -162,7 +163,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
         int start = (int)lines.size() > maxLines ? (int)lines.size() - maxLines : 0;
         float ly = logBox.y + 4;
         for (int i = start; i < (int)lines.size(); i++) {
-            DrawText(lines[i].c_str(), (int)logBox.x + 6, (int)ly, 10, {170, 170, 178, 255});
+            DrawText(lines[i].c_str(), (int)logBox.x + 6, (int)ly, 10, theme.textSecondary);
             ly += 12;
         }
     }
