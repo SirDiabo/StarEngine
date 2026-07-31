@@ -4,6 +4,8 @@
 #include "Core/InputMappingRegistry.h"
 #include "Core/NamedListRegistry.h"
 #include "Core/SaveFileRegistry.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cstdlib>
@@ -31,24 +33,24 @@ static std::vector<std::string> GetProjectInputMappingNames() {
 }
 
 void StargraphEditorPanel::RenderLeftPanel() {
+    const UIPalette& theme = UITheme::Get();
     float topY = bounds.y + toolbarHeight + componentOutlinerHeight;
     Rectangle panel = {bounds.x, topY, leftPanelWidth, bounds.height - toolbarHeight - componentOutlinerHeight};
-    DrawRectangleRec(panel, {30, 30, 33, 255});
-    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+    UIWidget::Panel(panel);
 
     Vector2 mousePos = GetMousePosition();
     float y = panel.y + 8;
 
     auto sectionHeader = [&](const char* label) {
-        DrawText(label, (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+        DrawText(label, (int)panel.x + 8, (int)y, 12, theme.textSecondary);
         y += 18;
-        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
         y += 6;
     };
 
     sectionHeader("Graphs");
-    DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, {42, 42, 48, 255});
-    DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, WHITE);
+    DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, theme.fieldBg);
+    DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, theme.textPrimary);
     y += 22;
 
     y += 8;
@@ -62,7 +64,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
         Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
         bool isSelected = (selectedVariableIndex == (int)i);
 
-        DrawRectangleRec(row, isSelected ? Color{55, 60, 80, 255} : Color{42, 42, 48, 255});
+        DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
         DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(vars[i].type));
 
         if (renamingVariableIndex == (int)i) {
@@ -79,7 +81,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
             }
         } else {
             std::string label = vars[i].name + (vars[i].isArray ? " []" : "");
-            DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, WHITE);
+            DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, theme.textPrimary);
 
             if (CheckCollisionPointRec(mousePos, row)) {
                 if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -120,7 +122,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
 
     if (addingVariable) {
         Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-        DrawRectangleRec(row, {42, 42, 48, 255});
+        DrawRectangleRec(row, theme.fieldBg);
         DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
 
         std::string nameOut = varNameBuffer;
@@ -144,7 +146,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
     }
 
     Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
-    GuiButton(addBtn, "+ Variable");
+    UIWidget::Button(addBtn, "+ Variable");
     
     if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
         snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
@@ -162,19 +164,17 @@ void StargraphEditorPanel::RenderLeftPanel() {
             }
         }
 
-        DrawRectangleRec(popup, {55, 55, 60, 255});
-        DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+        UIWidget::Panel(popup);
 
         Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        GuiButton(renameBtn, "Rename");
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, renameBtn)) {
+        if (UIWidget::Button(renameBtn, "Rename")) {
             snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
             PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
             renamingVariableIndex = varContextMenuIndex;
             variableNameActiveField = 1;
             varContextMenuOpen = false;
         }
-        if (GuiButton({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
+        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
             vars.erase(vars.begin() + varContextMenuIndex);
             selectedVariableIndex = -1;
             varContextMenuOpen = false;
@@ -188,6 +188,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
 }
 
 void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField) {
+    const UIPalette& theme = UITheme::Get();
     if (varArrayBufs.size() != var.arrayValues.size()) {
         varArrayBufs.resize(var.arrayValues.size());
     }
@@ -214,7 +215,7 @@ void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, 
                     elem = bval ? "true" : "false";
                     changed = true;
                 }
-                DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 11, WHITE);
+                DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 11, theme.textPrimary);
                 break;
             }
             case PinType::Integer: {
@@ -307,17 +308,17 @@ void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, 
 }
 
 void StargraphEditorPanel::RenderRightPanel() {
+    const UIPalette& theme = UITheme::Get();
     Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight,
                        rightPanelWidth, bounds.height - toolbarHeight};
-    DrawRectangleRec(panel, {30, 30, 33, 255});
-    DrawRectangleLinesEx(panel, 1, {55, 55, 60, 255});
+    UIWidget::Panel(panel);
 
     float y = panel.y + 8;
 
     if (showSelfActorDetails) {
-        DrawText(graph.assetName.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        DrawText(graph.assetName.c_str(), (int)panel.x + 8, (int)y, 13, theme.textPrimary);
         y += 20;
-        DrawText("Actor properties", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Actor properties", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         return;
     }
 
@@ -331,7 +332,7 @@ void StargraphEditorPanel::RenderRightPanel() {
     if (selectedVariableIndex >= 0 && selectedVariableIndex < (int)vars.size()) {
         Variable& var = vars[selectedVariableIndex];
 
-        DrawText("Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Name", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
 
         static char varNameEditBuf[128] = "";
@@ -404,7 +405,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         }
         y += 24;
 
-        DrawText("Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Type", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
 
         static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object","Wildcard"};
@@ -436,7 +437,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         }
         y += 24;
 
-        DrawText("Array", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Array", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         {
             Rectangle arrayCheckRect = {panel.x + 8, y, 18, 18};
@@ -455,11 +456,11 @@ void StargraphEditorPanel::RenderRightPanel() {
                 isDirty = true;
                 activeField = 0;
             }
-            DrawText(isArr ? "true" : "false", (int)arrayCheckRect.x + 24, (int)arrayCheckRect.y + 2, 12, WHITE);
+            DrawText(isArr ? "true" : "false", (int)arrayCheckRect.x + 24, (int)arrayCheckRect.y + 2, 12, theme.textPrimary);
         }
         y += 24;
 
-        DrawText("Default Value", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Default Value", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
 
         if (var.isArray) {
@@ -471,7 +472,7 @@ void StargraphEditorPanel::RenderRightPanel() {
                 var.value = bval ? "true" : "false";
                 isDirty = true;
             }
-            DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 12, WHITE);
+            DrawText(bval ? "true" : "false", (int)boolRect.x + 24, (int)boolRect.y + 2, 12, theme.textPrimary);
         } else if (var.type == PinType::Integer) {
             Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
             int ival = atoi(var.value.c_str());
@@ -510,7 +511,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         }
         y += 26;
 
-        DrawText("Replication", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Replication", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
 
         static const char* replNames[] = {"Local", "Replicated", "Server Only"};
@@ -525,7 +526,7 @@ void StargraphEditorPanel::RenderRightPanel() {
         }
         y += 26;
 
-        DrawText("Save File", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Save File", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         Rectangle saveRect = {panel.x + 8, y, panel.width - 16, 18};
         PropertyField::Style saveStyle;
@@ -546,7 +547,7 @@ void StargraphEditorPanel::RenderRightPanel() {
     }
 
     if (selectedNodeId == -1) {
-        DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, {100, 100, 110, 255});
+        DrawText("Nothing selected", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         return;
     }
 
@@ -563,24 +564,24 @@ void StargraphEditorPanel::RenderRightPanel() {
     for (const Node& node : graph.GetNodes()) {
         if (std::stoi(node.id) != selectedNodeId) continue;
 
-        DrawText(node.title.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+        DrawText(node.title.c_str(), (int)panel.x + 8, (int)y, 13, theme.textPrimary);
         y += 20;
-        DrawText(node.type.c_str(), (int)panel.x + 8, (int)y, 11, {120, 120, 130, 255});
+        DrawText(node.type.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 18;
-        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
         y += 8;
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
             if (pin.name == "Variable_Name") continue;
             if (pin.name == "Component_Name") continue;
-            DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+            DrawText(pin.name.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
             y += 14;
             if ((node.type == "Play_Sound" || node.type == "Load_Music") && pin.name == "Path") {
                 Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
-                DrawRectangleRec(r, {38, 38, 42, 255});
-                DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+                DrawRectangleRec(r, theme.fieldBg);
+                DrawRectangleLinesEx(r, 1, theme.fieldBorder);
                 std::string pathLabel = pin.defaultValue.empty() ? "None" : std::filesystem::path((std::string)pin.defaultValue).stem().string();
-                DrawText(pathLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+                DrawText(pathLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), r)) {
                     audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
                 }
@@ -595,7 +596,7 @@ void StargraphEditorPanel::RenderRightPanel() {
                 y += 22;
             } else {
                 DrawText(pin.defaultValue.empty() ? "(empty)" : pin.defaultValue.c_str(),
-                         (int)panel.x + 12, (int)y, 11, WHITE);
+                         (int)panel.x + 12, (int)y, 11, theme.textPrimary);
                 y += 16;
             }
         }
@@ -604,6 +605,7 @@ void StargraphEditorPanel::RenderRightPanel() {
 }
 
 void StargraphEditorPanel::RenderKeyPickerPopup() {
+    const UIPalette& theme = UITheme::Get();
     Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
@@ -669,8 +671,7 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         }
     }
 
-    DrawRectangleRec(popup, {44, 44, 50, 255});
-    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+    UIWidget::Panel(popup);
 
     Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
     GuiTextBox(searchRect, keyPickerSearch, sizeof(keyPickerSearch), true);
@@ -690,14 +691,14 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     for (int idx : filtered) {
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
         bool hover = CheckCollisionPointRec(mp, btn);
-        if (hover) DrawRectangleRec(btn, {65, 65, 85, 255});
+        if (hover) DrawRectangleRec(btn, theme.surfaceHover);
 
         std::string display;
         for (char c : allKeys[idx]) {
             if (c == '_') display += ' ';
             else display += c;
         }
-        DrawText(display.c_str(), (int)btn.x + 6, (int)btn.y + 4, 11, WHITE);
+        DrawText(display.c_str(), (int)btn.x + 6, (int)btn.y + 4, 11, theme.textPrimary);
 
         if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             targetPin->defaultValue = allKeys[idx];

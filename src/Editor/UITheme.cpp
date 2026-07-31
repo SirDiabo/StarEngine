@@ -36,6 +36,7 @@ static UIPalette MakeDarkPalette() {
     p.danger = {190, 70, 70, 255};
     p.dangerBg = {160, 55, 55, 255};
     p.success = {40, 160, 75, 255};
+    p.successBg = {30, 130, 60, 255};
     return p;
 }
 
@@ -75,6 +76,7 @@ static UIPalette MakeLightPalette() {
     p.danger = {195, 70, 70, 255};
     p.dangerBg = {175, 60, 60, 255};
     p.success = {50, 140, 80, 255};
+    p.successBg = {40, 120, 65, 255};
     return p;
 }
 

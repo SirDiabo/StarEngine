@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "UITheme.h"
 #include <string>
 
 class PinValue;
@@ -7,10 +8,10 @@ class PinValue;
 namespace PropertyField {
 
 struct Style {
-    Color box = {38, 38, 42, 255};
-    Color border = {70, 70, 80, 255};
-    Color text = WHITE;
-    Color label = {150, 150, 160, 255};
+    Color box = UITheme::Get().fieldBg;
+    Color border = UITheme::Get().fieldBorder;
+    Color text = UITheme::Get().textPrimary;
+    Color label = UITheme::Get().textSecondary;
 };
 
 bool FloatBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeField,

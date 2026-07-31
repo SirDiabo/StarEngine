@@ -1,5 +1,7 @@
 #include "StargraphEditorPanel.h"
 #include "ViewportPanel.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 
 const float StargraphEditorPanel::minNodeWidth   = 160.0f;
@@ -62,16 +64,18 @@ void StargraphEditorPanel::SaveGraph() {
 }
 
 void StargraphEditorPanel::RenderToolbar() {
+    const UIPalette& theme = UITheme::Get();
+
     Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
-    DrawRectangleRec(toolbar, {32, 32, 36, 255});
+    DrawRectangleRec(toolbar, theme.tabBar);
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
-             (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
+             (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
 
     float btnY = toolbar.y + 4;
     float btnLeft = bounds.x + 8;
 
     Rectangle saveBtn = {btnLeft, btnY, 50, 22};
-    if (GuiButton(saveBtn, "Save")) {
+    if (UIWidget::Button(saveBtn, "Save")) {
         SaveGraph();
     }
     btnLeft += 54;
@@ -81,14 +85,14 @@ void StargraphEditorPanel::RenderToolbar() {
 
     Rectangle selfBtn = {btnLeft, btnY, 48, 22};
     bool selfHovered = CheckCollisionPointRec(mp, selfBtn);
-    Color selfColor = showSelfActorDetails ? Color{70, 130, 200, 255} : Color{50, 100, 160, 255};
-    DrawRectangleRec(selfBtn, selfHovered ? Color{80, 150, 230, 255} : selfColor);
+    Color selfColor = (showSelfActorDetails || selfHovered) ? theme.accent : theme.buttonBg;
+    DrawRectangleRec(selfBtn, selfColor);
     DrawText("Self", (int)selfBtn.x + 7, (int)selfBtn.y + 4, 13, WHITE);
 
     float btnRight = bounds.x + bounds.width - 4;
 
     Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
-    if (GuiButton(closeBtn, "X")) {
+    if (UIWidget::Button(closeBtn, "X")) {
         if (isDirty) SaveGraph();
         Close();
         return;
@@ -98,8 +102,7 @@ void StargraphEditorPanel::RenderToolbar() {
     Rectangle stopBtn = {btnRight - 48, btnY, 48, 22};
     if (canStop) {
         bool stopHovered = CheckCollisionPointRec(mp, stopBtn);
-        Color stopColor = stopHovered ? Color{160, 40, 40, 255} : Color{130, 30, 30, 255};
-        DrawRectangleRec(stopBtn, stopColor);
+        DrawRectangleRec(stopBtn, stopHovered ? theme.danger : theme.dangerBg);
         DrawText("STOP", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
         btnRight -= 52;
     }
@@ -107,7 +110,7 @@ void StargraphEditorPanel::RenderToolbar() {
     Rectangle playBtn = {btnRight - 48, btnY, 48, 22};
     if (!canStop) {
         bool playHovered = CheckCollisionPointRec(mp, playBtn);
-        DrawRectangleRec(playBtn, playHovered ? Color{40, 160, 75, 255} : Color{30, 130, 60, 255});
+        DrawRectangleRec(playBtn, playHovered ? theme.success : theme.successBg);
         DrawText("PLAY", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
         btnRight -= 52;
     }
@@ -142,7 +145,7 @@ void StargraphEditorPanel::RenderToolbar() {
 void StargraphEditorPanel::Render() {
     if (!isOpen) return;
 
-    DrawRectangleRec(bounds, {24, 24, 26, 255});
+    DrawRectangleRec(bounds, UITheme::Get().windowBg);
 
     RenderToolbar();
     RenderComponentOutliner({bounds.x, bounds.y + toolbarHeight, leftPanelWidth, componentOutlinerHeight});

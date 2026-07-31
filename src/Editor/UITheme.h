@@ -41,6 +41,7 @@ struct UIPalette {
     Color danger;
     Color dangerBg;
     Color success;
+    Color successBg;
 };
 
 namespace UITheme {

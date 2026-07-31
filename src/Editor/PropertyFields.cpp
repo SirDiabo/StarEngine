@@ -1,4 +1,5 @@
 #include "PropertyFields.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include <cstdio>
@@ -206,7 +207,7 @@ void ArrayHeader(Rectangle r, const char* label, int count, ArrayAction& action,
     DrawText(text, (int)r.x, (int)r.y + 3, 11, style.label);
 
     Rectangle addBtn = {r.x + r.width - kArrayBtnW, r.y, kArrayBtnW, r.height};
-    if (GuiButton(addBtn, "+")) action.addClicked = true;
+    if (UIWidget::Button(addBtn, "+")) action.addClicked = true;
 }
 
 void ArrayRowControls(Rectangle rowRect, int index, int count, ArrayAction& action, const Style& style) {
@@ -219,14 +220,9 @@ void ArrayRowControls(Rectangle rowRect, int index, int count, ArrayAction& acti
     bool canUp = index > 0;
     bool canDown = index < count - 1;
 
-    GuiSetState(canUp ? STATE_NORMAL : STATE_DISABLED);
-    if (GuiButton(upBtn, "^") && canUp) action.moveUpIndex = index;
-
-    GuiSetState(canDown ? STATE_NORMAL : STATE_DISABLED);
-    if (GuiButton(downBtn, "v") && canDown) action.moveDownIndex = index;
-
-    GuiSetState(STATE_NORMAL);
-    if (GuiButton(removeBtn, "x")) action.removeIndex = index;
+    if (UIWidget::Button(upBtn, "^", canUp)) action.moveUpIndex = index;
+    if (UIWidget::Button(downBtn, "v", canDown)) action.moveDownIndex = index;
+    if (UIWidget::Button(removeBtn, "x")) action.removeIndex = index;
 }
 
 Rectangle ArrayValueRect(Rectangle rowRect) {
