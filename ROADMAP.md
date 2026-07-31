@@ -97,7 +97,8 @@ x ProjectSettingsTab fully migrated onto UITheme/UIWidget
 x UIPalette successBg field for the recurring idle/hover semantic-action-button pattern
 x PropertyField::Style now reads its defaults from UITheme instead of fixed dark values
 x StargraphEditorPanel base toolbar and StargraphEditorPanel_Panels migrated onto UITheme/UIWidget
-o StargraphEditorPanel_Graph and _Details migrated onto UITheme/UIWidget
+x StargraphEditorPanel_Details migrated onto UITheme/UIWidget
+x StargraphEditorPanel_Graph add-node search popup migrated onto UITheme/UIWidget
 
 ### 1.11 Editor Settings and Project Settings Categorization
 x SettingsSwitcher reusable category sidebar plus content area

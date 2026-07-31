@@ -2,6 +2,8 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/InputKeyNames.h"
 #include "PropertyFields.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -1424,8 +1426,8 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
     }
 
-    DrawRectangleRec(popup, {44, 44, 50, 255});
-    DrawRectangleLinesEx(popup, 1, {80, 80, 90, 255});
+    DrawRectangleRec(popup, UITheme::Get().panelBg);
+    DrawRectangleLinesEx(popup, 1, UITheme::Get().panelBorder);
 
     Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
     GuiTextBox(searchRect, nodeMenuSearch, sizeof(nodeMenuSearch), true);
@@ -1444,19 +1446,20 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     std::string lastCategory;
     float y = popup.y + searchH + 4 - nodeMenuScrollOffset;
+    const UIPalette& theme = UITheme::Get();
     for (const auto& entry : entries) {
         if (entry.first != lastCategory) {
             if (!lastCategory.empty()) {
-                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, {70, 70, 80, 255});
+                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, theme.panelBorder);
             }
             lastCategory = entry.first;
-            DrawText(entry.first.c_str(), (int)popup.x + 8, (int)y + 4, 11, {150, 165, 195, 255});
+            DrawText(entry.first.c_str(), (int)popup.x + 8, (int)y + 4, 11, theme.accent);
             y += categoryHeaderH;
         }
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
         if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
-            DrawRectangleRec(btn, {65, 65, 85, 255});
+            DrawRectangleRec(btn, theme.surfaceHover);
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 std::string nodeType = entry.second;
                 std::string eventName;
@@ -1543,7 +1546,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             entryDisplay = "Key " + entryDisplay.substr(14);
         }
         for (char& c : entryDisplay) if (c == '_') c = ' ';
-        DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, WHITE);
+        DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, theme.textPrimary);
         y += itemH;
     }
 

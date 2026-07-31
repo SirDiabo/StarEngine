@@ -4,29 +4,31 @@
 #include "Core/InputMappingRegistry.h"
 #include "Core/StarAsset.h"
 #include "Core/SaveFileRegistry.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
 
 void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
-    DrawRectangleRec(area, {28, 28, 31, 255});
-    DrawRectangleLinesEx(area, 1, {55, 55, 60, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(area);
 
     Vector2 mousePos = GetMousePosition();
     float y = area.y + 6;
 
-    DrawText("Components", (int)area.x + 8, (int)y, 12, {160, 160, 170, 255});
+    DrawText("Components", (int)area.x + 8, (int)y, 12, theme.textSecondary);
 
     // Add Component button.
     Rectangle addBtn = {area.x + area.width - 50, y - 2, 44, 16};
-    if (GuiButton(addBtn, "+ Add")) {
+    if (UIWidget::Button(addBtn, "+ Add")) {
         if (addComponentMenu.IsOpen()) addComponentMenu.Close();
         else addComponentMenu.Open({addBtn.x, addBtn.y + addBtn.height});
     }
 
     y += 18;
-    DrawLine((int)area.x + 4, (int)y, (int)(area.x + area.width - 4), (int)y, {55, 55, 60, 255});
+    DrawLine((int)area.x + 4, (int)y, (int)(area.x + area.width - 4), (int)y, theme.panelBorder);
     y += 6;
 
     std::vector<ComponentDecl>& comps = graph.GetComponents();
@@ -36,11 +38,11 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         Rectangle row = {area.x + 4, y, area.width - 8, 18};
         bool isSelected = (selectedComponentIndex == (int)i);
 
-        DrawRectangleRec(row, isSelected ? Color{55, 60, 80, 255} : Color{38, 38, 42, 255});
+        DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
         DrawRectangleRec({area.x + 8, y + 4, 10, 10}, {90, 150, 210, 255});
 
         std::string label = comps[i].name + " (" + comps[i].componentType + ")";
-        DrawText(label.c_str(), (int)area.x + 24, (int)y + 2, 11, WHITE);
+        DrawText(label.c_str(), (int)area.x + 24, (int)y + 2, 11, theme.textPrimary);
 
         if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             selectedComponentIndex = (int)i;
@@ -71,7 +73,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     }
 
     if (comps.empty()) {
-        DrawText("No components", (int)area.x + 8, (int)y, 11, {100, 100, 108, 255});
+        DrawText("No components", (int)area.x + 8, (int)y, 11, theme.textSecondary);
     }
 
     if (addComponentMenu.IsOpen()) {
@@ -121,6 +123,7 @@ static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, si
 }
 
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
+    const UIPalette& theme = UITheme::Get();
     ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
@@ -173,9 +176,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     auto saveButton = [&](Rectangle fieldRect, const char* fieldKey) {
         Rectangle btn = {fieldRect.x + fieldRect.width + 4, fieldRect.y, 18, 18};
         bool has = comp.savableFields.count(fieldKey) && !comp.savableFields[fieldKey].empty();
-        DrawRectangleRec(btn, has ? Color{80, 140, 95, 255} : Color{38, 38, 42, 255});
-        DrawRectangleLinesEx(btn, 1, {70, 70, 80, 255});
-        DrawText("S", (int)btn.x + 5, (int)btn.y + 3, 11, has ? WHITE : Color{120, 120, 130, 255});
+        DrawRectangleRec(btn, has ? theme.success : theme.fieldBg);
+        DrawRectangleLinesEx(btn, 1, theme.fieldBorder);
+        DrawText("S", (int)btn.x + 5, (int)btn.y + 3, 11, has ? theme.textPrimary : theme.buttonDisabledText);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, btn) && !pickerBlocksInput) {
             saveTargetFieldKey = fieldKey;
             savePicker.Open({btn.x, btn.y + btn.height}, SaveFileRegistry::Category());
@@ -184,7 +187,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     auto textField = [&](const char* label, char* buf, size_t bufSize, int fieldId, std::string& outVal,
                           const char* saveKey = nullptr) {
-        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText(label, (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
         Rectangle r = {panel.x + 8, y, w, 18};
@@ -196,7 +199,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal,
                            const char* saveKey = nullptr) {
-        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText(label, (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
         Rectangle r = {panel.x + 8, y, w, 18};
@@ -208,7 +211,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     auto vec3Row = [&](const char* label, char bufs[3][32], int fieldBase, float& vx, float& vy, float& vz,
                         const char* saveKey = nullptr) {
-        DrawText(label, (int)panel.x + 8, (int)y, 11, {180, 200, 230, 255});
+        DrawText(label, (int)panel.x + 8, (int)y, 11, theme.sectionHeader);
         y += 16;
         float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
         Rectangle row = {panel.x + 8, y, w, 18};
@@ -221,14 +224,14 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
     auto assetField = [&](const char* label, const std::string& current, AssetPickerPopup& picker,
                            const char* extension, std::string& outVal, const char* saveKey = nullptr) {
-        DrawText(label, (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText(label, (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
         Rectangle r = {panel.x + 8, y, w, 18};
-        DrawRectangleRec(r, {38, 38, 42, 255});
-        DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+        DrawRectangleRec(r, theme.fieldBg);
+        DrawRectangleLinesEx(r, 1, theme.fieldBorder);
         std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
-        DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+        DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
             componentMeshPicker.Close();
             componentMaterialPicker.Close();
@@ -243,18 +246,18 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
     };
 
-    DrawText(comp.componentType.c_str(), (int)panel.x + 8, (int)y, 13, WHITE);
+    DrawText(comp.componentType.c_str(), (int)panel.x + 8, (int)y, 13, theme.textPrimary);
     y += 20;
 
     textField("Name", compNameBuf, sizeof(compNameBuf), 1, comp.name);
     y += 4;
 
     {
-        DrawText("Parent", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Parent", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         std::vector<std::string> parentOptions = GetValidParentOptions(graph, (size_t)selectedComponentIndex);
         std::string parentLabel = comp.parentName.empty() ? "None (Root)" : comp.parentName;
-        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, parentLabel.c_str())) {
+        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, parentLabel.c_str())) {
             auto it = std::find(parentOptions.begin(), parentOptions.end(), comp.parentName);
             size_t idx = (it != parentOptions.end()) ? (size_t)(it - parentOptions.begin()) : 0;
             idx = (idx + 1) % parentOptions.size();
@@ -282,20 +285,20 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         if (comp.materialAssetPaths.size() != meshSlots.size()) comp.materialAssetPaths.resize(meshSlots.size());
 
         if (meshSlots.empty()) {
-            DrawText("No material slots", (int)panel.x + 8, (int)y, 10, {130, 130, 140, 255});
+            DrawText("No material slots", (int)panel.x + 8, (int)y, 10, theme.textSecondary);
             y += 18;
         } else {
-            DrawText("Materials", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+            DrawText("Materials", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
             y += 14;
             for (size_t i = 0; i < meshSlots.size(); i++) {
                 Rectangle rowRect = {panel.x + 8, y, panel.width - 16, PropertyField::ArrayRowHeight()};
-                DrawRectangleRec(rowRect, {38, 38, 42, 255});
-                DrawRectangleLinesEx(rowRect, 1, {70, 70, 80, 255});
+                DrawRectangleRec(rowRect, theme.fieldBg);
+                DrawRectangleLinesEx(rowRect, 1, theme.fieldBorder);
                 std::string slotName = meshSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : meshSlots[i].usemtlName;
-                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 2, 10, {150, 150, 160, 255});
+                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 2, 10, theme.textSecondary);
                 std::string matLabel = comp.materialAssetPaths[i].empty() ? "None" :
                     std::filesystem::path(comp.materialAssetPaths[i]).stem().string();
-                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 2, 10, WHITE);
+                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 2, 10, theme.textPrimary);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
                     componentMeshPicker.Close();
                     componentMaterialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
@@ -315,9 +318,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Casts Shadow");
         y += 24;
     } else if (comp.componentType == "CollisionComponent") {
-        DrawText("Shape", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Shape", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
-        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, comp.collisionShape.c_str())) {
+        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.collisionShape.c_str())) {
             if (comp.collisionShape == "Box") comp.collisionShape = "Sphere";
             else if (comp.collisionShape == "Sphere") comp.collisionShape = "Capsule";
             else comp.collisionShape = "Box";
@@ -331,13 +334,13 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight, "Height");
         }
     } else if (comp.componentType == "AudioComponent") {
-        DrawText("Sound Path", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Sound Path", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         Rectangle r = {panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18};
-        DrawRectangleRec(r, {38, 38, 42, 255});
-        DrawRectangleLinesEx(r, 1, {70, 70, 80, 255});
+        DrawRectangleRec(r, theme.fieldBg);
+        DrawRectangleLinesEx(r, 1, theme.fieldBorder);
         std::string soundLabel = comp.soundAssetPath.empty() ? "None" : std::filesystem::path(comp.soundAssetPath).stem().string();
-        DrawText(soundLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, WHITE);
+        DrawText(soundLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
             audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
         }
@@ -361,9 +364,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
         y += 24;
     } else if (comp.componentType == "LightComponent") {
-        DrawText("Light Type", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Light Type", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
-        if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, comp.lightType.c_str())) {
+        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.lightType.c_str())) {
             if (comp.lightType == "Point") comp.lightType = "Rectangle";
             else if (comp.lightType == "Rectangle") comp.lightType = "Spot";
             else if (comp.lightType == "Spot") comp.lightType = "Global";
@@ -391,18 +394,18 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     } else if (comp.componentType == "InputComponent") {
         static const char* mappingTypeNames[] = {"Bool", "Axis", "Axis2D"};
 
-        DrawText("Device", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Device", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         Rectangle deviceBtn = {panel.x + 60, y - 2, panel.width - 68, 16};
-        DrawRectangleRec(deviceBtn, {50, 50, 58, 255});
-        DrawText(comp.inputDevice.c_str(), (int)deviceBtn.x + 6, (int)deviceBtn.y + 3, 11, {200, 200, 210, 255});
+        DrawRectangleRec(deviceBtn, theme.buttonBg);
+        DrawText(comp.inputDevice.c_str(), (int)deviceBtn.x + 6, (int)deviceBtn.y + 3, 11, theme.textPrimary);
         if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, deviceBtn)) {
             inputDevicePicker.Open({deviceBtn.x, deviceBtn.y + deviceBtn.height}, deviceBtn.width);
         }
         y += 22;
 
-        DrawText("Mappings", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText("Mappings", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         Rectangle addMappingBtn = {panel.x + panel.width - 60, y - 2, 52, 16};
-        if (GuiButton(addMappingBtn, "+ Add") && !pickerBlocksInput) {
+        if (UIWidget::Button(addMappingBtn, "+ Add") && !pickerBlocksInput) {
             inputMappingPicker.Open({addMappingBtn.x, addMappingBtn.y + addMappingBtn.height}, InputMappingRegistry::Category());
         }
         y += 20;
@@ -415,20 +418,20 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
 
             Rectangle nameRow = {panel.x + 8, y, panel.width - 16, 18};
-            DrawRectangleRec(nameRow, {38, 38, 42, 255});
-            DrawText(mappingName.c_str(), (int)nameRow.x + 4, (int)nameRow.y + 3, 11, WHITE);
+            DrawRectangleRec(nameRow, theme.fieldBg);
+            DrawText(mappingName.c_str(), (int)nameRow.x + 4, (int)nameRow.y + 3, 11, theme.textPrimary);
 
             Rectangle typeBtn = {nameRow.x + nameRow.width - 134, nameRow.y, 52, 18};
-            DrawRectangleRec(typeBtn, {50, 50, 58, 255});
-            DrawText(mappingTypeNames[(int)mapping.type], (int)typeBtn.x + 6, (int)typeBtn.y + 3, 11, {200, 200, 210, 255});
+            DrawRectangleRec(typeBtn, theme.buttonBg);
+            DrawText(mappingTypeNames[(int)mapping.type], (int)typeBtn.x + 6, (int)typeBtn.y + 3, 11, theme.textPrimary);
             if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, typeBtn)) {
                 mapping.type = (InputMappingType)(((int)mapping.type + 1) % 3);
                 InputMappingRegistry::Get().SetMapping(mappingName, mapping);
             }
 
             Rectangle addKeyBtn = {nameRow.x + nameRow.width - 78, nameRow.y, 42, 18};
-            DrawRectangleRec(addKeyBtn, {50, 65, 50, 255});
-            DrawText("+ Key", (int)addKeyBtn.x + 4, (int)addKeyBtn.y + 3, 10, WHITE);
+            DrawRectangleRec(addKeyBtn, theme.successBg);
+            DrawText("+ Key", (int)addKeyBtn.x + 4, (int)addKeyBtn.y + 3, 10, theme.textPrimary);
             if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, addKeyBtn)) {
                 inputKeyPickerMappingIndex = (int)mi;
                 inputKeyPickerBindingIndex = -1;
@@ -436,8 +439,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             }
 
             Rectangle removeBtn = {nameRow.x + nameRow.width - 32, nameRow.y, 28, 18};
-            DrawRectangleRec(removeBtn, {70, 45, 45, 255});
-            DrawText("x", (int)removeBtn.x + 12, (int)removeBtn.y + 2, 12, WHITE);
+            DrawRectangleRec(removeBtn, theme.dangerBg);
+            DrawText("x", (int)removeBtn.x + 12, (int)removeBtn.y + 2, 12, theme.textPrimary);
             if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, removeBtn)) {
                 removeMappingIndex = (int)mi;
             }
@@ -452,9 +455,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 Rectangle keyRect = {panel.x + 16, y, panel.width - 16 - 8 - rightColW, 18};
                 std::string display = binding.key;
                 for (char& c : display) if (c == '_') c = ' ';
-                DrawRectangleRec(keyRect, {35, 35, 40, 255});
-                DrawRectangleLinesEx(keyRect, 1, {60, 60, 70, 255});
-                DrawText(display.c_str(), (int)keyRect.x + 6, (int)keyRect.y + 3, 11, WHITE);
+                DrawRectangleRec(keyRect, theme.fieldBg);
+                DrawRectangleLinesEx(keyRect, 1, theme.fieldBorder);
+                DrawText(display.c_str(), (int)keyRect.x + 6, (int)keyRect.y + 3, 11, theme.textPrimary);
                 if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, keyRect)) {
                     inputKeyPickerMappingIndex = (int)mi;
                     inputKeyPickerBindingIndex = (int)bi;
@@ -480,8 +483,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
                 if (mapping.type == InputMappingType::Axis2D) {
                     Rectangle axisBtn = {x, y, 24, 18};
-                    DrawRectangleRec(axisBtn, {50, 50, 58, 255});
-                    DrawText(binding.axis == 0 ? "X" : "Y", (int)axisBtn.x + 8, (int)axisBtn.y + 3, 11, WHITE);
+                    DrawRectangleRec(axisBtn, theme.buttonBg);
+                    DrawText(binding.axis == 0 ? "X" : "Y", (int)axisBtn.x + 8, (int)axisBtn.y + 3, 11, theme.textPrimary);
                     if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, axisBtn)) {
                         binding.axis = (binding.axis == 0) ? 1 : 0;
                         InputMappingRegistry::Get().SetMapping(mappingName, mapping);
@@ -491,8 +494,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
                 Rectangle listenBtn = {x, y, 22, 18};
                 bool listening = (listeningForInputBindingMappingIndex == (int)mi && listeningForInputBindingIndex == (int)bi);
-                DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : Color{50, 50, 56, 255});
-                DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 10, WHITE);
+                DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : theme.buttonBg);
+                DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 10, theme.textPrimary);
                 if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, listenBtn)) {
                     listeningForInputBindingMappingIndex = (int)mi;
                     listeningForInputBindingIndex = (int)bi;
@@ -501,8 +504,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 x += 26;
 
                 Rectangle removeBindingBtn = {x, y, 18, 18};
-                DrawRectangleRec(removeBindingBtn, {70, 45, 45, 255});
-                DrawText("x", (int)removeBindingBtn.x + 6, (int)removeBindingBtn.y + 2, 11, WHITE);
+                DrawRectangleRec(removeBindingBtn, theme.dangerBg);
+                DrawText("x", (int)removeBindingBtn.x + 6, (int)removeBindingBtn.y + 2, 11, theme.textPrimary);
                 if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, removeBindingBtn)) {
                     removeBindingIndex = (int)bi;
                 }
@@ -641,6 +644,7 @@ static PinType NextParamType(PinType type) {
 }
 
 void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, Node& node) {
+    const UIPalette& theme = UITheme::Get();
     int nodeId = std::stoi(node.id);
     if (lastEventDetailNodeId != nodeId) {
         snprintf(eventNameBuf, sizeof(eventNameBuf), "%s", node.title.c_str());
@@ -654,7 +658,7 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
         eventActiveField = 0;
     }
 
-    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
     std::string titleVal = node.title;
@@ -664,10 +668,10 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
     }
     y += 26;
 
-    DrawText("Replication", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    DrawText("Replication", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     static const char* replNames[] = {"Local", "Replicated", "Server Only"};
-    if (GuiButton({panel.x + 8, y, panel.width - 16, 18}, replNames[(int)node.eventReplication])) {
+    if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, replNames[(int)node.eventReplication])) {
         node.eventReplication = (ReplicationMode)(((int)node.eventReplication + 1) % 3);
         isDirty = true;
     }
@@ -679,9 +683,9 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
     }
 
     y += 6;
-    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, {55, 55, 60, 255});
+    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
     y += 10;
-    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
     y += 18;
 
     std::string pinToRemove;
@@ -699,13 +703,13 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
         }
 
         Rectangle typeR = {panel.x + panel.width - 54, y, 30, 18};
-        if (GuiButton(typeR, ParamTypeShortName(pin.type))) {
+        if (UIWidget::Button(typeR, ParamTypeShortName(pin.type))) {
             pin.type = NextParamType(pin.type);
             isDirty = true;
         }
 
         Rectangle delR = {panel.x + panel.width - 20, y, 18, 18};
-        if (GuiButton(delR, "X")) pinToRemove = pin.name;
+        if (UIWidget::Button(delR, "X")) pinToRemove = pin.name;
 
         y += 22;
         row++;
@@ -718,7 +722,7 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
 
     y += 6;
     if (row < 8) {
-        if (GuiButton({panel.x + 8, y, panel.width - 16, 20}, "+ Add Parameter")) {
+        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 20}, "+ Add Parameter")) {
             std::string newName;
             int n = 1;
             do {
@@ -734,6 +738,7 @@ void StargraphEditorPanel::RenderCustomEventDetails(Rectangle panel, float y, No
 }
 
 void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y, Node& node) {
+    const UIPalette& theme = UITheme::Get();
     int nodeId = std::stoi(node.id);
     if (lastEventDetailNodeId != nodeId) {
         eventNameBuf[0] = '\0';
@@ -742,7 +747,7 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
         eventActiveField = 0;
     }
 
-    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+    DrawText("Event Name", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
 
     Pin* eventNamePin = nullptr;
@@ -758,7 +763,7 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
     }
     y += 26;
 
-    if (GuiButton({panel.x + 8, y, panel.width - 16, 20}, "Refresh Pins")) {
+    if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 20}, "Refresh Pins")) {
         std::string targetName = eventNamePin ? std::string(eventNamePin->defaultValue) : std::string();
         Node* targetEvent = graph.FindCustomEventByName(targetName);
         if (targetEvent) {
@@ -781,12 +786,12 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
     }
     y += 28;
 
-    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, {160, 160, 170, 255});
+    DrawText("Parameters", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
     y += 18;
     for (const Pin& pin : node.inputs) {
         if (pin.type == PinType::Exec) continue;
         if (pin.name == "Target" || pin.name == "Event Name") continue;
-        DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, {160, 160, 170, 255});
+        DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 16;
     }
 }
