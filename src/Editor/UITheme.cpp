@@ -30,6 +30,7 @@ static UIPalette MakeDarkPalette() {
 
     p.textPrimary = {220, 220, 220, 255};
     p.textSecondary = {150, 150, 160, 255};
+    p.sectionHeader = {180, 200, 230, 255};
 
     p.accent = {100, 160, 230, 255};
     p.danger = {190, 70, 70, 255};
@@ -68,6 +69,7 @@ static UIPalette MakeLightPalette() {
 
     p.textPrimary = {30, 30, 34, 255};
     p.textSecondary = {110, 110, 120, 255};
+    p.sectionHeader = {40, 90, 165, 255};
 
     p.accent = {50, 110, 200, 255};
     p.danger = {195, 70, 70, 255};

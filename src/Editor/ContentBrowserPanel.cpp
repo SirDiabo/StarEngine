@@ -10,6 +10,8 @@
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
 #include "PropertyFields.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -357,16 +359,16 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp);
     Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 111, 220, 222};
+    const UIPalette& theme = UITheme::Get();
 
     DrawRectangleRec({bounds.x, bounds.y, bounds.width, bounds.height}, {0, 0, 0, 120});
-    DrawRectangleRec(box, {45, 45, 50, 255});
-    DrawRectangleLinesEx(box, 1, {90, 90, 98, 255});
+    UIWidget::Panel(box);
 
     std::string title = fs::path(materialEditorPath).stem().string();
-    DrawText(title.c_str(), (int)box.x + 8, (int)box.y + 6, 13, WHITE);
+    DrawText(title.c_str(), (int)box.x + 8, (int)box.y + 6, 13, theme.textPrimary);
 
     float y = box.y + 28;
-    DrawText("Base Color", (int)box.x + 8, (int)y, 11, {160, 160, 170, 255});
+    DrawText("Base Color", (int)box.x + 8, (int)y, 11, theme.textSecondary);
     y += 16;
 
     const char* channelLabels[4] = {"R", "G", "B", "A"};
@@ -375,7 +377,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     float chW = (box.width - 16 - 3 * 6) / 4;
     for (int i = 0; i < 4; i++) {
         float cx = box.x + 8 + i * (chW + 6);
-        DrawText(channelLabels[i], (int)cx, (int)y, 10, {140, 140, 150, 255});
+        DrawText(channelLabels[i], (int)cx, (int)y, 10, theme.textSecondary);
         Rectangle r = {cx, y + 12, chW, 18};
         int channelVal = *channels[i];
         if (PropertyField::IntBox(r, materialColorBuf[i], 8, i + 1, materialActiveField, channelVal)) {
@@ -385,25 +387,25 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     y += 38;
 
     DrawRectangleRec({box.x + box.width - 34, y - 34, 24, 24}, materialEditorData.baseColor);
-    DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, {90, 90, 98, 255});
+    DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, theme.fieldBorder);
 
     bool shadingAllowsLit = RenderSettings::Get().GetShadingType() != ShadingType::Unlit;
-    Color litLabelColor = shadingAllowsLit ? Color{160, 160, 170, 255} : Color{90, 90, 95, 255};
+    Color litLabelColor = shadingAllowsLit ? theme.textSecondary : theme.buttonDisabledText;
     DrawText("Lit", (int)box.x + 8, (int)y, 11, litLabelColor);
     GuiSetState(shadingAllowsLit ? STATE_NORMAL : STATE_DISABLED);
     PropertyField::BoolBox({box.x + box.width - 42, y - 2, 18, 18}, materialEditorData.lit);
     GuiSetState(STATE_NORMAL);
     y += 22;
 
-    DrawText("Texture", (int)box.x + 8, (int)y, 11, {160, 160, 170, 255});
+    DrawText("Texture", (int)box.x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle texRow = {box.x + 8, y, box.width - 16, 18};
-    DrawRectangleRec(texRow, {30, 30, 32, 255});
-    DrawRectangleLinesEx(texRow, 1, {65, 65, 75, 255});
+    DrawRectangleRec(texRow, theme.fieldBg);
+    DrawRectangleLinesEx(texRow, 1, theme.fieldBorder);
     std::string texLabel = materialEditorData.textureAssetPath.empty()
                                 ? "None"
                                 : fs::path(materialEditorData.textureAssetPath).stem().string();
-    DrawText(texLabel.c_str(), (int)texRow.x + 4, (int)texRow.y + 3, 11, WHITE);
+    DrawText(texLabel.c_str(), (int)texRow.x + 4, (int)texRow.y + 3, 11, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, texRow) && !pickerBlocksInput) {
         materialTexturePicker.Open({texRow.x, texRow.y + texRow.height}, ".startex");
     }
@@ -413,11 +415,11 @@ void ContentBrowserPanel::RenderMaterialEditor() {
 
     Rectangle saveBtn = {box.x + 8, box.y + box.height - 28, (box.width - 20) / 2, 22};
     Rectangle closeBtn = {saveBtn.x + saveBtn.width + 4, saveBtn.y, saveBtn.width, 22};
-    if (GuiButton(saveBtn, "Save") && !pickerBlocksInput) {
+    if (UIWidget::Button(saveBtn, "Save") && !pickerBlocksInput) {
         materialEditorData.SaveToFile(materialEditorPath);
         materialEditorOpen = false;
     }
-    if (GuiButton(closeBtn, "Cancel") && !pickerBlocksInput) {
+    if (UIWidget::Button(closeBtn, "Cancel") && !pickerBlocksInput) {
         materialEditorOpen = false;
     }
 }
@@ -425,11 +427,11 @@ void ContentBrowserPanel::RenderMaterialEditor() {
 void ContentBrowserPanel::Render() {
     if (!iconsLoaded && IsWindowReady()) LoadIcons();
 
-    DrawRectangleRec(bounds, {38, 38, 42, 255});
-    DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(bounds);
 
     if (Project::Get().GetRootPath().empty()) {
-        DrawText("No Project Loaded", (int)bounds.x + 10, (int)bounds.y + 10, 14, GRAY);
+        DrawText("No Project Loaded", (int)bounds.x + 10, (int)bounds.y + 10, 14, theme.textSecondary);
         return;
     }
 
@@ -446,22 +448,22 @@ void ContentBrowserPanel::Render() {
 
     // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
-    DrawRectangleRec(pathBar, {30, 30, 34, 255});
+    DrawRectangleRec(pathBar, theme.tabBar);
 
     float pathLabelX = pathBar.x + 6;
     if (importEnabled) {
         Rectangle importBtn = {pathBar.x + 2, pathBar.y + 2, 18, 18};
-        if (GuiButton(importBtn, "+") && !gridInputBlocked) ImportAssetAuto();
+        if (UIWidget::Button(importBtn, "+") && !gridInputBlocked) ImportAssetAuto();
         pathLabelX = importBtn.x + importBtn.width + 6;
     }
 
     std::string pathLabel = "Content" + (currentRelativeFolder.empty() ? "" : "/" + currentRelativeFolder);
-    DrawText(pathLabel.c_str(), (int)pathLabelX, (int)pathBar.y + 4, 12, LIGHTGRAY);
+    DrawText(pathLabel.c_str(), (int)pathLabelX, (int)pathBar.y + 4, 12, theme.textPrimary);
 
     if (!currentRelativeFolder.empty()) {
         int backW = MeasureText("< Back", 12) + 12;
         Rectangle backBtn = {client.x + client.width - backW - 4, client.y + 2, (float)backW, 18};
-        if (GuiButton(backBtn, "< Back") && !gridInputBlocked) NavigateUp();
+        if (UIWidget::Button(backBtn, "< Back") && !gridInputBlocked) NavigateUp();
     }
 
     Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
@@ -490,19 +492,18 @@ void ContentBrowserPanel::Render() {
         Rectangle iconRect  = {tx + 4, ty + 4, tileSize - 8, tileSize - 22};
         Rectangle labelRect = {tx, ty + tileSize - 18, tileSize, 18};
 
-        if (draggingAsset && entries[i].isFolder && CheckCollisionPointRec(mousePos, tileRect)) {
+        bool tileHovered = CheckCollisionPointRec(mousePos, tileRect);
+        if (draggingAsset && entries[i].isFolder && tileHovered) {
             dropTargetFolderIndex = (int)i;
         }
 
         bool isSelected = (selectedIndex == (int)i);
-        Color tileBg = isSelected ? Color{60, 80, 120, 255} : Color{48, 48, 54, 255};
-        if (CheckCollisionPointRec(mousePos, tileRect) && !isSelected)
-            tileBg = {55, 55, 62, 255};
+        Color tileBg = UIWidget::SelectableBg(tileHovered, isSelected, theme.buttonBg);
         if (draggingAsset && (int)i == dropTargetFolderIndex)
             tileBg = {70, 110, 80, 255};
 
         DrawRectangleRounded(tileRect, 0.1f, 4, tileBg);
-        if (isSelected) DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {100, 140, 220, 255});
+        if (isSelected) DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, theme.accent);
         if (draggingAsset && (int)i == dropTargetFolderIndex)
             DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {110, 200, 130, 255});
 
@@ -521,12 +522,11 @@ void ContentBrowserPanel::Render() {
         bool renamingThis = isRenamingItem && entries[i].fullDiskName == renamingOriginalDiskName;
 
         if (!renamingThis) {
-            DrawRectangleRec(labelRect, {35, 35, 40, 0});
             std::string label = entries[i].displayName;
             int labelW = MeasureText(label.c_str(), 10);
             if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
             int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
-            DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, WHITE);
+            DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, theme.textPrimary);
         } else {
             GuiTextBox({labelRect.x + 2, labelRect.y, labelRect.width - 4, labelRect.height},
                        nameBuffer, sizeof(nameBuffer), true);
@@ -534,7 +534,7 @@ void ContentBrowserPanel::Render() {
             if (IsKeyPressed(KEY_ESCAPE)) CancelRename();
         }
 
-        if (!gridInputBlocked && CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (!gridInputBlocked && tileHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float currentTime = (float)GetTime();
             if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
                 OpenEntry(entries[i]);
@@ -552,7 +552,7 @@ void ContentBrowserPanel::Render() {
             lastEntryClickIndex = (int)i;
         }
 
-        if (!gridInputBlocked && CheckCollisionPointRec(mousePos, tileRect) && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        if (!gridInputBlocked && tileHovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
             selectedIndex = (int)i;
             fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
             contextTargetPath = fullPath.string();
@@ -579,7 +579,7 @@ void ContentBrowserPanel::Render() {
         float ty = startY + row * cellSize;
         Rectangle tileRect = {tx, ty, tileSize, tileSize};
         DrawRectangleRounded(tileRect, 0.1f, 4, {55, 80, 100, 255});
-        DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {100, 160, 220, 255});
+        DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, theme.accent);
         GuiTextBox({tx + 2, ty + tileSize - 20, tileSize - 4, 18}, nameBuffer, sizeof(nameBuffer), true);
         if (IsKeyPressed(KEY_ENTER)) ConfirmPendingCreate();
         if (IsKeyPressed(KEY_ESCAPE)) CancelPendingCreate();
@@ -648,16 +648,15 @@ void ContentBrowserPanel::Render() {
         }
 
         if (contextMenuOpen) {
-            DrawRectangleRec(popup, {55, 55, 60, 255});
-            DrawRectangleLinesEx(popup, 1, {85, 85, 90, 255});
+            UIWidget::Panel(popup);
 
             Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
-            if (GuiButton(folderBtn, "New Folder")) BeginCreateFolder();
+            if (UIWidget::Button(folderBtn, "New Folder")) BeginCreateFolder();
 
             for (size_t i = 0; i < creatableTypes.size(); i++) {
                 Rectangle btn = {popup.x + 4, popup.y + 4 + (float)(i + 1) * 30, popup.width - 8, 24};
                 std::string label = "New " + creatableTypes[i]->typeName;
-                if (GuiButton(btn, label.c_str())) BeginCreateAsset(*creatableTypes[i]);
+                if (UIWidget::Button(btn, label.c_str())) BeginCreateAsset(*creatableTypes[i]);
             }
         }
     }
@@ -703,12 +702,11 @@ void ContentBrowserPanel::Render() {
         }
 
         if (itemContextMenuOpen) {
-            DrawRectangleRec(popup, {55, 55, 60, 255});
-            DrawRectangleLinesEx(popup, 1, {85, 85, 90, 255});
+            UIWidget::Panel(popup);
 
             for (size_t i = 0; i < items.size(); i++) {
                 Rectangle btn = {popup.x + 4, popup.y + 4 + (float)i * 26, popup.width - 8, 22};
-                if (!GuiButton(btn, items[i].c_str())) continue;
+                if (!UIWidget::Button(btn, items[i].c_str())) continue;
 
                 if (items[i] == "Open") {
                     ContentEntry target;
@@ -779,7 +777,7 @@ void ContentBrowserPanel::Render() {
 
     if (!importStatus.empty()) {
         DrawText(importStatus.c_str(), (int)client.x + 8, (int)(client.y + client.height - 16), 11,
-                  {150, 200, 150, 255});
+                  theme.success);
     }
 
     RenderMaterialEditor();

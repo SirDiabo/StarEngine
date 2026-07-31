@@ -90,6 +90,8 @@ x UIWidget::Interact consolidates hover/press/click Rectangle state
 x UIWidget::Button/IconButton/Panel/SelectableBg draw from UIPalette
 x Editor Settings tab exposing the Dark/Light toggle
 x DockArea and the popup family migrated onto UITheme/UIWidget
+x UIPalette sectionHeader field for the recurring pale-blue subsection label color
+x ContentBrowserPanel, ViewportPanel, DetailsPanel, OutlinerPanel, ModuleBrowserPanel migrated onto UITheme/UIWidget
 o Remaining CheckCollisionPointRec and GuiButton call sites migrated onto UIWidget
 
 ### 1.11 Editor Settings and Project Settings Categorization

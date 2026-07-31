@@ -1,6 +1,8 @@
 #include "DetailsPanel.h"
 #include "Core/StarAsset.h"
 #include "PropertyFields.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -36,8 +38,8 @@ void DetailsPanel::RefreshFromSelection(const ActorInstance& inst) {
 }
 
 void DetailsPanel::Render() {
-    DrawRectangleRec(bounds, {38, 38, 42, 255});
-    DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(bounds);
 
     float x = bounds.x;
     float y = bounds.y + 8;
@@ -46,7 +48,7 @@ void DetailsPanel::Render() {
 
     if (!starMap || !selectedActorIndex || *selectedActorIndex < 0 ||
         *selectedActorIndex >= (int)starMap->GetInstances().size()) {
-        DrawText("Nothing selected", (int)x + 8, (int)y, 11, {100, 100, 110, 255});
+        DrawText("Nothing selected", (int)x + 8, (int)y, 11, theme.textSecondary);
         return;
     }
 
@@ -64,10 +66,10 @@ void DetailsPanel::Render() {
         y += 22;
     };
 
-    DrawText(inst.className.c_str(), (int)x + 8, (int)y, 13, WHITE);
+    DrawText(inst.className.c_str(), (int)x + 8, (int)y, 13, theme.textPrimary);
     y += 20;
 
-    DrawText("Name", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Name", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle nameRect = {x + 8, y, w - 16, 18};
     std::string instName = inst.name;
@@ -76,17 +78,17 @@ void DetailsPanel::Render() {
     }
     y += 26;
 
-    DrawText("Position", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Position", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     vec3Row(posXBuf, posYBuf, posZBuf, 2, inst.posX, inst.posY, inst.posZ);
 
     y += 4;
-    DrawText("Rotation", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Rotation", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     vec3Row(rotXBuf, rotYBuf, rotZBuf, 5, inst.rotX, inst.rotY, inst.rotZ);
 
     y += 4;
-    DrawText("Scale", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Scale", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     vec3Row(scaleXBuf, scaleYBuf, scaleZBuf, 8, inst.scaleX, inst.scaleY, inst.scaleZ);
 
@@ -100,18 +102,19 @@ void DetailsPanel::Render() {
 }
 
 void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& y, float w) {
+    const UIPalette& theme = UITheme::Get();
     Vector2 mp = GetMousePosition();
     bool anyPickerOpen = meshPicker.IsOpen() || materialPicker.IsOpen();
 
-    DrawText("Mesh Component", (int)x + 8, (int)y, 12, {180, 200, 230, 255});
+    DrawText("Mesh Component", (int)x + 8, (int)y, 12, theme.sectionHeader);
     y += 18;
 
-    DrawText("Static Mesh", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Static Mesh", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle meshRow = {x + 8, y, w - 16, 18};
-    DrawRectangleRec(meshRow, {30, 30, 32, 255});
-    DrawRectangleLinesEx(meshRow, 1, {65, 65, 75, 255});
-    DrawText(AssetDisplayName(inst.meshAssetPath).c_str(), (int)meshRow.x + 4, (int)meshRow.y + 3, 11, WHITE);
+    DrawRectangleRec(meshRow, theme.fieldBg);
+    DrawRectangleLinesEx(meshRow, 1, theme.fieldBorder);
+    DrawText(AssetDisplayName(inst.meshAssetPath).c_str(), (int)meshRow.x + 4, (int)meshRow.y + 3, 11, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, meshRow) && !anyPickerOpen) {
         materialPicker.Close();
         meshPicker.Open({meshRow.x, meshRow.y + meshRow.height}, ".starasset");
@@ -139,16 +142,16 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
         return;
     }
 
-    DrawText("Materials", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Materials", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
     for (size_t i = 0; i < meshSlots.size(); i++) {
         Rectangle matRow = {x + 8, y, w - 16, 18};
-        DrawRectangleRec(matRow, {30, 30, 32, 255});
-        DrawRectangleLinesEx(matRow, 1, {65, 65, 75, 255});
+        DrawRectangleRec(matRow, theme.fieldBg);
+        DrawRectangleLinesEx(matRow, 1, theme.fieldBorder);
         std::string slotName = meshSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : meshSlots[i].usemtlName;
-        DrawText(slotName.c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 10, {150, 150, 160, 255});
+        DrawText(slotName.c_str(), (int)matRow.x + 4, (int)matRow.y + 3, 10, theme.textSecondary);
         std::string matLabel = AssetDisplayName(inst.materialAssetPaths[i]);
-        DrawText(matLabel.c_str(), (int)(matRow.x + matRow.width * 0.5f), (int)matRow.y + 3, 10, WHITE);
+        DrawText(matLabel.c_str(), (int)(matRow.x + matRow.width * 0.5f), (int)matRow.y + 3, 10, theme.textPrimary);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, matRow) && !anyPickerOpen) {
             meshPicker.Close();
             materialPicker.Open({matRow.x, matRow.y + matRow.height}, ".starmat");
@@ -164,6 +167,8 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
 }
 
 void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float x, float& y, float w) {
+    const UIPalette& theme = UITheme::Get();
+
     if (!classComponentsValid || cachedClassPath != inst.graphAssetPath) {
         cachedClassGraph = Stargraph{};
         cachedClassGraph.LoadFromFile(inst.graphAssetPath);
@@ -171,13 +176,13 @@ void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float
         classComponentsValid = true;
     }
 
-    DrawText("Class", (int)x + 8, (int)y, 11, {140, 140, 150, 255});
+    DrawText("Class", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
-    DrawText(AssetDisplayName(inst.graphAssetPath).c_str(), (int)x + 8, (int)y, 11, WHITE);
+    DrawText(AssetDisplayName(inst.graphAssetPath).c_str(), (int)x + 8, (int)y, 11, theme.textPrimary);
     y += 18;
 
     Rectangle editBtn = {x + 8, y, w - 16, 20};
-    if (GuiButton(editBtn, "Edit Class")) {
+    if (UIWidget::Button(editBtn, "Edit Class")) {
         if (onOpenAsset) onOpenAsset(inst.graphAssetPath, fs::path(inst.graphAssetPath).extension().string());
     }
     y += 28;
@@ -189,14 +194,14 @@ void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float
         return;
     }
 
-    DrawText("Components", (int)x + 8, (int)y, 12, {180, 200, 230, 255});
+    DrawText("Components", (int)x + 8, (int)y, 12, theme.sectionHeader);
     y += 18;
 
     for (const ComponentDecl& comp : comps) {
         Rectangle row = {x + 8, y, w - 16, 18};
-        DrawRectangleRec(row, {30, 30, 32, 255});
+        DrawRectangleRec(row, theme.fieldBg);
         std::string label = comp.name + "  (" + comp.componentType + ")";
-        DrawText(label.c_str(), (int)row.x + 4, (int)row.y + 3, 11, {210, 210, 215, 255});
+        DrawText(label.c_str(), (int)row.x + 4, (int)row.y + 3, 11, theme.textPrimary);
         y += 20;
     }
 

@@ -35,6 +35,7 @@ struct UIPalette {
 
     Color textPrimary;
     Color textSecondary;
+    Color sectionHeader;
 
     Color accent;
     Color danger;

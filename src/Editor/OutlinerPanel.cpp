@@ -1,4 +1,6 @@
 #include "OutlinerPanel.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 
@@ -7,15 +9,15 @@ void OutlinerPanel::Initialize() {
 }
 
 void OutlinerPanel::Render() {
-    DrawRectangleRec(bounds, {38, 38, 42, 255});
-    DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(bounds);
 
     Vector2 mp = GetMousePosition();
     float y = bounds.y + 4;
     float rowH = 20.0f;
 
     if (!starMap) {
-        DrawText("No map loaded", (int)bounds.x + 8, (int)y, 11, {100, 100, 110, 255});
+        DrawText("No map loaded", (int)bounds.x + 8, (int)y, 11, theme.textSecondary);
         return;
     }
 
@@ -25,14 +27,13 @@ void OutlinerPanel::Render() {
         Rectangle row = {bounds.x + 4, y, bounds.width - 8, rowH};
 
         bool isSelected = (selectedActorIndex && *selectedActorIndex == (int)i);
-        if (isSelected) {
-            DrawRectangleRec(row, {55, 60, 80, 255});
-        }
+        bool hovered = CheckCollisionPointRec(mp, row);
+        DrawRectangleRec(row, UIWidget::SelectableBg(hovered, isSelected, theme.panelBg));
 
-        Color textColor = isSelected ? WHITE : Color{140, 140, 150, 255};
+        Color textColor = isSelected ? theme.textPrimary : theme.textSecondary;
         DrawText(inst.name.c_str(), (int)row.x + 8, (int)row.y + 4, 11, textColor);
 
-        if (CheckCollisionPointRec(mp, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (selectedActorIndex) *selectedActorIndex = (int)i;
         }
 

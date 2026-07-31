@@ -13,6 +13,8 @@
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "LogPanel.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -487,19 +489,21 @@ Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
 }
 
 void ViewportPanel::RenderToolbar() {
-    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
-    DrawRectangleRec(toolbar, {36, 36, 40, 255});
-    DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
-             (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), {60, 60, 65, 255});
+    const UIPalette& theme = UITheme::Get();
 
-    DrawText(name, (int)bounds.x + 6, (int)bounds.y + 8, 13, WHITE);
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    DrawRectangleRec(toolbar, theme.tabBar);
+    DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
+             (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
+
+    DrawText(name, (int)bounds.x + 6, (int)bounds.y + 8, 13, theme.textPrimary);
 
     float btnRight = bounds.x + bounds.width - 4;
     float btnY = toolbar.y + 3;
 
     if (!playing) {
     Rectangle playBtn = {btnRight - 22, btnY, 22, 22};
-        DrawRectangleRec(playBtn, {30, 130, 60, 255});
+        DrawRectangleRec(playBtn, theme.success);
         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
@@ -517,7 +521,7 @@ void ViewportPanel::RenderToolbar() {
 
         else {
         Rectangle stopBtn = {btnRight - 22, btnY, 22, 22};
-            DrawRectangleRec(stopBtn, {160, 40, 40, 255});
+            DrawRectangleRec(stopBtn, theme.dangerBg);
             DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
@@ -546,13 +550,13 @@ void ViewportPanel::RenderToolbar() {
 
     if (mapLoaded) {
         Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
-        if (GuiButton(saveBtn, "Save")) SaveMap();
+        if (UIWidget::Button(saveBtn, "Save")) SaveMap();
         btnRight -= 54;
         if (mapDirty) DrawText("*", (int)btnRight - 10, (int)btnY + 4, 14, {200, 160, 60, 255});
 
         if (!playing) {
             Rectangle packageBtn = {btnRight - 66, btnY, 66, 22};
-            if (GuiButton(packageBtn, "Package")) onPackageRequested();
+            if (UIWidget::Button(packageBtn, "Package")) onPackageRequested();
             btnRight -= 70;
         }
     }
@@ -601,10 +605,11 @@ void ViewportPanel::Render() {
         DrawTextureRec(renderTarget.texture, source, {client.x, client.y}, WHITE);
     }
 
-    DrawRectangleLinesEx(bounds, 1, {70, 70, 75, 255});
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     if (playing) {
-        DrawRectangleLinesEx(bounds, 3, {60, 180, 60, 255});
+        DrawRectangleLinesEx(bounds, 3, theme.success);
     }
     RenderToolbar();
 
@@ -612,7 +617,7 @@ void ViewportPanel::Render() {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
         char info[128];
         snprintf(info, sizeof(info), "%s (%s)", inst.name.c_str(), inst.className.c_str());
-        DrawText(info, (int)bounds.x + 8, (int)(client.y + 6), 12, {200, 200, 210, 255});
+        DrawText(info, (int)bounds.x + 8, (int)(client.y + 6), 12, theme.textPrimary);
     }
 
     if (flying) {
@@ -624,6 +629,6 @@ void ViewportPanel::Render() {
         const char* msg = "Open a .starmap file from the Content Browser";
         int tw = MeasureText(msg, 13);
         DrawText(msg, (int)(bounds.x + bounds.width / 2 - tw / 2),
-                 (int)(bounds.y + bounds.height / 2), 13, {100, 100, 110, 255});
+                 (int)(bounds.y + bounds.height / 2), 13, theme.textSecondary);
     }
 }

@@ -5,6 +5,8 @@
 #include "Core/Project.h"
 #include "Core/ModuleImporter.h"
 #include "LogPanel.h"
+#include "UITheme.h"
+#include "UIWidgets.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -21,9 +23,11 @@ static std::string EntryDisplayName(const ModuleEntry& entry) {
 }
 
 void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowHeight) {
+    const UIPalette& theme = UITheme::Get();
+
     Rectangle row = { bounds.x + 4, y, bounds.width - 8, rowHeight };
-    DrawRectangleRec(row, {44, 44, 48, 255});
-    DrawRectangleLinesEx(row, 1, {60, 60, 66, 255});
+    DrawRectangleRec(row, theme.buttonBg);
+    DrawRectangleLinesEx(row, 1, theme.buttonBorder);
 
     std::string moduleName = EntryDisplayName(entry);
     bool enabled = entry.instance && entry.instance->IsEnabled();
@@ -31,7 +35,7 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
 
     Rectangle checkRect = { row.x + 8, row.y + 8, 18, 18 };
     if (pendingRebuild) {
-        DrawRectangleLinesEx(checkRect, 1, {90, 90, 96, 255});
+        DrawRectangleLinesEx(checkRect, 1, theme.buttonBorder);
     } else {
         bool toggled = enabled;
         if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen()) {
@@ -39,13 +43,13 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
         }
     }
 
-    Color titleColor = enabled || pendingRebuild ? WHITE : Color{120, 120, 126, 255};
+    Color titleColor = enabled || pendingRebuild ? theme.textPrimary : theme.buttonDisabledText;
     DrawText(moduleName.c_str(), (int)checkRect.x + 26, (int)row.y + 6, 14, titleColor);
 
     int nextLabelX = (int)checkRect.x + 26 + MeasureText(moduleName.c_str(), 14) + 10;
     if (entry.hasManifest && !entry.manifest.version.empty()) {
         std::string versionText = "v" + entry.manifest.version;
-        DrawText(versionText.c_str(), nextLabelX, (int)row.y + 8, 11, {130, 130, 140, 255});
+        DrawText(versionText.c_str(), nextLabelX, (int)row.y + 8, 11, theme.textSecondary);
         nextLabelX += MeasureText(versionText.c_str(), 11) + 10;
     }
     if (entry.hasManifest && entry.manifest.hasExternalDependencies) {
@@ -57,11 +61,11 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
         DrawText(tag, (int)(row.x + row.width - MeasureText(tag, 11) - 8), (int)row.y + 8, 11, {220, 170, 60, 255});
     } else if (entry.hasManifest) {
         std::string tag = entry.manifest.category;
-        DrawText(tag.c_str(), (int)(row.x + row.width - MeasureText(tag.c_str(), 11) - 8), (int)row.y + 8, 11, {120, 160, 220, 255});
+        DrawText(tag.c_str(), (int)(row.x + row.width - MeasureText(tag.c_str(), 11) - 8), (int)row.y + 8, 11, theme.accent);
     }
 
     if (entry.hasManifest && !entry.manifest.description.empty()) {
-        DrawText(entry.manifest.description.c_str(), (int)checkRect.x + 26, (int)row.y + 24, 11, {150, 150, 158, 255});
+        DrawText(entry.manifest.description.c_str(), (int)checkRect.x + 26, (int)row.y + 24, 11, theme.textSecondary);
     }
 
     if (entry.hasManifest && !entry.manifest.dependencies.empty()) {
@@ -70,13 +74,13 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
             if (i > 0) depsText += ", ";
             depsText += entry.manifest.dependencies[i];
         }
-        DrawText(depsText.c_str(), (int)checkRect.x + 26, (int)row.y + 40, 11, {130, 130, 140, 255});
+        DrawText(depsText.c_str(), (int)checkRect.x + 26, (int)row.y + 40, 11, theme.textSecondary);
     }
 }
 
 void ModuleBrowserPanel::Render() {
-    DrawRectangleRec(bounds, {38, 38, 42, 255});
-    DrawRectangleLinesEx(bounds, 1, {65, 65, 70, 255});
+    const UIPalette& theme = UITheme::Get();
+    UIWidget::Panel(bounds);
 
     float importBarHeight = inputMode == InputMode::None ? 26.0f : 56.0f;
     Rectangle importBar = { bounds.x + 8, bounds.y + bounds.height - importBarHeight - 6,
@@ -113,7 +117,7 @@ void ModuleBrowserPanel::Render() {
     }
 
     if (!statusMessage.empty()) {
-        DrawText(statusMessage.c_str(), (int)bounds.x + 8, (int)(importBar.y - 16), 11, {180, 200, 120, 255});
+        DrawText(statusMessage.c_str(), (int)bounds.x + 8, (int)(importBar.y - 16), 11, theme.success);
     }
 }
 
@@ -122,7 +126,7 @@ void ModuleBrowserPanel::RenderImportBar() {
     Rectangle importBtn = { bounds.x + 8, bounds.y + bounds.height - importBtnHeight - 6,
                              bounds.width - 16, importBtnHeight };
 
-    if (GuiButton(importBtn, "Import Module...")) {
+    if (UIWidget::Button(importBtn, "Import Module...")) {
         importMenu.Open({importBtn.x, importBtn.y - 3 * 22.0f - 4}, importBtn.width,
             { {"Import from Disk..."}, {"Import from Repository..."}, {"Import from Catalog..."} });
     }
@@ -136,8 +140,10 @@ void ModuleBrowserPanel::RenderImportBar() {
 }
 
 void ModuleBrowserPanel::RenderRepositoryEntry(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+
     Rectangle label = { area.x, area.y, area.width, 16 };
-    DrawText("owner/repo", (int)label.x, (int)label.y, 11, {150, 150, 158, 255});
+    DrawText("owner/repo", (int)label.x, (int)label.y, 11, theme.textSecondary);
 
     Rectangle textBox = { area.x, area.y + 16, area.width - 74, 26 };
     if (CheckCollisionPointRec(GetMousePosition(), textBox) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -148,7 +154,7 @@ void ModuleBrowserPanel::RenderRepositoryEntry(Rectangle area) {
     Rectangle confirmBtn = { textBox.x + textBox.width + 4, textBox.y, 34, 26 };
     Rectangle cancelBtn  = { confirmBtn.x + 38, textBox.y, 34, 26 };
 
-    bool confirm = GuiButton(confirmBtn, "Add");
+    bool confirm = UIWidget::Button(confirmBtn, "Add");
     if ((confirm || IsKeyPressed(KEY_ENTER)) && repoInputBuffer[0] != '\0') {
         std::string ownerRepo(repoInputBuffer);
         repoInputBuffer[0] = '\0';
@@ -156,7 +162,7 @@ void ModuleBrowserPanel::RenderRepositoryEntry(Rectangle area) {
         inputMode = InputMode::None;
         ConfirmRepositoryEntry(ownerRepo);
     }
-    if (GuiButton(cancelBtn, "X")) {
+    if (UIWidget::Button(cancelBtn, "X")) {
         repoInputBuffer[0] = '\0';
         repoInputEditing = false;
         inputMode = InputMode::None;
@@ -164,15 +170,17 @@ void ModuleBrowserPanel::RenderRepositoryEntry(Rectangle area) {
 }
 
 void ModuleBrowserPanel::RenderCatalogList(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+
     if (catalogLoading) {
-        DrawText("Loading catalog...", (int)area.x, (int)area.y + 4, 12, {180, 180, 188, 255});
+        DrawText("Loading catalog...", (int)area.x, (int)area.y + 4, 12, theme.textSecondary);
         return;
     }
 
     if (!catalogError.empty()) {
-        DrawText(catalogError.c_str(), (int)area.x, (int)area.y + 4, 11, {220, 120, 120, 255});
+        DrawText(catalogError.c_str(), (int)area.x, (int)area.y + 4, 11, theme.danger);
         Rectangle closeBtn = { area.x + area.width - 60, area.y, 60, 22 };
-        if (GuiButton(closeBtn, "Close")) inputMode = InputMode::None;
+        if (UIWidget::Button(closeBtn, "Close")) inputMode = InputMode::None;
         return;
     }
 
@@ -182,10 +190,10 @@ void ModuleBrowserPanel::RenderCatalogList(Rectangle area) {
         const CatalogEntry& e = catalogEntries[i];
         Rectangle row = { area.x, y, area.width - 64, rowH };
         std::string label = e.name + " - " + e.description;
-        DrawText(label.c_str(), (int)row.x + 2, (int)row.y + 4, 11, WHITE);
+        DrawText(label.c_str(), (int)row.x + 2, (int)row.y + 4, 11, theme.textPrimary);
 
         Rectangle addBtn = { area.x + area.width - 58, y, 58, rowH - 2 };
-        if (GuiButton(addBtn, "Add")) {
+        if (UIWidget::Button(addBtn, "Add")) {
             inputMode = InputMode::None;
             ConfirmRepositoryEntry(e.repository);
             return;
@@ -194,7 +202,7 @@ void ModuleBrowserPanel::RenderCatalogList(Rectangle area) {
     }
 
     Rectangle closeBtn = { area.x + area.width - 60, y + 4, 60, 22 };
-    if (GuiButton(closeBtn, "Close")) inputMode = InputMode::None;
+    if (UIWidget::Button(closeBtn, "Close")) inputMode = InputMode::None;
 }
 
 void ModuleBrowserPanel::ImportFromDisk() {
