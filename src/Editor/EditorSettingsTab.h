@@ -14,4 +14,5 @@ private:
     void RenderStyleCategory(Rectangle area);
 
     SettingsSwitcher switcher;
+    float colorListScroll = 0.0f;
 };

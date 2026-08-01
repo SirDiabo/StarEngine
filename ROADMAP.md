@@ -99,12 +99,17 @@ x PropertyField::Style now reads its defaults from UITheme instead of fixed dark
 x StargraphEditorPanel base toolbar and StargraphEditorPanel_Panels migrated onto UITheme/UIWidget
 x StargraphEditorPanel_Details migrated onto UITheme/UIWidget
 x StargraphEditorPanel_Graph add-node search popup migrated onto UITheme/UIWidget
+x Node/pin/wire canvas colors intentionally left as their own fixed visual language, not theme-driven
 
 ### 1.11 Editor Settings and Project Settings Categorization
 x SettingsSwitcher reusable category sidebar plus content area
 x EditorSettingsTab with a Style category holding the Dark/Light toggle
 x ProjectSettingsTab split into General, Maps, Rendering, and Save Files categories
-o Additional Editor Settings categories beyond Style
+x PropertyField::ColorField: labeled row with a name and filled preview swatch
+x Style category lists every UIPalette field with a friendly name and live preview swatch
+o Color picker popup on the ColorField swatch (RGB/HSV sliders, hex input, presets)
+o Per-field color overrides that persist independently of the Dark/Light preset
+o Additional theme presets beyond Dark/Light
 
 ---
 

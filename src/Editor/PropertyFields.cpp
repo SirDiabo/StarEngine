@@ -162,6 +162,16 @@ bool BoolBox(Rectangle r, bool& outVal) {
     return outVal != before;
 }
 
+void ColorField(Rectangle r, const char* label, Color value, const Style& style) {
+    float swatchSize = r.height - 4;
+    Rectangle swatch = {r.x + r.width - swatchSize - 2, r.y + 2, swatchSize, swatchSize};
+
+    DrawText(label, (int)r.x + 2, (int)(r.y + (r.height - 11) / 2.0f), 11, style.label);
+
+    DrawRectangleRec(swatch, value);
+    DrawRectangleLinesEx(swatch, 1, style.border);
+}
+
 static const Color AxisColorX = {220, 65, 65, 255};
 static const Color AxisColorY = {95, 200, 95, 255};
 static const Color AxisColorZ = {70, 140, 230, 255};
