@@ -1,11 +1,6 @@
 #pragma once
 #include "raylib.h"
 
-enum class ThemeMode {
-    Dark,
-    Light,
-};
-
 struct UIPalette {
     Color windowBg;
     Color panelBg;
@@ -47,7 +42,10 @@ struct UIPalette {
 namespace UITheme {
 
 const UIPalette& Get();
-ThemeMode GetMode();
-void SetMode(ThemeMode mode);
+
+int PresetCount();
+const char* PresetName(int index);
+int GetPresetIndex();
+void SetPreset(int index);
 
 }

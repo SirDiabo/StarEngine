@@ -108,8 +108,10 @@ x ProjectSettingsTab split into General, Maps, Rendering, and Save Files categor
 x PropertyField::ColorField: labeled row with a name and filled preview swatch
 x Style category lists every UIPalette field with a friendly name and live preview swatch
 o Color picker popup on the ColorField swatch (RGB/HSV sliders, hex input, presets)
-o Per-field color overrides that persist independently of the Dark/Light preset
-o Additional theme presets beyond Dark/Light
+o Per-field color overrides that persist independently of the active preset
+x UITheme rebuilt around an indexed preset list instead of a Dark/Light enum
+x Six new presets: Midnight, Slate, Forest, Sand, Matcha Latte, Sunset
+x Style category preset picker wraps into a grid instead of a fixed two-button row
 
 ---
 

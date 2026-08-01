@@ -34,7 +34,7 @@ static const ColorFieldEntry kColorFields[] = {
     {"Selected Surface",        &UIPalette::surfaceSelected},
     {"Splitter",                &UIPalette::splitter},
     {"Splitter (Hover)",        &UIPalette::splitterHover},
-    {"Drop Zone",               &UIPalette::dropZone},
+    {"Drop Zone",                &UIPalette::dropZone},
     {"Drop Zone Border",        &UIPalette::dropBorder},
     {"Button",                  &UIPalette::buttonBg},
     {"Button (Hover)",          &UIPalette::buttonHover},
@@ -75,19 +75,36 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
 
     float fx = area.x + 16;
     float fy = area.y + 16;
+    float maxRowWidth = area.width - 32 > 460.0f ? 460.0f : area.width - 32;
 
     DrawText("Theme", (int)fx, (int)fy, 14, theme.accent);
     fy += 22;
     DrawText("Editor color scheme.", (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 22;
 
-    Rectangle darkBtn  = {fx, fy, 90, 24};
-    Rectangle lightBtn = {fx + 96, fy, 90, 24};
+    int presetCount = UITheme::PresetCount();
+    int activePreset = UITheme::GetPresetIndex();
+    float btnX = fx;
+    float btnY = fy;
+    const float btnH = 24.0f;
+    const float btnPad = 14.0f;
+    const float btnGapX = 6.0f;
+    const float btnGapY = 6.0f;
 
-    bool isDark = UITheme::GetMode() == ThemeMode::Dark;
-    if (ThemeOptionButton(darkBtn, "Dark", isDark))    UITheme::SetMode(ThemeMode::Dark);
-    if (ThemeOptionButton(lightBtn, "Light", !isDark)) UITheme::SetMode(ThemeMode::Light);
-    fy += 36;
+    for (int i = 0; i < presetCount; i++) {
+        const char* name = UITheme::PresetName(i);
+        float btnW = (float)MeasureText(name, 11) + btnPad * 2;
+        if (btnX + btnW > fx + maxRowWidth && btnX > fx) {
+            btnX = fx;
+            btnY += btnH + btnGapY;
+        }
+        Rectangle btn = {btnX, btnY, btnW, btnH};
+        if (ThemeOptionButton(btn, name, i == activePreset)) {
+            UITheme::SetPreset(i);
+        }
+        btnX += btnW + btnGapX;
+    }
+    fy = btnY + btnH + 14.0f;
 
     DrawText("Colors", (int)fx, (int)fy, 14, theme.accent);
     fy += 22;
