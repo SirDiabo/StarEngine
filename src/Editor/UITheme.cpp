@@ -1,4 +1,8 @@
 #include "UITheme.h"
+#include "Core/LayoutSerializer.h"
+#include <filesystem>
+#include <unordered_map>
+#include <cstdlib>
 
 static UIPalette MakeDarkPalette() {
     UIPalette p;
@@ -340,6 +344,26 @@ static const int kPresetCount = sizeof(kPresets) / sizeof(kPresets[0]);
 static int g_presetIndex = 0;
 static UIPalette g_palette = MakeDarkPalette();
 
+static std::string GetThemeConfigPath() {
+    std::string home;
+#ifdef _WIN32
+    char* buf = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
+        home = buf;
+        free(buf);
+    } else {
+        home = ".";
+    }
+#else
+    const char* h = getenv("HOME");
+    home = h ? h : ".";
+#endif
+    std::filesystem::path dir = std::filesystem::path(home) / ".starengine";
+    std::filesystem::create_directories(dir);
+    return (dir / "theme.cfg").string();
+}
+
 namespace UITheme {
 
 const UIPalette& Get() {
@@ -363,6 +387,27 @@ void SetPreset(int index) {
     if (index < 0 || index >= kPresetCount) return;
     g_presetIndex = index;
     g_palette = kPresets[index].make();
+}
+
+void Save() {
+    std::unordered_map<std::string, std::string> data;
+    data["preset"] = kPresets[g_presetIndex].name;
+    LayoutSerializer::Save(GetThemeConfigPath(), data);
+}
+
+void Load() {
+    std::unordered_map<std::string, std::string> data;
+    if (!LayoutSerializer::Load(GetThemeConfigPath(), data)) return;
+
+    auto it = data.find("preset");
+    if (it == data.end()) return;
+
+    for (int i = 0; i < kPresetCount; i++) {
+        if (it->second == kPresets[i].name) {
+            SetPreset(i);
+            return;
+        }
+    }
 }
 
 }

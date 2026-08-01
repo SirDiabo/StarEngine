@@ -48,4 +48,7 @@ const char* PresetName(int index);
 int GetPresetIndex();
 void SetPreset(int index);
 
+void Load();
+void Save();
+
 }

@@ -112,6 +112,7 @@ o Per-field color overrides that persist independently of the active preset
 x UITheme rebuilt around an indexed preset list instead of a Dark/Light enum
 x Six new presets: Midnight, Slate, Forest, Sand, Matcha Latte, Sunset
 x Style category preset picker wraps into a grid instead of a fixed two-button row
+x UITheme::Save/Load persists the selected preset to ~/.starengine/theme.cfg, applied on startup
 
 ---
 

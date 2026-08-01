@@ -36,6 +36,7 @@ const float Editor::MENU_BAR_H       = 20.0f;
 
 Editor::~Editor() {
     SaveLayout();
+    UITheme::Save();
     delete menuBar;
     delete projectBrowser;
 }
@@ -66,6 +67,7 @@ void Editor::Initialize() {
     editorTabs[activeEditorTab]->BuildMenus(menuBar);
 
     LoadLayout();
+    UITheme::Load();
 }
 
 LogPanel* Editor::GetLogPanel() const {
