@@ -4,6 +4,7 @@
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "raylib.h"
+#include <string>
 
 static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
     UIWidget::Interaction s = UIWidget::Interact(r);
@@ -34,7 +35,7 @@ static const ColorFieldEntry kColorFields[] = {
     {"Selected Surface",        &UIPalette::surfaceSelected},
     {"Splitter",                &UIPalette::splitter},
     {"Splitter (Hover)",        &UIPalette::splitterHover},
-    {"Drop Zone",                &UIPalette::dropZone},
+    {"Drop Zone",               &UIPalette::dropZone},
     {"Drop Zone Border",        &UIPalette::dropBorder},
     {"Button",                  &UIPalette::buttonBg},
     {"Button (Hover)",          &UIPalette::buttonHover},
@@ -59,6 +60,8 @@ void EditorSettingsTab::Initialize() {
     title     = "Editor Settings";
     permanent = false;
     switcher.SetCategories({ "Style" });
+    colorPreviewOverride.assign(kColorFieldCount, Color{0, 0, 0, 0});
+    hasColorPreviewOverride.assign(kColorFieldCount, false);
 }
 
 void EditorSettingsTab::Render(float x, float y, float width, float height) {
@@ -130,12 +133,41 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     for (int i = 0; i < kColorFieldCount; i++) {
         if (y + rowH >= listArea.y && y <= listArea.y + listArea.height) {
             Rectangle row = {fx, y, rowWidth, rowH - 2};
-            Color value = theme.*(kColorFields[i].member);
-            PropertyField::ColorField(row, kColorFields[i].label, value);
+
+            Color value;
+            if (colorPicker.IsOpen() && editingColorField == i) {
+                value = colorPicker.GetLiveColor();
+            } else if (hasColorPreviewOverride[i]) {
+                value = colorPreviewOverride[i];
+            } else {
+                value = theme.*(kColorFields[i].member);
+            }
+
+            std::string label = kColorFields[i].label;
+            if (hasColorPreviewOverride[i]) label += " *";
+
+            if (PropertyField::ColorField(row, label.c_str(), value) && !colorPicker.IsOpen()) {
+                colorPicker.Open({row.x + row.width, row.y}, value);
+                editingColorField = i;
+            }
         }
         y += rowH;
     }
     EndScissorMode();
+
+    if (colorPicker.IsOpen()) {
+        Color result;
+        bool confirmed = false;
+        if (colorPicker.Render(result, confirmed)) {
+            if (confirmed && editingColorField >= 0) {
+                colorPreviewOverride[editingColorField] = result;
+                hasColorPreviewOverride[editingColorField] = true;
+            }
+            editingColorField = -1;
+        }
+    } else {
+        editingColorField = -1;
+    }
 }
 
 void EditorSettingsTab::BuildMenus(MenuBar* menuBar) {

@@ -1,6 +1,8 @@
 #pragma once
 #include "EditorTab.h"
 #include "SettingsSwitcher.h"
+#include "ColorPickerPopup.h"
+#include <vector>
 
 class MenuBar;
 
@@ -15,4 +17,9 @@ private:
 
     SettingsSwitcher switcher;
     float colorListScroll = 0.0f;
+
+    ColorPickerPopup colorPicker;
+    int editingColorField = -1;
+    std::vector<Color> colorPreviewOverride;
+    std::vector<bool> hasColorPreviewOverride;
 };

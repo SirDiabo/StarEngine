@@ -162,14 +162,17 @@ bool BoolBox(Rectangle r, bool& outVal) {
     return outVal != before;
 }
 
-void ColorField(Rectangle r, const char* label, Color value, const Style& style) {
+bool ColorField(Rectangle r, const char* label, Color value, const Style& style) {
     float swatchSize = r.height - 4;
     Rectangle swatch = {r.x + r.width - swatchSize - 2, r.y + 2, swatchSize, swatchSize};
 
     DrawText(label, (int)r.x + 2, (int)(r.y + (r.height - 11) / 2.0f), 11, style.label);
 
     DrawRectangleRec(swatch, value);
-    DrawRectangleLinesEx(swatch, 1, style.border);
+    bool hovered = CheckCollisionPointRec(GetMousePosition(), swatch);
+    DrawRectangleLinesEx(swatch, hovered ? 2 : 1, hovered ? style.text : style.border);
+
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 static const Color AxisColorX = {220, 65, 65, 255};

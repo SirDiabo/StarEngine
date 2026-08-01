@@ -30,7 +30,7 @@ bool StringBox(Rectangle r, char* buf, size_t bufSize, int fieldId, int& activeF
 
 bool BoolBox(Rectangle r, bool& outVal);
 
-void ColorField(Rectangle r, const char* label, Color value, const Style& style = {});
+bool ColorField(Rectangle r, const char* label, Color value, const Style& style = {});
 
 bool Vec3Row(Rectangle rowRect, char bufX[32], char bufY[32], char bufZ[32], int fieldIdBase,
              int& activeField, float& outX, float& outY, float& outZ, bool allowActivate = true,
