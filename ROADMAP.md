@@ -121,6 +121,7 @@ x UITheme::ExportToFile/ImportFromFile round-trip a full palette through a .star
 x Custom preset slot opens an OS file picker to import a .startheme file
 x Export Theme button below the color list saves the active palette via an OS save dialog
 x A loaded Custom palette survives a restart, saved into theme.cfg like a built-in preset
+x A lot more Themes
 
 ---
 

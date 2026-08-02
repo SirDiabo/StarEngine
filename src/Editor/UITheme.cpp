@@ -325,6 +325,326 @@ static UIPalette MakeSunsetPalette() {
     return p;
 }
 
+static UIPalette MakeHoneyPalette() {
+    UIPalette p;
+    p.windowBg = {250, 244, 225, 255};
+    p.panelBg = {255, 250, 235, 255};
+    p.panelBorder = {225, 205, 155, 255};
+
+    p.tabBar = {240, 225, 180, 255};
+    p.tabText = {70, 55, 20, 255};
+
+    p.surfaceHover = {235, 218, 165, 255};
+    p.surfaceSelected = {240, 195, 100, 255};
+
+    p.splitter = {228, 210, 165, 255};
+    p.splitterHover = {220, 150, 40, 255};
+
+    p.dropZone = {220, 150, 40, 60};
+    p.dropBorder = {200, 130, 20, 200};
+
+    p.buttonBg = {246, 236, 205, 255};
+    p.buttonHover = {235, 218, 175, 255};
+    p.buttonPressed = {230, 175, 90, 255};
+    p.buttonBorder = {210, 190, 140, 255};
+    p.buttonText = {60, 48, 18, 255};
+    p.buttonDisabledText = {165, 150, 110, 255};
+
+    p.fieldBg = {253, 248, 232, 255};
+    p.fieldBorder = {215, 197, 148, 255};
+
+    p.textPrimary = {55, 43, 15, 255};
+    p.textSecondary = {130, 112, 68, 255};
+    p.sectionHeader = {180, 120, 20, 255};
+
+    p.accent = {225, 155, 30, 255};
+    p.danger = {195, 75, 65, 255};
+    p.dangerBg = {178, 65, 55, 255};
+    p.success = {95, 140, 60, 255};
+    p.successBg = {78, 122, 50, 255};
+    return p;
+}
+
+static UIPalette MakeLavenderPalette() {
+    UIPalette p;
+    p.windowBg = {242, 238, 248, 255};
+    p.panelBg = {249, 246, 253, 255};
+    p.panelBorder = {205, 195, 225, 255};
+
+    p.tabBar = {225, 215, 240, 255};
+    p.tabText = {55, 45, 75, 255};
+
+    p.surfaceHover = {220, 208, 238, 255};
+    p.surfaceSelected = {195, 170, 225, 255};
+
+    p.splitter = {212, 202, 232, 255};
+    p.splitterHover = {150, 100, 210, 255};
+
+    p.dropZone = {150, 100, 210, 60};
+    p.dropBorder = {130, 80, 195, 200};
+
+    p.buttonBg = {238, 232, 248, 255};
+    p.buttonHover = {222, 212, 240, 255};
+    p.buttonPressed = {190, 160, 220, 255};
+    p.buttonBorder = {200, 188, 222, 255};
+    p.buttonText = {50, 42, 70, 255};
+    p.buttonDisabledText = {150, 142, 168, 255};
+
+    p.fieldBg = {250, 247, 253, 255};
+    p.fieldBorder = {202, 192, 224, 255};
+
+    p.textPrimary = {45, 38, 65, 255};
+    p.textSecondary = {112, 100, 138, 255};
+    p.sectionHeader = {130, 75, 195, 255};
+
+    p.accent = {150, 100, 215, 255};
+    p.danger = {195, 75, 75, 255};
+    p.dangerBg = {178, 65, 65, 255};
+    p.success = {80, 150, 100, 255};
+    p.successBg = {65, 130, 82, 255};
+    return p;
+}
+
+static UIPalette MakeDaisyPalette() {
+    UIPalette p;
+    p.windowBg = {250, 250, 240, 255};
+    p.panelBg = {255, 255, 250, 255};
+    p.panelBorder = {225, 220, 170, 255};
+
+    p.tabBar = {245, 240, 195, 255};
+    p.tabText = {60, 58, 30, 255};
+
+    p.surfaceHover = {240, 235, 190, 255};
+    p.surfaceSelected = {250, 225, 90, 255};
+
+    p.splitter = {230, 226, 185, 255};
+    p.splitterHover = {235, 195, 30, 255};
+
+    p.dropZone = {235, 195, 30, 60};
+    p.dropBorder = {210, 170, 15, 200};
+
+    p.buttonBg = {252, 250, 230, 255};
+    p.buttonHover = {245, 240, 200, 255};
+    p.buttonPressed = {245, 215, 80, 255};
+    p.buttonBorder = {218, 212, 165, 255};
+    p.buttonText = {55, 52, 25, 255};
+    p.buttonDisabledText = {165, 160, 120, 255};
+
+    p.fieldBg = {255, 255, 245, 255};
+    p.fieldBorder = {222, 216, 165, 255};
+
+    p.textPrimary = {50, 48, 22, 255};
+    p.textSecondary = {125, 118, 65, 255};
+    p.sectionHeader = {170, 140, 10, 255};
+
+    p.accent = {235, 195, 30, 255};
+    p.danger = {195, 75, 65, 255};
+    p.dangerBg = {178, 65, 55, 255};
+    p.success = {90, 150, 65, 255};
+    p.successBg = {72, 130, 50, 255};
+    return p;
+}
+
+static UIPalette MakeMintPalette() {
+    UIPalette p;
+    p.windowBg = {238, 248, 240, 255};
+    p.panelBg = {246, 253, 248, 255};
+    p.panelBorder = {180, 220, 190, 255};
+
+    p.tabBar = {210, 238, 215, 255};
+    p.tabText = {30, 65, 42, 255};
+
+    p.surfaceHover = {200, 232, 205, 255};
+    p.surfaceSelected = {150, 220, 165, 255};
+
+    p.splitter = {195, 228, 200, 255};
+    p.splitterHover = {60, 195, 120, 255};
+
+    p.dropZone = {60, 195, 120, 60};
+    p.dropBorder = {40, 175, 100, 200};
+
+    p.buttonBg = {232, 248, 235, 255};
+    p.buttonHover = {208, 235, 212, 255};
+    p.buttonPressed = {130, 210, 155, 255};
+    p.buttonBorder = {185, 220, 190, 255};
+    p.buttonText = {25, 58, 38, 255};
+    p.buttonDisabledText = {140, 165, 148, 255};
+
+    p.fieldBg = {248, 253, 249, 255};
+    p.fieldBorder = {188, 222, 195, 255};
+
+    p.textPrimary = {22, 55, 35, 255};
+    p.textSecondary = {90, 128, 100, 255};
+    p.sectionHeader = {30, 145, 85, 255};
+
+    p.accent = {50, 180, 110, 255};
+    p.danger = {195, 75, 65, 255};
+    p.dangerBg = {178, 65, 55, 255};
+    p.success = {45, 165, 95, 255};
+    p.successBg = {35, 145, 80, 255};
+    return p;
+}
+
+static UIPalette MakeCottonCandyPalette() {
+    UIPalette p;
+    p.windowBg = {252, 240, 245, 255};
+    p.panelBg = {255, 248, 250, 255};
+    p.panelBorder = {235, 195, 210, 255};
+
+    p.tabBar = {248, 220, 232, 255};
+    p.tabText = {75, 35, 50, 255};
+
+    p.surfaceHover = {245, 210, 225, 255};
+    p.surfaceSelected = {250, 165, 195, 255};
+
+    p.splitter = {238, 212, 224, 255};
+    p.splitterHover = {235, 100, 155, 255};
+
+    p.dropZone = {235, 100, 155, 60};
+    p.dropBorder = {220, 75, 135, 200};
+
+    p.buttonBg = {252, 232, 240, 255};
+    p.buttonHover = {247, 215, 228, 255};
+    p.buttonPressed = {245, 155, 185, 255};
+    p.buttonBorder = {230, 200, 213, 255};
+    p.buttonText = {70, 32, 45, 255};
+    p.buttonDisabledText = {175, 145, 155, 255};
+
+    p.fieldBg = {254, 245, 248, 255};
+    p.fieldBorder = {233, 200, 213, 255};
+
+    p.textPrimary = {65, 28, 40, 255};
+    p.textSecondary = {140, 100, 115, 255};
+    p.sectionHeader = {200, 55, 115, 255};
+
+    p.accent = {235, 105, 160, 255};
+    p.danger = {200, 70, 70, 255};
+    p.dangerBg = {182, 60, 60, 255};
+    p.success = {85, 150, 95, 255};
+    p.successBg = {68, 130, 78, 255};
+    return p;
+}
+
+static UIPalette MakeBlueberryPalette() {
+    UIPalette p;
+    p.windowBg = {16, 18, 32, 255};
+    p.panelBg = {26, 29, 48, 255};
+    p.panelBorder = {52, 56, 88, 255};
+
+    p.tabBar = {21, 24, 40, 255};
+    p.tabText = {200, 202, 225, 255};
+
+    p.surfaceHover = {36, 40, 62, 255};
+    p.surfaceSelected = {55, 62, 115, 255};
+
+    p.splitter = {18, 20, 34, 255};
+    p.splitterHover = {100, 110, 220, 255};
+
+    p.dropZone = {100, 110, 220, 80};
+    p.dropBorder = {130, 140, 240, 200};
+
+    p.buttonBg = {33, 36, 58, 255};
+    p.buttonHover = {44, 48, 74, 255};
+    p.buttonPressed = {75, 82, 145, 255};
+    p.buttonBorder = {60, 64, 98, 255};
+    p.buttonText = {220, 222, 238, 255};
+    p.buttonDisabledText = {100, 104, 130, 255};
+
+    p.fieldBg = {24, 27, 45, 255};
+    p.fieldBorder = {52, 56, 88, 255};
+
+    p.textPrimary = {222, 224, 240, 255};
+    p.textSecondary = {140, 145, 180, 255};
+    p.sectionHeader = {150, 165, 235, 255};
+
+    p.accent = {110, 125, 235, 255};
+    p.danger = {205, 80, 95, 255};
+    p.dangerBg = {170, 62, 75, 255};
+    p.success = {70, 175, 135, 255};
+    p.successBg = {52, 140, 105, 255};
+    return p;
+}
+
+static UIPalette MakePlumPalette() {
+    UIPalette p;
+    p.windowBg = {24, 16, 24, 255};
+    p.panelBg = {38, 27, 38, 255};
+    p.panelBorder = {70, 52, 70, 255};
+
+    p.tabBar = {32, 22, 32, 255};
+    p.tabText = {215, 200, 215, 255};
+
+    p.surfaceHover = {50, 37, 50, 255};
+    p.surfaceSelected = {95, 55, 95, 255};
+
+    p.splitter = {26, 18, 26, 255};
+    p.splitterHover = {200, 90, 190, 255};
+
+    p.dropZone = {200, 90, 190, 80};
+    p.dropBorder = {225, 115, 215, 200};
+
+    p.buttonBg = {46, 33, 46, 255};
+    p.buttonHover = {58, 43, 58, 255};
+    p.buttonPressed = {120, 65, 118, 255};
+    p.buttonBorder = {78, 60, 78, 255};
+    p.buttonText = {228, 216, 228, 255};
+    p.buttonDisabledText = {115, 100, 115, 255};
+
+    p.fieldBg = {36, 26, 36, 255};
+    p.fieldBorder = {70, 52, 70, 255};
+
+    p.textPrimary = {228, 216, 228, 255};
+    p.textSecondary = {162, 142, 162, 255};
+    p.sectionHeader = {225, 140, 215, 255};
+
+    p.accent = {195, 90, 190, 255};
+    p.danger = {210, 78, 88, 255};
+    p.dangerBg = {172, 62, 70, 255};
+    p.success = {90, 170, 120, 255};
+    p.successBg = {68, 138, 95, 255};
+    return p;
+}
+
+static UIPalette MakeCocoaPalette() {
+    UIPalette p;
+    p.windowBg = {24, 19, 16, 255};
+    p.panelBg = {37, 30, 25, 255};
+    p.panelBorder = {68, 55, 45, 255};
+
+    p.tabBar = {31, 25, 21, 255};
+    p.tabText = {215, 200, 188, 255};
+
+    p.surfaceHover = {48, 39, 32, 255};
+    p.surfaceSelected = {100, 70, 45, 255};
+
+    p.splitter = {26, 21, 17, 255};
+    p.splitterHover = {215, 140, 60, 255};
+
+    p.dropZone = {215, 140, 60, 80};
+    p.dropBorder = {235, 165, 90, 200};
+
+    p.buttonBg = {45, 36, 30, 255};
+    p.buttonHover = {57, 46, 38, 255};
+    p.buttonPressed = {150, 100, 55, 255};
+    p.buttonBorder = {76, 62, 51, 255};
+    p.buttonText = {224, 210, 198, 255};
+    p.buttonDisabledText = {112, 98, 88, 255};
+
+    p.fieldBg = {35, 28, 23, 255};
+    p.fieldBorder = {68, 55, 45, 255};
+
+    p.textPrimary = {224, 210, 198, 255};
+    p.textSecondary = {158, 140, 122, 255};
+    p.sectionHeader = {225, 150, 80, 255};
+
+    p.accent = {210, 135, 60, 255};
+    p.danger = {205, 80, 68, 255};
+    p.dangerBg = {170, 65, 55, 255};
+    p.success = {120, 165, 80, 255};
+    p.successBg = {95, 138, 62, 255};
+    return p;
+}
+
 struct ThemePreset {
     const char* name;
     UIPalette (*make)();
@@ -339,6 +659,14 @@ static const ThemePreset kPresets[] = {
     {"Sand", MakeSandPalette},
     {"Matcha Latte", MakeMatchaLattePalette},
     {"Sunset", MakeSunsetPalette},
+    {"Honey", MakeHoneyPalette},
+    {"Lavender", MakeLavenderPalette},
+    {"Daisy", MakeDaisyPalette},
+    {"Mint", MakeMintPalette},
+    {"Cotton Candy", MakeCottonCandyPalette},
+    {"Blueberry", MakeBlueberryPalette},
+    {"Plum", MakePlumPalette},
+    {"Cocoa", MakeCocoaPalette},
 };
 static const int kPresetCount = sizeof(kPresets) / sizeof(kPresets[0]);
 
