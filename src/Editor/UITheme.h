@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include <string>
 
 struct UIPalette {
     Color windowBg;
@@ -63,5 +64,8 @@ bool HasOverride(int fieldIndex);
 
 void Load();
 void Save();
+
+bool ExportToFile(const std::string& path);
+bool ImportFromFile(const std::string& path);
 
 }

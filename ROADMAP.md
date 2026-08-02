@@ -117,6 +117,10 @@ x UITheme rebuilt around an indexed preset list instead of a Dark/Light enum
 x Six new presets: Midnight, Slate, Forest, Sand, Matcha Latte, Sunset
 x Style category preset picker wraps into a grid instead of a fixed two-button row
 x UITheme::Save/Load persists the selected preset to ~/.starengine/theme.cfg, applied on startup
+x UITheme::ExportToFile/ImportFromFile round-trip a full palette through a .startheme file
+x Custom preset slot opens an OS file picker to import a .startheme file
+x Export Theme button below the color list saves the active palette via an OS save dialog
+x A loaded Custom palette survives a restart, saved into theme.cfg like a built-in preset
 
 ---
 

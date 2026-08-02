@@ -3,8 +3,11 @@
 #include "PropertyFields.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
+#include "NativeFileDialog.h"
 #include "raylib.h"
 #include <string>
+#include <filesystem>
+#include <cstdlib>
 
 static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
     UIWidget::Interaction s = UIWidget::Interact(r);
@@ -18,6 +21,11 @@ static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
              active ? theme.textPrimary : theme.textSecondary);
 
     return s.clicked;
+}
+
+static std::string StarEngineDir() {
+    return (std::filesystem::path(getenv("USERPROFILE") ? getenv("USERPROFILE") :
+            (getenv("HOME") ? getenv("HOME") : ".")) / ".starengine").string();
 }
 
 void EditorSettingsTab::Initialize() {
@@ -56,6 +64,14 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     const float btnGapX = 6.0f;
     const float btnGapY = 6.0f;
 
+    Rectangle customBtn = {btnX, btnY, (float)MeasureText("Custom", 11) + btnPad * 2, btnH};
+    if (ThemeOptionButton(customBtn, "Custom", activePreset == -1)) {
+        std::string path = NativeFileDialog::OpenFile(
+            "Import Theme", StarEngineDir(), "StarEngine Theme", "*.startheme");
+        if (!path.empty()) UITheme::ImportFromFile(path);
+    }
+    btnX += customBtn.width + btnGapX;
+
     for (int i = 0; i < presetCount; i++) {
         const char* name = UITheme::PresetName(i);
         float btnW = (float)MeasureText(name, 11) + btnPad * 2;
@@ -83,7 +99,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 20;
 
-    Rectangle listArea = {area.x, fy, area.width, area.y + area.height - fy - 8};
+    Rectangle listArea = {area.x, fy, area.width, area.y + area.height - fy - 42};
     float rowH = 22.0f;
     float rowWidth = area.width - 32 > 360.0f ? 360.0f : area.width - 32;
     float contentHeight = fieldCount * rowH;
@@ -121,6 +137,17 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
         y += rowH;
     }
     EndScissorMode();
+
+    Rectangle exportBtn = {fx, listArea.y + listArea.height + 8, rowWidth, 24};
+    if (UIWidget::Button(exportBtn, "Export Theme...")) {
+        std::string path = NativeFileDialog::SaveFile(
+            "Export Theme", StarEngineDir(), "my_theme.startheme", "StarEngine Theme", "*.startheme");
+        if (!path.empty()) {
+            if (path.size() < 10 || path.substr(path.size() - 10) != ".startheme")
+                path += ".startheme";
+            UITheme::ExportToFile(path);
+        }
+    }
 
     if (colorPicker.IsOpen()) {
         Color result;

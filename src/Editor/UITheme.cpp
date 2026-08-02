@@ -466,7 +466,17 @@ bool HasOverride(int fieldIndex) {
 
 void Save() {
     std::unordered_map<std::string, std::string> data;
-    data["preset"] = kPresets[g_presetIndex].name;
+    if (g_presetIndex >= 0) {
+        data["preset"] = kPresets[g_presetIndex].name;
+    } else {
+        data["preset"] = "Custom";
+        for (int i = 0; i < kFieldCount; i++) {
+            Color c = g_basePalette.*(kFields[i].member);
+            char hex[9];
+            snprintf(hex, sizeof(hex), "%02X%02X%02X%02X", c.r, c.g, c.b, c.a);
+            data[std::string("base:") + kFields[i].name] = hex;
+        }
+    }
     for (int i = 0; i < kFieldCount; i++) {
         if (!g_hasOverride[i]) continue;
         Color c = g_overrideValue[i];
@@ -483,11 +493,25 @@ void Load() {
 
     auto presetIt = data.find("preset");
     if (presetIt != data.end()) {
-        for (int i = 0; i < kPresetCount; i++) {
-            if (presetIt->second == kPresets[i].name) {
-                g_presetIndex = i;
-                g_basePalette = kPresets[i].make();
-                break;
+        if (presetIt->second == "Custom") {
+            g_presetIndex = -1;
+            UIPalette custom = MakeDarkPalette();
+            for (int i = 0; i < kFieldCount; i++) {
+                auto it = data.find(std::string("base:") + kFields[i].name);
+                if (it == data.end() || it->second.size() < 8) continue;
+                unsigned long v = strtoul(it->second.c_str(), nullptr, 16);
+                Color c = {(unsigned char)((v >> 24) & 0xFF), (unsigned char)((v >> 16) & 0xFF),
+                           (unsigned char)((v >> 8) & 0xFF), (unsigned char)(v & 0xFF)};
+                custom.*(kFields[i].member) = c;
+            }
+            g_basePalette = custom;
+        } else {
+            for (int i = 0; i < kPresetCount; i++) {
+                if (presetIt->second == kPresets[i].name) {
+                    g_presetIndex = i;
+                    g_basePalette = kPresets[i].make();
+                    break;
+                }
             }
         }
     }
@@ -503,6 +527,40 @@ void Load() {
         g_overrideValue[i] = c;
     }
     RecomputeEffectivePalette();
+}
+
+bool ExportToFile(const std::string& path) {
+    std::unordered_map<std::string, std::string> data;
+    for (int i = 0; i < kFieldCount; i++) {
+        Color c = g_effectivePalette.*(kFields[i].member);
+        char hex[9];
+        snprintf(hex, sizeof(hex), "%02X%02X%02X%02X", c.r, c.g, c.b, c.a);
+        data[kFields[i].name] = hex;
+    }
+    return LayoutSerializer::Save(path, data);
+}
+
+bool ImportFromFile(const std::string& path) {
+    std::unordered_map<std::string, std::string> data;
+    if (!LayoutSerializer::Load(path, data)) return false;
+
+    UIPalette custom = MakeDarkPalette();
+    bool foundAny = false;
+    for (int i = 0; i < kFieldCount; i++) {
+        auto it = data.find(kFields[i].name);
+        if (it == data.end() || it->second.size() < 8) continue;
+        unsigned long v = strtoul(it->second.c_str(), nullptr, 16);
+        Color c = {(unsigned char)((v >> 24) & 0xFF), (unsigned char)((v >> 16) & 0xFF),
+                   (unsigned char)((v >> 8) & 0xFF), (unsigned char)(v & 0xFF)};
+        custom.*(kFields[i].member) = c;
+        foundAny = true;
+    }
+    if (!foundAny) return false;
+
+    g_presetIndex = -1;
+    g_basePalette = custom;
+    ClearAllOverrides();
+    return true;
 }
 
 }
