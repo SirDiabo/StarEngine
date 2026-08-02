@@ -15,7 +15,7 @@ void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
     justOpened = true;
     extension = ext;
     displayNames.clear();
-    fullPaths.clear();
+    contentPaths.clear();
 
     fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
     if (fs::exists(contentRoot)) {
@@ -25,7 +25,7 @@ void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
 
             fs::path relative = fs::relative(entry.path(), contentRoot);
             displayNames.push_back(relative.stem().string());
-            fullPaths.push_back(entry.path().string());
+            contentPaths.push_back(relative.generic_string());
         }
     }
 
@@ -74,7 +74,7 @@ bool AssetPickerPopup::Render(std::string& outPath) {
         });
 
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            outPath = fullPaths[i];
+            outPath = contentPaths[i];
             Close();
             return true;
         }

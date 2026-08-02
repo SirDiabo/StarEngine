@@ -147,7 +147,7 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
         vec3Row("Scale", scaleBuf, 7);
 
         if (materialSlots.empty()) {
-            DrawText("No material slots (plain .obj, no mtllib)", (int)box.x + 10, (int)y, 10, theme.textSecondary);
+            DrawText("No material slots", (int)box.x + 10, (int)y, 10, theme.textSecondary);
             y += 20;
         } else {
             DrawText("Materials", (int)box.x + 10, (int)y, 11, theme.sectionHeader);

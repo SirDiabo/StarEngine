@@ -244,6 +244,8 @@ x Content browser icon for .staractor files
 
 ### 3.2 Asset Registry
 x AssetInfo, AssetTypeRegistry
+x Asset references (mesh, material, texture, map picks and viewport drops) are stored relative to Content, not the machine-local import path
+x Reimport re-vendors Texture and Sound sources into _Source, matching StaticMesh
 o Asset registry persistence (scan and cache on project load)
 o Asset reimport on source file change
 o Asset cooking pipeline (for game packaging)

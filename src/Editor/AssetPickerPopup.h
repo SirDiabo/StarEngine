@@ -20,7 +20,7 @@ private:
     Rectangle area{};
     std::string extension;
     std::vector<std::string> displayNames;
-    std::vector<std::string> fullPaths;
+    std::vector<std::string> contentPaths;
 
     static std::vector<std::function<void()>> deferredDraws;
 };

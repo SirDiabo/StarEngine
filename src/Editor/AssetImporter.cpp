@@ -116,16 +116,16 @@ std::string Reimport(const std::string& starAssetPath) {
     if (!StarAsset::LoadFromFile(starAssetPath, asset)) return "";
     if (asset.sourcePath.empty()) return "";
 
+    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+    fs::path folder = fs::path(starAssetPath).parent_path();
+
     fs::path src(asset.sourcePath);
     std::error_code ec;
     if (!fs::exists(src, ec)) {
-        fs::path vendored = fs::path(asset.vendoredSourcePath);
+        fs::path vendored = contentRoot / asset.vendoredSourcePath;
         if (asset.vendoredSourcePath.empty() || !fs::exists(vendored, ec)) return "";
         src = vendored;
     }
-
-    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
-    fs::path folder = fs::path(starAssetPath).parent_path();
 
     StarAsset rebuilt;
     if (asset.assetType == "StaticMesh") {
@@ -133,7 +133,8 @@ std::string Reimport(const std::string& starAssetPath) {
     } else {
         rebuilt.assetType = asset.assetType;
         rebuilt.sourcePath = fs::absolute(src, ec).string();
-        rebuilt.vendoredSourcePath = asset.vendoredSourcePath;
+        rebuilt.vendoredSourcePath =
+            SourceVendoring::Vendor(contentRoot.string(), rebuilt.sourcePath, fs::path(starAssetPath).stem().string());
     }
 
     // Preserve user-edited import transform and any material reassignments by name.

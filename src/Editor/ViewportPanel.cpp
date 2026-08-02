@@ -12,6 +12,7 @@
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
+#include "Core/ContentPathResolver.h"
 #include "LogPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
@@ -161,7 +162,7 @@ void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenP
     ActorInstance inst;
     inst.name = assetName + "_" + std::to_string(starMap.GetInstances().size() + 1);
     inst.className = "Actor";
-    inst.graphAssetPath = assetPath;
+    inst.graphAssetPath = ContentPathResolver::MakeRelative(assetPath);
     inst.posX = worldX;
     inst.posY = 0;
     inst.posZ = worldZ;
@@ -202,7 +203,7 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     ActorInstance inst;
     inst.name = baseName + "_" + std::to_string(starMap.GetInstances().size() + 1);
     inst.className = "StaticMeshActor";
-    inst.meshAssetPath = assetPath;
+    inst.meshAssetPath = ContentPathResolver::MakeRelative(assetPath);
     inst.posX = worldX + asset.importPosX;
     inst.posY = asset.importPosY;
     inst.posZ = worldZ + asset.importPosZ;
