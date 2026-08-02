@@ -109,8 +109,10 @@ x PropertyField::ColorField: labeled row with a name and filled preview swatch
 x Style category lists every UIPalette field with a friendly name and live preview swatch
 x ColorPickerPopup: RGBA/HSV sliders with live gradient tracks, hex input, Old/New preview, Cancel/Confirm
 x ColorField swatch click opens the picker with a live-updating preview while editing
-o Preset palette grid in the color picker popup
-o Per-field color overrides persisted to disk (currently session-only in EditorSettingsTab)
+x Preset palette grid in the color picker popup (12 common colors)
+x UITheme::SetOverride/ClearOverride layer per-field overrides on top of the active preset, editor-wide
+x Per-field overrides persisted to ~/.starengine/theme.cfg alongside the preset
+x Reset Colors button clears all active overrides
 x UITheme rebuilt around an indexed preset list instead of a Dark/Light enum
 x Six new presets: Midnight, Slate, Forest, Sand, Matcha Latte, Sunset
 x Style category preset picker wraps into a grid instead of a fixed two-button row

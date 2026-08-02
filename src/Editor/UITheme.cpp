@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <cstdlib>
+#include <cstdio>
 
 static UIPalette MakeDarkPalette() {
     UIPalette p;
@@ -341,8 +342,50 @@ static const ThemePreset kPresets[] = {
 };
 static const int kPresetCount = sizeof(kPresets) / sizeof(kPresets[0]);
 
+static const UIColorFieldInfo kFields[] = {
+    {"Window Background",      &UIPalette::windowBg},
+    {"Panel Background",       &UIPalette::panelBg},
+    {"Panel Border",           &UIPalette::panelBorder},
+    {"Tab Bar",                &UIPalette::tabBar},
+    {"Tab Text",               &UIPalette::tabText},
+    {"Hover Surface",          &UIPalette::surfaceHover},
+    {"Selected Surface",       &UIPalette::surfaceSelected},
+    {"Splitter",               &UIPalette::splitter},
+    {"Splitter (Hover)",       &UIPalette::splitterHover},
+    {"Drop Zone",              &UIPalette::dropZone},
+    {"Drop Zone Border",       &UIPalette::dropBorder},
+    {"Button",                 &UIPalette::buttonBg},
+    {"Button (Hover)",         &UIPalette::buttonHover},
+    {"Button (Pressed)",       &UIPalette::buttonPressed},
+    {"Button Border",          &UIPalette::buttonBorder},
+    {"Button Text",            &UIPalette::buttonText},
+    {"Button Text (Disabled)", &UIPalette::buttonDisabledText},
+    {"Field Background",       &UIPalette::fieldBg},
+    {"Field Border",           &UIPalette::fieldBorder},
+    {"Primary Text",           &UIPalette::textPrimary},
+    {"Secondary Text",         &UIPalette::textSecondary},
+    {"Section Header",         &UIPalette::sectionHeader},
+    {"Accent",                 &UIPalette::accent},
+    {"Danger (Hover)",         &UIPalette::danger},
+    {"Danger",                 &UIPalette::dangerBg},
+    {"Success (Hover)",        &UIPalette::success},
+    {"Success",                &UIPalette::successBg},
+};
+static const int kFieldCount = sizeof(kFields) / sizeof(kFields[0]);
+
 static int g_presetIndex = 0;
-static UIPalette g_palette = MakeDarkPalette();
+static UIPalette g_basePalette = MakeDarkPalette();
+static UIPalette g_effectivePalette = MakeDarkPalette();
+
+static bool g_hasOverride[kFieldCount] = {};
+static Color g_overrideValue[kFieldCount] = {};
+
+static void RecomputeEffectivePalette() {
+    g_effectivePalette = g_basePalette;
+    for (int i = 0; i < kFieldCount; i++) {
+        if (g_hasOverride[i]) g_effectivePalette.*(kFields[i].member) = g_overrideValue[i];
+    }
+}
 
 static std::string GetThemeConfigPath() {
     std::string home;
@@ -367,7 +410,7 @@ static std::string GetThemeConfigPath() {
 namespace UITheme {
 
 const UIPalette& Get() {
-    return g_palette;
+    return g_effectivePalette;
 }
 
 int PresetCount() {
@@ -386,12 +429,51 @@ int GetPresetIndex() {
 void SetPreset(int index) {
     if (index < 0 || index >= kPresetCount) return;
     g_presetIndex = index;
-    g_palette = kPresets[index].make();
+    g_basePalette = kPresets[index].make();
+    ClearAllOverrides();
+}
+
+int FieldCount() {
+    return kFieldCount;
+}
+
+const UIColorFieldInfo& Field(int index) {
+    return kFields[index];
+}
+
+void SetOverride(int fieldIndex, Color value) {
+    if (fieldIndex < 0 || fieldIndex >= kFieldCount) return;
+    g_hasOverride[fieldIndex] = true;
+    g_overrideValue[fieldIndex] = value;
+    RecomputeEffectivePalette();
+}
+
+void ClearOverride(int fieldIndex) {
+    if (fieldIndex < 0 || fieldIndex >= kFieldCount) return;
+    g_hasOverride[fieldIndex] = false;
+    RecomputeEffectivePalette();
+}
+
+void ClearAllOverrides() {
+    for (int i = 0; i < kFieldCount; i++) g_hasOverride[i] = false;
+    RecomputeEffectivePalette();
+}
+
+bool HasOverride(int fieldIndex) {
+    if (fieldIndex < 0 || fieldIndex >= kFieldCount) return false;
+    return g_hasOverride[fieldIndex];
 }
 
 void Save() {
     std::unordered_map<std::string, std::string> data;
     data["preset"] = kPresets[g_presetIndex].name;
+    for (int i = 0; i < kFieldCount; i++) {
+        if (!g_hasOverride[i]) continue;
+        Color c = g_overrideValue[i];
+        char hex[9];
+        snprintf(hex, sizeof(hex), "%02X%02X%02X%02X", c.r, c.g, c.b, c.a);
+        data[std::string("override:") + kFields[i].name] = hex;
+    }
     LayoutSerializer::Save(GetThemeConfigPath(), data);
 }
 
@@ -399,15 +481,28 @@ void Load() {
     std::unordered_map<std::string, std::string> data;
     if (!LayoutSerializer::Load(GetThemeConfigPath(), data)) return;
 
-    auto it = data.find("preset");
-    if (it == data.end()) return;
-
-    for (int i = 0; i < kPresetCount; i++) {
-        if (it->second == kPresets[i].name) {
-            SetPreset(i);
-            return;
+    auto presetIt = data.find("preset");
+    if (presetIt != data.end()) {
+        for (int i = 0; i < kPresetCount; i++) {
+            if (presetIt->second == kPresets[i].name) {
+                g_presetIndex = i;
+                g_basePalette = kPresets[i].make();
+                break;
+            }
         }
     }
+
+    ClearAllOverrides();
+    for (int i = 0; i < kFieldCount; i++) {
+        auto it = data.find(std::string("override:") + kFields[i].name);
+        if (it == data.end() || it->second.size() < 8) continue;
+        unsigned long v = strtoul(it->second.c_str(), nullptr, 16);
+        Color c = {(unsigned char)((v >> 24) & 0xFF), (unsigned char)((v >> 16) & 0xFF),
+                   (unsigned char)((v >> 8) & 0xFF), (unsigned char)(v & 0xFF)};
+        g_hasOverride[i] = true;
+        g_overrideValue[i] = c;
+    }
+    RecomputeEffectivePalette();
 }
 
 }

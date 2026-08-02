@@ -20,48 +20,10 @@ static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
     return s.clicked;
 }
 
-struct ColorFieldEntry {
-    const char* label;
-    Color UIPalette::* member;
-};
-
-static const ColorFieldEntry kColorFields[] = {
-    {"Window Background",       &UIPalette::windowBg},
-    {"Panel Background",        &UIPalette::panelBg},
-    {"Panel Border",            &UIPalette::panelBorder},
-    {"Tab Bar",                 &UIPalette::tabBar},
-    {"Tab Text",                &UIPalette::tabText},
-    {"Hover Surface",           &UIPalette::surfaceHover},
-    {"Selected Surface",        &UIPalette::surfaceSelected},
-    {"Splitter",                &UIPalette::splitter},
-    {"Splitter (Hover)",        &UIPalette::splitterHover},
-    {"Drop Zone",               &UIPalette::dropZone},
-    {"Drop Zone Border",        &UIPalette::dropBorder},
-    {"Button",                  &UIPalette::buttonBg},
-    {"Button (Hover)",          &UIPalette::buttonHover},
-    {"Button (Pressed)",        &UIPalette::buttonPressed},
-    {"Button Border",           &UIPalette::buttonBorder},
-    {"Button Text",             &UIPalette::buttonText},
-    {"Button Text (Disabled)",  &UIPalette::buttonDisabledText},
-    {"Field Background",        &UIPalette::fieldBg},
-    {"Field Border",            &UIPalette::fieldBorder},
-    {"Primary Text",            &UIPalette::textPrimary},
-    {"Secondary Text",          &UIPalette::textSecondary},
-    {"Section Header",          &UIPalette::sectionHeader},
-    {"Accent",                  &UIPalette::accent},
-    {"Danger (Hover)",          &UIPalette::danger},
-    {"Danger",                  &UIPalette::dangerBg},
-    {"Success (Hover)",         &UIPalette::success},
-    {"Success",                 &UIPalette::successBg},
-};
-static const int kColorFieldCount = sizeof(kColorFields) / sizeof(kColorFields[0]);
-
 void EditorSettingsTab::Initialize() {
     title     = "Editor Settings";
     permanent = false;
     switcher.SetCategories({ "Style" });
-    colorPreviewOverride.assign(kColorFieldCount, Color{0, 0, 0, 0});
-    hasColorPreviewOverride.assign(kColorFieldCount, false);
 }
 
 void EditorSettingsTab::Render(float x, float y, float width, float height) {
@@ -109,16 +71,22 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     }
     fy = btnY + btnH + 14.0f;
 
+    int fieldCount = UITheme::FieldCount();
+
     DrawText("Colors", (int)fx, (int)fy, 14, theme.accent);
+    Rectangle resetBtn = {fx + maxRowWidth - 90, fy - 3, 90, 20};
+    if (UIWidget::Button(resetBtn, "Reset Colors")) {
+        UITheme::ClearAllOverrides();
+    }
     fy += 22;
-    DrawText("Individual overrides for the active preset.",
+    DrawText("Individual overrides for the active preset. Click a swatch to edit.",
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 20;
 
     Rectangle listArea = {area.x, fy, area.width, area.y + area.height - fy - 8};
     float rowH = 22.0f;
     float rowWidth = area.width - 32 > 360.0f ? 360.0f : area.width - 32;
-    float contentHeight = kColorFieldCount * rowH;
+    float contentHeight = fieldCount * rowH;
 
     Vector2 mouse = GetMousePosition();
     if (CheckCollisionPointRec(mouse, listArea)) {
@@ -130,21 +98,20 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
 
     BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
     float y = listArea.y - colorListScroll;
-    for (int i = 0; i < kColorFieldCount; i++) {
+    for (int i = 0; i < fieldCount; i++) {
         if (y + rowH >= listArea.y && y <= listArea.y + listArea.height) {
+            const UIColorFieldInfo& field = UITheme::Field(i);
             Rectangle row = {fx, y, rowWidth, rowH - 2};
 
             Color value;
             if (colorPicker.IsOpen() && editingColorField == i) {
                 value = colorPicker.GetLiveColor();
-            } else if (hasColorPreviewOverride[i]) {
-                value = colorPreviewOverride[i];
             } else {
-                value = theme.*(kColorFields[i].member);
+                value = theme.*(field.member);
             }
 
-            std::string label = kColorFields[i].label;
-            if (hasColorPreviewOverride[i]) label += " *";
+            std::string label = field.name;
+            if (UITheme::HasOverride(i)) label += " *";
 
             if (PropertyField::ColorField(row, label.c_str(), value) && !colorPicker.IsOpen()) {
                 colorPicker.Open({row.x + row.width, row.y}, value);
@@ -160,8 +127,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
         bool confirmed = false;
         if (colorPicker.Render(result, confirmed)) {
             if (confirmed && editingColorField >= 0) {
-                colorPreviewOverride[editingColorField] = result;
-                hasColorPreviewOverride[editingColorField] = true;
+                UITheme::SetOverride(editingColorField, result);
             }
             editingColorField = -1;
         }

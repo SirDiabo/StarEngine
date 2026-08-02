@@ -39,6 +39,11 @@ struct UIPalette {
     Color successBg;
 };
 
+struct UIColorFieldInfo {
+    const char* name;
+    Color UIPalette::* member;
+};
+
 namespace UITheme {
 
 const UIPalette& Get();
@@ -47,6 +52,14 @@ int PresetCount();
 const char* PresetName(int index);
 int GetPresetIndex();
 void SetPreset(int index);
+
+int FieldCount();
+const UIColorFieldInfo& Field(int index);
+
+void SetOverride(int fieldIndex, Color value);
+void ClearOverride(int fieldIndex);
+void ClearAllOverrides();
+bool HasOverride(int fieldIndex);
 
 void Load();
 void Save();

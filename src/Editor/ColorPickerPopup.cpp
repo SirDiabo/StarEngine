@@ -7,7 +7,28 @@
 #include <cstring>
 
 static const float POPUP_W = 260.0f;
-static const float POPUP_H = 320.0f;
+static const float POPUP_H = 415.0f;
+
+struct PresetSwatch {
+    const char* name;
+    Color color;
+};
+
+static const PresetSwatch kPresetSwatches[] = {
+    {"Red",    {225, 60, 60, 255}},
+    {"Orange", {230, 140, 50, 255}},
+    {"Yellow", {225, 210, 60, 255}},
+    {"Green",  {70, 175, 80, 255}},
+    {"Blue",   {70, 120, 220, 255}},
+    {"Purple", {150, 80, 200, 255}},
+    {"Cyan",   {60, 190, 200, 255}},
+    {"Lime",   {150, 220, 60, 255}},
+    {"Brown",  {140, 95, 60, 255}},
+    {"White",  {255, 255, 255, 255}},
+    {"Black",  {20, 20, 20, 255}},
+    {"Gray",   {130, 130, 130, 255}},
+};
+static const int kPresetSwatchCount = sizeof(kPresetSwatches) / sizeof(kPresetSwatches[0]);
 
 static bool DragSlider(Rectangle r, float& value01, int sliderId, int& activeSlider) {
     Vector2 mp = GetMousePosition();
@@ -246,6 +267,28 @@ bool ColorPickerPopup::Render(Color& outColor, bool& outConfirmed) {
         hexActive = false;
     }
     fy += 30;
+
+    DrawText("Presets", (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 14;
+    const float swSize = 34.0f;
+    const float swGap = 4.0f;
+    const int swCols = 6;
+    for (int i = 0; i < kPresetSwatchCount; i++) {
+        int col = i % swCols;
+        int row = i / swCols;
+        Rectangle sw = {fx + col * (swSize + swGap), fy + row * (swSize + swGap), swSize, swSize};
+        DrawRectangleRec(sw, kPresetSwatches[i].color);
+        bool swHovered = CheckCollisionPointRec(mp, sw);
+        DrawRectangleLinesEx(sw, swHovered ? 2 : 1, swHovered ? theme.textPrimary : theme.fieldBorder);
+        if (swHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            rf = kPresetSwatches[i].color.r / 255.0f;
+            gf = kPresetSwatches[i].color.g / 255.0f;
+            bf = kPresetSwatches[i].color.b / 255.0f;
+            SyncFromRGB();
+        }
+    }
+    int swRows = (kPresetSwatchCount + swCols - 1) / swCols;
+    fy += swRows * (swSize + swGap) + 8;
 
     float btnW = (contentW - 8) / 2.0f;
     Rectangle cancelBtn = {fx, area.y + area.height - 34, btnW, 24};

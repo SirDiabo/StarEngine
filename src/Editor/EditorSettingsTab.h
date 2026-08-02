@@ -2,7 +2,6 @@
 #include "EditorTab.h"
 #include "SettingsSwitcher.h"
 #include "ColorPickerPopup.h"
-#include <vector>
 
 class MenuBar;
 
@@ -20,6 +19,4 @@ private:
 
     ColorPickerPopup colorPicker;
     int editingColorField = -1;
-    std::vector<Color> colorPreviewOverride;
-    std::vector<bool> hasColorPreviewOverride;
 };
