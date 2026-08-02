@@ -5,6 +5,8 @@ class CameraComponent : public SceneComponent {
 public:
     float fov = 50.0f;
     bool orthographic = false;
+    float nearClip = 0.1f;
+    float farClip = 4000.0f;
 
     bool useControlYaw = false;
     bool useControlPitch = true;

@@ -208,6 +208,8 @@ struct ComponentDecl {
     // CameraComponent
     float cameraFov = 50.0f;
     bool cameraOrthographic = false;
+    float cameraNearClip = 0.1f;
+    float cameraFarClip = 4000.0f;
 
     // LightComponent
     std::string lightType = "Point";

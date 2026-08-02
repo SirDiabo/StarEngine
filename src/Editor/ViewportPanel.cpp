@@ -341,6 +341,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
                 camera.up = {0, 1, 0};
                 camera.fovy = cc->fov;
                 camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
+                rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
             } else {
                 Actor* first = actors.front().get();
                 cameraTarget = first->position;
@@ -387,6 +388,7 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 void ViewportPanel::RenderScene() {
     const float placeholderSize = 50.0f;
 
+    rlSetClipPlanes(RL_CULL_DISTANCE_NEAR, RL_CULL_DISTANCE_FAR);
     BeginMode3D(camera);
 
     DrawGrid(40, 100.0f);

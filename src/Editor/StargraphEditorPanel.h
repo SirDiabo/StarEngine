@@ -150,6 +150,8 @@ private:
     char compSoundBuf[256] = "";
     char compVolumeBuf[32] = "";
     char compFovBuf[32] = "";
+    char compNearClipBuf[32] = "";
+    char compFarClipBuf[32] = "";
     char compLightColorBuf[3][32] = {"", "", ""};
     char compLightIntensityBuf[32] = "";
     char compLightRadiusBuf[32] = "";

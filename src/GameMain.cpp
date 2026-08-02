@@ -17,6 +17,7 @@
 #include "Modules.modules.generated.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "rlgl.h"
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -108,6 +109,7 @@ int main(int argc, char* argv[]) {
             camera.target = Vector3Add(compPos, forward);
             camera.fovy = cc->fov;
             camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
+            rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
             break;
         }
     }
@@ -128,6 +130,7 @@ int main(int argc, char* argv[]) {
                 camera.position = compPos;
                 camera.target = Vector3Add(compPos, forward);
                 camera.fovy = cc->fov;
+                rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
                 break;
             }
         }

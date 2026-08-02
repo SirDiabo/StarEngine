@@ -88,6 +88,10 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
             [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).fov = d.cameraFov; }),
         Bln("CameraComponent", "CameraOrthographic", &ComponentDecl::cameraOrthographic,
             [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).orthographic = d.cameraOrthographic; }),
+        Flt("CameraComponent", "CameraNearClip", &ComponentDecl::cameraNearClip,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).nearClip = d.cameraNearClip; }),
+        Flt("CameraComponent", "CameraFarClip", &ComponentDecl::cameraFarClip,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).farClip = d.cameraFarClip; }),
 
         Str("LightComponent", "LightType", &ComponentDecl::lightType,
             [](Component& c, const ComponentDecl& d) {

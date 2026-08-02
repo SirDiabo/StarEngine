@@ -116,6 +116,71 @@ void RegisterCameraComponentNodes() {
     };
     NodeRegistry::Get().RegisterNode(getCameraOrtho);
 
+    // Set Camera Clip
+    NodeTemplate setCameraClip;
+    setCameraClip.type = "Set_Camera_Clip";
+    setCameraClip.category = "Camera";
+    setCameraClip.moduleName = "Stargraph";
+    setCameraClip.hideFromContextMenu = true;
+    setCameraClip.requiresComponentClass = "CameraComponent";
+    setCameraClip.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Near", PinType::Float, true, false, 0, "0.1"});
+        node->inputs.push_back({"Far", PinType::Float, true, false, 0, "4000.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setCameraClip.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        float nearClip = 0.1f;
+        float farClip = 4000.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+            if (p.name == "Near" && !p.defaultValue.empty()) nearClip = p.defaultValue.AsFloat();
+            if (p.name == "Far" && !p.defaultValue.empty()) farClip = p.defaultValue.AsFloat();
+        }
+        if (!target) return;
+        if (CameraComponent* cc = dynamic_cast<CameraComponent*>(target)) {
+            cc->nearClip = nearClip;
+            cc->farClip = farClip;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setCameraClip);
+
+    // Get Camera Clip
+    NodeTemplate getCameraClip;
+    getCameraClip.type = "Get_Camera_Clip";
+    getCameraClip.category = "Camera";
+    getCameraClip.moduleName = "Stargraph";
+    getCameraClip.hideFromContextMenu = true;
+    getCameraClip.requiresComponentClass = "CameraComponent";
+    getCameraClip.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Near", PinType::Float, false, true});
+        node->outputs.push_back({"Far", PinType::Float, false, true});
+    };
+    getCameraClip.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (CameraComponent* cc = dynamic_cast<CameraComponent*>(target)) {
+            char nearBuf[32], farBuf[32];
+            snprintf(nearBuf, sizeof(nearBuf), "%g", cc->nearClip);
+            snprintf(farBuf, sizeof(farBuf), "%g", cc->farClip);
+            for (Pin& p : node.outputs) {
+                if (p.name == "Near") p.defaultValue = nearBuf;
+                if (p.name == "Far") p.defaultValue = farBuf;
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getCameraClip);
+
     NodeTemplate getCameraMatrix;
     getCameraMatrix.type = "Get_Camera_Matrix";
     getCameraMatrix.category = "Camera";
@@ -139,6 +204,8 @@ void RegisterCameraComponentNodes() {
 
         Camera3D cam = {0};
         cam.up = {0, 1, 0};
+        float nearClip = 0.1f;
+        float farClip = 4000.0f;
         if (targetActor->GetCameraComponent()) {
             CameraComponent* cc = targetActor->GetCameraComponent();
             Vector3 compPos = targetActor->GetComponentWorldPosition(cc);
@@ -150,6 +217,8 @@ void RegisterCameraComponentNodes() {
             cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
             cam.fovy = cc->fov;
             cam.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
+            nearClip = cc->nearClip;
+            farClip = cc->farClip;
         } else {
             Vector3 forward = {cosf(targetActor->rotation.y * DEG2RAD), 0, sinf(targetActor->rotation.y * DEG2RAD)};
             cam.position = targetActor->position;
@@ -161,9 +230,9 @@ void RegisterCameraComponentNodes() {
         Matrix view = MatrixLookAt(cam.position, cam.target, cam.up);
         Matrix proj = MatrixIdentity();
         if (cam.projection == CAMERA_PERSPECTIVE) {
-            proj = MatrixPerspective(cam.fovy * DEG2RAD, (float)GetScreenWidth() / (float)GetScreenHeight(), 0.1f, 1000.0f);
+            proj = MatrixPerspective(cam.fovy * DEG2RAD, (float)GetScreenWidth() / (float)GetScreenHeight(), nearClip, farClip);
         } else {
-            proj = MatrixOrtho(0, (float)GetScreenWidth(), 0, (float)GetScreenHeight(), -1000.0f, 1000.0f);
+            proj = MatrixOrtho(0, (float)GetScreenWidth(), 0, (float)GetScreenHeight(), -farClip, farClip);
         }
 
         char viewBuf[512], projBuf[512];
@@ -233,6 +302,8 @@ CameraComponent::CameraComponent() : SceneComponent() {
 void CameraComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddFloat("FOV", &fov);
+    outProperties.AddFloat("Near Clip", &nearClip);
+    outProperties.AddFloat("Far Clip", &farClip);
     outProperties.AddBool("Orthographic", &orthographic);
     outProperties.AddBool("Use Control Yaw", &useControlYaw);
     outProperties.AddBool("Use Control Pitch", &useControlPitch);

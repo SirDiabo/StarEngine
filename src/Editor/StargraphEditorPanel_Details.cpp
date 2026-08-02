@@ -148,6 +148,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
         snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
         snprintf(compFovBuf, sizeof(compFovBuf), "%.2f", comp.cameraFov);
+        snprintf(compNearClipBuf, sizeof(compNearClipBuf), "%.2f", comp.cameraNearClip);
+        snprintf(compFarClipBuf, sizeof(compFarClipBuf), "%.2f", comp.cameraFarClip);
         snprintf(compLightColorBuf[0], 32, "%.2f", comp.lightColorR);
         snprintf(compLightColorBuf[1], 32, "%.2f", comp.lightColorG);
         snprintf(compLightColorBuf[2], 32, "%.2f", comp.lightColorB);
@@ -360,6 +362,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         y += 24;
     } else if (comp.componentType == "CameraComponent") {
         floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov, "FOV");
+        floatField("Near Clip", compNearClipBuf, sizeof(compNearClipBuf), 25, comp.cameraNearClip, "Near Clip");
+        floatField("Far Clip", compFarClipBuf, sizeof(compFarClipBuf), 26, comp.cameraFarClip, "Far Clip");
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
         y += 24;
