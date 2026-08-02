@@ -252,18 +252,36 @@ jobs:
           
           # Windows
           mkdir -p staging/StarEngine
-          cp artifacts/star-engine-windows/build/Release/StarEngine.exe staging/StarEngine/ || exit 1
+          WIN_EXE=$(find artifacts/star-engine-windows -type f -name "StarEngine.exe" 2>/dev/null | head -1)
+          if [ -z "$WIN_EXE" ]; then
+            echo "❌ Windows executable not found in star-engine-windows artifact"
+            ls -laR artifacts/star-engine-windows/ 2>/dev/null || echo "artifact directory not found"
+            exit 1
+          fi
+          cp "$WIN_EXE" staging/StarEngine/StarEngine.exe
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine/ && rm -rf StarEngine)
           
           # Linux
           mkdir -p staging/StarEngine
-          cp artifacts/star-engine-linux/build/StarEngine staging/StarEngine/ || exit 1
+          LINUX_EXE=$(find artifacts/star-engine-linux -type f -name "StarEngine" ! -name "*.exe" 2>/dev/null | head -1)
+          if [ -z "$LINUX_EXE" ]; then
+            echo "❌ Linux executable not found in star-engine-linux artifact"
+            ls -laR artifacts/star-engine-linux/ 2>/dev/null || echo "artifact directory not found"
+            exit 1
+          fi
+          cp "$LINUX_EXE" staging/StarEngine/StarEngine
           chmod +x staging/StarEngine/StarEngine
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine/ && rm -rf StarEngine)
           
           # macOS
           mkdir -p staging/StarEngine
-          cp artifacts/star-engine-macos/build/StarEngine staging/StarEngine/ || exit 1
+          MACOS_EXE=$(find artifacts/star-engine-macos -type f -name "StarEngine" ! -name "*.exe" 2>/dev/null | head -1)
+          if [ -z "$MACOS_EXE" ]; then
+            echo "❌ macOS executable not found in star-engine-macos artifact"
+            ls -laR artifacts/star-engine-macos/ 2>/dev/null || echo "artifact directory not found"
+            exit 1
+          fi
+          cp "$MACOS_EXE" staging/StarEngine/StarEngine
           chmod +x staging/StarEngine/StarEngine
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine/ && rm -rf StarEngine)
           
