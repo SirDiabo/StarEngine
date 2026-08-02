@@ -114,6 +114,12 @@ void ContentBrowserPanel::NavigateUp() {
     selectedIndex = -1;
 }
 
+void ContentBrowserPanel::NavigateToRelativeFolder(const std::string& relativePath) {
+    currentRelativeFolder = relativePath;
+    if (currentRelativeFolder == ".") currentRelativeFolder.clear();
+    selectedIndex = -1;
+}
+
 void ContentBrowserPanel::OpenEntry(const ContentEntry& entry) {
     if (entry.isFolder) {
         NavigateInto(entry.displayName);
@@ -457,8 +463,46 @@ void ContentBrowserPanel::Render() {
         pathLabelX = importBtn.x + importBtn.width + 6;
     }
 
-    std::string pathLabel = "Content" + (currentRelativeFolder.empty() ? "" : "/" + currentRelativeFolder);
-    DrawText(pathLabel.c_str(), (int)pathLabelX, (int)pathBar.y + 4, 12, theme.textPrimary);
+    std::vector<std::pair<std::string, std::string>> crumbs;
+    crumbs.push_back({"Content", ""});
+    if (!currentRelativeFolder.empty()) {
+        size_t pos = 0;
+        std::string cumulative;
+        while (pos <= currentRelativeFolder.size()) {
+            size_t sep = currentRelativeFolder.find('/', pos);
+            std::string part = (sep == std::string::npos)
+                ? currentRelativeFolder.substr(pos)
+                : currentRelativeFolder.substr(pos, sep - pos);
+            cumulative = cumulative.empty() ? part : cumulative + "/" + part;
+            crumbs.push_back({part, cumulative});
+            if (sep == std::string::npos) break;
+            pos = sep + 1;
+        }
+    }
+
+    const int crumbFontSize = 12;
+    float cursorX = pathLabelX;
+    for (size_t i = 0; i < crumbs.size(); i++) {
+        if (i > 0) {
+            const char* separator = " |";
+            int sepW = MeasureText(separator, crumbFontSize);
+            DrawText(separator, (int)cursorX, (int)pathBar.y + 4, crumbFontSize, theme.textSecondary);
+            cursorX += (float)(sepW + 6);
+        }
+
+        int labelW = MeasureText(crumbs[i].first.c_str(), crumbFontSize);
+        Rectangle crumbRect = {cursorX, pathBar.y + 2, (float)labelW, 18};
+
+        Color crumbColor = theme.textPrimary;
+        if (!gridInputBlocked) {
+            UIWidget::Interaction crumbIntr = UIWidget::Interact(crumbRect, true);
+            if (crumbIntr.hovered) crumbColor = theme.accent;
+            if (crumbIntr.clicked) NavigateToRelativeFolder(crumbs[i].second);
+        }
+
+        DrawText(crumbs[i].first.c_str(), (int)cursorX, (int)pathBar.y + 4, crumbFontSize, crumbColor);
+        cursorX += (float)labelW;
+    }
 
     if (!currentRelativeFolder.empty()) {
         int backW = MeasureText("< Back", 12) + 12;

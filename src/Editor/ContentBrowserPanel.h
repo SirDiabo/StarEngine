@@ -32,6 +32,7 @@ private:
     std::vector<ContentEntry> ScanCurrentFolder() const;
     void NavigateInto(const std::string& folderName);
     void NavigateUp();
+    void NavigateToRelativeFolder(const std::string& relativePath);
 
     void BeginCreateFolder();
     void BeginCreateAsset(const AssetTypeInfo& info);
