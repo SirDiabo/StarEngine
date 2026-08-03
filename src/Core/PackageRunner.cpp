@@ -4,6 +4,7 @@
 #include "SafeProcess.h"
 #include "EngineRoot.h"
 #include "CMakeBuild.h"
+#include "BuildDiagnostics.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
 #include <cstdio>
@@ -114,6 +115,12 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
         return result;
     }
 
+    std::string cmakeMissing = BuildDiagnostics::CheckCMakeAvailable();
+    if (!cmakeMissing.empty()) {
+        result.error = cmakeMissing;
+        return result;
+    }
+
     std::string platformKey = PackagePlatformName(options.platform);
     std::string rendererKey = GameRendererName(options.renderer);
     fs::path buildDir = fs::temp_directory_path() / "StarEnginePackageBuild" / (platformKey + "_" + rendererKey);
@@ -150,6 +157,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     result.log += "\n";
     if (SafeProcess::Run(configureArgs, result.log) != 0) {
         result.error = "CMake configure failed. See log.";
+        std::string hint = BuildDiagnostics::DiagnoseConfigureFailure(result.log);
+        if (!hint.empty()) result.error += " " + hint;
         return result;
     }
 
@@ -160,6 +169,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     buildArgs.push_back("cmake");
     buildArgs.push_back("--build");
     buildArgs.push_back(buildDir.string());
+    buildArgs.push_back("--config");
+    buildArgs.push_back("Release");
     buildArgs.push_back("-j" + std::to_string(jobs));
 
     result.log += "\n== Build ==\n";

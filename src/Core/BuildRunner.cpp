@@ -3,6 +3,7 @@
 #include "EngineRoot.h"
 #include "ExecutablePath.h"
 #include "CMakeBuild.h"
+#include "BuildDiagnostics.h"
 #include <cstdio>
 #include <filesystem>
 
@@ -72,6 +73,7 @@ static fs::path LocateBuiltEditorExecutable(const fs::path& buildDir, const std:
     return {};
 }
 
+// Renaming a locked exe aside works on Windows too, unlike overwriting it directly
 static void MoveAsideForReplacement(const fs::path& launcherPath) {
     std::error_code ec;
     fs::path oldPath = launcherPath;
@@ -82,6 +84,13 @@ static void MoveAsideForReplacement(const fs::path& launcherPath) {
 
 BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config) {
     BuildResult result;
+
+    std::string cmakeMissing = BuildDiagnostics::CheckCMakeAvailable();
+    if (!cmakeMissing.empty()) {
+        result.success = false;
+        result.error = cmakeMissing;
+        return result;
+    }
 
     std::string engineRoot = EngineRoot::Resolve();
 
@@ -101,6 +110,8 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
     if (!configureOk) {
         result.success = false;
         result.error = "CMake configure failed";
+        std::string hint = BuildDiagnostics::DiagnoseConfigureFailure(configureOutput);
+        if (!hint.empty()) result.error += ". " + hint;
         return result;
     }
 
