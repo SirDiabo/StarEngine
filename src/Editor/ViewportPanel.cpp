@@ -389,7 +389,7 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 void ViewportPanel::RenderScene() {
     const float placeholderSize = 50.0f;
 
-    rlSetClipPlanes(RL_CULL_DISTANCE_NEAR, RL_CULL_DISTANCE_FAR);
+    rlSetClipPlanes(0.1, 60000.0);
     BeginMode3D(camera);
 
     DrawGrid(40, 100.0f);
@@ -612,7 +612,7 @@ void ViewportPanel::Render() {
     DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     if (playing) {
-        DrawRectangleLinesEx(bounds, 3, theme.success);
+        DrawRectangleLinesEx(client, 3, theme.success);
     }
     RenderToolbar();
 
