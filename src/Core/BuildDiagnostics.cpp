@@ -24,7 +24,9 @@ std::string DiagnoseConfigureFailure(const std::string& log) {
                "\"sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev\" "
                "on Debian/Ubuntu, or the equivalent -devel packages on other distros, then try again.";
     }
-    if (log.find("Could NOT find OpenGL") != std::string::npos) {
+    if (log.find("Could NOT find OpenGL") != std::string::npos ||
+        log.find("OPENGL_INCLUDE_DIR") != std::string::npos ||
+        log.find("OPENGL_gl_LIBRARY") != std::string::npos) {
         return "Missing OpenGL development headers. Install them with "
                "\"sudo apt install libgl1-mesa-dev\" on Debian/Ubuntu, or the equivalent "
                "-devel packages on other distros, then try again.";
