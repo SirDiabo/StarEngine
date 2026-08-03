@@ -4,6 +4,7 @@
 #include "Core/CookedFile.h"
 #include "Core/PackageCipher.h"
 #include "Core/StarPak.h"
+#include "Core/ExecutablePath.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -33,12 +34,13 @@ static std::string FindBootstrapFile(const fs::path& exeDir) {
 }
 
 int main(int argc, char* argv[]) {
-    fs::path exePath = argc > 0 ? fs::path(argv[0]) : fs::path();
+    std::string resolvedExe = GetExecutablePath();
+    fs::path exePath = !resolvedExe.empty() ? fs::path(resolvedExe) : (argc > 0 ? fs::path(argv[0]) : fs::path());
+    std::error_code ec;
+    if (!exePath.empty()) exePath = fs::absolute(exePath, ec);
     fs::path exeDir = exePath.empty() ? fs::current_path() : exePath.parent_path();
     if (exeDir.empty()) exeDir = fs::current_path();
-    std::error_code ec;
     exeDir = fs::absolute(exeDir, ec);
-    if (!exePath.empty()) exePath = fs::absolute(exePath, ec);
 
     PackagedGameConfig config;
 

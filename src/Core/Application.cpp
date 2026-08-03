@@ -6,6 +6,7 @@
 #include "Core/AssetTypeRegistry.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
+#include "Core/ExecutablePath.h"
 #include "Core/SafeProcess.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
@@ -58,7 +59,9 @@ bool Application::Initialize(int argc, char* argv[]) {
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
 
-    EmbeddedAssets::Get().Init(argc > 0 ? argv[0] : "");
+    std::string exePath = GetExecutablePath();
+    if (exePath.empty() && argc > 0) exePath = argv[0];
+    EmbeddedAssets::Get().Init(exePath);
 
     {
         Image icon = EmbeddedAssets::Get().LoadImageAsset("logo.png");
