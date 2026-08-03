@@ -2,6 +2,7 @@
 #include "Module.h"
 #include "EngineRoot.h"
 #include "ExecutablePath.h"
+#include "CMakeBuild.h"
 #include <cstdio>
 #include <filesystem>
 
@@ -83,6 +84,12 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
     BuildResult result;
 
     std::string engineRoot = EngineRoot::Resolve();
+
+    if (CMakeBuild::CacheSourceMismatch(buildDir, engineRoot)) {
+        std::error_code wipeEc;
+        fs::remove_all(buildDir, wipeEc);
+    }
+
     bool hasExistingCache = fs::exists(fs::path(buildDir) / "CMakeCache.txt");
 
     std::string configureOutput;

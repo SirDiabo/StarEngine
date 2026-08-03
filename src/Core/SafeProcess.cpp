@@ -118,6 +118,7 @@ int Run(const std::vector<std::string>& argv, std::string& log) {
         close(pipeFd[0]);
         close(pipeFd[1]);
         execvp(cargs[0], cargs.data());
+        perror(cargs[0]);
         _exit(127);
     }
 

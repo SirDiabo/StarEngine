@@ -3,6 +3,7 @@
 #include "StarPak.h"
 #include "SafeProcess.h"
 #include "EngineRoot.h"
+#include "CMakeBuild.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
 #include <cstdio>
@@ -116,6 +117,11 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     std::string platformKey = PackagePlatformName(options.platform);
     std::string rendererKey = GameRendererName(options.renderer);
     fs::path buildDir = fs::temp_directory_path() / "StarEnginePackageBuild" / (platformKey + "_" + rendererKey);
+
+    if (CMakeBuild::CacheSourceMismatch(buildDir.string(), engineRoot.string())) {
+        std::error_code wipeEc;
+        fs::remove_all(buildDir, wipeEc);
+    }
 
     std::string toolchainFile = WriteToolchainFileIfNeeded(options.platform, buildDir.string());
 
