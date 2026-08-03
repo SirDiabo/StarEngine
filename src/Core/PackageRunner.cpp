@@ -2,6 +2,7 @@
 #include "PackageCooker.h"
 #include "StarPak.h"
 #include "SafeProcess.h"
+#include "EngineRoot.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
 #include <cstdio>
@@ -24,16 +25,8 @@ namespace fs = std::filesystem;
 namespace {
 
 std::string GetEngineRoot() {
-    if (const char* override = std::getenv("STARENGINE_ENGINE_ROOT")) {
-        if (override[0] != '\0') return override;
-    }
-#ifdef STARENGINE_SOURCE_ROOT
-    return fs::path(STARENGINE_SOURCE_ROOT).parent_path().string();
-#else
-    return fs::current_path().string();
-#endif
+    return EngineRoot::Resolve();
 }
-
 
 std::string GenerateCipherKey() {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

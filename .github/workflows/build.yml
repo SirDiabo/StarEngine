@@ -208,6 +208,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Extract Version
         id: version
@@ -239,6 +240,15 @@ jobs:
         with:
           path: artifacts
 
+      - name: Assemble Engine Source Tree
+        run: |
+          mkdir -p engine-source/Source
+          cp CMakeLists.txt engine-source/Source/
+          cp -r cmake engine-source/Source/
+          cp -r src engine-source/Source/
+          cp -r external engine-source/Source/
+          find engine-source/Source -name ".git" -exec rm -rf {} + 2>/dev/null || true
+
       - name: Package Artifacts
         run: |
           mkdir -p release staging
@@ -252,6 +262,7 @@ jobs:
             exit 1
           fi
           cp "$WIN_EXE" staging/StarEngine/StarEngine.exe
+          cp -r engine-source/Source staging/StarEngine/Source
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip StarEngine/ && rm -rf StarEngine)
           
           # Linux
@@ -264,6 +275,7 @@ jobs:
           fi
           cp "$LINUX_EXE" staging/StarEngine/StarEngine
           chmod +x staging/StarEngine/StarEngine
+          cp -r engine-source/Source staging/StarEngine/Source
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine/ && rm -rf StarEngine)
           
           # macOS
@@ -276,9 +288,10 @@ jobs:
           fi
           cp "$MACOS_EXE" staging/StarEngine/StarEngine
           chmod +x staging/StarEngine/StarEngine
+          cp -r engine-source/Source staging/StarEngine/Source
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine/ && rm -rf StarEngine)
           
-          rm -rf staging
+          rm -rf staging engine-source
           ls -lh release/
 
       - name: Verify Release Artifacts

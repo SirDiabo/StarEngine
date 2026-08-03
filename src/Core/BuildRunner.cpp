@@ -1,10 +1,15 @@
 #include "BuildRunner.h"
 #include "Module.h"
+#include "EngineRoot.h"
+#include "ExecutablePath.h"
 #include <cstdio>
+#include <filesystem>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+namespace fs = std::filesystem;
 
 BuildRunner& BuildRunner::Get() {
     static BuildRunner instance;
@@ -12,18 +17,14 @@ BuildRunner& BuildRunner::Get() {
 }
 
 std::string BuildRunner::GetDefaultBuildDirectory() {
-#ifdef STARENGINE_BUILD_DIR
-    return STARENGINE_BUILD_DIR;
-#else
-    return ".";
-#endif
+    return EngineRoot::BuildDirectory();
 }
 
 std::string BuildRunner::GetDefaultBuildConfig() {
 #ifdef STARENGINE_BUILD_CONFIG
     return STARENGINE_BUILD_CONFIG;
 #else
-    return "";
+    return "Release";
 #endif
 }
 
@@ -50,33 +51,51 @@ static bool RunShellCommand(const std::string& cmd, std::string& outOutput) {
     return exitCode == 0;
 }
 
-static void PrepareRunningExecutableForRebuild() {
+static fs::path LocateBuiltEditorExecutable(const fs::path& buildDir, const std::string& config) {
+    std::string exeName = "StarEngine";
 #ifdef _WIN32
-    wchar_t path[MAX_PATH];
-    DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) return;
-
-    std::wstring exePath(path);
-    std::wstring oldPath = exePath + L".old";
-
-    DeleteFileW(oldPath.c_str());
-    MoveFileExW(exePath.c_str(), oldPath.c_str(), MOVEFILE_REPLACE_EXISTING);
+    exeName += ".exe";
 #endif
+
+    fs::path direct = buildDir / exeName;
+    if (fs::exists(direct)) return direct;
+
+    if (!config.empty()) {
+        fs::path nested = buildDir / config / exeName;
+        if (fs::exists(nested)) return nested;
+    }
+    for (const char* candidate : {"Release", "Debug", "RelWithDebInfo"}) {
+        fs::path nested = buildDir / candidate / exeName;
+        if (fs::exists(nested)) return nested;
+    }
+    return {};
+}
+
+static void MoveAsideForReplacement(const fs::path& launcherPath) {
+    std::error_code ec;
+    fs::path oldPath = launcherPath;
+    oldPath += ".old";
+    fs::remove(oldPath, ec);
+    fs::rename(launcherPath, oldPath, ec);
 }
 
 BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config) {
     BuildResult result;
 
-    std::string reconfigureOutput;
-    bool reconfigureOk = RunShellCommand("cmake \"" + buildDir + "\"", reconfigureOutput);
-    result.output += reconfigureOutput;
-    if (!reconfigureOk) {
+    std::string engineRoot = EngineRoot::Resolve();
+    bool hasExistingCache = fs::exists(fs::path(buildDir) / "CMakeCache.txt");
+
+    std::string configureOutput;
+    std::string configureCmd = hasExistingCache
+        ? "cmake \"" + buildDir + "\""
+        : "cmake -S \"" + engineRoot + "\" -B \"" + buildDir + "\" -DCMAKE_BUILD_TYPE=Release";
+    bool configureOk = RunShellCommand(configureCmd, configureOutput);
+    result.output += configureOutput;
+    if (!configureOk) {
         result.success = false;
-        result.error = "CMake reconfigure failed";
+        result.error = "CMake configure failed";
         return result;
     }
-
-    PrepareRunningExecutableForRebuild();
 
     std::string cmd = "cmake --build \"" + buildDir + "\"";
     if (!config.empty()) cmd += " --config \"" + config + "\"";
@@ -84,11 +103,37 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
     std::string buildOutput;
     bool buildOk = RunShellCommand(cmd, buildOutput);
     result.output += buildOutput;
-    result.success = buildOk;
-    if (!result.success) {
+    if (!buildOk) {
+        result.success = false;
         result.error = "Build failed";
+        return result;
     }
 
+    fs::path builtExe = LocateBuiltEditorExecutable(buildDir, config);
+    if (builtExe.empty()) {
+        result.success = false;
+        result.error = "Build succeeded but the rebuilt editor executable was not found";
+        return result;
+    }
+
+    std::string runningExe = GetExecutablePath();
+    if (runningExe.empty()) {
+        result.success = false;
+        result.error = "Could not locate the running executable to replace";
+        return result;
+    }
+
+    MoveAsideForReplacement(runningExe);
+
+    std::error_code ec;
+    fs::copy_file(builtExe, runningExe, fs::copy_options::overwrite_existing, ec);
+    if (ec) {
+        result.success = false;
+        result.error = "Rebuilt the editor, but could not replace the running executable: " + ec.message();
+        return result;
+    }
+
+    result.success = true;
     return result;
 }
 

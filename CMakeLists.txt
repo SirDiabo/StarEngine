@@ -76,7 +76,6 @@ else()
     endif()
 
     target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
-    target_compile_definitions(StarEngine PRIVATE STARENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}")
     target_compile_definitions(StarEngine PRIVATE STARENGINE_BUILD_CONFIG="$<CONFIG>")
 
     if(WIN32)

@@ -1,5 +1,6 @@
 #include "Module.h"
 #include "Project.h"
+#include "EngineRoot.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -36,11 +37,7 @@ void ModuleManager::UpdateAll(float deltaTime) {
 }
 
 std::string ModuleManager::GetModulesSourceRoot() {
-#ifdef STARENGINE_SOURCE_ROOT
-    return (fs::path(STARENGINE_SOURCE_ROOT) / "Modules").string();
-#else
-    return (fs::path("src") / "Modules").string();
-#endif
+    return (fs::path(EngineRoot::Resolve()) / "src" / "Modules").string();
 }
 
 std::string ModuleManager::GetProjectModulesRoot() {
