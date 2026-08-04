@@ -130,10 +130,16 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    double perfTickAccum = 0.0, perfRenderAccum = 0.0, perfPresentAccum = 0.0;
+    int perfSampleCount = 0;
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
+
+        double perfTickStart = GetTime();
         ModuleManager::Get().UpdateAll(deltaTime);
         World::Get().Tick(deltaTime);
+        perfTickAccum += GetTime() - perfTickStart;
 
         for (const auto& actor : World::Get().GetActors()) {
             if (actor->GetCameraComponent()) {
@@ -170,14 +176,28 @@ int main(int argc, char* argv[]) {
             renderTargetHeight = scaledHeight;
         }
 
+        double perfRenderStart = GetTime();
         RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255}, false);
+        perfRenderAccum += GetTime() - perfRenderStart;
 
+        double perfPresentStart = GetTime();
         BeginDrawing();
         ClearBackground(BLACK);
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
         Rectangle dest = {0, 0, (float)screenWidth, (float)screenHeight};
         DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
         EndDrawing();
+        perfPresentAccum += GetTime() - perfPresentStart;
+
+        if (++perfSampleCount >= 120) {
+            TraceLog(LOG_INFO, "PERF tick=%.3fms render=%.3fms present=%.3fms (avg over %d frames)",
+                (perfTickAccum / perfSampleCount) * 1000.0,
+                (perfRenderAccum / perfSampleCount) * 1000.0,
+                (perfPresentAccum / perfSampleCount) * 1000.0,
+                perfSampleCount);
+            perfTickAccum = perfRenderAccum = perfPresentAccum = 0.0;
+            perfSampleCount = 0;
+        }
     }
 
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);

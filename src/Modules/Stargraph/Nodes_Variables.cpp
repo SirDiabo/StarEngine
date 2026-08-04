@@ -16,12 +16,9 @@ void RegisterVariableNodes() {
         for (const Pin& p : node.inputs) {
             if (p.name == "Variable_Name") { varName = p.defaultValue; break; }
         }
-        for (const Variable& v : graph.GetVariables()) {
-            if (v.name == varName) {
-                for (Pin& p : node.outputs) {
-                    if (p.name == "Value") { p.defaultValue = v.value; break; }
-                }
-                break;
+        if (Variable* v = graph.FindVariable(varName)) {
+            for (Pin& p : node.outputs) {
+                if (p.name == "Value") { p.defaultValue = v->value; break; }
             }
         }
     };
@@ -44,12 +41,9 @@ void RegisterVariableNodes() {
             if (p.name == "Variable_Name") varName = p.defaultValue;
             if (p.name == "Value")         value   = p.defaultValue;
         }
-        for (Variable& v : graph.GetVariables()) {
-            if (v.name != varName) continue;
-            
-            if (v.replication == ReplicationMode::ServerOnly && !NetworkBackendRegistry::Get().HasAuthority()) break;
-            v.value = value;
-            break;
+        if (Variable* v = graph.FindVariable(varName)) {
+            if (v->replication == ReplicationMode::ServerOnly && !NetworkBackendRegistry::Get().HasAuthority()) return;
+            v->value = value;
         }
     };
     NodeRegistry::Get().RegisterNode(setVar);

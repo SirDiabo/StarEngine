@@ -18,14 +18,13 @@ static void ResolveWildcardPins(Stargraph& graph, Node* node) {
 
     for (const Pin& pin : node->inputs) {
         if (!pin.isWildcard) continue;
-        for (const Link& link : graph.GetLinks()) {
-            if (link.inputPinId != pin.id) continue;
-            for (const Node& n : graph.GetNodes()) {
-                for (const Pin& p : n.outputs) {
-                    if (p.id == link.outputPinId && p.type != PinType::Wildcard) {
-                        resolvedType = p.type;
-                    }
-                }
+        Link* link = graph.GetLinkToPin(pin.id);
+        if (!link) continue;
+        Node* fromNode = graph.FindNodeByPinId(link->outputPinId);
+        if (!fromNode) continue;
+        for (const Pin& p : fromNode->outputs) {
+            if (p.id == link->outputPinId && p.type != PinType::Wildcard) {
+                resolvedType = p.type;
             }
         }
     }
@@ -33,13 +32,12 @@ static void ResolveWildcardPins(Stargraph& graph, Node* node) {
     if (resolvedType == PinType::None) {
         for (const Pin& pin : node->outputs) {
             if (!pin.isWildcard) continue;
-            for (const Link& link : graph.GetLinks()) {
-                if (link.outputPinId != pin.id) continue;
-                for (const Node& n : graph.GetNodes()) {
-                    for (const Pin& p : n.inputs) {
-                        if (p.id == link.inputPinId && p.type != PinType::Wildcard) {
-                            resolvedType = p.type;
-                        }
+            for (Link* link : graph.GetLinksFromPin(pin.id)) {
+                Node* toNode = graph.FindNodeByPinId(link->inputPinId);
+                if (!toNode) continue;
+                for (const Pin& p : toNode->inputs) {
+                    if (p.id == link->inputPinId && p.type != PinType::Wildcard) {
+                        resolvedType = p.type;
                     }
                 }
             }
@@ -57,36 +55,34 @@ static void ResolveWildcardPins(Stargraph& graph, Node* node) {
 static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx, std::vector<int>& visiting) {
     for (int id : visiting) if (id == inputPin.id) return; // cycle: this pin is already being resolved further up the chain
 
-    for (const Link& link : graph.GetLinks()) {
-        if (link.inputPinId != inputPin.id) continue;
+    Link* link = graph.GetLinkToPin(inputPin.id);
+    if (!link) return;
 
-        Node* fromNode = graph.FindNodeByPinId(link.outputPinId);
-        if (!fromNode) continue;
+    Node* fromNode = graph.FindNodeByPinId(link->outputPinId);
+    if (!fromNode) return;
 
-        visiting.push_back(inputPin.id);
+    visiting.push_back(inputPin.id);
 
-        ResolveWildcardPins(graph, fromNode);
-        ResolveWildcardPins(graph, toNode);
+    ResolveWildcardPins(graph, fromNode);
+    ResolveWildcardPins(graph, toNode);
 
-        for (Pin& upPin : fromNode->inputs) {
-            if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx, visiting);
-        }
-
-        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
-        if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
-
-        for (const Pin& outPin : fromNode->outputs) {
-            if (outPin.id == link.outputPinId) {
-                if (inputPin.defaultValue != outPin.defaultValue) {
-                    inputPin.defaultValue = outPin.defaultValue;
-                }
-                break;
-            }
-        }
-
-        visiting.pop_back();
-        break;
+    for (Pin& upPin : fromNode->inputs) {
+        if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx, visiting);
     }
+
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
+    if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
+
+    for (const Pin& outPin : fromNode->outputs) {
+        if (outPin.id == link->outputPinId) {
+            if (inputPin.defaultValue != outPin.defaultValue) {
+                inputPin.defaultValue = outPin.defaultValue;
+            }
+            break;
+        }
+    }
+
+    visiting.pop_back();
 }
 
 void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionContext& ctx) {
@@ -111,12 +107,10 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
         for (const Pin& pin : current->outputs) {
             if (pin.type != PinType::Exec) continue;
             if (pin.name != "Out") continue;
-            for (const Link& link : graph.GetLinks()) {
-                if (link.outputPinId == pin.id) {
-                    next = graph.FindNodeByPinId(link.inputPinId);
-                    nextPinId = link.inputPinId;
-                    break;
-                }
+            for (Link* link : graph.GetLinksFromPin(pin.id)) {
+                next = graph.FindNodeByPinId(link->inputPinId);
+                nextPinId = link->inputPinId;
+                break;
             }
             if (next) break;
         }
@@ -128,10 +122,8 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
 void GraphExecutor::RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName) {
     for (const Pin& pin : node->outputs) {
         if (pin.name != pinName) continue;
-        for (const Link& link : graph.GetLinks()) {
-            if (link.outputPinId == pin.id) {
-                ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx, link.inputPinId);
-            }
+        for (Link* link : graph.GetLinksFromPin(pin.id)) {
+            ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link->inputPinId), ctx, link->inputPinId);
         }
     }
 }
@@ -159,10 +151,8 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
     if (!held && wasHeld) {
         for (const Pin& outPin : node.outputs) {
             if (outPin.type == PinType::Exec && outPin.name == "Completed") {
-                for (const Link& link : graph.GetLinks()) {
-                    if (link.outputPinId == outPin.id) {
-                        GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx, link.inputPinId);
-                    }
+                for (Link* link : graph.GetLinksFromPin(outPin.id)) {
+                    GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link->inputPinId), ctx, link->inputPinId);
                 }
             }
         }
@@ -172,10 +162,8 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
         if (!wasHeld) {
             for (const Pin& outPin : node.outputs) {
                 if (outPin.type == PinType::Exec && outPin.name == "Started") {
-                    for (const Link& link : graph.GetLinks()) {
-                        if (link.outputPinId == outPin.id) {
-                            GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx, link.inputPinId);
-                        }
+                    for (Link* link : graph.GetLinksFromPin(outPin.id)) {
+                        GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link->inputPinId), ctx, link->inputPinId);
                     }
                 }
             }
@@ -183,10 +171,8 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
 
         for (const Pin& outPin : node.outputs) {
             if (outPin.type == PinType::Exec && outPin.name == "Triggered") {
-                for (const Link& link : graph.GetLinks()) {
-                    if (link.outputPinId == outPin.id) {
-                        GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link.inputPinId), ctx, link.inputPinId);
-                    }
+                for (Link* link : graph.GetLinksFromPin(outPin.id)) {
+                    GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(link->inputPinId), ctx, link->inputPinId);
                 }
             }
         }
@@ -259,11 +245,9 @@ Node* GraphExecutor::FollowExecLink(Stargraph& graph, Node* fromNode, const std:
     for (const Pin& pin : fromNode->outputs) {
         if (pin.type != PinType::Exec) continue;
         if (pin.name != pinName) continue;
-        for (const Link& link : graph.GetLinks()) {
-            if (link.outputPinId == pin.id) {
-                if (outPinId) *outPinId = link.inputPinId;
-                return graph.FindNodeByPinId(link.inputPinId);
-            }
+        for (Link* link : graph.GetLinksFromPin(pin.id)) {
+            if (outPinId) *outPinId = link->inputPinId;
+            return graph.FindNodeByPinId(link->inputPinId);
         }
     }
     return nullptr;

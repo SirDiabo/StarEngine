@@ -26,24 +26,12 @@ void RegisterMathNodes() {
             PinType typeA = PinType::Float, typeB = PinType::Float;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { typeA = op.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeA = t;
                 }
                 if (p.name == "B") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& op : n.outputs) if (op.id == lk.outputPinId) { typeB = op.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeB = t;
                 }
             }
 
@@ -546,14 +534,8 @@ void RegisterMathNodes() {
             PinType inType = PinType::Float;
             for (const Pin& p : node.inputs) {
                 if (p.name == "Value") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { inType = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) inType = t;
                 }
             }
 
@@ -651,24 +633,12 @@ void RegisterMathNodes() {
             PinType typeA = PinType::Float, typeB = PinType::Float;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeA = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeA = t;
                 }
                 if (p.name == "B") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeB = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeB = t;
                 }
             }
 
@@ -714,34 +684,16 @@ void RegisterMathNodes() {
             PinType valueType = PinType::Float, minType = PinType::Float, maxType = PinType::Float;
             for (const Pin& p : node.inputs) {
                 if (p.name == "Value") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { valueType = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) valueType = t;
                 }
                 if (p.name == "Min") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { minType = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) minType = t;
                 }
                 if (p.name == "Max") {
-                    for (const Link& lk : graph.GetLinks()) {
-                        if (lk.inputPinId == p.id) {
-                            for (const Node& n : graph.GetNodes()) {
-                                for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { maxType = opPin.type; break; }
-                            }
-                            break;
-                        }
-                    }
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) maxType = t;
                 }
             }
 
@@ -976,24 +928,12 @@ void RegisterMathNodes() {
         PinType typeA = PinType::Float, typeB = PinType::Float;
         for (const Pin& p : node.inputs) {
             if (p.name == "A") {
-                for (const Link& lk : graph.GetLinks()) {
-                    if (lk.inputPinId == p.id) {
-                        for (const Node& n : graph.GetNodes()) {
-                            for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeA = opPin.type; break; }
-                        }
-                        break;
-                    }
-                }
+                PinType t = graph.GetConnectedOutputType(p.id);
+                if (t != PinType::None) typeA = t;
             }
             if (p.name == "B") {
-                for (const Link& lk : graph.GetLinks()) {
-                    if (lk.inputPinId == p.id) {
-                        for (const Node& n : graph.GetNodes()) {
-                            for (const Pin& opPin : n.outputs) if (opPin.id == lk.outputPinId) { typeB = opPin.type; break; }
-                        }
-                        break;
-                    }
-                }
+                PinType t = graph.GetConnectedOutputType(p.id);
+                if (t != PinType::None) typeB = t;
             }
         }
 

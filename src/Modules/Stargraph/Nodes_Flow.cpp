@@ -104,10 +104,8 @@ void RegisterFlowNodes() {
     sequence.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         for (const Pin& outPin : node.outputs) {
             if (outPin.type != PinType::Exec) continue;
-            for (const Link& lk : graph.GetLinks()) {
-                if (lk.outputPinId == outPin.id) {
-                    GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(lk.inputPinId), ctx, lk.inputPinId);
-                }
+            for (Link* lk : graph.GetLinksFromPin(outPin.id)) {
+                GraphExecutor::ExecuteLinkedNodes(graph, graph.FindNodeByPinId(lk->inputPinId), ctx, lk->inputPinId);
             }
         }
     };

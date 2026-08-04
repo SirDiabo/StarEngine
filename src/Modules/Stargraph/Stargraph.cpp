@@ -7,7 +7,7 @@
 #include <sstream>
 
 Node* Stargraph::CreateNode(const std::string& type) {
-    InvalidateNodeTypeCache();
+    InvalidateCaches();
 
     nodes.emplace_back();
     Node* node = &nodes.back();
@@ -31,6 +31,7 @@ Node* Stargraph::CreateNode(const std::string& type) {
 
 void Stargraph::AddLink(const Link& link) {
     links.push_back(link);
+    InvalidateCaches();
 }
 
 void Stargraph::RemoveLink(int pinId) {
@@ -41,12 +42,14 @@ void Stargraph::RemoveLink(int pinId) {
             ++it;
         }
     }
+    InvalidateCaches();
 }
 
 void Stargraph::RemoveSpecificLink(int outputPinId, int inputPinId) {
     for (auto it = links.begin(); it != links.end(); ++it) {
         if (it->outputPinId == outputPinId && it->inputPinId == inputPinId) {
             links.erase(it);
+            InvalidateCaches();
             return;
         }
     }
@@ -64,14 +67,17 @@ std::string Variable::DefaultElementText() const {
 
 void Stargraph::AddVariable(const Variable& var) {
     variables.push_back(var);
+    InvalidateCaches();
 }
 
 void Stargraph::RemoveVariable(size_t index) {
     if (index < variables.size()) variables.erase(variables.begin() + index);
+    InvalidateCaches();
 }
 
 void Stargraph::RenameVariable(size_t index, const std::string& newName) {
     if (index < variables.size()) variables[index].name = newName;
+    InvalidateCaches();
 }
 
 void Stargraph::AddComponent(const ComponentDecl& comp) {
@@ -95,7 +101,7 @@ Pin* Stargraph::FindPin(int pinId) {
 }
 
 Node* Stargraph::FindNodeByPinId(int pinId) {
-    if (!nodesByTypeCacheBuilt) BuildCaches();
+    if (!cachesBuilt) BuildCaches();
     auto it = pinToNodeCache.find(pinId);
     return it != pinToNodeCache.end() ? it->second : nullptr;
 }
@@ -121,7 +127,7 @@ Node* Stargraph::FindCustomEventByName(const std::string& eventName) {
 }
 
 const std::vector<Node*>& Stargraph::GetNodesOfType(const std::string& type) {
-    if (!nodesByTypeCacheBuilt) BuildCaches();
+    if (!cachesBuilt) BuildCaches();
     static const std::vector<Node*> empty;
     auto it = nodesByTypeCache.find(type);
     return it != nodesByTypeCache.end() ? it->second : empty;
@@ -130,18 +136,33 @@ const std::vector<Node*>& Stargraph::GetNodesOfType(const std::string& type) {
 void Stargraph::BuildCaches() {
     nodesByTypeCache.clear();
     pinToNodeCache.clear();
+    outputPinToLinksCache.clear();
+    inputPinToLinkCache.clear();
+    variableByNameCache.clear();
+
     for (Node& node : nodes) {
         nodesByTypeCache[node.type].push_back(&node);
         for (const Pin& pin : node.inputs) pinToNodeCache[pin.id] = &node;
         for (const Pin& pin : node.outputs) pinToNodeCache[pin.id] = &node;
     }
-    nodesByTypeCacheBuilt = true;
+    for (Link& link : links) {
+        outputPinToLinksCache[link.outputPinId].push_back(&link);
+        inputPinToLinkCache[link.inputPinId] = &link;
+    }
+    for (Variable& v : variables) {
+        variableByNameCache[v.name] = &v;
+    }
+
+    cachesBuilt = true;
 }
 
-void Stargraph::InvalidateNodeTypeCache() {
-    nodesByTypeCacheBuilt = false;
+void Stargraph::InvalidateCaches() {
+    cachesBuilt = false;
     nodesByTypeCache.clear();
     pinToNodeCache.clear();
+    outputPinToLinksCache.clear();
+    inputPinToLinkCache.clear();
+    variableByNameCache.clear();
 }
 
 Pin* Stargraph::AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type) {
@@ -171,10 +192,9 @@ void Stargraph::RemoveDynamicPin(Node& node, bool isOutput, const std::string& p
 }
 
 Variable* Stargraph::FindVariable(const std::string& name) {
-    for (Variable& v : variables) {
-        if (v.name == name) return &v;
-    }
-    return nullptr;
+    if (!cachesBuilt) BuildCaches();
+    auto it = variableByNameCache.find(name);
+    return it != variableByNameCache.end() ? it->second : nullptr;
 }
 
 const Variable* Stargraph::FindVariable(const std::string& name) const {
@@ -184,13 +204,37 @@ const Variable* Stargraph::FindVariable(const std::string& name) const {
     return nullptr;
 }
 
+const std::vector<Link*>& Stargraph::GetLinksFromPin(int outputPinId) {
+    if (!cachesBuilt) BuildCaches();
+    static const std::vector<Link*> empty;
+    auto it = outputPinToLinksCache.find(outputPinId);
+    return it != outputPinToLinksCache.end() ? it->second : empty;
+}
+
+Link* Stargraph::GetLinkToPin(int inputPinId) {
+    if (!cachesBuilt) BuildCaches();
+    auto it = inputPinToLinkCache.find(inputPinId);
+    return it != inputPinToLinkCache.end() ? it->second : nullptr;
+}
+
+PinType Stargraph::GetConnectedOutputType(int inputPinId) {
+    Link* link = GetLinkToPin(inputPinId);
+    if (!link) return PinType::None;
+    Node* fromNode = FindNodeByPinId(link->outputPinId);
+    if (!fromNode) return PinType::None;
+    for (const Pin& p : fromNode->outputs) {
+        if (p.id == link->outputPinId) return p.type;
+    }
+    return PinType::None;
+}
+
 bool Stargraph::RemoveNode(int nodeId) {
     for (auto it = nodes.begin(); it != nodes.end(); ++it) {
         if (std::stoi(it->id) == nodeId) {
             for (const Pin& pin : it->inputs) RemoveLink(pin.id);
             for (const Pin& pin : it->outputs) RemoveLink(pin.id);
             nodes.erase(it);
-            InvalidateNodeTypeCache();
+            InvalidateCaches();
             return true;
         }
     }
@@ -438,7 +482,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
     if (!in.is_open()) return false;
 
     nodes.clear();
-    InvalidateNodeTypeCache();
+    InvalidateCaches();
     links.clear();
     variables.clear();
     components.clear();

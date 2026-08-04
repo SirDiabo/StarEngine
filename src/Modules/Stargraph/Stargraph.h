@@ -266,6 +266,11 @@ public:
     Variable* FindVariable(const std::string& name);
     const Variable* FindVariable(const std::string& name) const;
 
+    const std::vector<Link*>& GetLinksFromPin(int outputPinId);
+    Link* GetLinkToPin(int inputPinId);
+
+    PinType GetConnectedOutputType(int inputPinId);
+
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
 
@@ -284,8 +289,11 @@ private:
 
     std::unordered_map<std::string, std::vector<Node*>> nodesByTypeCache;
     std::unordered_map<int, Node*> pinToNodeCache;
-    bool nodesByTypeCacheBuilt = false;
-    void InvalidateNodeTypeCache();
+    std::unordered_map<int, std::vector<Link*>> outputPinToLinksCache;
+    std::unordered_map<int, Link*> inputPinToLinkCache;
+    std::unordered_map<std::string, Variable*> variableByNameCache;
+    bool cachesBuilt = false;
+    void InvalidateCaches();
     void BuildCaches();
 };
 
