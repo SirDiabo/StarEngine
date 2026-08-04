@@ -3,6 +3,7 @@
 #include "Core/StarMaterial.h"
 #include "Core/CookedFile.h"
 #include "Modules/Rendering/ShadingModel.h"
+#include <cmath>
 
 AssetCache& AssetCache::Get() {
     static AssetCache instance;
@@ -45,6 +46,44 @@ Texture2D* AssetCache::GetOrLoadTexture(const std::string& textureAssetPath) {
     return &inserted.first->second;
 }
 
+const StarMaterial* AssetCache::GetOrLoadMaterial(const std::string& materialAssetPath) {
+    auto it = materialCache.find(materialAssetPath);
+    if (it != materialCache.end()) return &it->second;
+
+    StarMaterial material;
+    if (!StarMaterial::LoadFromFile(materialAssetPath, material)) return nullptr;
+
+    auto inserted = materialCache.emplace(materialAssetPath, material);
+    return &inserted.first->second;
+}
+
+void AssetCache::ReloadMaterial(const std::string& materialAssetPath) {
+    materialCache.erase(materialAssetPath);
+}
+
+BoundingBox AssetCache::GetOrComputeModelBounds(Model* model) {
+    if (!model) return {};
+
+    auto it = modelBoundsCache.find(model);
+    if (it != modelBoundsCache.end()) return it->second;
+
+    BoundingBox merged{};
+    bool any = false;
+    for (int i = 0; i < model->meshCount; i++) {
+        BoundingBox meshBox = GetMeshBoundingBox(model->meshes[i]);
+        if (!any) { merged = meshBox; any = true; continue; }
+        merged.min.x = fminf(merged.min.x, meshBox.min.x);
+        merged.min.y = fminf(merged.min.y, meshBox.min.y);
+        merged.min.z = fminf(merged.min.z, meshBox.min.z);
+        merged.max.x = fmaxf(merged.max.x, meshBox.max.x);
+        merged.max.y = fmaxf(merged.max.y, meshBox.max.y);
+        merged.max.z = fmaxf(merged.max.z, meshBox.max.z);
+    }
+
+    modelBoundsCache.emplace(model, merged);
+    return merged;
+}
+
 void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>& materialPaths) {
     if (!model) return;
 
@@ -52,12 +91,11 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
         Color color = WHITE;
         bool lit = false;
         if ((size_t)i < materialPaths.size() && !materialPaths[i].empty()) {
-            StarMaterial material;
-            if (StarMaterial::LoadFromFile(materialPaths[i], material)) {
-                color = material.baseColor;
-                lit = material.lit;
-                if (!material.textureAssetPath.empty()) {
-                    if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material.textureAssetPath)) {
+            if (const StarMaterial* material = AssetCache::Get().GetOrLoadMaterial(materialPaths[i])) {
+                color = material->baseColor;
+                lit = material->lit;
+                if (!material->textureAssetPath.empty()) {
+                    if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material->textureAssetPath)) {
                         model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
                     }
                 }
@@ -75,13 +113,16 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
 
     auto it = meshCache.find(normalized);
     if (it == meshCache.end()) return;
+    modelBoundsCache.erase(&it->second);
     UnloadModel(it->second);
     meshCache.erase(it);
 }
 
 void AssetCache::Clear() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
+    modelBoundsCache.clear();
     meshCache.clear();
     for (auto& kv : textureCache) UnloadTexture(kv.second);
     textureCache.clear();
+    materialCache.clear();
 }

@@ -4,6 +4,7 @@
 #include "Core/RenderSettings.h"
 #include "Core/Module.h"
 #include "Core/EmbeddedAssets.h"
+#include "Runtime/AssetCache.h"
 #include "Core/OSTrash.h"
 #include "Core/SafeProcess.h"
 #include "NativeFileDialog.h"
@@ -423,6 +424,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     Rectangle closeBtn = {saveBtn.x + saveBtn.width + 4, saveBtn.y, saveBtn.width, 22};
     if (UIWidget::Button(saveBtn, "Save") && !pickerBlocksInput) {
         materialEditorData.SaveToFile(materialEditorPath);
+        AssetCache::Get().ReloadMaterial(materialEditorPath);
         materialEditorOpen = false;
     }
     if (UIWidget::Button(closeBtn, "Cancel") && !pickerBlocksInput) {

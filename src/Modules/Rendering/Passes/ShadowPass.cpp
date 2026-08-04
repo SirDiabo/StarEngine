@@ -7,6 +7,7 @@
 #include "Runtime/CollisionTrace.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include <vector>
 
 namespace {
 
@@ -28,11 +29,13 @@ void EnsureShadowTextureLoaded() {
     shadowTextureLoaded = true;
 }
 
-bool FindShadowDirection(Vector3 fromPos, Vector3& outDirection) {
-    LightComponent* nearest = nullptr;
-    float bestDistSq = 1e30f;
-    Vector3 nearestDir{0, -1, 0};
+struct ShadowLight {
+    bool isSun;
+    Vector3 position;
+    Vector3 direction;
+};
 
+void GatherShadowLights(std::vector<ShadowLight>& outLights) {
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;
@@ -45,24 +48,37 @@ bool FindShadowDirection(Vector3 fromPos, Vector3& outDirection) {
                 float yr = rot.y * DEG2RAD;
                 float pr = rot.x * DEG2RAD;
                 Vector3 dir = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
-                // Sun has no position, so it can't be "nearest" - only use it if nothing closer exists yet.
-                if (!nearest) { nearest = lc; nearestDir = dir; }
+                outLights.push_back({true, {0, 0, 0}, dir});
                 continue;
             }
 
-            Vector3 lightPos = actor->GetComponentWorldPosition(lc);
-            float distSq = Vector3DistanceSqr(lightPos, fromPos);
-            if (distSq < bestDistSq) {
-                bestDistSq = distSq;
-                nearest = lc;
-                nearestDir = Vector3Normalize(Vector3Subtract(fromPos, lightPos));
-            }
+            outLights.push_back({false, actor->GetComponentWorldPosition(lc), {0, 0, 0}});
+        }
+    }
+}
+
+bool FindShadowDirection(const std::vector<ShadowLight>& lights, Vector3 fromPos, Vector3& outDirection) {
+    const ShadowLight* nearest = nullptr;
+    const ShadowLight* sun = nullptr;
+    float bestDistSq = 1e30f;
+    Vector3 nearestDir{0, -1, 0};
+
+    for (const auto& light : lights) {
+        if (light.isSun) {
+            if (!sun) sun = &light;
+            continue;
+        }
+        float distSq = Vector3DistanceSqr(light.position, fromPos);
+        if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            nearest = &light;
+            nearestDir = Vector3Normalize(Vector3Subtract(fromPos, light.position));
         }
     }
 
-    if (!nearest) return false;
-    outDirection = nearestDir;
-    return true;
+    if (nearest) { outDirection = nearestDir; return true; }
+    if (sun) { outDirection = sun->direction; return true; }
+    return false;
 }
 
 void DrawShadowDecal(Vector3 hitPoint, Vector3 hitNormal, Vector3 lightDir, bool haveLight) {
@@ -120,6 +136,9 @@ bool Enabled() {
 void Run() {
     EnsureShadowTextureLoaded();
 
+    std::vector<ShadowLight> lights;
+    GatherShadowLights(lights);
+
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;
@@ -137,7 +156,7 @@ void Run() {
             if (!CollisionTrace::TraceAgainstMeshes(start, end, actor, hitActor, hitPoint, hitNormal, hitDist)) continue;
 
             Vector3 lightDir;
-            bool haveLight = FindShadowDirection(casterPos, lightDir);
+            bool haveLight = FindShadowDirection(lights, casterPos, lightDir);
             DrawShadowDecal(hitPoint, hitNormal, lightDir, haveLight);
         }
     }

@@ -125,19 +125,19 @@ Vector3 Actor::ComputeWorldScale(Vector3 localScale, Vector3 parentScale) {
 }
 
 void Actor::GetComponentWorldTransform(Component* comp, Vector3& outPos, Vector3& outRot, Vector3& outScale) const {
-    std::vector<Component*> chain;
+    Component* chain[64];
+    int count = 0;
     Component* c = comp;
-    int guard = 0;
-    while (c && guard++ < 64) {
-        chain.push_back(c);
+    while (c && count < 64) {
+        chain[count++] = c;
         c = c->parent;
     }
 
     outPos = position;
     outRot = rotation;
     outScale = scale;
-    for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-        Component* cur = *it;
+    for (int i = count - 1; i >= 0; i--) {
+        Component* cur = chain[i];
         outPos = ComputeWorldPosition(cur->position, outPos, outRot, outScale);
         outRot = ComputeWorldRotation(cur->rotation, outRot);
         outScale = ComputeWorldScale(cur->scale, outScale);
