@@ -88,11 +88,13 @@ fs::path LocateBuiltExecutable(const fs::path& buildDir, PackagePlatform platfor
     return {};
 }
 
-std::string RewriteToContentRelative(const std::string& absolutePath, const fs::path& contentRoot) {
-    if (absolutePath.empty()) return absolutePath;
+std::string RewriteToContentRelative(const std::string& mapPath, const fs::path& contentRoot) {
+    if (mapPath.empty()) return mapPath;
+    if (!fs::path(mapPath).is_absolute()) return mapPath;
+
     std::error_code ec;
-    fs::path relative = fs::relative(fs::path(absolutePath), contentRoot, ec);
-    if (ec || relative.generic_string().rfind("..", 0) == 0) return absolutePath;
+    fs::path relative = fs::relative(fs::path(mapPath), contentRoot, ec);
+    if (ec || relative.generic_string().rfind("..", 0) == 0) return mapPath;
     return relative.generic_string();
 }
 
