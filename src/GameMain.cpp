@@ -47,18 +47,25 @@ int main(int argc, char* argv[]) {
     StarPak::Reader pak;
     if (!exePath.empty() && pak.LoadFromExecutable(exePath.string())) {
         std::vector<uint8_t> bootBytes = pak.ReadEntry(StarPak::kBootConfigPath);
-        if (bootBytes.empty()) return 1;
+        if (bootBytes.empty()) {
+            TraceLog(LOG_ERROR, "GameMain: pak loaded but boot config entry was empty");
+            return 1;
+        }
         if (!PackagedGameConfig::LoadFromText(std::string(bootBytes.begin(), bootBytes.end()), config)) {
+            TraceLog(LOG_ERROR, "GameMain: failed to parse boot config from pak");
             return 1;
         }
         CookedFile::SetActivePak(std::move(pak), CookCipherFromName(config.cipher), config.cipherKey);
+        TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
         std::string bootstrapPath = FindBootstrapFile(exeDir);
         if (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
+            TraceLog(LOG_ERROR, "GameMain: no embedded pak and no .starproject bootstrap found next to the exe");
             return 1;
         }
         ContentPathResolver::SetContentRoot((exeDir / "Content").string());
         CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+        TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     }
 
     RegisterAllModules();
@@ -88,9 +95,16 @@ int main(int argc, char* argv[]) {
     }
 
     StarMap map;
-    if (!config.defaultMap.empty()) map.LoadFromFile(config.defaultMap);
+    if (!config.defaultMap.empty()) {
+        if (!map.LoadFromFile(config.defaultMap)) {
+            TraceLog(LOG_ERROR, "GameMain: failed to load default map '%s'", config.defaultMap.c_str());
+        }
+    } else {
+        TraceLog(LOG_WARNING, "GameMain: no default map set, starting with an empty world");
+    }
     WorldSpawner::SpawnMapActors(map);
     World::Get().BeginPlay();
+    TraceLog(LOG_INFO, "GameMain: spawned %d actors", (int)World::Get().GetActors().size());
 
     Camera3D camera{};
     camera.position = {0, 400, 800};
