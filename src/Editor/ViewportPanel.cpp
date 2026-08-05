@@ -389,7 +389,7 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 void ViewportPanel::RenderScene() {
     const float placeholderSize = 50.0f;
 
-    rlSetClipPlanes(0.1, 60000.0);
+    rlSetClipPlanes(0.1, 5000000.0);
     BeginMode3D(camera);
 
     DrawGrid(40, 100.0f);
