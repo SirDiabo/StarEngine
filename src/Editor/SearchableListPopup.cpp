@@ -64,6 +64,7 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
 
     Vector2 mp = GetMousePosition();
 
+    bool wasJustOpened = justOpened;
     if (justOpened) {
         justOpened = false;
     } else {
@@ -116,7 +117,7 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
         if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
             DrawRectangleRec(btn, theme.surfaceHover);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clickedId = e.id;
+            if (!wasJustOpened && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clickedId = e.id;
         }
         DrawText(e.label.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, theme.textPrimary);
         y += itemH;

@@ -16,6 +16,13 @@ void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
 
     float height = 22.0f + (float)(entries.size() + 2) * 18.0f + 4.0f;
     area = {anchorPos.x, anchorPos.y, 200.0f, height};
+
+    float screenW = (float)GetScreenWidth();
+    float screenH = (float)GetScreenHeight();
+    if (area.x + area.width > screenW) area.x = screenW - area.width;
+    if (area.x < 0) area.x = 0;
+    if (area.y + area.height > screenH) area.y = screenH - area.height;
+    if (area.y < 0) area.y = 0;
 }
 
 void RegistryPickerPopup::Close() {
@@ -27,6 +34,7 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
     if (!open) return false;
 
     Vector2 mousePos = GetMousePosition();
+    bool wasJustOpened = justOpened;
 
     Rectangle areaCopy = area;
     deferredDraws.push_back([areaCopy]() {
@@ -43,7 +51,7 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
         if (noneHovered) DrawRectangleRec(noneItem, theme.surfaceHover);
         DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, theme.textSecondary);
     });
-    if (!creating && noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (!creating && !wasJustOpened && noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         outVal.clear();
         Close();
         return true;
@@ -61,7 +69,7 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
             DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, theme.textPrimary);
         });
 
-        if (!creating && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (!creating && !wasJustOpened && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             outVal = entries[i];
             Close();
             return true;
@@ -88,7 +96,7 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
             if (newHovered) DrawRectangleRec(newItem, theme.surfaceHover);
             DrawText("+ New...", (int)newItem.x + 6, (int)newItem.y + 3, 11, theme.success);
         });
-        if (newHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (!wasJustOpened && newHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             creating = true;
             newEntryBuf[0] = '\0';
         }
