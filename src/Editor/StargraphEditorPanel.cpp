@@ -58,7 +58,7 @@ void StargraphEditorPanel::Close() {
 }
 
 void StargraphEditorPanel::SaveGraph() {
-    graph.SaveToFile(filePath);
+    if (!graph.SaveToFile(filePath)) return;
     isDirty = false;
     if (viewportPanel) viewportPanel->InvalidateClassGraph(filePath);
 }

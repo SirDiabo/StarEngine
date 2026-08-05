@@ -80,7 +80,11 @@ bool RegistryPickerPopup::Render(std::string& outVal) {
     // Inline create-new row
     Rectangle newItem = {area.x + 1, y, area.width - 2, 18};
     if (creating) {
-        GuiTextBox(newItem, newEntryBuf, sizeof(newEntryBuf), true);
+        char* entryBuf = newEntryBuf;
+        size_t entryBufSize = sizeof(newEntryBuf);
+        deferredDraws.push_back([newItem, entryBuf, entryBufSize]() {
+            GuiTextBox(newItem, entryBuf, entryBufSize, true);
+        });
         if (IsKeyPressed(KEY_ENTER) && newEntryBuf[0] != '\0') {
             std::string name = newEntryBuf;
             NamedListRegistry::Get().AddEntry(category, name);
