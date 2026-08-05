@@ -527,6 +527,7 @@ void ContentBrowserPanel::Render() {
 
     int dropTargetFolderIndex = -1;
     bool rightClickConsumedByEntry = false;
+    bool leftClickConsumedByEntry = false;
 
     for (size_t i = 0; i < entries.size(); i++) {
         int col = (int)i % cols;
@@ -581,6 +582,7 @@ void ContentBrowserPanel::Render() {
         }
 
         if (!gridInputBlocked && tileHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            leftClickConsumedByEntry = true;
             float currentTime = (float)GetTime();
             if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
                 OpenEntry(entries[i]);
@@ -632,6 +634,11 @@ void ContentBrowserPanel::Render() {
     }
 
     EndScissorMode();
+
+    if (!gridInputBlocked && !leftClickConsumedByEntry && selectedIndex != -1 &&
+        IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        selectedIndex = -1;
+    }
 
     if (draggingAsset) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
