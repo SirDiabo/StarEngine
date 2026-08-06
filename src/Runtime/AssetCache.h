@@ -14,6 +14,7 @@ public:
     const StarMaterial* GetOrLoadMaterial(const std::string& materialAssetPath);
     BoundingBox GetOrComputeModelBounds(Model* model);
     void ReloadModel(const std::string& sourceMeshPath);
+    void ReloadTexture(const std::string& textureAssetPath);
     void ReloadMaterial(const std::string& materialAssetPath);
     void Clear();
 

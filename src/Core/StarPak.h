@@ -7,6 +7,7 @@
 namespace StarPak {
 
 constexpr const char* kBootConfigPath = "__boot__";
+constexpr const char* kInputMappingsPath = "__input_mappings__";
 
 struct Entry {
     std::string path;

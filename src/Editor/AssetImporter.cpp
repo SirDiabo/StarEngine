@@ -6,6 +6,7 @@
 #include "Core/SourceVendoring.h"
 #include "Core/ObjMtlParser.h"
 #include "ImportDetailsPanel.h"
+#include "Runtime/AssetCache.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdio>
@@ -162,6 +163,11 @@ std::string Reimport(const std::string& starAssetPath) {
     }
 
     if (rebuilt.SaveToFile(starAssetPath)) {
+        if (rebuilt.assetType == "StaticMesh") {
+            AssetCache::Get().ReloadModel(rebuilt.ResolveSourcePath());
+        } else if (rebuilt.assetType == "Texture") {
+            AssetCache::Get().ReloadTexture(starAssetPath);
+        }
         return starAssetPath;
     }
     return "";

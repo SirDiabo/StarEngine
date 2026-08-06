@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <random>
 #include <thread>
 
@@ -227,6 +228,13 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
     std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();
 
+    fs::path inputMappingsSource = fs::path(options.projectRoot) / "Saved" / "InputMappings.cfg";
+    std::vector<uint8_t> inputMappingsBytes;
+    if (fs::exists(inputMappingsSource)) {
+        std::ifstream mappingsIn(inputMappingsSource, std::ios::binary);
+        inputMappingsBytes.assign(std::istreambuf_iterator<char>(mappingsIn), std::istreambuf_iterator<char>());
+    }
+
     PackagedGameConfig bootConfig;
     bootConfig.name = settings.name;
     bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
@@ -240,8 +248,13 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     if (options.format == PackageFormat::SingleFile) {
         fs::path pakTempPath = buildDir / "content.starpak";
 
+        std::vector<PackageCooker::ExtraPakFile> extraFiles;
+        if (!inputMappingsBytes.empty()) {
+            extraFiles.push_back({StarPak::kInputMappingsPath, inputMappingsBytes});
+        }
+
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                            options.cipher, cipherKey, bootConfig.ToText());
+                                                            options.cipher, cipherKey, bootConfig.ToText(), extraFiles);
         if (!cookResult.success) {
             result.error = "Cooking failed: " + cookResult.error;
             return result;
@@ -263,6 +276,12 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
             return result;
         }
         result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n";
+
+        if (!inputMappingsBytes.empty()) {
+            fs::path outputMappingsPath = fs::path(options.outputDir) / "Saved" / "InputMappings.cfg";
+            std::ofstream mappingsOut(outputMappingsPath, std::ios::binary);
+            mappingsOut.write(reinterpret_cast<const char*>(inputMappingsBytes.data()), (std::streamsize)inputMappingsBytes.size());
+        }
 
         fs::path bootstrapPath = fs::path(options.outputDir) / (settings.name + ".starproject");
         std::ofstream out(bootstrapPath);

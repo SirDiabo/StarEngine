@@ -23,6 +23,7 @@ public:
     static InputMappingRegistry& Get();
 
     void Load(const std::string& projectRoot);
+    void LoadFromText(const std::string& text);
     void Save() const;
 
     const InputMapping* Find(const std::string& name) const;

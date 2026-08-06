@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cctype>
 
+std::vector<std::function<void()>> SearchableListPopup::deferredDraws;
+
 void SearchableListPopup::Open(Vector2 anchorPos, float widthIn, float maxVisibleHeightIn) {
     open = true;
     justOpened = true;
@@ -84,11 +86,18 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
         return "";
     }
 
-    DrawRectangleRec(popup, UITheme::Get().panelBg);
-    DrawRectangleLinesEx(popup, 1, UITheme::Get().panelBorder);
+    Rectangle popupCopy = popup;
+    deferredDraws.push_back([popupCopy]() {
+        DrawRectangleRec(popupCopy, UITheme::Get().panelBg);
+        DrawRectangleLinesEx(popupCopy, 1, UITheme::Get().panelBorder);
+    });
 
     Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
-    GuiTextBox(searchRect, search, sizeof(search), true);
+    char* searchBuf = search;
+    size_t searchBufSize = sizeof(search);
+    deferredDraws.push_back([searchRect, searchBuf, searchBufSize]() {
+        GuiTextBox(searchRect, searchBuf, searchBufSize, true);
+    });
 
     Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
     if (CheckCollisionPointRec(mp, listArea)) {
@@ -100,40 +109,67 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
     if (scrollOffset < 0) scrollOffset = 0;
     if (scrollOffset > maxScroll) scrollOffset = maxScroll;
 
-    BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
+    struct DrawItem {
+        bool isHeader;
+        std::string text;
+        Rectangle rect;
+        bool hovered;
+        bool drawDivider;
+    };
+    std::vector<DrawItem> drawItems;
 
     std::string clickedId;
     std::string lastCategory;
     float y = popup.y + searchH + 4 - scrollOffset;
-    const UIPalette& theme = UITheme::Get();
     for (const Entry& e : filtered) {
         if (e.category != lastCategory) {
-            if (!lastCategory.empty()) {
-                DrawLineV({popup.x + 6, y}, {popup.x + popup.width - 6, y}, theme.panelBorder);
-            }
+            drawItems.push_back({true, e.category, {popup.x, y, popup.width, categoryHeaderH}, false, !lastCategory.empty()});
             lastCategory = e.category;
-            DrawText(e.category.c_str(), (int)popup.x + 8, (int)y + 4, 11, theme.accent);
             y += categoryHeaderH;
         }
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
-            DrawRectangleRec(btn, theme.surfaceHover);
-            if (!wasJustOpened && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clickedId = e.id;
-        }
-        DrawText(e.label.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, theme.textPrimary);
+        bool hovered = CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea);
+        if (hovered && !wasJustOpened && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clickedId = e.id;
+        drawItems.push_back({false, e.label, btn, hovered, false});
         y += itemH;
     }
 
-    EndScissorMode();
+    Rectangle listAreaCopy = listArea;
+    Rectangle popupCopy2 = popup;
+    float totalItemsHCopy = totalItemsH;
+    float listHCopy = listH;
+    float scrollOffsetCopy = scrollOffset;
+    float maxScrollCopy = maxScroll;
+    deferredDraws.push_back([drawItems, listAreaCopy, popupCopy2, totalItemsHCopy, listHCopy, scrollOffsetCopy, maxScrollCopy]() {
+        const UIPalette& theme = UITheme::Get();
+        BeginScissorMode((int)listAreaCopy.x, (int)listAreaCopy.y, (int)listAreaCopy.width, (int)listAreaCopy.height);
+        for (const auto& item : drawItems) {
+            if (item.isHeader) {
+                if (item.drawDivider) {
+                    DrawLineV({item.rect.x + 6, item.rect.y}, {item.rect.x + item.rect.width - 6, item.rect.y}, theme.panelBorder);
+                }
+                DrawText(item.text.c_str(), (int)item.rect.x + 8, (int)item.rect.y + 4, 11, theme.accent);
+            } else {
+                if (item.hovered) DrawRectangleRec(item.rect, theme.surfaceHover);
+                DrawText(item.text.c_str(), (int)item.rect.x + 8, (int)item.rect.y + 4, 12, theme.textPrimary);
+            }
+        }
+        EndScissorMode();
 
-    if (totalItemsH > listH) {
-        float scrollRatio = (maxScroll > 0) ? scrollOffset / maxScroll : 0;
-        float barH = (listH / totalItemsH) * listH;
-        float barY = listArea.y + scrollRatio * (listH - barH);
-        DrawRectangleRec({popup.x + popup.width - 4, barY, 3, barH}, {100, 100, 120, 200});
-    }
+        if (totalItemsHCopy > listHCopy) {
+            float scrollRatio = (maxScrollCopy > 0) ? scrollOffsetCopy / maxScrollCopy : 0;
+            float barH = (listHCopy / totalItemsHCopy) * listHCopy;
+            float barY = listAreaCopy.y + scrollRatio * (listHCopy - barH);
+            DrawRectangleRec({popupCopy2.x + popupCopy2.width - 4, barY, 3, barH}, {100, 100, 120, 200});
+        }
+    });
 
     if (!clickedId.empty()) open = false;
     return clickedId;
+}
+
+void SearchableListPopup::FlushDeferredDraws() {
+    for (const auto& draw : deferredDraws) draw();
+    deferredDraws.clear();
 }

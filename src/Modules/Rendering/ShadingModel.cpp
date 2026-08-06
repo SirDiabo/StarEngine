@@ -98,6 +98,7 @@ in vec3 fragLight;
 
 void main() {
     vec4 texelColor = texture(texture0, fragTexCoord);
+    if (texelColor.a < 0.5) discard;
     finalColor = texelColor * colDiffuse * fragColor * vec4(fragLight, 1.0);
 }
 )glsl";
@@ -143,12 +144,29 @@ std::string BuildPerPixelFS() {
     return std::string("#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\nin vec3 fragWorldPos;\nin vec3 fragWorldNormal;\n")
         + kSampleAndOutput + kLightingGLSL + R"glsl(
 void main() {
-    vec3 lightAccum = ComputeLighting(fragWorldPos, normalize(fragWorldNormal));
     vec4 texelColor = texture(texture0, fragTexCoord);
+    if (texelColor.a < 0.5) discard;
+    vec3 lightAccum = ComputeLighting(fragWorldPos, normalize(fragWorldNormal));
     finalColor = texelColor * colDiffuse * fragColor * vec4(lightAccum, 1.0);
 }
 )glsl";
 }
+
+const char* kVertexUnlit = R"glsl(
+void main() {
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+const char* kFragmentCutout = R"glsl(
+void main() {
+    vec4 texelColor = texture(texture0, fragTexCoord);
+    if (texelColor.a < 0.5) discard;
+    finalColor = texelColor * colDiffuse * fragColor;
+}
+)glsl";
 
 struct LightLocs {
     int type = -1, position = -1, direction = -1, color = -1;
@@ -182,6 +200,21 @@ struct LitVariant {
 LitVariant vertexVariant;
 LitVariant pixelVariant;
 
+struct UnlitVariant {
+    Shader shader = {0};
+    bool loaded = false;
+
+    void EnsureLoaded() {
+        if (loaded) return;
+        std::string vs = std::string(kAttribsAndVaryings) + kVertexUnlit;
+        std::string fs = std::string("#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\n") + kSampleAndOutput + kFragmentCutout;
+        shader = LoadShaderFromMemory(vs.c_str(), fs.c_str());
+        loaded = true;
+    }
+};
+
+UnlitVariant unlitVariant;
+
 LitVariant& ActiveVariant() {
     if (RenderSettings::Get().GetLightingQuality() == LightingQuality::PerPixel) {
         pixelVariant.EnsureLoaded(BuildPerPixelVS(), BuildPerPixelFS());
@@ -209,10 +242,8 @@ Shader& ShadingModel::GetLitShader() {
 }
 
 Shader ShadingModel::GetDefaultShader() {
-    Shader shader = {0};
-    shader.id = rlGetShaderIdDefault();
-    shader.locs = rlGetShaderLocsDefault();
-    return shader;
+    unlitVariant.EnsureLoaded();
+    return unlitVariant.shader;
 }
 
 const char* ShadingModel::GetLightingGLSL() {

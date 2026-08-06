@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,8 @@ public:
 
     std::string Render(const std::vector<Entry>& entries, Rectangle boundsArea);
 
+    static void FlushDeferredDraws();
+
 private:
     bool open = false;
     bool justOpened = false;
@@ -27,4 +30,6 @@ private:
     float scrollOffset = 0.0f;
     char search[64] = {};
     Rectangle lastRect{};
+
+    static std::vector<std::function<void()>> deferredDraws;
 };

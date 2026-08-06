@@ -175,7 +175,8 @@ CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std
 
 CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std::string& outputPakFileStr,
                                      CookCipher cipher, const std::string& cipherKey,
-                                     const std::string& bootConfigText) {
+                                     const std::string& bootConfigText,
+                                     const std::vector<ExtraPakFile>& extraFiles) {
     StarPak::Writer writer;
 
     CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey,
@@ -186,6 +187,10 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
 
     writer.AddFile(StarPak::kBootConfigPath,
                    std::vector<uint8_t>(bootConfigText.begin(), bootConfigText.end()));
+
+    for (const ExtraPakFile& extra : extraFiles) {
+        writer.AddFile(extra.virtualPath, extra.bytes);
+    }
 
     if (!writer.WriteToFile(outputPakFileStr)) {
         result.success = false;

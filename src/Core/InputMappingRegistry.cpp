@@ -76,6 +76,23 @@ void InputMappingRegistry::Load(const std::string& projectRoot) {
     }
 }
 
+void InputMappingRegistry::LoadFromText(const std::string& text) {
+    mappings.clear();
+    filePath.clear();
+
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string value = line.substr(eq + 1);
+        mappings[key] = DecodeMapping(value);
+    }
+}
+
 void InputMappingRegistry::Save() const {
     if (filePath.empty()) return;
 

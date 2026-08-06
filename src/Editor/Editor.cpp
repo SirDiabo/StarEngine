@@ -16,6 +16,7 @@
 #include "RegistryPickerPopup.h"
 #include "ChoicePopup.h"
 #include "ConfirmPopup.h"
+#include "SearchableListPopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
 #include "Core/LayoutSerializer.h"
@@ -130,6 +131,7 @@ void Editor::Render() {
     RegistryPickerPopup::FlushDeferredDraws();
     ChoicePopup::FlushDeferredDraws();
     ConfirmPopup::FlushDeferredDraws();
+    SearchableListPopup::FlushDeferredDraws();
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {

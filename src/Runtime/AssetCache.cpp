@@ -61,6 +61,13 @@ void AssetCache::ReloadMaterial(const std::string& materialAssetPath) {
     materialCache.erase(materialAssetPath);
 }
 
+void AssetCache::ReloadTexture(const std::string& textureAssetPath) {
+    auto it = textureCache.find(textureAssetPath);
+    if (it == textureCache.end()) return;
+    UnloadTexture(it->second);
+    textureCache.erase(it);
+}
+
 BoundingBox AssetCache::GetOrComputeModelBounds(Model* model) {
     if (!model) return {};
 

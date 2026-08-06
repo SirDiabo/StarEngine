@@ -5,6 +5,7 @@
 #include "Core/PackageCipher.h"
 #include "Core/StarPak.h"
 #include "Core/ExecutablePath.h"
+#include "Core/InputMappingRegistry.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -55,6 +56,10 @@ int main(int argc, char* argv[]) {
             TraceLog(LOG_ERROR, "GameMain: failed to parse boot config from pak");
             return 1;
         }
+        if (pak.HasEntry(StarPak::kInputMappingsPath)) {
+            std::vector<uint8_t> mappingBytes = pak.ReadEntry(StarPak::kInputMappingsPath);
+            InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
+        }
         CookedFile::SetActivePak(std::move(pak), CookCipherFromName(config.cipher), config.cipherKey);
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
@@ -65,6 +70,7 @@ int main(int argc, char* argv[]) {
         }
         ContentPathResolver::SetContentRoot((exeDir / "Content").string());
         CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+        InputMappingRegistry::Get().Load(exeDir.string());
         TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     }
 
