@@ -7,6 +7,7 @@
 #include "Core/ObjMtlParser.h"
 #include "ImportDetailsPanel.h"
 #include "Runtime/AssetCache.h"
+#include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdio>
@@ -28,13 +29,21 @@ fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, c
 }
 
 StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::path& folder,
-                         const std::filesystem::path& contentRoot) {
+                         const std::filesystem::path& contentRoot,
+                         const std::vector<MaterialSlot>& previousSlots) {
     std::error_code ec;
     StarAsset asset;
     asset.assetType = "StaticMesh";
     asset.sourcePath = fs::absolute(absoluteSrc, ec).string();
     asset.vendoredSourcePath = SourceVendoring::Vendor(contentRoot.string(), asset.sourcePath, absoluteSrc.stem().string());
     asset.importScaleX = asset.importScaleY = asset.importScaleZ = 100.0f;
+
+    auto findPreviousSlot = [&](const std::string& usemtlName) -> const MaterialSlot* {
+        for (const MaterialSlot& old : previousSlots) {
+            if (old.usemtlName == usemtlName) return &old;
+        }
+        return nullptr;
+    };
 
     if (ObjMtlParser::IsObjFile(absoluteSrc)) {
         std::vector<uint8_t> objBytes = ReadFileBytes(absoluteSrc);
@@ -46,6 +55,14 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
             for (const ObjMtlParser::MtlMaterial& mat : ObjMtlParser::ParseMtlMaterials(mtlBytes)) {
                 MaterialSlot slot;
                 slot.usemtlName = mat.name;
+
+                const MaterialSlot* existing = findPreviousSlot(mat.name);
+                if (existing && !existing->materialPath.empty() &&
+                    fs::exists(contentRoot / existing->materialPath, ec)) {
+                    slot.materialPath = existing->materialPath;
+                    asset.materialSlots.push_back(slot);
+                    continue;
+                }
 
                 StarMaterial starMat;
                 starMat.baseColor = Color{mat.colorR, mat.colorG, mat.colorB, mat.colorA};
@@ -74,6 +91,56 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                 asset.materialSlots.push_back(slot);
             }
         }
+    } else {
+        Model rawModel = LoadModel(absoluteSrc.string().c_str());
+        if (rawModel.materialCount > 0) {
+            for (int i = 0; i < rawModel.materialCount; i++) {
+                Material& srcMat = rawModel.materials[i];
+                MaterialSlot slot;
+                slot.usemtlName = "Material_" + std::to_string(i);
+
+                const MaterialSlot* existing = findPreviousSlot(slot.usemtlName);
+                if (existing && !existing->materialPath.empty() &&
+                    fs::exists(contentRoot / existing->materialPath, ec)) {
+                    slot.materialPath = existing->materialPath;
+                    asset.materialSlots.push_back(slot);
+                    continue;
+                }
+
+                StarMaterial starMat;
+                Color mapColor = srcMat.maps[MATERIAL_MAP_ALBEDO].color;
+                starMat.baseColor = mapColor;
+
+                Texture2D srcTex = srcMat.maps[MATERIAL_MAP_ALBEDO].texture;
+                if (srcTex.id != 0) {
+                    Image img = LoadImageFromTexture(srcTex);
+                    if (img.data != nullptr) {
+                        fs::path pngTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + slot.usemtlName, ".png");
+                        if (ExportImage(img, pngTarget.string().c_str())) {
+                            fs::path texTarget = UniqueTargetPath(folder, pngTarget.stem().string(), ".startex");
+                            StarAsset texAsset;
+                            texAsset.assetType = "Texture";
+                            texAsset.sourcePath = fs::absolute(pngTarget, ec).string();
+                            texAsset.vendoredSourcePath =
+                                SourceVendoring::Vendor(contentRoot.string(), texAsset.sourcePath, texTarget.stem().string());
+                            if (texAsset.SaveToFile(texTarget.string())) {
+                                AssetRegistry::Get().RegisterAsset(texTarget.string(), texAsset.sourcePath, texTarget.string());
+                                starMat.textureAssetPath = fs::relative(texTarget, contentRoot, ec).generic_string();
+                            }
+                        }
+                        UnloadImage(img);
+                    }
+                }
+
+                fs::path matTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + slot.usemtlName, ".starmat");
+                if (starMat.SaveToFile(matTarget.string())) {
+                    slot.materialPath = fs::relative(matTarget, contentRoot, ec).generic_string();
+                }
+
+                asset.materialSlots.push_back(slot);
+            }
+        }
+        UnloadModel(rawModel);
     }
 
     return asset;
@@ -97,7 +164,7 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
 
     StarAsset asset;
     if (assetType == "StaticMesh") {
-        asset = BuildMeshAsset(absoluteSrc, folder, contentRoot);
+        asset = BuildMeshAsset(absoluteSrc, folder, contentRoot, {});
     } else {
         asset.assetType = assetType;
         asset.sourcePath = absoluteSrc.string();
@@ -130,7 +197,7 @@ std::string Reimport(const std::string& starAssetPath) {
 
     StarAsset rebuilt;
     if (asset.assetType == "StaticMesh") {
-        rebuilt = BuildMeshAsset(fs::absolute(src, ec), folder, contentRoot);
+        rebuilt = BuildMeshAsset(fs::absolute(src, ec), folder, contentRoot, asset.materialSlots);
     } else {
         rebuilt.assetType = asset.assetType;
         rebuilt.sourcePath = fs::absolute(src, ec).string();

@@ -16,6 +16,7 @@ public:
     bool RegisterAsset(const std::string& virtualPath, const std::string& sourcePath, const std::string& cookedPath);
     bool NeedsReimport(const std::string& virtualPath);
     void Reimport(const std::string& virtualPath);
+    void Clear() { assets.clear(); }
 
 private:
     std::unordered_map<std::string, AssetInfo> assets;

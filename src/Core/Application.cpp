@@ -4,6 +4,7 @@
 #include "Core/Project.h"
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
+#include "Core/AssetRegistry.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
 #include "Core/ExecutablePath.h"
@@ -11,8 +12,10 @@
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
+#include "Runtime/AssetCache.h"
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
+#include "Modules/Stargraph/StargraphAssetCache.h"
 #include "raylib.h"
 #include "raygui.h"
 #include <filesystem>
@@ -138,6 +141,11 @@ void Application::Run() {
         if (editor->WantsOpenProject()) {
             std::string path = editor->GetOpenProjectPath();
             if (!path.empty()) {
+                if (World::Get().IsPlaying()) World::Get().EndPlay();
+                editor->CloseAllAssetEditorTabs();
+                AssetCache::Get().Clear();
+                StargraphAssetCache::Get().Clear();
+                AssetRegistry::Get().Clear();
                 Project::Get().Load(path);
                 ModuleManager::Get().ShutdownAll();
                 ModuleManager::Get().InitializeAll();
@@ -153,7 +161,10 @@ void Application::Run() {
         }
 
         if (editor->WantsCancel()) {
-            running = false;
+            if (Project::Get().GetRootPath().empty()) {
+                running = false;
+            }
+            editor->ResetCancelFlag();
         }
 
         BeginDrawing();

@@ -27,6 +27,9 @@ public:
     std::string GetOpenProjectPath() const;
     void ResetNewProjectFlag();
     void ResetSaveProjectFlag();
+    void ResetCancelFlag();
+
+    void CloseAllAssetEditorTabs();
 
     void SaveLayout() const;
     void LoadLayout();

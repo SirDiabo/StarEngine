@@ -15,6 +15,7 @@ public:
     void Show(Mode mode = Mode::Open, bool allowCancel = false);
     void Render();
     void ResetFlags();
+    void ResetCancelFlag() { wantsCancel = false; }
     Mode GetMode() const { return mode; }
     bool WantsNewProject() const { return createConfirmed; }
     bool WantsOpenProject() const { return openProject; }

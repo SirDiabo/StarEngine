@@ -427,6 +427,22 @@ void Editor::ResetSaveProjectFlag() {
     if (menuBar) menuBar->wantsSaveProject = false;
 }
 
+void Editor::ResetCancelFlag() {
+    if (projectBrowser) projectBrowser->ResetCancelFlag();
+}
+
+void Editor::CloseAllAssetEditorTabs() {
+    for (int i = (int)editorTabs.size() - 1; i >= 0; i--) {
+        if (editorTabs[i]->IsPermanent()) continue;
+        editorTabs.erase(editorTabs.begin() + i);
+    }
+    activeEditorTab = 0;
+    if (!editorTabs.empty()) {
+        editorTabs[activeEditorTab]->OnActivated();
+        editorTabs[activeEditorTab]->BuildMenus(menuBar);
+    }
+}
+
 void Editor::SaveState() const {
     fs::path dir = fs::path(GetLayoutPath()).parent_path();
     fs::create_directories(dir);
