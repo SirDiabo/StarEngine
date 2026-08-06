@@ -16,6 +16,17 @@ static bool IsTimerFunctionNameNode(const std::string& type) {
            type == "Resume_Timer_By_Function_Name" || type == "Clear_Timer_By_Function_Name";
 }
 
+static std::string NodeMenuDisplayLabel(const std::string& rawType) {
+    std::string display = rawType;
+    if (display.rfind("Call_Custom_Event:", 0) == 0) {
+        display = "Event " + display.substr(18);
+    } else if (display.rfind("Input_Mapping:", 0) == 0) {
+        display = "Key " + display.substr(14);
+    }
+    for (char& c : display) if (c == '_') c = ' ';
+    return display;
+}
+
 Color StargraphEditorPanel::GetPinColor(PinType type) const {
     switch (type) {
         case PinType::Exec:    return {255, 255, 255, 255};
@@ -1309,7 +1320,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     const auto& templates = NodeRegistry::Get().GetFilteredTemplates(filterCompatibleWithPin != -1);
     std::string searchLower = nodeMenuSearch;
     for (char& c : searchLower) c = (char)tolower(c);
-    for (char& c : searchLower) if (c == ' ') c = '_';
+    while (!searchLower.empty() && searchLower.back() == ' ') searchLower.pop_back();
+    size_t searchStart = searchLower.find_first_not_of(' ');
+    searchLower = (searchStart == std::string::npos) ? "" : searchLower.substr(searchStart);
 
     std::vector<std::pair<std::string, std::string>> entries;
     for (const auto& t : templates) {
@@ -1318,7 +1331,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (t.type == "Input_Mapping") continue;
 
         if (!searchLower.empty()) {
-            std::string typeLower = t.type;
+            std::string typeLower = NodeMenuDisplayLabel(t.type);
             for (char& c : typeLower) c = (char)tolower(c);
             if (typeLower.find(searchLower) == std::string::npos) continue;
         }
@@ -1360,7 +1373,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         std::string eventName = node.title;
         if (eventName.empty()) continue;
 
-        std::string typeLower = "call_custom_event:" + eventName;
+        std::string typeLower = NodeMenuDisplayLabel("Call_Custom_Event:" + eventName);
         for (char& c : typeLower) c = (char)tolower(c);
         if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
 
@@ -1372,7 +1385,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         for (const std::string& mappingName : comp.inputMappingNames) {
             if (mappingName.empty()) continue;
 
-            std::string typeLower = "input_mapping:" + mappingName;
+            std::string typeLower = NodeMenuDisplayLabel("Input_Mapping:" + mappingName);
             for (char& c : typeLower) c = (char)tolower(c);
             if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
 
@@ -1539,13 +1552,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 filterCompatibleWithPin = -1;
             }
         }
-        std::string entryDisplay = entry.second;
-        if (entryDisplay.rfind("Call_Custom_Event:", 0) == 0) {
-            entryDisplay = "Event " + entryDisplay.substr(18);
-        } else if (entryDisplay.rfind("Input_Mapping:", 0) == 0) {
-            entryDisplay = "Key " + entryDisplay.substr(14);
-        }
-        for (char& c : entryDisplay) if (c == '_') c = ' ';
+        std::string entryDisplay = NodeMenuDisplayLabel(entry.second);
         DrawText(entryDisplay.c_str(), (int)btn.x + 8, (int)btn.y + 4, 12, theme.textPrimary);
         y += itemH;
     }

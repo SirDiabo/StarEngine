@@ -60,6 +60,8 @@ std::string SearchableListPopup::Render(const std::vector<Entry>& entries, Recta
     Rectangle popup = {pos.x, pos.y, width, menuH};
     if (popup.x + popup.width  > boundsArea.x + boundsArea.width)  popup.x = boundsArea.x + boundsArea.width  - popup.width;
     if (popup.y + popup.height > boundsArea.y + boundsArea.height) popup.y = boundsArea.y + boundsArea.height - popup.height;
+    if (popup.x < boundsArea.x) popup.x = boundsArea.x;
+    if (popup.y < boundsArea.y) popup.y = boundsArea.y;
     lastRect = popup;
 
     Vector2 mp = GetMousePosition();

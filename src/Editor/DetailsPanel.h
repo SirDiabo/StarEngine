@@ -32,8 +32,4 @@ private:
     AssetPickerPopup meshPicker;
     AssetPickerPopup materialPicker;
     int materialSlotPickerIndex = -1;
-
-    bool classComponentsValid = false;
-    Stargraph cachedClassGraph;
-    std::string cachedClassPath;
 };

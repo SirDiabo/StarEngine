@@ -3,6 +3,7 @@
 #include "PropertyFields.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
+#include "Modules/Stargraph/StargraphAssetCache.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -34,7 +35,6 @@ void DetailsPanel::RefreshFromSelection(const ActorInstance& inst) {
     meshPicker.Close();
     materialPicker.Close();
     materialSlotPickerIndex = -1;
-    classComponentsValid = false;
 }
 
 void DetailsPanel::Render() {
@@ -169,12 +169,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
 void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float x, float& y, float w) {
     const UIPalette& theme = UITheme::Get();
 
-    if (!classComponentsValid || cachedClassPath != inst.graphAssetPath) {
-        cachedClassGraph = Stargraph{};
-        cachedClassGraph.LoadFromFile(inst.graphAssetPath);
-        cachedClassPath = inst.graphAssetPath;
-        classComponentsValid = true;
-    }
+    const Stargraph* classGraph = StargraphAssetCache::Get().GetOrLoad(inst.graphAssetPath);
 
     DrawText("Class", (int)x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
@@ -187,7 +182,13 @@ void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float
     }
     y += 28;
 
-    const auto& comps = cachedClassGraph.GetComponents();
+    if (!classGraph) {
+        DrawText("Could not load class asset.", (int)x + 8, (int)y, 11, {110, 110, 118, 255});
+        y += 16;
+        return;
+    }
+
+    const auto& comps = classGraph->GetComponents();
     if (comps.empty()) {
         DrawText("No components on this class.", (int)x + 8, (int)y, 11, {110, 110, 118, 255});
         y += 16;
