@@ -50,6 +50,11 @@ bool StarAsset::SaveToFile(const std::string& path) const {
         out << "SkeletonBone" << i << "ScaleY=" << b.bindScaleY << "\n";
         out << "SkeletonBone" << i << "ScaleZ=" << b.bindScaleZ << "\n";
     }
+    out << "AnimSourceIndex=" << animSourceIndex << "\n";
+    out << "AnimName=" << animName << "\n";
+    out << "AnimFrameCount=" << animFrameCount << "\n";
+    out << "AnimBoneCount=" << animBoneCount << "\n";
+    out << "AnimFPS=" << animFramesPerSecond << "\n";
 
     return true;
 }
@@ -118,6 +123,11 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
             else if (field == "ScaleY") b.bindScaleY = SafeParse::ToFloat(value);
             else if (field == "ScaleZ") b.bindScaleZ = SafeParse::ToFloat(value);
         }
+        else if (key == "AnimSourceIndex") outAsset.animSourceIndex = SafeParse::ToInt(value);
+        else if (key == "AnimName") outAsset.animName = value;
+        else if (key == "AnimFrameCount") outAsset.animFrameCount = SafeParse::ToInt(value);
+        else if (key == "AnimBoneCount") outAsset.animBoneCount = (unsigned int)SafeParse::ToInt(value);
+        else if (key == "AnimFPS") outAsset.animFramesPerSecond = SafeParse::ToFloat(value);
     }
 
     if (materialSlotCount > 0 && (size_t)materialSlotCount > outAsset.materialSlots.size()) {

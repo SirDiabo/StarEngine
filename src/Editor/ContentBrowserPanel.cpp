@@ -732,7 +732,7 @@ void ContentBrowserPanel::Render() {
     if (itemContextMenuOpen) {
         bool showReimport = !contextTargetIsFolder &&
             (contextTargetExtension == ".starasset" || contextTargetExtension == ".startex" ||
-             contextTargetExtension == ".starsound");
+             contextTargetExtension == ".starsound" || contextTargetExtension == ".staranim");
         bool showPaste = !clipboardPath.empty();
 
         std::vector<std::string> items = {"Open", "Rename", "Duplicate", "Copy"};

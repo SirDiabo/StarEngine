@@ -39,4 +39,11 @@ void MeshesModule::RegisterAssetType() {
         return mat.SaveToFile(fullPath);
     };
     AssetTypeRegistry::Get().RegisterType(material);
+
+    AssetTypeInfo animation;
+    animation.typeName = "Animation";
+    animation.extension = ".staranim";
+    animation.category = "Mesh";
+    animation.moduleName = "Meshes";
+    AssetTypeRegistry::Get().RegisterType(animation);
 }

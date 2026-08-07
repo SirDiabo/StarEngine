@@ -30,6 +30,12 @@ struct StarAsset {
     bool hasSkeleton = false;
     std::vector<SkeletonBone> skeleton;
 
+    int animSourceIndex = -1;
+    std::string animName;
+    int animFrameCount = 0;
+    unsigned int animBoneCount = 0;
+    float animFramesPerSecond = 30.0f;
+
     std::string ResolveSourcePath() const;
 
     bool SaveToFile(const std::string& path) const;

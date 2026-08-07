@@ -10,6 +10,7 @@
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 #include <cstdio>
 
 namespace fs = std::filesystem;
@@ -26,6 +27,60 @@ fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, c
     int suffix = 1;
     while (fs::exists(target)) target = folder / (baseName + "_" + std::to_string(suffix++) + ext);
     return target;
+}
+
+void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, const fs::path& contentRoot) {
+    std::error_code ec;
+    std::string absoluteSrcStr = fs::absolute(absoluteSrc, ec).string();
+
+    std::unordered_map<std::string, fs::path> existingByName;
+    std::unordered_map<std::string, float> existingFpsByName;
+    if (fs::exists(folder, ec)) {
+        for (const auto& entry : fs::directory_iterator(folder, ec)) {
+            if (entry.path().extension() != ".staranim") continue;
+            StarAsset existing;
+            if (!StarAsset::LoadFromFile(entry.path().string(), existing)) continue;
+            if (existing.assetType != "Animation") continue;
+            std::string existingSrc = existing.sourcePath;
+            if (existingSrc.empty() || existingSrc != absoluteSrcStr) continue;
+            existingByName[existing.animName] = entry.path();
+            existingFpsByName[existing.animName] = existing.animFramesPerSecond;
+        }
+    }
+
+    int animCount = 0;
+    ModelAnimation* anims = LoadModelAnimations(absoluteSrc.string().c_str(), &animCount);
+    if (anims == nullptr || animCount <= 0) return;
+
+    for (int i = 0; i < animCount; i++) {
+        const ModelAnimation& anim = anims[i];
+        std::string clipName = anim.name[0] != '\0' ? std::string(anim.name) : ("Anim_" + std::to_string(i));
+
+        StarAsset animAsset;
+        animAsset.assetType = "Animation";
+        animAsset.sourcePath = absoluteSrcStr;
+        animAsset.vendoredSourcePath = SourceVendoring::Vendor(contentRoot.string(), absoluteSrcStr,
+                                                                 absoluteSrc.stem().string() + "_" + clipName);
+        animAsset.animSourceIndex = i;
+        animAsset.animName = clipName;
+        animAsset.animFrameCount = anim.keyframeCount;
+        animAsset.animBoneCount = anim.boneCount;
+
+        fs::path target;
+        auto foundExisting = existingByName.find(clipName);
+        if (foundExisting != existingByName.end()) {
+            target = foundExisting->second;
+            animAsset.animFramesPerSecond = existingFpsByName[clipName];
+        } else {
+            target = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + clipName, ".staranim");
+        }
+
+        if (animAsset.SaveToFile(target.string())) {
+            AssetRegistry::Get().RegisterAsset(target.string(), animAsset.sourcePath, target.string());
+        }
+    }
+
+    UnloadModelAnimations(anims, animCount);
 }
 
 StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::path& folder,
@@ -190,6 +245,7 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
     StarAsset asset;
     if (assetType == "StaticMesh") {
         asset = BuildMeshAsset(absoluteSrc, folder, contentRoot, {});
+        ExtractAnimations(absoluteSrc, folder, contentRoot);
     } else {
         asset.assetType = assetType;
         asset.sourcePath = absoluteSrc.string();
@@ -223,6 +279,33 @@ std::string Reimport(const std::string& starAssetPath) {
     StarAsset rebuilt;
     if (asset.assetType == "StaticMesh") {
         rebuilt = BuildMeshAsset(fs::absolute(src, ec), folder, contentRoot, asset.materialSlots);
+        ExtractAnimations(fs::absolute(src, ec), folder, contentRoot);
+    } else if (asset.assetType == "Animation") {
+        int animCount = 0;
+        ModelAnimation* anims = LoadModelAnimations(src.string().c_str(), &animCount);
+        rebuilt.assetType = "Animation";
+        rebuilt.sourcePath = fs::absolute(src, ec).string();
+        rebuilt.vendoredSourcePath = asset.vendoredSourcePath;
+        rebuilt.animName = asset.animName;
+        rebuilt.animFramesPerSecond = asset.animFramesPerSecond;
+        bool matched = false;
+        if (anims != nullptr) {
+            for (int i = 0; i < animCount; i++) {
+                if (asset.animName == anims[i].name) {
+                    rebuilt.animSourceIndex = i;
+                    rebuilt.animFrameCount = anims[i].keyframeCount;
+                    rebuilt.animBoneCount = anims[i].boneCount;
+                    matched = true;
+                    break;
+                }
+            }
+            UnloadModelAnimations(anims, animCount);
+        }
+        if (!matched) {
+            rebuilt.animSourceIndex = asset.animSourceIndex;
+            rebuilt.animFrameCount = asset.animFrameCount;
+            rebuilt.animBoneCount = asset.animBoneCount;
+        }
     } else {
         rebuilt.assetType = asset.assetType;
         rebuilt.sourcePath = fs::absolute(src, ec).string();
@@ -259,6 +342,8 @@ std::string Reimport(const std::string& starAssetPath) {
             AssetCache::Get().ReloadModel(rebuilt.ResolveSourcePath());
         } else if (rebuilt.assetType == "Texture") {
             AssetCache::Get().ReloadTexture(starAssetPath);
+        } else if (rebuilt.assetType == "Animation") {
+            AssetCache::Get().ReloadAnimation(starAssetPath);
         }
         return starAssetPath;
     }

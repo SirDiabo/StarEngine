@@ -68,6 +68,56 @@ void AssetCache::ReloadTexture(const std::string& textureAssetPath) {
     textureCache.erase(it);
 }
 
+ModelAnimation* AssetCache::GetOrLoadAnimation(const std::string& animAssetPath) {
+    auto it = animationCache.find(animAssetPath);
+    if (it != animationCache.end()) return it->second;
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(animAssetPath, asset) || asset.assetType != "Animation") return nullptr;
+
+    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
+    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+
+    auto srcIt = animationSourceCache.find(resolved);
+    if (srcIt == animationSourceCache.end()) {
+        LoadedAnimationSet set;
+        set.animations = LoadModelAnimations(resolved.c_str(), &set.count);
+        if (set.animations == nullptr || set.count <= 0) return nullptr;
+        srcIt = animationSourceCache.emplace(resolved, set).first;
+    }
+
+    int idx = -1;
+    for (int i = 0; i < srcIt->second.count; i++) {
+        if (asset.animName == srcIt->second.animations[i].name) { idx = i; break; }
+    }
+    if (idx < 0 && asset.animSourceIndex >= 0 && asset.animSourceIndex < srcIt->second.count) {
+        idx = asset.animSourceIndex;
+    }
+    if (idx < 0) return nullptr;
+
+    ModelAnimation* anim = &srcIt->second.animations[idx];
+    animationCache.emplace(animAssetPath, anim);
+    return anim;
+}
+
+void AssetCache::ReloadAnimation(const std::string& animAssetPath) {
+    StarAsset asset;
+    std::string resolved;
+    if (StarAsset::LoadFromFile(animAssetPath, asset)) {
+        resolved = CookedFile::Open(asset.ResolveSourcePath());
+        if (resolved.empty()) resolved = asset.ResolveSourcePath();
+    }
+
+    if (!resolved.empty()) {
+        auto srcIt = animationSourceCache.find(resolved);
+        if (srcIt != animationSourceCache.end()) {
+            UnloadModelAnimations(srcIt->second.animations, srcIt->second.count);
+            animationSourceCache.erase(srcIt);
+        }
+    }
+    animationCache.clear();
+}
+
 BoundingBox AssetCache::GetOrComputeModelBounds(Model* model) {
     if (!model) return {};
 
@@ -132,4 +182,7 @@ void AssetCache::Clear() {
     for (auto& kv : textureCache) UnloadTexture(kv.second);
     textureCache.clear();
     materialCache.clear();
+    for (auto& kv : animationSourceCache) UnloadModelAnimations(kv.second.animations, kv.second.count);
+    animationSourceCache.clear();
+    animationCache.clear();
 }
