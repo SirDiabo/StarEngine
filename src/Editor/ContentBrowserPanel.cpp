@@ -29,12 +29,14 @@ void ContentBrowserPanel::LoadIcons() {
         if (tex.id != 0) icons[key] = tex;
     };
 
-    load("folder",   "icon_folder.png");
-    load("actor",    "icon_actor.png");
-    load("starmap",  "icon_starmap.png");
-    load("asset",    "icon_asset.png");
-    load("texture",  "icon_texture.png");
-    load("material", "icon_material.png");
+    load("folder",      "icon_folder.png");
+    load("actor",       "icon_actor.png");
+    load("starmap",     "icon_map.png");
+    load("asset",       "icon_asset.png");
+    load("texture",     "icon_texture.png");
+    load("material",    "icon_material.png");
+    load("animation",   "icon_anim.png");
+    load("sound",       "icon_sound.png");
     iconsLoaded = true;
 }
 
@@ -55,9 +57,11 @@ Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const 
     std::string key = "asset";
     if (entry.isFolder) key = "folder";
     else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
-    else if (entry.extension == ".starmap") key = "starmap";
-    else if (entry.extension == ".startex") key = "texture";
-    else if (entry.extension == ".starmat") key = "material";
+    else if (entry.extension == ".starmap")     key = "map";
+    else if (entry.extension == ".startex")     key = "texture";
+    else if (entry.extension == ".starmat")     key = "material";
+    else if (entry.extension == ".staranim")    key = "animation";
+    else if (entry.extension == ".starsound")   key = "sound";
 
     auto it = icons.find(key);
     if (it != icons.end()) return it->second;
