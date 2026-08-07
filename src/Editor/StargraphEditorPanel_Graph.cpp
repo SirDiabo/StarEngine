@@ -459,19 +459,23 @@ void StargraphEditorPanel::PasteNodes() {
         node->posX = roundf((rawX + cn.posX) / gridSnap) * gridSnap;
         node->posY = roundf((rawY + cn.posY) / gridSnap) * gridSnap;
 
+        for (const auto& pt : cn.inputPinTypes) {
+            bool found = false;
+            for (Pin& p : node->inputs) {
+                if (p.name == pt.first) { p.type = PinTypeFromString(pt.second); found = true; break; }
+            }
+            if (!found) graph.AddDynamicPin(*node, false, pt.first, PinTypeFromString(pt.second));
+        }
+        for (const auto& op : cn.outputPinTypes) {
+            bool found = false;
+            for (Pin& p : node->outputs) {
+                if (p.name == op.first) { p.type = PinTypeFromString(op.second); found = true; break; }
+            }
+            if (!found) graph.AddDynamicPin(*node, true, op.first, PinTypeFromString(op.second));
+        }
         for (const auto& pin : cn.inputPins) {
             for (Pin& p : node->inputs) {
                 if (p.name == pin.first) p.defaultValue = pin.second;
-            }
-        }
-        for (const auto& pt : cn.inputPinTypes) {
-            for (Pin& p : node->inputs) {
-                if (p.name == pt.first && p.type == PinType::Wildcard) p.type = PinTypeFromString(pt.second);
-            }
-        }
-        for (const auto& op : cn.outputPinTypes) {
-            for (Pin& p : node->outputs) {
-                if (p.name == op.first && p.type == PinType::Wildcard) p.type = PinTypeFromString(op.second);
             }
         }
         createdNodes.push_back(node);
@@ -519,16 +523,24 @@ void StargraphEditorPanel::DuplicateSelected() {
         node->posY = src->posY + offset;
 
         for (const Pin& sp : src->inputs) {
+            bool found = false;
             for (Pin& p : node->inputs) {
                 if (p.name != sp.name) continue;
                 p.defaultValue = sp.defaultValue;
-                if (p.type == PinType::Wildcard) p.type = sp.type;
+                p.type = sp.type;
+                found = true;
+            }
+            if (!found) {
+                Pin* np = graph.AddDynamicPin(*node, false, sp.name, sp.type);
+                if (np) np->defaultValue = sp.defaultValue;
             }
         }
         for (const Pin& sp : src->outputs) {
+            bool found = false;
             for (Pin& p : node->outputs) {
-                if (p.name == sp.name && p.type == PinType::Wildcard) p.type = sp.type;
+                if (p.name == sp.name) { p.type = sp.type; found = true; break; }
             }
+            if (!found) graph.AddDynamicPin(*node, true, sp.name, sp.type);
         }
 
         oldIds.push_back(nodeId);
