@@ -9,6 +9,7 @@ struct AssetTypeInfo {
     std::string category;
     std::string moduleName;
     std::function<bool(const std::string& fullPath, const std::string& assetName)> createAsset;
+    std::function<bool(const std::string& fullPath, const std::string& newAssetName)> renameAsset;
 };
 
 class AssetTypeRegistry {

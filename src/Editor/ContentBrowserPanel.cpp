@@ -163,6 +163,9 @@ void ContentBrowserPanel::ConfirmRename() {
             if (ec) {
                 importStatus = "Rename failed: " + ec.message();
                 success = false;
+            } else if (!renamingIsFolder) {
+                const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(renamingExtension);
+                if (info && info->renameAsset) info->renameAsset(newPath.string(), typedName);
             }
         }
     }

@@ -64,6 +64,12 @@ void StargraphModule::RegisterAssetType() {
         graph.parentClass = "Actor";
         return graph.SaveToFile(fullPath);
     };
+    info.renameAsset = [](const std::string& fullPath, const std::string& newAssetName) {
+        Stargraph graph;
+        if (!graph.LoadFromFile(fullPath)) return false;
+        graph.assetName = newAssetName;
+        return graph.SaveToFile(fullPath);
+    };
     AssetTypeRegistry::Get().RegisterType(info);
 
     AssetTypeInfo sound;
