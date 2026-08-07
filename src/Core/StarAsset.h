@@ -7,6 +7,14 @@ struct MaterialSlot {
     std::string materialPath;
 };
 
+struct SkeletonBone {
+    std::string name;
+    int parentIndex = -1;
+    float bindPosX = 0.0f, bindPosY = 0.0f, bindPosZ = 0.0f;
+    float bindRotX = 0.0f, bindRotY = 0.0f, bindRotZ = 0.0f, bindRotW = 1.0f;
+    float bindScaleX = 1.0f, bindScaleY = 1.0f, bindScaleZ = 1.0f;
+};
+
 struct StarAsset {
     std::string assetType;
     std::string sourcePath;
@@ -18,6 +26,9 @@ struct StarAsset {
     float importScaleX = 1.0f, importScaleY = 1.0f, importScaleZ = 1.0f;
 
     std::vector<MaterialSlot> materialSlots;
+
+    bool hasSkeleton = false;
+    std::vector<SkeletonBone> skeleton;
 
     std::string ResolveSourcePath() const;
 

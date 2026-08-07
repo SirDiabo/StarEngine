@@ -33,6 +33,23 @@ bool StarAsset::SaveToFile(const std::string& path) const {
         out << "MaterialSlot" << i << "Name=" << materialSlots[i].usemtlName << "\n";
         out << "MaterialSlot" << i << "Path=" << materialSlots[i].materialPath << "\n";
     }
+    out << "HasSkeleton=" << (hasSkeleton ? 1 : 0) << "\n";
+    out << "SkeletonBoneCount=" << skeleton.size() << "\n";
+    for (size_t i = 0; i < skeleton.size(); i++) {
+        const SkeletonBone& b = skeleton[i];
+        out << "SkeletonBone" << i << "Name=" << b.name << "\n";
+        out << "SkeletonBone" << i << "Parent=" << b.parentIndex << "\n";
+        out << "SkeletonBone" << i << "PosX=" << b.bindPosX << "\n";
+        out << "SkeletonBone" << i << "PosY=" << b.bindPosY << "\n";
+        out << "SkeletonBone" << i << "PosZ=" << b.bindPosZ << "\n";
+        out << "SkeletonBone" << i << "RotX=" << b.bindRotX << "\n";
+        out << "SkeletonBone" << i << "RotY=" << b.bindRotY << "\n";
+        out << "SkeletonBone" << i << "RotZ=" << b.bindRotZ << "\n";
+        out << "SkeletonBone" << i << "RotW=" << b.bindRotW << "\n";
+        out << "SkeletonBone" << i << "ScaleX=" << b.bindScaleX << "\n";
+        out << "SkeletonBone" << i << "ScaleY=" << b.bindScaleY << "\n";
+        out << "SkeletonBone" << i << "ScaleZ=" << b.bindScaleZ << "\n";
+    }
 
     return true;
 }
@@ -42,6 +59,7 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
     if (!in.is_open()) return false;
 
     int materialSlotCount = 0;
+    int skeletonBoneCount = 0;
 
     std::string line;
     while (std::getline(in, line)) {
@@ -77,10 +95,36 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
             if (field == "Name") outAsset.materialSlots[index].usemtlName = value;
             else if (field == "Path") outAsset.materialSlots[index].materialPath = value;
         }
+        else if (key == "HasSkeleton") outAsset.hasSkeleton = SafeParse::ToInt(value) != 0;
+        else if (key == "SkeletonBoneCount") skeletonBoneCount = SafeParse::ToInt(value);
+        else if (key.rfind("SkeletonBone", 0) == 0) {
+            size_t nameEnd = key.find_first_not_of("0123456789", 12);
+            if (nameEnd == std::string::npos) continue;
+            int index = std::atoi(key.substr(12, nameEnd - 12).c_str());
+            std::string field = key.substr(nameEnd);
+            if (index < 0) continue;
+            if ((size_t)index >= outAsset.skeleton.size()) outAsset.skeleton.resize(index + 1);
+            SkeletonBone& b = outAsset.skeleton[index];
+            if (field == "Name") b.name = value;
+            else if (field == "Parent") b.parentIndex = SafeParse::ToInt(value);
+            else if (field == "PosX") b.bindPosX = SafeParse::ToFloat(value);
+            else if (field == "PosY") b.bindPosY = SafeParse::ToFloat(value);
+            else if (field == "PosZ") b.bindPosZ = SafeParse::ToFloat(value);
+            else if (field == "RotX") b.bindRotX = SafeParse::ToFloat(value);
+            else if (field == "RotY") b.bindRotY = SafeParse::ToFloat(value);
+            else if (field == "RotZ") b.bindRotZ = SafeParse::ToFloat(value);
+            else if (field == "RotW") b.bindRotW = SafeParse::ToFloat(value);
+            else if (field == "ScaleX") b.bindScaleX = SafeParse::ToFloat(value);
+            else if (field == "ScaleY") b.bindScaleY = SafeParse::ToFloat(value);
+            else if (field == "ScaleZ") b.bindScaleZ = SafeParse::ToFloat(value);
+        }
     }
 
     if (materialSlotCount > 0 && (size_t)materialSlotCount > outAsset.materialSlots.size()) {
         outAsset.materialSlots.resize(materialSlotCount);
+    }
+    if (skeletonBoneCount > 0 && (size_t)skeletonBoneCount > outAsset.skeleton.size()) {
+        outAsset.skeleton.resize(skeletonBoneCount);
     }
 
     return true;

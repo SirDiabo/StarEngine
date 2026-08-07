@@ -140,6 +140,31 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                 asset.materialSlots.push_back(slot);
             }
         }
+
+        if (rawModel.skeleton.boneCount > 0 && rawModel.skeleton.bones != nullptr && rawModel.skeleton.bindPose != nullptr) {
+            asset.hasSkeleton = true;
+            asset.skeleton.reserve(rawModel.skeleton.boneCount);
+            for (unsigned int i = 0; i < rawModel.skeleton.boneCount; i++) {
+                SkeletonBone bone;
+                bone.name = rawModel.skeleton.bones[i].name;
+                bone.parentIndex = rawModel.skeleton.bones[i].parent;
+
+                const Transform& t = rawModel.skeleton.bindPose[i];
+                bone.bindPosX = t.translation.x;
+                bone.bindPosY = t.translation.y;
+                bone.bindPosZ = t.translation.z;
+                bone.bindRotX = t.rotation.x;
+                bone.bindRotY = t.rotation.y;
+                bone.bindRotZ = t.rotation.z;
+                bone.bindRotW = t.rotation.w;
+                bone.bindScaleX = t.scale.x;
+                bone.bindScaleY = t.scale.y;
+                bone.bindScaleZ = t.scale.z;
+
+                asset.skeleton.push_back(bone);
+            }
+        }
+
         UnloadModel(rawModel);
     }
 

@@ -37,4 +37,7 @@ private:
     std::vector<MaterialSlot> materialSlots;
     int materialSlotPickerIndex = -1;
     AssetPickerPopup materialPicker;
+
+    bool hasSkeleton = false;
+    int skeletonBoneCount = 0;
 };

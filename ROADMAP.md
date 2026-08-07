@@ -742,10 +742,12 @@ x Multiple components of same type on one actor; convenience accessors for most 
 o Physics/collision response (CollisionComponent is authorable/visual but no movement/overlap)
 
 ### 13.6 Skeletal Mesh and Animations
-o Skeletal mesh import with .StarRig
-o Animation import with .StarAnim
-o Animation Preview Tab
-o Animation Graph File to be assigned to Skeletal Meshes inside actors
+o Skeleton/armature data inside the mesh .starasset
+o Animation import as standalone .staranim files, assigned to a mesh by skeleton compatibility
+o MeshComponent gains an "Animation": current .staranim, playing/paused, play rate, looping, current time
+o Core animation nodes with a MeshComponent target: Play Animation (Anim, Looping bool), Stop Animation, Set Anim Play Rate
+o Animation Preview Tab (skeletal mesh + animation dropdown, scrub bar, play/pause)
+o Later: Animation Graph module (state machines, blending) assignable to skeletal meshes, superseding the single-clip nodes above
 
 ### 13.7 UI / Widget Module (StarWidget)
 o Create Widget in Content Browser

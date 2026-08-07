@@ -29,6 +29,8 @@ void ImportDetailsPanel::LoadFromAsset() {
     snprintf(scaleBuf[1], sizeof(scaleBuf[1]), "%.2f", asset.importScaleY);
     snprintf(scaleBuf[2], sizeof(scaleBuf[2]), "%.2f", asset.importScaleZ);
     materialSlots = asset.materialSlots;
+    hasSkeleton = asset.hasSkeleton;
+    skeletonBoneCount = (int)asset.skeleton.size();
 }
 
 void ImportDetailsPanel::SaveToAsset() {
@@ -77,7 +79,7 @@ void ImportDetailsPanel::Render() {
 
     bool isMesh = (assetType == "StaticMesh");
     float boxWidth = 340;
-    float boxHeight = isMesh ? (196.0f + materialSlots.size() * 24.0f + (materialSlots.empty() ? 0.0f : 38.0f)) : 120.0f;
+    float boxHeight = isMesh ? (196.0f + (hasSkeleton ? 20.0f : 0.0f) + materialSlots.size() * 24.0f + (materialSlots.empty() ? 0.0f : 38.0f)) : 120.0f;
 
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
@@ -145,6 +147,12 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
         vec3Row("Position", posBuf, 1);
         vec3Row("Rotation", rotBuf, 4);
         vec3Row("Scale", scaleBuf, 7);
+
+        if (hasSkeleton) {
+            std::string skelLabel = "Skeleton: " + std::to_string(skeletonBoneCount) + " bones";
+            DrawText(skelLabel.c_str(), (int)box.x + 10, (int)y, 11, theme.textSecondary);
+            y += 20;
+        }
 
         if (materialSlots.empty()) {
             DrawText("No material slots", (int)box.x + 10, (int)y, 10, theme.textSecondary);
