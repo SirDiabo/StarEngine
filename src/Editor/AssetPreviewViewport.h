@@ -11,6 +11,7 @@ public:
 
     void SetAsset(const std::string& starAssetPath);
     void OnReimport();
+    void SetPreviewAnimation(ModelAnimation* anim, float frame) { previewAnim = anim; previewAnimFrame = frame; }
 
     void Render(float x, float y, float width, float height);
 
@@ -26,6 +27,9 @@ private:
 
     std::string assetPath;
     StarAsset asset;
+
+    ModelAnimation* previewAnim = nullptr;
+    float previewAnimFrame = 0.0f;
 
     bool flying = false;
     bool orbiting = false;

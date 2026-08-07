@@ -3,6 +3,7 @@
 #include "LevelEditorTab.h"
 #include "StargraphEditorTab.h"
 #include "AssetPreviewTab.h"
+#include "AnimationPreviewTab.h"
 #include "ProjectSettingsTab.h"
 #include "EditorSettingsTab.h"
 #include "PackageTab.h"
@@ -210,6 +211,24 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
         auto* previewTab = new AssetPreviewTab(fullPath);
         previewTab->Initialize();
         editorTabs.emplace_back(previewTab);
+        editorTabs[activeEditorTab]->OnDeactivated();
+        activeEditorTab = (int)editorTabs.size() - 1;
+        editorTabs[activeEditorTab]->OnActivated();
+        editorTabs[activeEditorTab]->BuildMenus(menuBar);
+    } else if (extension == ".staranim") {
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            auto* animTab = dynamic_cast<AnimationPreviewTab*>(editorTabs[i].get());
+            if (animTab && animTab->GetAssetPath() == fullPath) {
+                editorTabs[activeEditorTab]->OnDeactivated();
+                activeEditorTab = i;
+                editorTabs[activeEditorTab]->OnActivated();
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                return;
+            }
+        }
+        auto* animTab = new AnimationPreviewTab(fullPath);
+        animTab->Initialize();
+        editorTabs.emplace_back(animTab);
         editorTabs[activeEditorTab]->OnDeactivated();
         activeEditorTab = (int)editorTabs.size() - 1;
         editorTabs[activeEditorTab]->OnActivated();

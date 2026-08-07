@@ -237,6 +237,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
             componentMeshPicker.Close();
             componentMaterialPicker.Close();
+            componentAnimPicker.Close();
             picker.Open({r.x, r.y + r.height}, extension);
         }
         if (saveKey) saveButton(r, saveKey);
@@ -303,6 +304,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 2, 10, theme.textPrimary);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
                     componentMeshPicker.Close();
+                    componentAnimPicker.Close();
                     componentMaterialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
                     materialSlotPickerIndex = (int)i;
                 }
@@ -318,6 +320,11 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Casts Shadow", &comp.meshCastsShadow)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Casts Shadow");
+        y += 24;
+
+        assetField("Default Anim", comp.defaultAnimPath, componentAnimPicker, ".staranim", comp.defaultAnimPath, "Default Anim");
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Default Anim Looping", &comp.defaultAnimLooping)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Default Anim Looping");
         y += 24;
     } else if (comp.componentType == "CollisionComponent") {
         DrawText("Shape", (int)panel.x + 8, (int)y, 11, theme.textSecondary);

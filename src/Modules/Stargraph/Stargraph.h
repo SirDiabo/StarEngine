@@ -194,6 +194,9 @@ struct ComponentDecl {
     std::vector<std::string> materialAssetPaths;
     bool meshCastsShadow = true;
 
+    std::string defaultAnimPath;
+    bool defaultAnimLooping = false;
+
     // CollisionComponent
     std::string collisionShape = "Box";
     float collisionRadius = 50.0f;

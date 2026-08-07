@@ -167,6 +167,7 @@ void AssetPreviewViewport::RenderScene() {
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
         AssetCache::ApplyMaterialSlots(model, matPaths);
+        if (previewAnim != nullptr) UpdateModelAnimation(*model, *previewAnim, previewAnimFrame);
         DrawModel(*model, pos, 1.0f, WHITE);
         DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 120});
         model->transform = savedTransform;
