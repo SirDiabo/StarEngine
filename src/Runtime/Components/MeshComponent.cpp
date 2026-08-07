@@ -3,6 +3,7 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Core/StarAsset.h"
 #include "Runtime/AssetCache.h"
+#include <cmath>
 #include <cstdlib>
 #include "Runtime/PointerUtil.h"
 
@@ -62,16 +63,125 @@ void RegisterMeshComponentNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(setMaterial);
+
+    NodeTemplate playAnim;
+    playAnim.type = "Play_Animation";
+    playAnim.category = "Mesh";
+    playAnim.moduleName = "Stargraph";
+    playAnim.requiresComponentClass = "MeshComponent";
+    playAnim.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Anim", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    playAnim.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        std::string animPath;
+        bool looping = false;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+            if (p.name == "Anim") animPath = p.defaultValue;
+            if (p.name == "Looping") looping = p.defaultValue.AsBool();
+        }
+        if (!target) return;
+        if (MeshComponent* mc = dynamic_cast<MeshComponent*>(target)) {
+            mc->PlayAnimation(animPath, looping);
+        }
+    };
+    NodeRegistry::Get().RegisterNode(playAnim);
+
+    NodeTemplate stopAnim;
+    stopAnim.type = "Stop_Animation";
+    stopAnim.category = "Mesh";
+    stopAnim.moduleName = "Stargraph";
+    stopAnim.requiresComponentClass = "MeshComponent";
+    stopAnim.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    stopAnim.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (MeshComponent* mc = dynamic_cast<MeshComponent*>(target)) {
+            mc->StopAnimation();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(stopAnim);
+
+    NodeTemplate setAnimRate;
+    setAnimRate.type = "Set_Anim_Play_Rate";
+    setAnimRate.category = "Mesh";
+    setAnimRate.moduleName = "Stargraph";
+    setAnimRate.requiresComponentClass = "MeshComponent";
+    setAnimRate.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Rate", PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setAnimRate.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        float rate = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+            if (p.name == "Rate") rate = p.defaultValue.AsFloat();
+        }
+        if (!target) return;
+        if (MeshComponent* mc = dynamic_cast<MeshComponent*>(target)) {
+            mc->SetAnimPlayRate(rate);
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setAnimRate);
 }
 
 void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddString("Static Mesh", &meshPath);
     outProperties.AddBool("Casts Shadow", &castsShadow);
+    outProperties.AddString("Current Anim", &currentAnimPath);
+    outProperties.AddBool("Anim Playing", &animPlaying, true);
+    outProperties.AddBool("Anim Looping", &animLooping);
+    outProperties.AddFloat("Anim Play Rate", &animPlayRate);
 }
 
 void MeshComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
+
+    if (!animPlaying || currentAnimPath.empty()) return;
+
+    Model* model = GetCachedModel();
+    ModelAnimation* anim = GetCurrentAnimation();
+    if (!model || !anim || cachedAnimFrameCount <= 0 || cachedAnimFps <= 0.0f) return;
+
+    animTime += deltaTime * animPlayRate;
+
+    float duration = (float)cachedAnimFrameCount / cachedAnimFps;
+    if (duration <= 0.0f) return;
+
+    if (animTime >= duration) {
+        if (animLooping) animTime = fmodf(animTime, duration);
+        else { animTime = duration; animPlaying = false; }
+    } else if (animTime < 0.0f) {
+        if (animLooping) {
+            animTime = fmodf(animTime, duration);
+            if (animTime < 0.0f) animTime += duration;
+        } else { animTime = 0.0f; animPlaying = false; }
+    }
+
+    float frame = animTime * cachedAnimFps;
+    UpdateModelAnimation(*model, *anim, frame);
 }
 
 void MeshComponent::SetMeshPath(const std::string& path) {
@@ -90,6 +200,39 @@ void MeshComponent::SetMaterialPath(int slotIndex, const std::string& path) {
     if ((size_t)slotIndex >= materialPaths.size()) materialPaths.resize(slotIndex + 1);
     materialPaths[slotIndex] = path;
     InvalidateCachedModel();
+}
+
+void MeshComponent::PlayAnimation(const std::string& animPath, bool loop) {
+    currentAnimPath = animPath;
+    animTime = 0.0f;
+    animLooping = loop;
+    animPlaying = true;
+}
+
+void MeshComponent::StopAnimation() {
+    animPlaying = false;
+}
+
+void MeshComponent::SetAnimPlayRate(float rate) {
+    animPlayRate = rate;
+}
+
+ModelAnimation* MeshComponent::GetCurrentAnimation() {
+    if (currentAnimPath != cachedAnimMetaPath) {
+        cachedAnimFps = 30.0f;
+        cachedAnimFrameCount = 0;
+        cachedAnimMetaPath.clear();
+        if (!currentAnimPath.empty()) {
+            StarAsset asset;
+            if (StarAsset::LoadFromFile(currentAnimPath, asset) && asset.assetType == "Animation") {
+                cachedAnimFps = asset.animFramesPerSecond > 0.0f ? asset.animFramesPerSecond : 30.0f;
+                cachedAnimFrameCount = asset.animFrameCount;
+                cachedAnimMetaPath = currentAnimPath;
+            }
+        }
+    }
+    if (currentAnimPath.empty()) return nullptr;
+    return AssetCache::Get().GetOrLoadAnimation(currentAnimPath);
 }
 
 Model* MeshComponent::GetCachedModel() {
