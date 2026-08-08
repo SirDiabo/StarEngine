@@ -40,6 +40,7 @@ private:
     void CancelPendingCreate();
     void CookImportedAsset(const std::string& srcPath, const std::string& assetType,
                             const std::string& extension);
+    void BeginMeshImport(const std::string& srcPath);
     void ImportAssetAuto();
     void ImportPathAuto(const std::string& path);
     void HandleFileDrop();

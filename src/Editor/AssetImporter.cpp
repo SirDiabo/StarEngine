@@ -359,6 +359,65 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
 
 namespace AssetImporter {
 
+MeshImportPreview InspectMeshSource(const std::string& srcPath) {
+    MeshImportPreview preview;
+    fs::path src(srcPath);
+    std::error_code ec;
+    fs::path absoluteSrc = fs::absolute(src, ec);
+    if (ec) absoluteSrc = src;
+    if (!fs::exists(absoluteSrc, ec)) return preview;
+
+    if (ObjMtlParser::IsObjFile(absoluteSrc)) {
+        std::vector<uint8_t> objBytes = ReadFileBytes(absoluteSrc);
+        for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(objBytes)) {
+            fs::path mtlPath = absoluteSrc.parent_path() / mtlName;
+            if (!fs::exists(mtlPath, ec)) continue;
+            std::vector<uint8_t> mtlBytes = ReadFileBytes(mtlPath);
+            for (const ObjMtlParser::MtlMaterial& mat : ObjMtlParser::ParseMtlMaterials(mtlBytes)) {
+                preview.materialNames.push_back(mat.name);
+            }
+        }
+        preview.materialCount = (int)preview.materialNames.size();
+    } else {
+        Model rawModel = LoadModel(absoluteSrc.string().c_str());
+        preview.materialCount = rawModel.materialCount;
+        std::vector<std::string> gltfNames = ExtractGltfMaterialNames(absoluteSrc);
+        for (int i = 0; i < rawModel.materialCount; i++) {
+            if ((size_t)i < gltfNames.size() && !gltfNames[i].empty()) preview.materialNames.push_back(gltfNames[i]);
+            else preview.materialNames.push_back("Material_" + std::to_string(i));
+        }
+        preview.hasSkeleton = rawModel.skeleton.boneCount > 0;
+        preview.skeletonBoneCount = rawModel.skeleton.boneCount;
+        UnloadModel(rawModel);
+
+        int animCount = 0;
+        ModelAnimation* anims = LoadModelAnimations(absoluteSrc.string().c_str(), &animCount);
+        if (anims != nullptr) {
+            for (int i = 0; i < animCount; i++) {
+                preview.animationNames.push_back(
+                    anims[i].name[0] != '\0' ? std::string(anims[i].name) : ("Anim_" + std::to_string(i)));
+            }
+            UnloadModelAnimations(anims, animCount);
+        }
+    }
+
+    preview.valid = true;
+    return preview;
+}
+
+std::string CookAnimationsOnly(const std::string& srcPath, const std::string& targetFolder) {
+    fs::path src(srcPath);
+    std::error_code ec;
+    fs::path absoluteSrc = fs::absolute(src, ec);
+    if (ec) absoluteSrc = src;
+
+    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+    fs::path folder = targetFolder.empty() ? contentRoot : fs::path(targetFolder);
+
+    ExtractAnimations(absoluteSrc, folder, contentRoot);
+    return folder.string();
+}
+
 std::string Cook(const std::string& srcPath, const std::string& assetType, const std::string& extension,
                   const std::string& targetFolder) {
     fs::path src(srcPath);
@@ -383,7 +442,6 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
 
     if (asset.SaveToFile(target.string())) {
         AssetRegistry::Get().RegisterAsset(target.string(), asset.sourcePath, target.string());
-        ImportDetailsPanel::Get().Open(target.string(), assetType);
         return target.string();
     }
     return "";

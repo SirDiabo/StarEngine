@@ -311,9 +311,14 @@ void ContentBrowserPanel::CookImportedAsset(const std::string& srcPath, const st
     std::string result = AssetImporter::Cook(srcPath, assetType, extension, GetCurrentFolderPath());
     if (!result.empty()) {
         importStatus = "Imported " + fs::path(result).stem().string();
+        ImportDetailsPanel::Get().Open(result, assetType);
     } else {
         importStatus = "Import failed: could not write " + fs::path(srcPath).stem().string();
     }
+}
+
+void ContentBrowserPanel::BeginMeshImport(const std::string& srcPath) {
+    ImportDetailsPanel::Get().OpenForImport(srcPath, "StaticMesh", ".starasset", GetCurrentFolderPath());
 }
 
 void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
@@ -325,7 +330,7 @@ void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     if (std::find(meshExts.begin(), meshExts.end(), ext) != meshExts.end()) {
-        CookImportedAsset(path, "StaticMesh", ".starasset");
+        BeginMeshImport(path);
     } else if (std::find(texExts.begin(), texExts.end(), ext) != texExts.end()) {
         CookImportedAsset(path, "Texture", ".startex");
     } else if (std::find(soundExts.begin(), soundExts.end(), ext) != soundExts.end()) {

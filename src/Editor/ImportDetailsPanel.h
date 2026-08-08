@@ -10,6 +10,8 @@ public:
     static ImportDetailsPanel& Get();
 
     void Open(const std::string& assetPath, const std::string& assetType, bool inlinePanel = false);
+    void OpenForImport(const std::string& srcPath, const std::string& assetType, const std::string& extension,
+                        const std::string& targetFolder);
     void Close();
     bool IsOpen() const { return open; }
 
@@ -40,4 +42,15 @@ private:
 
     bool hasSkeleton = false;
     int skeletonBoneCount = 0;
+
+    bool pendingImport = false;
+    std::string pendingSrcPath;
+    std::string pendingExtension;
+    std::string pendingTargetFolder;
+
+    bool hasAnimations = false;
+    std::vector<std::string> pendingAnimationNames;
+    bool animationOnly = false;
+    std::string animationOnlyTargetMesh;
+    std::vector<std::string> compatibleMeshPaths;
 };
