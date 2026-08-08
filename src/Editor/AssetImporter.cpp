@@ -8,6 +8,8 @@
 #include "ImportDetailsPanel.h"
 #include "Runtime/AssetCache.h"
 #include "raylib.h"
+#include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
@@ -22,6 +24,17 @@ std::vector<uint8_t> ReadFileBytes(const fs::path& p) {
     return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 }
 
+std::string SanitizeFileNamePart(const std::string& name) {
+    std::string result = name;
+    for (char& c : result) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+            c == '"' || c == '<' || c == '>' || c == '|') {
+            c = '_';
+        }
+    }
+    return result;
+}
+
 fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, const std::string& ext) {
     fs::path target = folder / (baseName + ext);
     int suffix = 1;
@@ -29,12 +42,117 @@ fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, c
     return target;
 }
 
+std::string ExtractJsonNameField(const std::string& obj) {
+    int depth = 0;
+    size_t i = 0;
+    while (i < obj.size()) {
+        char c = obj[i];
+        if (c == '"') {
+            size_t strStart = i + 1;
+            size_t strEnd = strStart;
+            while (strEnd < obj.size() && obj[strEnd] != '"') {
+                if (obj[strEnd] == '\\') strEnd++;
+                strEnd++;
+            }
+            std::string key = obj.substr(strStart, std::min(strEnd, obj.size()) - strStart);
+            i = strEnd + 1;
+            if (depth == 1 && key == "name") {
+                while (i < obj.size() && (obj[i] == ' ' || obj[i] == ':' || obj[i] == '\t' ||
+                                           obj[i] == '\n' || obj[i] == '\r')) i++;
+                if (i < obj.size() && obj[i] == '"') {
+                    size_t vStart = i + 1;
+                    size_t vEnd = vStart;
+                    std::string value;
+                    while (vEnd < obj.size() && obj[vEnd] != '"') {
+                        if (obj[vEnd] == '\\' && vEnd + 1 < obj.size()) {
+                            value += obj[vEnd + 1];
+                            vEnd += 2;
+                            continue;
+                        }
+                        value += obj[vEnd];
+                        vEnd++;
+                    }
+                    return value;
+                }
+            }
+            continue;
+        }
+        if (c == '{' || c == '[') depth++;
+        else if (c == '}' || c == ']') depth--;
+        i++;
+    }
+    return "";
+}
+
+std::string ExtractGltfOrGlbJsonText(const std::vector<uint8_t>& bytes) {
+    if (bytes.size() >= 20 && bytes[0] == 'g' && bytes[1] == 'l' && bytes[2] == 'T' && bytes[3] == 'F') {
+        uint32_t chunkLength = 0, chunkType = 0;
+        std::memcpy(&chunkLength, &bytes[12], 4);
+        std::memcpy(&chunkType, &bytes[16], 4);
+        if (chunkType != 0x4E4F534Au) return "";
+        size_t jsonStart = 20;
+        if (jsonStart + chunkLength > bytes.size()) return "";
+        return std::string(reinterpret_cast<const char*>(&bytes[jsonStart]), chunkLength);
+    }
+    return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
+std::vector<std::string> ExtractGltfMaterialNames(const fs::path& absoluteSrc) {
+    std::vector<std::string> names;
+    std::vector<uint8_t> bytes = ReadFileBytes(absoluteSrc);
+    if (bytes.empty()) return names;
+
+    std::string json = ExtractGltfOrGlbJsonText(bytes);
+    if (json.empty()) return names;
+
+    size_t matKeyPos = json.find("\"materials\"");
+    if (matKeyPos == std::string::npos) return names;
+    size_t arrStart = json.find('[', matKeyPos);
+    if (arrStart == std::string::npos) return names;
+
+    size_t i = arrStart + 1;
+    int depth = 0;
+    size_t objStart = std::string::npos;
+    while (i < json.size()) {
+        char c = json[i];
+        if (c == '"') {
+            size_t strEnd = i + 1;
+            while (strEnd < json.size() && json[strEnd] != '"') {
+                if (json[strEnd] == '\\') strEnd++;
+                strEnd++;
+            }
+            i = strEnd + 1;
+            continue;
+        }
+        if (c == '{') {
+            if (depth == 0) objStart = i;
+            depth++;
+        } else if (c == '}') {
+            depth--;
+            if (depth == 0 && objStart != std::string::npos) {
+                names.push_back(ExtractJsonNameField(json.substr(objStart, i - objStart + 1)));
+                objStart = std::string::npos;
+            }
+        } else if (c == '[') {
+            depth++;
+        } else if (c == ']') {
+            if (depth == 0) break;
+            depth--;
+        }
+        i++;
+    }
+    return names;
+}
+
 void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, const fs::path& contentRoot) {
     std::error_code ec;
     std::string absoluteSrcStr = fs::absolute(absoluteSrc, ec).string();
 
+    std::string ext = absoluteSrc.extension().string();
+    for (char& c : ext) c = (char)tolower(c);
+    float sourceFps = (ext == ".gltf" || ext == ".glb") ? 60.0f : 30.0f;
+
     std::unordered_map<std::string, fs::path> existingByName;
-    std::unordered_map<std::string, float> existingFpsByName;
     if (fs::exists(folder, ec)) {
         for (const auto& entry : fs::directory_iterator(folder, ec)) {
             if (entry.path().extension() != ".staranim") continue;
@@ -44,7 +162,6 @@ void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, cons
             std::string existingSrc = existing.sourcePath;
             if (existingSrc.empty() || existingSrc != absoluteSrcStr) continue;
             existingByName[existing.animName] = entry.path();
-            existingFpsByName[existing.animName] = existing.animFramesPerSecond;
         }
     }
 
@@ -65,12 +182,12 @@ void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, cons
         animAsset.animName = clipName;
         animAsset.animFrameCount = anim.keyframeCount;
         animAsset.animBoneCount = anim.boneCount;
+        animAsset.animFramesPerSecond = sourceFps;
 
         fs::path target;
         auto foundExisting = existingByName.find(clipName);
         if (foundExisting != existingByName.end()) {
             target = foundExisting->second;
-            animAsset.animFramesPerSecond = existingFpsByName[clipName];
         } else {
             target = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + clipName, ".staranim");
         }
@@ -91,7 +208,12 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
     asset.assetType = "StaticMesh";
     asset.sourcePath = fs::absolute(absoluteSrc, ec).string();
     asset.vendoredSourcePath = SourceVendoring::Vendor(contentRoot.string(), asset.sourcePath, absoluteSrc.stem().string());
-    asset.importScaleX = asset.importScaleY = asset.importScaleZ = 100.0f;
+
+    std::string srcExtLower = absoluteSrc.extension().string();
+    for (char& c : srcExtLower) c = (char)tolower(c);
+    bool isGltfFormat = (srcExtLower == ".gltf" || srcExtLower == ".glb");
+    float defaultScale = isGltfFormat ? 1.0f : 100.0f;
+    asset.importScaleX = asset.importScaleY = asset.importScaleZ = defaultScale;
 
     auto findPreviousSlot = [&](const std::string& usemtlName) -> const MaterialSlot* {
         for (const MaterialSlot& old : previousSlots) {
@@ -148,11 +270,16 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
         }
     } else {
         Model rawModel = LoadModel(absoluteSrc.string().c_str());
+        std::vector<std::string> gltfMaterialNames = ExtractGltfMaterialNames(absoluteSrc);
         if (rawModel.materialCount > 0) {
             for (int i = 0; i < rawModel.materialCount; i++) {
                 Material& srcMat = rawModel.materials[i];
                 MaterialSlot slot;
-                slot.usemtlName = "Material_" + std::to_string(i);
+                if ((size_t)i < gltfMaterialNames.size() && !gltfMaterialNames[i].empty()) {
+                    slot.usemtlName = gltfMaterialNames[i];
+                } else {
+                    slot.usemtlName = "Material_" + std::to_string(i);
+                }
 
                 const MaterialSlot* existing = findPreviousSlot(slot.usemtlName);
                 if (existing && !existing->materialPath.empty() &&
@@ -166,11 +293,13 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                 Color mapColor = srcMat.maps[MATERIAL_MAP_ALBEDO].color;
                 starMat.baseColor = mapColor;
 
+                std::string safeName = SanitizeFileNamePart(slot.usemtlName);
+
                 Texture2D srcTex = srcMat.maps[MATERIAL_MAP_ALBEDO].texture;
                 if (srcTex.id != 0) {
                     Image img = LoadImageFromTexture(srcTex);
                     if (img.data != nullptr) {
-                        fs::path pngTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + slot.usemtlName, ".png");
+                        fs::path pngTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + safeName, ".png");
                         if (ExportImage(img, pngTarget.string().c_str())) {
                             fs::path texTarget = UniqueTargetPath(folder, pngTarget.stem().string(), ".startex");
                             StarAsset texAsset;
@@ -187,7 +316,7 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                     }
                 }
 
-                fs::path matTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + slot.usemtlName, ".starmat");
+                fs::path matTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + safeName, ".starmat");
                 if (starMat.SaveToFile(matTarget.string())) {
                     slot.materialPath = fs::relative(matTarget, contentRoot, ec).generic_string();
                 }
@@ -287,7 +416,9 @@ std::string Reimport(const std::string& starAssetPath) {
         rebuilt.sourcePath = fs::absolute(src, ec).string();
         rebuilt.vendoredSourcePath = asset.vendoredSourcePath;
         rebuilt.animName = asset.animName;
-        rebuilt.animFramesPerSecond = asset.animFramesPerSecond;
+        std::string srcExt = src.extension().string();
+        for (char& c : srcExt) c = (char)tolower(c);
+        rebuilt.animFramesPerSecond = (srcExt == ".gltf" || srcExt == ".glb") ? 60.0f : 30.0f;
         bool matched = false;
         if (anims != nullptr) {
             for (int i = 0; i < animCount; i++) {
