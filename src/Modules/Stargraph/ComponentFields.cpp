@@ -90,6 +90,8 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.looping; }),
         Flt("AudioComponent", "Volume", &ComponentDecl::volume,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).volume = d.volume; }),
+        Flt("AudioComponent", "Pitch", &ComponentDecl::pitch,
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = d.pitch; }),
         Bln("AudioComponent", "AutoPlay", &ComponentDecl::autoPlay,
             [](Component& c, const ComponentDecl& d) {
                 auto& ac = static_cast<AudioComponent&>(c);

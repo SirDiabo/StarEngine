@@ -208,6 +208,7 @@ struct ComponentDecl {
     bool autoPlay = false;
     bool looping = false;
     float volume = 1.0f;
+    float pitch = 1.0f;
 
     // CameraComponent
     float cameraFov = 50.0f;

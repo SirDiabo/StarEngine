@@ -132,6 +132,7 @@ private:
     bool componentDragActive = false;
 
     int selectedComponentIndex = -1;
+    int lastValidComponentIndex = -1;
     SearchableListPopup addComponentMenu;
 
     AssetPickerPopup componentMeshPicker;
@@ -150,6 +151,7 @@ private:
     char compHeightBuf[32] = "";
     char compSoundBuf[256] = "";
     char compVolumeBuf[32] = "";
+    char compPitchBuf[32] = "";
     char compFovBuf[32] = "";
     char compNearClipBuf[32] = "";
     char compFarClipBuf[32] = "";

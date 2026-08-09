@@ -781,6 +781,7 @@ void StargraphEditorPanel::RenderGraph() {
                     }
                     selectedVariableIndex = -1;
                     selectedComponentIndex = -1;
+                    lastValidComponentIndex = -1;
                     draggingNode = true;
                     nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
                     break;
@@ -1081,6 +1082,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 }
                 selectedVariableIndex = -1;
                 selectedComponentIndex = -1;
+                lastValidComponentIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
                 break;

@@ -87,6 +87,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
                 if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     selectedVariableIndex = (int)i;
                     selectedComponentIndex = -1;
+                    lastValidComponentIndex = -1;
                     selectedNodeId = -1;
                     selectedNodeIds.clear();
                     variableDragIndex = (int)i;
@@ -96,6 +97,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
                 if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
                     selectedVariableIndex = (int)i;
                     selectedComponentIndex = -1;
+                    lastValidComponentIndex = -1;
                     varContextMenuOpen = true;
                     varContextMenuIndex = (int)i;
                 }
@@ -323,7 +325,8 @@ void StargraphEditorPanel::RenderRightPanel() {
     }
 
     std::vector<ComponentDecl>& comps = graph.GetComponents();
-    if (selectedComponentIndex >= 0 && selectedComponentIndex < (int)comps.size()) {
+    if (lastValidComponentIndex >= (int)comps.size()) lastValidComponentIndex = -1;
+    if (lastValidComponentIndex >= 0) {
         RenderComponentDetails(panel, y);
         return;
     }

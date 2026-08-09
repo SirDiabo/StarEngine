@@ -90,6 +90,130 @@ void RegisterAudioComponentNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(setLooping);
+
+    NodeTemplate setPitch;
+    setPitch.type = "Set_Pitch";
+    setPitch.category = "Audio";
+    setPitch.moduleName = "Stargraph";
+    setPitch.hideFromContextMenu = true;
+    setPitch.requiresComponentClass = "AudioComponent";
+    setPitch.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setPitch.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        float pitch = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+            if (p.name == "Pitch" && !p.defaultValue.empty()) pitch = p.defaultValue.AsFloat();
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->pitch = pitch;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setPitch);
+
+    NodeTemplate playAudio;
+    playAudio.type = "Play_Audio";
+    playAudio.category = "Audio";
+    playAudio.moduleName = "Stargraph";
+    playAudio.requiresComponentClass = "AudioComponent";
+    playAudio.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    playAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->Play();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(playAudio);
+
+    NodeTemplate stopAudio;
+    stopAudio.type = "Stop_Audio";
+    stopAudio.category = "Audio";
+    stopAudio.moduleName = "Stargraph";
+    stopAudio.requiresComponentClass = "AudioComponent";
+    stopAudio.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    stopAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->Stop();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(stopAudio);
+
+    NodeTemplate pauseAudio;
+    pauseAudio.type = "Pause_Audio";
+    pauseAudio.category = "Audio";
+    pauseAudio.moduleName = "Stargraph";
+    pauseAudio.requiresComponentClass = "AudioComponent";
+    pauseAudio.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    pauseAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->Pause();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(pauseAudio);
+
+    NodeTemplate resumeAudio;
+    resumeAudio.type = "Resume_Audio";
+    resumeAudio.category = "Audio";
+    resumeAudio.moduleName = "Stargraph";
+    resumeAudio.requiresComponentClass = "AudioComponent";
+    resumeAudio.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    resumeAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = StarPointer::FromHex<Component>(p.defaultValue);
+            }
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->Resume();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(resumeAudio);
 }
 
 void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
@@ -98,17 +222,19 @@ void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddBool("Auto Play", &autoPlay);
     outProperties.AddBool("Looping", &looping);
     outProperties.AddFloat("Volume", &volume);
+    outProperties.AddFloat("Pitch", &pitch);
 }
 
 void AudioComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
 
-    if (!wantsPlaying || soundPath.empty()) return;
+    if (!wantsPlaying || paused || soundPath.empty()) return;
 
     Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
     if (!snd) return;
 
     SetSoundVolume(*snd, volume);
+    SetSoundPitch(*snd, pitch);
     if (looping && !IsSoundPlaying(*snd)) {
         PlaySound(*snd);
     }
@@ -116,15 +242,34 @@ void AudioComponent::Update(float deltaTime) {
 
 void AudioComponent::Play() {
     wantsPlaying = true;
+    paused = false;
     Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
     if (!snd) return;
     SetSoundVolume(*snd, volume);
+    SetSoundPitch(*snd, pitch);
     PlaySound(*snd);
 }
 
 void AudioComponent::Stop() {
     wantsPlaying = false;
+    paused = false;
     Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
     if (!snd) return;
     StopSound(*snd);
+}
+
+void AudioComponent::Pause() {
+    if (!wantsPlaying || paused) return;
+    paused = true;
+    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
+    if (!snd) return;
+    PauseSound(*snd);
+}
+
+void AudioComponent::Resume() {
+    if (!wantsPlaying || !paused) return;
+    paused = false;
+    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
+    if (!snd) return;
+    ResumeSound(*snd);
 }

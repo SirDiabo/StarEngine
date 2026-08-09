@@ -123,6 +123,7 @@ void StargraphEditorPanel::RenderToolbar() {
                 selectedNodeIds.clear();
                 selectedVariableIndex = -1;
                 selectedComponentIndex = -1;
+                lastValidComponentIndex = -1;
             }
         }
         if (canStop && CheckCollisionPointRec(mp, stopBtn)) {

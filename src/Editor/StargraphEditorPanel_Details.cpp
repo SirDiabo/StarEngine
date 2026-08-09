@@ -49,6 +49,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             leftClickConsumedByComponent = true;
             selectedComponentIndex = (int)i;
+            lastValidComponentIndex = (int)i;
             selectedNodeId = -1;
             selectedNodeIds.clear();
             selectedVariableIndex = -1;
@@ -68,6 +69,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         if (isSelected && IsKeyPressed(KEY_DELETE)) {
             graph.RemoveComponent(i);
             selectedComponentIndex = -1;
+            lastValidComponentIndex = -1;
             isDirty = true;
             break;
         }
@@ -91,6 +93,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             comp.name          = picked;
             graph.AddComponent(comp);
             selectedComponentIndex = (int)graph.GetComponents().size() - 1;
+            lastValidComponentIndex = selectedComponentIndex;
             selectedNodeId = -1;
             selectedNodeIds.clear();
             selectedVariableIndex = -1;
@@ -98,11 +101,10 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         }
     }
 
-    // Breaks Details Panel, Needs rethink
-    //if (!popupWasOpenThisFrame && !leftClickConsumedByComponent && selectedComponentIndex != -1 &&
-    //    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-    //    selectedComponentIndex = -1;
-    //}
+    if (!popupWasOpenThisFrame && !leftClickConsumedByComponent && selectedComponentIndex != -1 &&
+        IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        selectedComponentIndex = -1;
+    }
 }
 
 static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, size_t componentIndex) {
@@ -133,7 +135,7 @@ static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, si
 
 void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     const UIPalette& theme = UITheme::Get();
-    ComponentDecl& comp = graph.GetComponents()[selectedComponentIndex];
+    ComponentDecl& comp = graph.GetComponents()[lastValidComponentIndex];
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
                             || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp)
@@ -141,7 +143,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                             || inputDevicePicker.ContainsPoint(mp);
     const float kSaveColWidth = 24.0f;
 
-    if (lastComponentDetailIndex != selectedComponentIndex) {
+    if (lastComponentDetailIndex != lastValidComponentIndex) {
         snprintf(compNameBuf, sizeof(compNameBuf), "%s", comp.name.c_str());
         snprintf(compPosBuf[0], 32, "%.2f", comp.posX);
         snprintf(compPosBuf[1], 32, "%.2f", comp.posY);
@@ -156,6 +158,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compHeightBuf, sizeof(compHeightBuf), "%.2f", comp.collisionHeight);
         snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
         snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
+        snprintf(compPitchBuf, sizeof(compPitchBuf), "%.2f", comp.pitch);
         snprintf(compFovBuf, sizeof(compFovBuf), "%.2f", comp.cameraFov);
         snprintf(compNearClipBuf, sizeof(compNearClipBuf), "%.2f", comp.cameraNearClip);
         snprintf(compFarClipBuf, sizeof(compFarClipBuf), "%.2f", comp.cameraFarClip);
@@ -168,7 +171,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", comp.lightOuterConeAngle);
         snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", comp.lightWidth);
         snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", comp.lightHeight);
-        lastComponentDetailIndex = selectedComponentIndex;
+        lastComponentDetailIndex = lastValidComponentIndex;
         componentActiveField = 0;
         componentMeshPicker.Close();
         componentMaterialPicker.Close();
@@ -267,7 +270,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     {
         DrawText("Parent", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
-        std::vector<std::string> parentOptions = GetValidParentOptions(graph, (size_t)selectedComponentIndex);
+        std::vector<std::string> parentOptions = GetValidParentOptions(graph, (size_t)lastValidComponentIndex);
         std::string parentLabel = comp.parentName.empty() ? "None (Root)" : comp.parentName;
         if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, parentLabel.c_str())) {
             auto it = std::find(parentOptions.begin(), parentOptions.end(), comp.parentName);
@@ -373,6 +376,7 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             isDirty = true;
         }
         floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume, "Volume");
+        floatField("Pitch", compPitchBuf, sizeof(compPitchBuf), 27, comp.pitch, "Pitch");
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Auto Play", &comp.autoPlay)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Auto Play");
         y += 24;
