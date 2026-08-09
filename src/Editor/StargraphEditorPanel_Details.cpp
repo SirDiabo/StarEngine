@@ -17,6 +17,8 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
 
     Vector2 mousePos = GetMousePosition();
     float y = area.y + 6;
+    bool popupWasOpenThisFrame = addComponentMenu.IsOpen();
+    bool leftClickConsumedByComponent = false;
 
     DrawText("Components", (int)area.x + 8, (int)y, 12, theme.textSecondary);
 
@@ -45,6 +47,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         DrawText(label.c_str(), (int)area.x + 24, (int)y + 2, 11, theme.textPrimary);
 
         if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            leftClickConsumedByComponent = true;
             selectedComponentIndex = (int)i;
             selectedNodeId = -1;
             selectedNodeIds.clear();
@@ -94,6 +97,12 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             isDirty = true;
         }
     }
+
+    // Breaks Details Panel, Needs rethink
+    //if (!popupWasOpenThisFrame && !leftClickConsumedByComponent && selectedComponentIndex != -1 &&
+    //    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    //    selectedComponentIndex = -1;
+    //}
 }
 
 static std::vector<std::string> GetValidParentOptions(const Stargraph& graph, size_t componentIndex) {
@@ -325,6 +334,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         assetField("Default Anim", comp.defaultAnimPath, componentAnimPicker, ".staranim", comp.defaultAnimPath, "Default Anim");
         if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Default Anim Looping", &comp.defaultAnimLooping)) isDirty = true;
         saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Default Anim Looping");
+        y += 24;
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Default Anim Auto Play", &comp.defaultAnimAutoPlay)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Default Anim Auto Play");
         y += 24;
     } else if (comp.componentType == "CollisionComponent") {
         DrawText("Shape", (int)panel.x + 8, (int)y, 11, theme.textSecondary);

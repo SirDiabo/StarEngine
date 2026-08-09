@@ -63,9 +63,14 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
         Bln("MeshComponent", "MeshCastsShadow", &ComponentDecl::meshCastsShadow,
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.meshCastsShadow; }),
         Str("MeshComponent", "DefaultAnim", &ComponentDecl::defaultAnimPath,
-            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).currentAnimPath = d.defaultAnimPath; }),
+            [](Component& c, const ComponentDecl& d) {
+                auto& mc = static_cast<MeshComponent&>(c);
+                if (d.defaultAnimAutoPlay && !d.defaultAnimPath.empty()) mc.PlayAnimation(d.defaultAnimPath, d.defaultAnimLooping);
+                else mc.currentAnimPath = d.defaultAnimPath;
+            }),
         Bln("MeshComponent", "DefaultAnimLooping", &ComponentDecl::defaultAnimLooping,
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).animLooping = d.defaultAnimLooping; }),
+        Bln("MeshComponent", "DefaultAnimAutoPlay", &ComponentDecl::defaultAnimAutoPlay, nullptr),
 
         Str("CollisionComponent", "CollisionShape", &ComponentDecl::collisionShape,
             [](Component& c, const ComponentDecl& d) {

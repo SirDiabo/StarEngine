@@ -196,6 +196,7 @@ struct ComponentDecl {
 
     std::string defaultAnimPath;
     bool defaultAnimLooping = false;
+    bool defaultAnimAutoPlay = false;
 
     // CollisionComponent
     std::string collisionShape = "Box";

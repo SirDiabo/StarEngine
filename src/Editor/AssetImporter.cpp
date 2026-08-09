@@ -271,14 +271,16 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
     } else {
         Model rawModel = LoadModel(absoluteSrc.string().c_str());
         std::vector<std::string> gltfMaterialNames = ExtractGltfMaterialNames(absoluteSrc);
-        if (rawModel.materialCount > 0) {
-            for (int i = 0; i < rawModel.materialCount; i++) {
+        int startIdx = isGltfFormat ? 1 : 0;
+        if (rawModel.materialCount > startIdx) {
+            for (int i = startIdx; i < rawModel.materialCount; i++) {
                 Material& srcMat = rawModel.materials[i];
                 MaterialSlot slot;
-                if ((size_t)i < gltfMaterialNames.size() && !gltfMaterialNames[i].empty()) {
-                    slot.usemtlName = gltfMaterialNames[i];
+                int nameIdx = i - startIdx;
+                if ((size_t)nameIdx < gltfMaterialNames.size() && !gltfMaterialNames[nameIdx].empty()) {
+                    slot.usemtlName = gltfMaterialNames[nameIdx];
                 } else {
-                    slot.usemtlName = "Material_" + std::to_string(i);
+                    slot.usemtlName = "Material_" + std::to_string(nameIdx);
                 }
 
                 const MaterialSlot* existing = findPreviousSlot(slot.usemtlName);
@@ -296,7 +298,7 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                 std::string safeName = SanitizeFileNamePart(slot.usemtlName);
 
                 Texture2D srcTex = srcMat.maps[MATERIAL_MAP_ALBEDO].texture;
-                if (srcTex.id != 0) {
+                if (srcTex.id != 0 && srcTex.width > 1 && srcTex.height > 1) {
                     Image img = LoadImageFromTexture(srcTex);
                     if (img.data != nullptr) {
                         fs::path pngTarget = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + safeName, ".png");
@@ -379,12 +381,18 @@ MeshImportPreview InspectMeshSource(const std::string& srcPath) {
         }
         preview.materialCount = (int)preview.materialNames.size();
     } else {
+        std::string ext = absoluteSrc.extension().string();
+        for (char& c : ext) c = (char)tolower(c);
+        bool isGltfFormat = (ext == ".gltf" || ext == ".glb");
+        int startIdx = isGltfFormat ? 1 : 0;
+
         Model rawModel = LoadModel(absoluteSrc.string().c_str());
-        preview.materialCount = rawModel.materialCount;
+        preview.materialCount = (rawModel.materialCount > startIdx) ? (rawModel.materialCount - startIdx) : 0;
         std::vector<std::string> gltfNames = ExtractGltfMaterialNames(absoluteSrc);
-        for (int i = 0; i < rawModel.materialCount; i++) {
-            if ((size_t)i < gltfNames.size() && !gltfNames[i].empty()) preview.materialNames.push_back(gltfNames[i]);
-            else preview.materialNames.push_back("Material_" + std::to_string(i));
+        for (int i = startIdx; i < rawModel.materialCount; i++) {
+            int nameIdx = i - startIdx;
+            if ((size_t)nameIdx < gltfNames.size() && !gltfNames[nameIdx].empty()) preview.materialNames.push_back(gltfNames[nameIdx]);
+            else preview.materialNames.push_back("Material_" + std::to_string(nameIdx));
         }
         preview.hasSkeleton = rawModel.skeleton.boneCount > 0;
         preview.skeletonBoneCount = rawModel.skeleton.boneCount;
