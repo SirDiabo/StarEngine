@@ -77,6 +77,7 @@ else()
 
     target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")
     target_compile_definitions(StarEngine PRIVATE STARENGINE_BUILD_CONFIG="$<CONFIG>")
+    target_compile_definitions(StarEngine PRIVATE STARENGINE_VERSION="${PROJECT_VERSION}")
 
     if(WIN32)
         target_link_libraries(StarEngine PRIVATE comdlg32 shell32 ole32)
