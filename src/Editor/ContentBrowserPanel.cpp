@@ -31,7 +31,7 @@ void ContentBrowserPanel::LoadIcons() {
 
     load("folder",      "icon_folder.png");
     load("actor",       "icon_actor.png");
-    load("starmap",     "icon_map.png");
+    load("map",         "icon_map.png");
     load("asset",       "icon_asset.png");
     load("texture",     "icon_texture.png");
     load("material",    "icon_material.png");
