@@ -86,12 +86,16 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
 
         Str("AudioComponent", "Sound", &ComponentDecl::soundAssetPath,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).soundPath = d.soundAssetPath; }),
-        Bln("AudioComponent", "AutoPlay", &ComponentDecl::autoPlay,
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).autoPlay = d.autoPlay; }),
         Bln("AudioComponent", "Looping", &ComponentDecl::looping,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.looping; }),
         Flt("AudioComponent", "Volume", &ComponentDecl::volume,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).volume = d.volume; }),
+        Bln("AudioComponent", "AutoPlay", &ComponentDecl::autoPlay,
+            [](Component& c, const ComponentDecl& d) {
+                auto& ac = static_cast<AudioComponent&>(c);
+                if (d.autoPlay && !d.soundAssetPath.empty()) ac.Play();
+                else ac.autoPlay = d.autoPlay;
+            }),
 
         Flt("CameraComponent", "CameraFOV", &ComponentDecl::cameraFov,
             [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).fov = d.cameraFov; }),

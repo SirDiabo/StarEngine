@@ -1,6 +1,8 @@
 #include "AudioComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Runtime/AudioCore.h"
+#include "raylib.h"
 #include <cstdlib>
 #include "Runtime/PointerUtil.h"
 
@@ -100,4 +102,29 @@ void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
 
 void AudioComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
+
+    if (!wantsPlaying || soundPath.empty()) return;
+
+    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
+    if (!snd) return;
+
+    SetSoundVolume(*snd, volume);
+    if (looping && !IsSoundPlaying(*snd)) {
+        PlaySound(*snd);
+    }
+}
+
+void AudioComponent::Play() {
+    wantsPlaying = true;
+    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
+    if (!snd) return;
+    SetSoundVolume(*snd, volume);
+    PlaySound(*snd);
+}
+
+void AudioComponent::Stop() {
+    wantsPlaying = false;
+    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
+    if (!snd) return;
+    StopSound(*snd);
 }

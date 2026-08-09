@@ -12,6 +12,12 @@ public:
     const char* GetClassName() const override { return "AudioComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
+
+    void Play();
+    void Stop();
+
+private:
+    bool wantsPlaying = false;
 };
 
 void RegisterAudioComponentNodes();
