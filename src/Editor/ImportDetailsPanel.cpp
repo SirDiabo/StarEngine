@@ -289,7 +289,7 @@ void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
                 DrawText(animName.c_str(), (int)box.x + 14, (int)y, 10, theme.textSecondary);
                 y += 14;
             }
-            Rectangle animOnlyRow = {box.x + 10, y, boxWidth - 20, 18};
+            Rectangle animOnlyRow = {box.x + 10, y, 18, 18};
             GuiCheckBox(animOnlyRow, "Only Import Animation", &animationOnly);
             y += 22;
             if (animationOnly) {
