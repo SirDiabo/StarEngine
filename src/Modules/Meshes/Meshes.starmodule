@@ -1,9 +1,0 @@
-name=Meshes
-version=1.0
-description=Static mesh import (OBJ, glTF), texture import, and a flat-color/texture material system rendered via raylib's model loader.
-author=StarEngine
-category=Rendering
-enabledByDefault=true
-dependencies=
-assetTypes=.starasset;.startex;.starmat
-nodeCategories=

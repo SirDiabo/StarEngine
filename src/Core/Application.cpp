@@ -5,6 +5,7 @@
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Core/AssetRegistry.h"
+#include "Core/StarMaterial.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
 #include "Core/ExecutablePath.h"
@@ -87,6 +88,34 @@ bool Application::Initialize(int argc, char* argv[]) {
         return map.SaveToFile(fullPath);
     };
     AssetTypeRegistry::Get().RegisterType(mapType);
+
+    AssetTypeInfo meshType;
+    meshType.typeName = "StaticMesh";
+    meshType.extension = ".starasset";
+    meshType.category = "Mesh";
+    AssetTypeRegistry::Get().RegisterType(meshType);
+
+    AssetTypeInfo textureType;
+    textureType.typeName = "Texture";
+    textureType.extension = ".startex";
+    textureType.category = "Mesh";
+    AssetTypeRegistry::Get().RegisterType(textureType);
+
+    AssetTypeInfo materialType;
+    materialType.typeName = "Material";
+    materialType.extension = ".starmat";
+    materialType.category = "Mesh";
+    materialType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+        StarMaterial mat;
+        return mat.SaveToFile(fullPath);
+    };
+    AssetTypeRegistry::Get().RegisterType(materialType);
+
+    AssetTypeInfo animationType;
+    animationType.typeName = "Animation";
+    animationType.extension = ".staranim";
+    animationType.category = "Mesh";
+    AssetTypeRegistry::Get().RegisterType(animationType);
 
     activeLogPanel = editor->GetLogPanel();
     SetTraceLogCallback(ForwardTraceLogToPanel);
