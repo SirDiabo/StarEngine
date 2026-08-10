@@ -4,6 +4,7 @@
 #include "ChoicePopup.h"
 #include "SettingsSwitcher.h"
 #include <string>
+#include <vector>
 
 class MenuBar;
 
@@ -27,6 +28,8 @@ private:
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
     ChoicePopup lightingQualityPopup;
+
+    std::vector<std::string> shadingOptionIds;
 
     char renderScaleBuf[16] = "";
     char newSaveFileBuf[64] = "";

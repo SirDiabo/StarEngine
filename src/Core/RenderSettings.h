@@ -1,14 +1,6 @@
 #pragma once
 #include <string>
 
-enum class ShadingType {
-    Unlit,
-    ProjectedBlobShadows,
-};
-
-std::string ShadingTypeName(ShadingType type);
-ShadingType ShadingTypeFromName(const std::string& name);
-
 enum class LightingQuality {
     PerVertex,
     PerPixel,
@@ -24,8 +16,8 @@ public:
     void Load(const std::string& projectRoot);
     void Save() const;
 
-    ShadingType GetShadingType() const { return shadingType; }
-    void SetShadingType(ShadingType value);
+    const std::string& GetShadingType() const { return shadingType; }
+    void SetShadingType(const std::string& value);
 
     LightingQuality GetLightingQuality() const { return lightingQuality; }
     void SetLightingQuality(LightingQuality value);
@@ -35,7 +27,7 @@ public:
 
 private:
     std::string filePath;
-    ShadingType shadingType = ShadingType::Unlit;
+    std::string shadingType = "Unlit";
     LightingQuality lightingQuality = LightingQuality::PerVertex;
     float renderScale = 1.0f;
 };

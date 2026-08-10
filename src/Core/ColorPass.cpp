@@ -1,6 +1,6 @@
 #include "ColorPass.h"
 #include "Runtime/SceneRenderer.h"
-#include "Modules/Rendering/ShadingModel.h"
+#include "ShadingModel.h"
 
 namespace ColorPass {
 

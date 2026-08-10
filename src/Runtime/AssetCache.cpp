@@ -2,7 +2,7 @@
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/CookedFile.h"
-#include "Modules/Rendering/ShadingModel.h"
+#include "Core/ShadingModel.h"
 #include <cmath>
 
 AssetCache& AssetCache::Get() {

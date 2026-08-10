@@ -1,6 +1,7 @@
 #include "ShadingModel.h"
-#include "Core/Module.h"
-#include "Core/RenderSettings.h"
+#include "Module.h"
+#include "RenderSettings.h"
+#include "ShadingTechniqueRegistry.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/LightComponent.h"
@@ -233,8 +234,9 @@ Vector3 DirectionFromRotation(Vector3 rot) {
 } // namespace
 
 bool ShadingModel::ShouldUseLitShading() {
-    return ModuleManager::Get().IsModuleEnabled("Rendering")
-        && RenderSettings::Get().GetShadingType() != ShadingType::Unlit;
+    const std::string& shadingId = RenderSettings::Get().GetShadingType();
+    if (shadingId.empty() || shadingId == "Unlit") return false;
+    return ShadingTechniqueRegistry::Get().FindAvailable(shadingId) != nullptr;
 }
 
 Shader& ShadingModel::GetLitShader() {

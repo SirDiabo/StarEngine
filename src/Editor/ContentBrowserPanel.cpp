@@ -2,7 +2,7 @@
 #include "Core/Project.h"
 #include "Core/StarMaterial.h"
 #include "Core/RenderSettings.h"
-#include "Core/Module.h"
+#include "Core/ShadingModel.h"
 #include "Core/EmbeddedAssets.h"
 #include "Runtime/AssetCache.h"
 #include "Core/OSTrash.h"
@@ -408,7 +408,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     DrawRectangleRec({box.x + box.width - 34, y - 34, 24, 24}, materialEditorData.baseColor);
     DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, theme.fieldBorder);
 
-    bool shadingAllowsLit = RenderSettings::Get().GetShadingType() != ShadingType::Unlit;
+    bool shadingAllowsLit = ShadingModel::ShouldUseLitShading();
     Color litLabelColor = shadingAllowsLit ? theme.textSecondary : theme.buttonDisabledText;
     DrawText("Lit", (int)box.x + 8, (int)y, 11, litLabelColor);
     GuiSetState(shadingAllowsLit ? STATE_NORMAL : STATE_DISABLED);
@@ -457,8 +457,7 @@ void ContentBrowserPanel::Render() {
 
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
-    const bool importEnabled = ModuleManager::Get().IsModuleEnabled("Meshes") ||
-                                ModuleManager::Get().IsModuleEnabled("Stargraph");
+    const bool importEnabled = true;
     const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem ||
                                    itemContextMenuOpen || isRenamingItem || deleteConfirm.IsOpen();
 

@@ -1,9 +1,0 @@
-name=Rendering
-version=1.0
-description=Render pipeline (Shadow/Color/Post-process passes), Shading Type, lights, and blob shadows.
-author=StarEngine
-category=Rendering
-enabledByDefault=true
-dependencies=Meshes
-assetTypes=
-nodeCategories=

@@ -1,0 +1,9 @@
+name=BlobShadows
+version=1.0
+description=Cheap projected blob-decal shadows, cast straight down from each shadow-casting mesh onto whatever is beneath it. Plugs into the engine's Shading Type as "Blob Shadows".
+author=StarEngine
+category=Rendering
+enabledByDefault=true
+dependencies=
+assetTypes=
+nodeCategories=

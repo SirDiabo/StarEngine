@@ -5,6 +5,8 @@
 #include "Core/NamedListRegistry.h"
 #include "Core/SaveFileRegistry.h"
 #include "Core/RenderSettings.h"
+#include "Core/ShadingTechniqueRegistry.h"
+#include "Core/ShadingModel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "raygui.h"
@@ -140,26 +142,36 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
     Rectangle shadingRow = {fx, fy, fw, 20};
     DrawRectangleRec(shadingRow, theme.fieldBg);
     DrawRectangleLinesEx(shadingRow, 1, theme.fieldBorder);
-    ShadingType shadingType = RenderSettings::Get().GetShadingType();
-    std::string shadingLabel = shadingType == ShadingType::ProjectedBlobShadows
-        ? "Projected Blob Shadows" : "Unlit";
+
+    shadingOptionIds.clear();
+    std::vector<ChoiceOption> shadingChoices;
+    for (const ShadingTechnique& option : ShadingTechniqueRegistry::Get().GetAllOptions()) {
+        shadingOptionIds.push_back(option.id);
+        shadingChoices.push_back({option.displayName, true, ""});
+    }
+
+    const std::string& currentShadingId = RenderSettings::Get().GetShadingType();
+    std::string shadingLabel = "Unlit";
+    for (size_t i = 0; i < shadingOptionIds.size(); i++) {
+        if (shadingOptionIds[i] == currentShadingId) {
+            shadingLabel = shadingChoices[i].label;
+            break;
+        }
+    }
     DrawText(shadingLabel.c_str(), (int)shadingRow.x + 6, (int)shadingRow.y + 4, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, shadingRow) && !anyPopupOpen) {
-        shadingTypePopup.Open({shadingRow.x, shadingRow.y + shadingRow.height}, fw, {
-            {"Unlit", true, ""},
-            {"Projected Blob Shadows", true, ""},
-        });
+        shadingTypePopup.Open({shadingRow.x, shadingRow.y + shadingRow.height}, fw, shadingChoices);
     }
     fy += 20;
-    DrawText("Unlit runs no lighting or shadow pass at all, the cheapest option.",
+    DrawText("Unlit runs no lighting or shadow pass at all, the cheapest option. Other options come from enabled shadow modules.",
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
     int shadingChoice = 0;
-    if (shadingTypePopup.Render(shadingChoice)) {
-        RenderSettings::Get().SetShadingType(shadingChoice == 1 ? ShadingType::ProjectedBlobShadows : ShadingType::Unlit);
+    if (shadingTypePopup.Render(shadingChoice) && shadingChoice >= 0 && shadingChoice < (int)shadingOptionIds.size()) {
+        RenderSettings::Get().SetShadingType(shadingOptionIds[shadingChoice]);
     }
 
-    bool lightingEnabled = shadingType != ShadingType::Unlit;
+    bool lightingEnabled = ShadingModel::ShouldUseLitShading();
     Color lightingLabelColor = lightingEnabled ? theme.textSecondary : theme.buttonDisabledText;
     DrawText("Lighting Quality", (int)fx, (int)fy, 11, lightingLabelColor);
     fy += 14;

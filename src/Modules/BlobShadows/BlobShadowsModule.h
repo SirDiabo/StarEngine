@@ -1,9 +1,9 @@
 #pragma once
 #include "Core/Module.h"
 
-class RenderingModule : public Module {
+class BlobShadowsModule : public Module {
 public:
-    RenderingModule();
+    BlobShadowsModule();
 
     bool Initialize() override;
     void Shutdown() override;

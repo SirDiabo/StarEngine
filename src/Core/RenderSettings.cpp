@@ -5,14 +5,6 @@
 
 namespace fs = std::filesystem;
 
-std::string ShadingTypeName(ShadingType type) {
-    return type == ShadingType::ProjectedBlobShadows ? "ProjectedBlobShadows" : "Unlit";
-}
-
-ShadingType ShadingTypeFromName(const std::string& name) {
-    return name == "ProjectedBlobShadows" ? ShadingType::ProjectedBlobShadows : ShadingType::Unlit;
-}
-
 std::string LightingQualityName(LightingQuality quality) {
     return quality == LightingQuality::PerPixel ? "PerPixel" : "PerVertex";
 }
@@ -27,7 +19,7 @@ RenderSettings& RenderSettings::Get() {
 }
 
 void RenderSettings::Load(const std::string& projectRoot) {
-    shadingType = ShadingType::Unlit;
+    shadingType = "Unlit";
     lightingQuality = LightingQuality::PerVertex;
     renderScale = 1.0f;
     filePath = (fs::path(projectRoot) / "Saved" / "RenderSettings.cfg").string();
@@ -36,7 +28,7 @@ void RenderSettings::Load(const std::string& projectRoot) {
     if (!LayoutSerializer::Load(filePath, raw)) return;
 
     auto it = raw.find("shadingType");
-    if (it != raw.end()) shadingType = ShadingTypeFromName(it->second);
+    if (it != raw.end() && !it->second.empty()) shadingType = it->second;
 
     it = raw.find("lightingQuality");
     if (it != raw.end()) lightingQuality = LightingQualityFromName(it->second);
@@ -50,14 +42,14 @@ void RenderSettings::Save() const {
     if (filePath.empty()) return;
 
     std::unordered_map<std::string, std::string> raw;
-    raw["shadingType"] = ShadingTypeName(shadingType);
+    raw["shadingType"] = shadingType;
     raw["lightingQuality"] = LightingQualityName(lightingQuality);
     raw["renderScale"] = std::to_string(renderScale);
     LayoutSerializer::Save(filePath, raw);
 }
 
-void RenderSettings::SetShadingType(ShadingType value) {
-    shadingType = value;
+void RenderSettings::SetShadingType(const std::string& value) {
+    shadingType = value.empty() ? "Unlit" : value;
     Save();
 }
 

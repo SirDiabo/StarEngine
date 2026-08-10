@@ -6,7 +6,7 @@
 #include "Runtime/AssetCache.h"
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/PrintMessageLog.h"
-#include "Modules/Rendering/RenderPipeline.h"
+#include "Core/RenderPipeline.h"
 #include "Core/RenderSettings.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"

@@ -1,5 +1,4 @@
 #include "ShadowPass.h"
-#include "Core/RenderSettings.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/MeshComponent.h"
@@ -128,10 +127,6 @@ void DrawShadowDecal(Vector3 hitPoint, Vector3 hitNormal, Vector3 lightDir, bool
 } // namespace
 
 namespace ShadowPass {
-
-bool Enabled() {
-    return RenderSettings::Get().GetShadingType() == ShadingType::ProjectedBlobShadows;
-}
 
 void Run() {
     EnsureShadowTextureLoaded();

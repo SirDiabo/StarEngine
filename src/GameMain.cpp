@@ -14,7 +14,7 @@
 #include "Runtime/AssetCache.h"
 #include "Runtime/AudioCore.h"
 #include "Runtime/Components/CameraComponent.h"
-#include "Modules/Rendering/RenderPipeline.h"
+#include "Core/RenderPipeline.h"
 #include "Core/RenderSettings.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     if (!ModuleManager::Get().InitializeAll()) return 1;
 
     RenderSettings::Get().SetRenderScale(config.renderScale);
-    RenderSettings::Get().SetShadingType(ShadingTypeFromName(config.shadingType));
+    RenderSettings::Get().SetShadingType(config.shadingType);
     RenderSettings::Get().SetLightingQuality(LightingQualityFromName(config.lightingQuality));
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
