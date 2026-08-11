@@ -77,9 +77,9 @@ void RegisterInputComponentNodes() {
                 if (!PollInputKey(binding.key, raw, gamepadIndex)) continue;
 
                 if (mapping->type == InputMappingType::Bool)       held = true;
-                else if (mapping->type == InputMappingType::Axis)  axis += binding.scale;
-                else if (binding.axis == 0)                        axisX += binding.scale;
-                else                                                axisY += binding.scale;
+                else if (mapping->type == InputMappingType::Axis)  axis += raw * binding.scale;
+                else if (binding.axis == 0)                        axisX += raw * binding.scale;
+                else                                                axisY += raw * binding.scale;
             }
             if (mapping->type == InputMappingType::Axis)   held = axis != 0.0f;
             if (mapping->type == InputMappingType::Axis2D) held = (axisX != 0.0f || axisY != 0.0f);

@@ -85,10 +85,13 @@ bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) 
 
     if (keyName == "LEFT_MOUSE") {
         held = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        outAxis = held ? 1.0f : 0.0f;
     } else if (keyName == "RIGHT_MOUSE") {
         held = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+        outAxis = held ? 1.0f : 0.0f;
     } else if (keyName == "MIDDLE_MOUSE") {
         held = IsMouseButtonDown(MOUSE_BUTTON_MIDDLE);
+        outAxis = held ? 1.0f : 0.0f;
     } else if (keyName == "MOUSE_WHEEL") {
         outAxis = GetMouseWheelMove();
         if (outAxis > 1.0f) outAxis = 1.0f;
@@ -101,47 +104,56 @@ bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) 
         outAxis = GetMouseDelta().y * -1.0f;
         held = outAxis != 0.0f;
     } else if (keyName == "MOUSE_UP") {
-        held = GetMouseDelta().y < 0.0f;
+        float dy = GetMouseDelta().y;
+        outAxis = dy < 0.0f ? -dy : 0.0f;
+        held = outAxis > 0.0f;
     } else if (keyName == "MOUSE_DOWN") {
-        held = GetMouseDelta().y > 0.0f;
+        float dy = GetMouseDelta().y;
+        outAxis = dy > 0.0f ? dy : 0.0f;
+        held = outAxis > 0.0f;
     } else if (keyName == "MOUSE_LEFT") {
-        held = GetMouseDelta().x < 0.0f;
+        float dx = GetMouseDelta().x;
+        outAxis = dx < 0.0f ? -dx : 0.0f;
+        held = outAxis > 0.0f;
     } else if (keyName == "MOUSE_RIGHT") {
-        held = GetMouseDelta().x > 0.0f;
+        float dx = GetMouseDelta().x;
+        outAxis = dx > 0.0f ? dx : 0.0f;
+        held = outAxis > 0.0f;
     } else if (keyName.rfind("GAMEPAD_", 0) == 0) {
         const int pad = gamepadIndex;
         bool avail = IsGamepadAvailable(pad);
-        if (keyName == "GAMEPAD_FACE_UP")         held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP);
-        else if (keyName == "GAMEPAD_FACE_DOWN")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-        else if (keyName == "GAMEPAD_FACE_LEFT")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
-        else if (keyName == "GAMEPAD_FACE_RIGHT") held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
-        else if (keyName == "GAMEPAD_DPAD_UP")    held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_UP);
-        else if (keyName == "GAMEPAD_DPAD_DOWN")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
-        else if (keyName == "GAMEPAD_DPAD_LEFT")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_LEFT);
-        else if (keyName == "GAMEPAD_DPAD_RIGHT") held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_RIGHT);
-        else if (keyName == "GAMEPAD_SHOULDER_L") held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1);
-        else if (keyName == "GAMEPAD_SHOULDER_R") held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
-        else if (keyName == "GAMEPAD_SPECIAL_L")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT);
-        else if (keyName == "GAMEPAD_SPECIAL_R")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT);
-        else if (keyName == "GAMEPAD_LEFT_THUMB")  held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_THUMB);
-        else if (keyName == "GAMEPAD_RIGHT_THUMB") held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_THUMB);
+        if (keyName == "GAMEPAD_FACE_UP")         { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_FACE_DOWN")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_FACE_LEFT")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_FACE_RIGHT") { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_DPAD_UP")    { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_UP); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_DPAD_DOWN")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_DOWN); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_DPAD_LEFT")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_LEFT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_DPAD_RIGHT") { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_RIGHT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_SHOULDER_L") { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_SHOULDER_R") { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_SPECIAL_L")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_SPECIAL_R")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_LEFT_THUMB")  { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_THUMB); outAxis = held ? 1.0f : 0.0f; }
+        else if (keyName == "GAMEPAD_RIGHT_THUMB") { held = avail && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_THUMB); outAxis = held ? 1.0f : 0.0f; }
         else if (keyName == "GAMEPAD_LEFT_STICK_X")  { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X)  : 0.0f; held = fabsf(outAxis) > 0.1f; }
         else if (keyName == "GAMEPAD_LEFT_STICK_Y")  { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y)  : 0.0f; held = fabsf(outAxis) > 0.1f; }
         else if (keyName == "GAMEPAD_RIGHT_STICK_X") { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X) : 0.0f; held = fabsf(outAxis) > 0.1f; }
         else if (keyName == "GAMEPAD_RIGHT_STICK_Y") { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y) : 0.0f; held = fabsf(outAxis) > 0.1f; }
         else if (keyName == "GAMEPAD_TRIGGER_L") { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER)  : 0.0f; held = outAxis > 0.1f; }
         else if (keyName == "GAMEPAD_TRIGGER_R") { outAxis = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) : 0.0f; held = outAxis > 0.1f; }
-        else if (keyName == "GAMEPAD_LEFT_STICK_UP")     { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y)  : 0.0f; held = y < -0.1f; }
-        else if (keyName == "GAMEPAD_LEFT_STICK_DOWN")   { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y)  : 0.0f; held = y > 0.1f; }
-        else if (keyName == "GAMEPAD_LEFT_STICK_LEFT")   { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X)  : 0.0f; held = x < -0.1f; }
-        else if (keyName == "GAMEPAD_LEFT_STICK_RIGHT")  { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X)  : 0.0f; held = x > 0.1f; }
-        else if (keyName == "GAMEPAD_RIGHT_STICK_UP")    { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y) : 0.0f; held = y < -0.1f; }
-        else if (keyName == "GAMEPAD_RIGHT_STICK_DOWN")  { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y) : 0.0f; held = y > 0.1f; }
-        else if (keyName == "GAMEPAD_RIGHT_STICK_LEFT")  { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X) : 0.0f; held = x < -0.1f; }
-        else if (keyName == "GAMEPAD_RIGHT_STICK_RIGHT") { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X) : 0.0f; held = x > 0.1f; }
+        else if (keyName == "GAMEPAD_LEFT_STICK_UP")     { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y)  : 0.0f; outAxis = y < -0.1f ? -y : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_LEFT_STICK_DOWN")   { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y)  : 0.0f; outAxis = y > 0.1f ? y : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_LEFT_STICK_LEFT")   { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X)  : 0.0f; outAxis = x < -0.1f ? -x : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_LEFT_STICK_RIGHT")  { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X)  : 0.0f; outAxis = x > 0.1f ? x : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_RIGHT_STICK_UP")    { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y) : 0.0f; outAxis = y < -0.1f ? -y : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_RIGHT_STICK_DOWN")  { float y = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y) : 0.0f; outAxis = y > 0.1f ? y : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_RIGHT_STICK_LEFT")  { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X) : 0.0f; outAxis = x < -0.1f ? -x : 0.0f; held = outAxis > 0.0f; }
+        else if (keyName == "GAMEPAD_RIGHT_STICK_RIGHT") { float x = avail ? GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X) : 0.0f; outAxis = x > 0.1f ? x : 0.0f; held = outAxis > 0.0f; }
     } else {
         int key = InputKeyNameToCode(keyName);
         held = key != 0 && IsKeyDown(key);
+        outAxis = held ? 1.0f : 0.0f;
     }
 
     return held;
