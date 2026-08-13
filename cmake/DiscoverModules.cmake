@@ -26,7 +26,14 @@ else()
     set(STARENGINE_PROJECT_MODULES_DIR "")
 endif()
 
+set(STARENGINE_ENGINE_MODULES_DIR "${CMAKE_SOURCE_DIR}/Modules")
+if(EXISTS "${STARENGINE_ENGINE_MODULES_DIR}")
+    list(APPEND STARENGINE_MODULE_ROOTS "${STARENGINE_ENGINE_MODULES_DIR}")
+endif()
+
 set(STARENGINE_MODULE_PLAIN_SOURCES "")
+set(STARENGINE_MODULE_PLAIN_SOURCES_EDITOR_ONLY "")
+set(_starengine_seen_module_names "")
 
 foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
     string(REPLACE "\\" "/" _normalized_root "${MODULE_ROOT}")
@@ -37,12 +44,31 @@ foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
             continue()
         endif()
 
+        get_filename_component(_module_name "${_normalized_dir}" NAME)
+        list(FIND _starengine_seen_module_names "${_module_name}" _starengine_module_seen_index)
+        if(NOT _starengine_module_seen_index EQUAL -1)
+            continue()
+        endif()
+        list(APPEND _starengine_seen_module_names "${_module_name}")
+
+        set(_starengine_module_editor_only FALSE)
+        file(GLOB _starengine_module_manifests "${_normalized_dir}/*.starmodule")
+        foreach(_starengine_manifest ${_starengine_module_manifests})
+            file(STRINGS "${_starengine_manifest}" _starengine_manifest_lines)
+            foreach(_starengine_manifest_line ${_starengine_manifest_lines})
+                if(_starengine_manifest_line STREQUAL "editorOnly=true")
+                    set(_starengine_module_editor_only TRUE)
+                endif()
+            endforeach()
+        endforeach()
+
         if(EXISTS "${_normalized_dir}/CMakeLists.txt")
-            
-            get_filename_component(_module_name "${_normalized_dir}" NAME)
             add_subdirectory("${_normalized_dir}" "${CMAKE_BINARY_DIR}/modules/${_module_name}")
-        elseif(NOT "${_normalized_root}" STREQUAL "${CMAKE_SOURCE_DIR}/src/Modules")
-            
+        elseif(_starengine_module_editor_only)
+            file(GLOB_RECURSE _module_sources CONFIGURE_DEPENDS
+                "${_normalized_dir}/*.cpp" "${_normalized_dir}/*.c")
+            list(APPEND STARENGINE_MODULE_PLAIN_SOURCES_EDITOR_ONLY ${_module_sources})
+        else()
             file(GLOB_RECURSE _module_sources CONFIGURE_DEPENDS
                 "${_normalized_dir}/*.cpp" "${_normalized_dir}/*.c")
             list(APPEND STARENGINE_MODULE_PLAIN_SOURCES ${_module_sources})
@@ -51,3 +77,4 @@ foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
 endforeach()
 
 get_property(STARENGINE_MODULE_LIBRARIES GLOBAL PROPERTY STARENGINE_MODULE_LIBRARIES)
+get_property(STARENGINE_MODULE_LIBRARIES_EDITOR_ONLY GLOBAL PROPERTY STARENGINE_MODULE_LIBRARIES_EDITOR_ONLY)

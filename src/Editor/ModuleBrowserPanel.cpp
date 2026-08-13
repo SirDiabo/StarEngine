@@ -1,6 +1,7 @@
 #include "ModuleBrowserPanel.h"
 #include "NativeFileDialog.h"
 #include "Core/Module.h"
+#include "Core/ModuleManifest.h"
 #include "Core/BuildRunner.h"
 #include "Core/Project.h"
 #include "Core/ModuleImporter.h"
@@ -38,7 +39,7 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
         DrawRectangleLinesEx(checkRect, 1, theme.buttonBorder);
     } else {
         bool toggled = enabled;
-        if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen()) {
+        if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen() && !engineOrProjectPopup.IsOpen()) {
             ModuleManager::Get().SetModuleEnabled(moduleName, toggled);
         }
     }
@@ -116,6 +117,21 @@ void ModuleBrowserPanel::Render() {
         case InputMode::CatalogList:     RenderCatalogList(importBar);    break;
     }
 
+    int engineOrProjectChoice = -1;
+    if (engineOrProjectPopup.Render(engineOrProjectChoice)) {
+        if (engineOrProjectChoice == 0) {
+            std::string engineDir = ModuleManager::GetEngineModulesRoot();
+            std::string newDest, relocateError;
+            if (ModuleImporter::RelocateModule(pendingRelocateDir, engineDir, newDest, relocateError)) {
+                statusMessage = "Added to the engine.";
+            } else {
+                statusMessage = "Kept in this project (" + relocateError + ")";
+            }
+        }
+        pendingRelocateDir.clear();
+        FinishImport(true, "");
+    }
+
     if (!statusMessage.empty()) {
         DrawText(statusMessage.c_str(), (int)bounds.x + 8, (int)(importBar.y - 16), 11, theme.success);
     }
@@ -126,7 +142,7 @@ void ModuleBrowserPanel::RenderImportBar() {
     Rectangle importBtn = { bounds.x + 8, bounds.y + bounds.height - importBtnHeight - 6,
                              bounds.width - 16, importBtnHeight };
 
-    if (UIWidget::Button(importBtn, "Import Module...")) {
+    if (UIWidget::Button(importBtn, "Import Module...") && !engineOrProjectPopup.IsOpen()) {
         importMenu.Open({importBtn.x, importBtn.y - 3 * 22.0f - 4}, importBtn.width,
             { {"Import from Disk..."}, {"Import from Repository..."}, {"Import from Catalog..."} });
     }
@@ -190,6 +206,7 @@ void ModuleBrowserPanel::RenderCatalogList(Rectangle area) {
         const CatalogEntry& e = catalogEntries[i];
         Rectangle row = { area.x, y, area.width - 64, rowH };
         std::string label = e.name + " - " + e.description;
+        if (e.engineModule) label += " [Engine]";
         DrawText(label.c_str(), (int)row.x + 2, (int)row.y + 4, 11, theme.textPrimary);
 
         Rectangle addBtn = { area.x + area.width - 58, y, 58, rowH - 2 };
@@ -211,9 +228,13 @@ void ModuleBrowserPanel::ImportFromDisk() {
     if (path.empty()) return;
 
     std::string modulesDir = Project::Get().GetModulesDirectory();
-    std::string error;
-    bool success = ModuleImporter::CopyFromDisk(path, modulesDir, error);
-    FinishImport(success, error);
+    std::string destDir, error;
+    bool success = ModuleImporter::CopyFromDisk(path, modulesDir, destDir, error);
+    if (!success) {
+        FinishImport(false, error);
+        return;
+    }
+    HandleImportedModule(destDir);
 }
 
 void ModuleBrowserPanel::BeginRepositoryEntry() {
@@ -224,9 +245,13 @@ void ModuleBrowserPanel::BeginRepositoryEntry() {
 void ModuleBrowserPanel::ConfirmRepositoryEntry(const std::string& ownerRepo) {
     statusMessage = "Cloning " + ownerRepo + "...";
     std::string modulesDir = Project::Get().GetModulesDirectory();
-    std::string error;
-    bool success = ModuleImporter::CloneFromRepository(ownerRepo, modulesDir, error);
-    FinishImport(success, error);
+    std::string destDir, error;
+    bool success = ModuleImporter::CloneFromRepository(ownerRepo, modulesDir, destDir, error);
+    if (!success) {
+        FinishImport(false, error);
+        return;
+    }
+    HandleImportedModule(destDir);
 }
 
 void ModuleBrowserPanel::BeginCatalogBrowse() {
@@ -238,6 +263,29 @@ void ModuleBrowserPanel::BeginCatalogBrowse() {
     bool ok = ModuleImporter::FetchCatalog(catalogEntries, catalogError);
     catalogLoading = false;
     if (!ok && catalogError.empty()) catalogError = "Could not load the module catalog.";
+}
+
+void ModuleBrowserPanel::HandleImportedModule(const std::string& destDir) {
+    ModuleManifest manifest;
+    bool foundManifest = false;
+    std::error_code ec;
+    for (const auto& fileEntry : fs::directory_iterator(destDir, ec)) {
+        if (fileEntry.path().extension() == ".starmodule") {
+            foundManifest = ModuleManifest::LoadFromFile(fileEntry.path().string(), manifest);
+            break;
+        }
+    }
+
+    if (foundManifest && manifest.engineModule) {
+        pendingRelocateDir = destDir;
+        engineOrProjectPopup.Open({bounds.x + bounds.width * 0.5f - 140.0f, bounds.y + bounds.height * 0.5f}, 280.0f, {
+            {"Add to the Engine", true, ""},
+            {"Keep in This Project", true, ""},
+        });
+        return;
+    }
+
+    FinishImport(true, "");
 }
 
 void ModuleBrowserPanel::FinishImport(bool success, const std::string& message) {

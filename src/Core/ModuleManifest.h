@@ -9,6 +9,8 @@ struct ModuleManifest {
     std::string author;
     std::string category;
     bool enabledByDefault = true;
+    bool engineModule = false;
+    bool editorOnly = false;
 
     // Other module names this module requires to function.
     std::string repository;

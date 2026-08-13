@@ -47,6 +47,8 @@ public:
 
     static std::string GetModulesSourceRoot();
 
+    static std::string GetEngineModulesRoot();
+
     static std::string GetProjectModulesRoot();
 
 private:

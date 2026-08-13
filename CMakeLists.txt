@@ -20,6 +20,8 @@ add_custom_target(generate_modules ALL
     COMMAND ${CMAKE_COMMAND}
         -DMODULES_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src/Modules"
         -DMODULES_PROJECT_DIR="${STARENGINE_PROJECT_MODULES_DIR}"
+        -DMODULES_ENGINE_DIR="${STARENGINE_ENGINE_MODULES_DIR}"
+        -DSTARENGINE_BUILD_GAME="${STARENGINE_BUILD_GAME}"
         -DMODULES_OUTPUT_FILE="${MODULES_GENERATED_FILE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/GenerateModules.cmake"
     BYPRODUCTS ${MODULES_GENERATED_FILE}
@@ -62,6 +64,7 @@ else()
     list(FILTER SOURCES EXCLUDE REGEX ".*/GameMain\\.cpp$")
     list(FILTER SOURCES EXCLUDE REGEX ".*/Tools/.*\\.cpp$")
     list(APPEND SOURCES ${STARENGINE_MODULE_PLAIN_SOURCES})
+    list(APPEND SOURCES ${STARENGINE_MODULE_PLAIN_SOURCES_EDITOR_ONLY})
 
     add_executable(StarEngine ${SOURCES} ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngine generate_modules)
@@ -73,6 +76,9 @@ else()
     target_link_libraries(StarEngine PRIVATE raylib)
     if(STARENGINE_MODULE_LIBRARIES)
         target_link_libraries(StarEngine PRIVATE ${STARENGINE_MODULE_LIBRARIES})
+    endif()
+    if(STARENGINE_MODULE_LIBRARIES_EDITOR_ONLY)
+        target_link_libraries(StarEngine PRIVATE ${STARENGINE_MODULE_LIBRARIES_EDITOR_ONLY})
     endif()
 
     target_compile_definitions(StarEngine PRIVATE STARENGINE_SOURCE_ROOT="${CMAKE_SOURCE_DIR}/src")

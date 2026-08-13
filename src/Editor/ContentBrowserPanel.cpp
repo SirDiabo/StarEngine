@@ -7,6 +7,7 @@
 #include "Runtime/AssetCache.h"
 #include "Core/OSTrash.h"
 #include "Core/SafeProcess.h"
+#include "Core/SourceFormatConverterRegistry.h"
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
@@ -329,22 +330,41 @@ void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     std::string ext = fs::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
+    std::string actualPath = path;
+    const SourceFormatConverter* converter = SourceFormatConverterRegistry::Get().FindAvailable(ext);
+    if (converter) {
+        std::string convertedPath, convertError;
+        bool converted = converter->convert(path, fs::temp_directory_path().string(), convertedPath, convertError);
+        if (!converted) {
+            importStatus = "Import failed: " + convertError;
+            return;
+        }
+        actualPath = convertedPath;
+        ext = fs::path(actualPath).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    }
+
     if (std::find(meshExts.begin(), meshExts.end(), ext) != meshExts.end()) {
-        BeginMeshImport(path);
+        BeginMeshImport(actualPath);
     } else if (std::find(texExts.begin(), texExts.end(), ext) != texExts.end()) {
-        CookImportedAsset(path, "Texture", ".startex");
+        CookImportedAsset(actualPath, "Texture", ".startex");
     } else if (std::find(soundExts.begin(), soundExts.end(), ext) != soundExts.end()) {
-        CookImportedAsset(path, "Sound", ".starsound");
+        CookImportedAsset(actualPath, "Sound", ".starsound");
     } else {
         importStatus = "Import failed: unrecognized file type " + ext;
     }
 }
 
 void ContentBrowserPanel::ImportAssetAuto() {
-    std::string path = NativeFileDialog::OpenFile(
-        "Import Asset", "",
-        "Mesh, Texture or Sound (obj, gltf, glb, iqm, png, jpg, bmp, wav)",
-        "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp;*.wav");
+    std::string description = "Mesh, Texture or Sound (obj, gltf, glb, iqm, png, jpg, bmp, wav)";
+    std::string filter = "*.obj;*.gltf;*.glb;*.iqm;*.png;*.jpg;*.jpeg;*.bmp;*.wav";
+    for (const SourceFormatConverter& converter : SourceFormatConverterRegistry::Get().GetAvailableConverters()) {
+        std::string extNoDot = converter.extension.empty() ? "" : converter.extension.substr(1);
+        description.insert(description.size() - 1, ", " + extNoDot);
+        filter += ";*" + converter.extension;
+    }
+
+    std::string path = NativeFileDialog::OpenFile("Import Asset", "", description, filter);
     if (path.empty()) return;
     ImportPathAuto(path);
 }

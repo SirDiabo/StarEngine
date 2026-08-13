@@ -27,6 +27,7 @@ private:
     void BeginRepositoryEntry();
     void ConfirmRepositoryEntry(const std::string& ownerRepo);
     void BeginCatalogBrowse();
+    void HandleImportedModule(const std::string& destDir);
     void FinishImport(bool success, const std::string& message);
 
     LogPanel* logPanel = nullptr;
@@ -41,4 +42,7 @@ private:
     std::vector<CatalogEntry> catalogEntries;
     std::string catalogError;
     bool catalogLoading = false;
+
+    ChoicePopup engineOrProjectPopup;
+    std::string pendingRelocateDir;
 };

@@ -11,6 +11,23 @@ static bool RunCommand(const std::string& cmd, std::string& outOutput) {
     return SafeProcess::Run(SafeProcess::TokenizeCommand(cmd), outOutput) == 0;
 }
 
+static bool MoveDirectory(const fs::path& from, const fs::path& to, std::string& outError) {
+    std::error_code ec;
+    fs::create_directories(to.parent_path(), ec);
+
+    fs::rename(from, to, ec);
+    if (!ec) return true;
+
+    ec.clear();
+    fs::copy(from, to, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
+    if (ec) {
+        outError = "Move failed: " + ec.message();
+        return false;
+    }
+    fs::remove_all(from, ec);
+    return true;
+}
+
 static bool IsValidRepoId(const std::string& ownerRepo) {
     size_t slash = ownerRepo.find('/');
     if (slash == std::string::npos || slash == 0 || slash == ownerRepo.size() - 1) return false;
@@ -61,6 +78,7 @@ bool ModuleImporter::FetchCatalog(std::vector<CatalogEntry>& outEntries, std::st
         else if (key == "repository") current.repository = value;
         else if (key == "category") current.category = value;
         else if (key == "description") current.description = value;
+        else if (key == "engineModule") current.engineModule = (value == "true");
     }
     flush();
 
@@ -73,6 +91,7 @@ bool ModuleImporter::FetchCatalog(std::vector<CatalogEntry>& outEntries, std::st
 
 bool ModuleImporter::CloneFromRepository(const std::string& ownerRepo,
                                            const std::string& projectModulesDir,
+                                           std::string& outDestDir,
                                            std::string& outError) {
     if (!IsValidRepoId(ownerRepo)) {
         outError = "Expected a repository in \"owner/repo\" form (letters, digits, . _ - only).";
@@ -112,7 +131,6 @@ bool ModuleImporter::CloneFromRepository(const std::string& ownerRepo,
         return false;
     }
 
-    // Record where this came from so the module list can offer updates later.
     manifest.repository = ownerRepo;
     for (const auto& fileEntry : fs::directory_iterator(destDir, ec)) {
         if (fileEntry.path().extension() == ".starmodule") {
@@ -121,11 +139,31 @@ bool ModuleImporter::CloneFromRepository(const std::string& ownerRepo,
         }
     }
 
+    outDestDir = destDir.string();
+    return true;
+}
+
+bool ModuleImporter::RelocateModule(const std::string& fromDir,
+                                     const std::string& toModulesDir,
+                                     std::string& outDestDir,
+                                     std::string& outError) {
+    fs::path from(fromDir);
+    fs::path to = fs::path(toModulesDir) / from.filename();
+
+    if (fs::exists(to)) {
+        outError = "A module already exists at " + to.string();
+        return false;
+    }
+
+    if (!MoveDirectory(from, to, outError)) return false;
+
+    outDestDir = to.string();
     return true;
 }
 
 bool ModuleImporter::CopyFromDisk(const std::string& manifestPath,
                                    const std::string& projectModulesDir,
+                                   std::string& outDestDir,
                                    std::string& outError) {
     ModuleManifest manifest;
     if (!ModuleManifest::LoadFromFile(manifestPath, manifest)) {
@@ -164,5 +202,6 @@ bool ModuleImporter::CopyFromDisk(const std::string& manifestPath,
         }
     }
 
+    outDestDir = destDir.string();
     return true;
 }

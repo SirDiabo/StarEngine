@@ -40,6 +40,10 @@ std::string ModuleManager::GetModulesSourceRoot() {
     return (fs::path(EngineRoot::Resolve()) / "src" / "Modules").string();
 }
 
+std::string ModuleManager::GetEngineModulesRoot() {
+    return (fs::path(EngineRoot::Resolve()) / "Modules").string();
+}
+
 std::string ModuleManager::GetProjectModulesRoot() {
     const std::string& rootPath = Project::Get().GetRootPath();
     if (rootPath.empty()) return "";
@@ -67,12 +71,22 @@ static void ScanManifestsUnder(const std::string& modulesRoot, std::vector<Modul
 void ModuleManager::ScanManifests() {
     entries.clear();
 
-    // Engine's built-in modules, then the current project's imported modules.
     ScanManifestsUnder(GetModulesSourceRoot(), entries);
     ScanManifestsUnder(GetProjectModulesRoot(), entries);
 
-    // Attach compiled-in instances to matching manifests, and add any
-    // registered module that has no manifest on disk.
+    std::vector<ModuleEntry> engineEntries;
+    ScanManifestsUnder(GetEngineModulesRoot(), engineEntries);
+    for (ModuleEntry& engineEntry : engineEntries) {
+        bool alreadyClaimedByProject = false;
+        for (const ModuleEntry& existing : entries) {
+            if (existing.manifest.name == engineEntry.manifest.name) {
+                alreadyClaimedByProject = true;
+                break;
+            }
+        }
+        if (!alreadyClaimedByProject) entries.push_back(engineEntry);
+    }
+
     for (Module* module : modules) {
         bool matched = false;
         for (ModuleEntry& entry : entries) {

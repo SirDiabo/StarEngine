@@ -7,6 +7,7 @@ struct CatalogEntry {
     std::string repository;   // "owner/repo"
     std::string category;
     std::string description;
+    bool engineModule = false;
 };
 
 class ModuleImporter {
@@ -17,9 +18,16 @@ public:
 
     static bool CloneFromRepository(const std::string& ownerRepo,
                                      const std::string& projectModulesDir,
+                                     std::string& outDestDir,
                                      std::string& outError);
 
     static bool CopyFromDisk(const std::string& manifestPath,
                               const std::string& projectModulesDir,
+                              std::string& outDestDir,
                               std::string& outError);
+
+    static bool RelocateModule(const std::string& fromDir,
+                                const std::string& toModulesDir,
+                                std::string& outDestDir,
+                                std::string& outError);
 };
