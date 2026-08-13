@@ -11,6 +11,9 @@ obj/
 *.dll
 *.dylib
 
+# Editor Modules
+Modules/
+
 # IDE
 .vs/
 .vscode/
