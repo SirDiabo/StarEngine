@@ -42,6 +42,20 @@ fs::path UniqueTargetPath(const fs::path& folder, const std::string& baseName, c
     return target;
 }
 
+std::string SanitizeFileNameComponent(const std::string& name) {
+    std::string result = name;
+    for (char& c : result) {
+        unsigned char uc = (unsigned char)c;
+        if (c == '<' || c == '>' || c == ':' || c == '"' || c == '/' || c == '\\' ||
+            c == '|' || c == '?' || c == '*' || uc < 0x20) {
+            c = '_';
+        }
+    }
+    while (!result.empty() && (result.back() == '.' || result.back() == ' ')) result.pop_back();
+    if (result.empty()) result = "Unnamed";
+    return result;
+}
+
 std::string ExtractJsonNameField(const std::string& obj) {
     int depth = 0;
     size_t i = 0;
@@ -172,28 +186,36 @@ void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, cons
     for (int i = 0; i < animCount; i++) {
         const ModelAnimation& anim = anims[i];
         std::string clipName = anim.name[0] != '\0' ? std::string(anim.name) : ("Anim_" + std::to_string(i));
+        std::string safeClipName = SanitizeFileNameComponent(clipName);
 
         StarAsset animAsset;
         animAsset.assetType = "Animation";
         animAsset.sourcePath = absoluteSrcStr;
         animAsset.vendoredSourcePath = SourceVendoring::Vendor(contentRoot.string(), absoluteSrcStr,
-                                                                 absoluteSrc.stem().string() + "_" + clipName);
+                                                                 absoluteSrc.stem().string() + "_" + safeClipName);
         animAsset.animSourceIndex = i;
         animAsset.animName = clipName;
         animAsset.animFrameCount = anim.keyframeCount;
         animAsset.animBoneCount = anim.boneCount;
         animAsset.animFramesPerSecond = sourceFps;
 
+        if (animAsset.vendoredSourcePath.empty()) {
+            TraceLog(LOG_WARNING, "IMPORT: Failed to vendor source for animation \"%s\"", clipName.c_str());
+        }
+
         fs::path target;
         auto foundExisting = existingByName.find(clipName);
         if (foundExisting != existingByName.end()) {
             target = foundExisting->second;
         } else {
-            target = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + clipName, ".staranim");
+            target = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + safeClipName, ".staranim");
         }
 
         if (animAsset.SaveToFile(target.string())) {
             AssetRegistry::Get().RegisterAsset(target.string(), animAsset.sourcePath, target.string());
+        } else {
+            TraceLog(LOG_WARNING, "IMPORT: Failed to write animation asset \"%s\" to %s",
+                     clipName.c_str(), target.string().c_str());
         }
     }
 
