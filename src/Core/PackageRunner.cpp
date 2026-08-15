@@ -101,7 +101,8 @@ std::string RewriteToContentRelative(const std::string& mapPath, const fs::path&
 
 } // namespace
 
-PackageResult PackageRunner::Package(const PackageOptions& options) {
+PackageResult PackageRunner::Package(const PackageOptions& options,
+                                      const std::function<void(const std::string&)>& onOutput) {
     PackageResult result;
 
     if (options.platform == PackagePlatform::Android) {
@@ -158,7 +159,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     result.log += "== Configure ==\n";
     for (const auto& a : configureArgs) result.log += a + " ";
     result.log += "\n";
-    if (SafeProcess::Run(configureArgs, result.log) != 0) {
+    if (onOutput) onOutput("== Configure ==\n");
+    if (SafeProcess::Run(configureArgs, result.log, onOutput) != 0) {
         result.error = "CMake configure failed. See log.";
         std::string hint = BuildDiagnostics::DiagnoseConfigureFailure(result.log);
         if (!hint.empty()) result.error += " " + hint;
@@ -179,7 +181,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
     result.log += "\n== Build ==\n";
     for (const auto& a : buildArgs) result.log += a + " ";
     result.log += "\n";
-    if (SafeProcess::Run(buildArgs, result.log) != 0) {
+    if (onOutput) onOutput("\n== Build ==\n");
+    if (SafeProcess::Run(buildArgs, result.log, onOutput) != 0) {
         result.error = "Build failed. See log.";
         return result;
     }
@@ -261,6 +264,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
         }
         result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
             " files into a single .starpak.\n";
+        if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
+            " files into a single .starpak.\n");
 
         if (!StarPak::AppendPakToExecutable(outputExe.string(), pakTempPath.string())) {
             result.error = "Could not append pak data to the packaged executable.";
@@ -276,6 +281,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options) {
             return result;
         }
         result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n";
+        if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n");
 
         if (!inputMappingsBytes.empty()) {
             fs::path outputMappingsPath = fs::path(options.outputDir) / "Saved" / "InputMappings.cfg";

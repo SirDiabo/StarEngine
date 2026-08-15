@@ -39,6 +39,7 @@ bool ModuleManifest::LoadFromFile(const std::string& filePath, ModuleManifest& o
     outManifest.enabledByDefault = !data.count("enabledByDefault") || data["enabledByDefault"] != "false";
     outManifest.engineModule = data.count("engineModule") && data["engineModule"] == "true";
     outManifest.editorOnly = data.count("editorOnly") && data["editorOnly"] == "true";
+    outManifest.requiresRestart = data.count("requiresRestart") && data["requiresRestart"] == "true";
 
     if (data.count("dependencies"))   outManifest.dependencies   = SplitCsv(data["dependencies"]);
     if (data.count("assetTypes"))     outManifest.assetTypes     = SplitCsv(data["assetTypes"]);
@@ -60,6 +61,7 @@ bool ModuleManifest::SaveToFile(const std::string& filePath, const ModuleManifes
     data["enabledByDefault"]  = manifest.enabledByDefault ? "true" : "false";
     data["engineModule"]      = manifest.engineModule ? "true" : "false";
     data["editorOnly"]        = manifest.editorOnly ? "true" : "false";
+    data["requiresRestart"]   = manifest.requiresRestart ? "true" : "false";
     data["dependencies"]      = JoinCsv(manifest.dependencies);
     data["assetTypes"]        = JoinCsv(manifest.assetTypes);
     data["nodeCategories"]    = JoinCsv(manifest.nodeCategories);

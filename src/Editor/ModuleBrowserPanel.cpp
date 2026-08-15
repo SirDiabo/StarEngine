@@ -6,6 +6,7 @@
 #include "Core/Project.h"
 #include "Core/ModuleImporter.h"
 #include "LogPanel.h"
+#include "LoadingPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "raygui.h"
@@ -31,20 +32,31 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
     DrawRectangleLinesEx(row, 1, theme.buttonBorder);
 
     std::string moduleName = EntryDisplayName(entry);
-    bool enabled = entry.instance && entry.instance->IsEnabled();
+    bool liveEnabled = entry.instance && entry.instance->IsEnabled();
     bool pendingRebuild = !entry.instance;
+
+    auto pendingIt = pendingToggles.find(moduleName);
+    bool hasPending = pendingIt != pendingToggles.end();
+    bool displayedEnabled = hasPending ? pendingIt->second : liveEnabled;
 
     Rectangle checkRect = { row.x + 8, row.y + 8, 18, 18 };
     if (pendingRebuild) {
         DrawRectangleLinesEx(checkRect, 1, theme.buttonBorder);
     } else {
-        bool toggled = enabled;
-        if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen() && !engineOrProjectPopup.IsOpen()) {
-            ModuleManager::Get().SetModuleEnabled(moduleName, toggled);
+        bool toggled = displayedEnabled;
+        if (GuiCheckBox(checkRect, "", &toggled) && !importMenu.IsOpen() && !engineOrProjectPopup.IsOpen() && !rebuildRunning) {
+            bool needsRestart = ModuleManager::Get().NeedsRestartToApply(moduleName, toggled);
+            if (needsRestart) {
+                if (toggled == liveEnabled) pendingToggles.erase(moduleName);
+                else pendingToggles[moduleName] = toggled;
+            } else {
+                ModuleManager::Get().SetModuleEnabled(moduleName, toggled);
+                pendingToggles.erase(moduleName);
+            }
         }
     }
 
-    Color titleColor = enabled || pendingRebuild ? theme.textPrimary : theme.buttonDisabledText;
+    Color titleColor = displayedEnabled || pendingRebuild ? theme.textPrimary : theme.buttonDisabledText;
     DrawText(moduleName.c_str(), (int)checkRect.x + 26, (int)row.y + 6, 14, titleColor);
 
     int nextLabelX = (int)checkRect.x + 26 + MeasureText(moduleName.c_str(), 14) + 10;
@@ -55,6 +67,10 @@ void ModuleBrowserPanel::RenderRow(const ModuleEntry& entry, float y, float rowH
     }
     if (entry.hasManifest && entry.manifest.hasExternalDependencies) {
         DrawText("(external)", nextLabelX, (int)row.y + 8, 11, {160, 130, 200, 255});
+        nextLabelX += MeasureText("(external)", 11) + 10;
+    }
+    if (hasPending) {
+        DrawText("(restart to apply)", nextLabelX, (int)row.y + 8, 11, {220, 170, 60, 255});
     }
 
     if (pendingRebuild) {
@@ -83,11 +99,34 @@ void ModuleBrowserPanel::Render() {
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel(bounds);
 
+    if (rebuildRunning) {
+        LoadingPanel::Get().SetStatusLine(rebuildTask.GetLatestLine());
+        bool taskSuccess = false;
+        std::string taskMessage;
+        if (rebuildTask.PollCompletion(taskSuccess, taskMessage)) {
+            rebuildRunning = false;
+            LoadingPanel::Get().Hide();
+            if (taskSuccess) {
+                statusMessage = "Rebuild complete. Restarting...";
+                BuildRunner::Get().TriggerRelaunch();
+            } else {
+                statusMessage = "Build failed. See log for details.";
+                if (logPanel) {
+                    logPanel->AddLog("[Build Error] " + taskMessage, LogLevel::Error);
+                    logPanel->AddLog(rebuildTask.GetFullLog());
+                }
+            }
+        }
+    }
+
+    float applyBarHeight = pendingToggles.empty() ? 0.0f : 32.0f;
     float importBarHeight = inputMode == InputMode::None ? 26.0f : 56.0f;
     Rectangle importBar = { bounds.x + 8, bounds.y + bounds.height - importBarHeight - 6,
                              bounds.width - 16, importBarHeight };
+    Rectangle applyBar = { bounds.x + 8, importBar.y - applyBarHeight, bounds.width - 16, applyBarHeight - 6 };
 
-    Rectangle listArea = { bounds.x, bounds.y + 4, bounds.width, bounds.height - importBarHeight - 16 };
+    Rectangle listArea = { bounds.x, bounds.y + 4, bounds.width,
+                            bounds.height - importBarHeight - applyBarHeight - 16 };
 
     const auto& entries = ModuleManager::Get().GetEntries();
     float rowHeight = 58.0f;
@@ -111,6 +150,14 @@ void ModuleBrowserPanel::Render() {
     }
     EndScissorMode();
 
+    if (!pendingToggles.empty()) {
+        std::string label = "Apply " + std::to_string(pendingToggles.size()) +
+            (pendingToggles.size() == 1 ? " Change" : " Changes") + " & Restart";
+        if (UIWidget::Button(applyBar, label.c_str()) && !engineOrProjectPopup.IsOpen() && !rebuildRunning) {
+            ApplyPendingToggles();
+        }
+    }
+
     switch (inputMode) {
         case InputMode::None:            RenderImportBar();               break;
         case InputMode::RepositoryEntry: RenderRepositoryEntry(importBar); break;
@@ -133,7 +180,7 @@ void ModuleBrowserPanel::Render() {
     }
 
     if (!statusMessage.empty()) {
-        DrawText(statusMessage.c_str(), (int)bounds.x + 8, (int)(importBar.y - 16), 11, theme.success);
+        DrawText(statusMessage.c_str(), (int)bounds.x + 8, (int)(applyBarHeight > 0 ? applyBar.y - 16 : importBar.y - 16), 11, theme.success);
     }
 }
 
@@ -296,17 +343,32 @@ void ModuleBrowserPanel::FinishImport(bool success, const std::string& message) 
 
     ModuleManager::Get().ScanManifests();
     statusMessage = "Imported. Rebuilding...";
+    StartRebuildAsync();
+}
 
-    BuildResult result = BuildRunner::Get().RunBuild(
-        BuildRunner::GetDefaultBuildDirectory(), BuildRunner::GetDefaultBuildConfig());
-    if (result.success) {
-        statusMessage = "Rebuild complete. Restarting...";
-        BuildRunner::Get().TriggerRelaunch();
-    } else {
-        statusMessage = "Build failed. See log for details.";
-        if (logPanel) {
-            logPanel->AddLog("[Build Error] " + result.error, LogLevel::Error);
-            logPanel->AddLog(result.output);
-        }
+void ModuleBrowserPanel::StartRebuildAsync() {
+    rebuildRunning = true;
+    LoadingPanel::Get().Show("Rebuilding StarEngine");
+
+    std::string buildDir = BuildRunner::GetDefaultBuildDirectory();
+    std::string config = BuildRunner::GetDefaultBuildConfig();
+
+    rebuildTask.Start([buildDir, config](const std::function<void(const std::string&)>& reportLine,
+                                          std::string& outFinalMessage) {
+        BuildResult result = BuildRunner::Get().RunBuild(buildDir, config, reportLine);
+        outFinalMessage = result.success ? "" : (result.error.empty() ? result.output : result.error);
+        return result.success;
+    });
+}
+
+void ModuleBrowserPanel::ApplyPendingToggles() {
+    for (const auto& toggle : pendingToggles) {
+        ModuleManager::Get().SetModuleEnabled(toggle.first, toggle.second);
     }
+    pendingToggles.clear();
+
+    Project::Get().Save();
+
+    statusMessage = "Restarting...";
+    BuildRunner::Get().TriggerRelaunch();
 }

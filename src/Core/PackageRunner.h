@@ -3,6 +3,7 @@
 #include "PackageCipher.h"
 #include "Project.h"
 #include <string>
+#include <functional>
 
 enum class PackageFormat {
     SingleFile,
@@ -29,5 +30,6 @@ struct PackageResult {
 };
 
 namespace PackageRunner {
-    PackageResult Package(const PackageOptions& options);
+    PackageResult Package(const PackageOptions& options,
+                           const std::function<void(const std::string&)>& onOutput = nullptr);
 }

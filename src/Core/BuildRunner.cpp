@@ -4,6 +4,7 @@
 #include "ExecutablePath.h"
 #include "CMakeBuild.h"
 #include "BuildDiagnostics.h"
+#include "SafeProcess.h"
 #include <cstdio>
 #include <filesystem>
 
@@ -28,29 +29,6 @@ std::string BuildRunner::GetDefaultBuildConfig() {
 #else
     return "Release";
 #endif
-}
-
-static bool RunShellCommand(const std::string& cmd, std::string& outOutput) {
-    std::string fullCmd = cmd + " 2>&1";
-    FILE* pipe = nullptr;
-#ifdef _WIN32
-    pipe = _popen(fullCmd.c_str(), "r");
-#else
-    pipe = popen(fullCmd.c_str(), "r");
-#endif
-    if (!pipe) return false;
-
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        outOutput += buffer;
-    }
-
-#ifdef _WIN32
-    int exitCode = _pclose(pipe);
-#else
-    int exitCode = pclose(pipe);
-#endif
-    return exitCode == 0;
 }
 
 static fs::path LocateBuiltEditorExecutable(const fs::path& buildDir, const std::string& config) {
@@ -82,7 +60,8 @@ static void MoveAsideForReplacement(const fs::path& launcherPath) {
     fs::rename(launcherPath, oldPath, ec);
 }
 
-BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config) {
+BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config,
+                                   const std::function<void(const std::string&)>& onOutput) {
     BuildResult result;
 
     std::string cmakeMissing = BuildDiagnostics::CheckCMakeAvailable();
@@ -101,13 +80,14 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
 
     bool hasExistingCache = fs::exists(fs::path(buildDir) / "CMakeCache.txt");
 
+    std::vector<std::string> configureArgs = hasExistingCache
+        ? std::vector<std::string>{"cmake", buildDir}
+        : std::vector<std::string>{"cmake", "-S", engineRoot, "-B", buildDir, "-DCMAKE_BUILD_TYPE=Release"};
+
     std::string configureOutput;
-    std::string configureCmd = hasExistingCache
-        ? "cmake \"" + buildDir + "\""
-        : "cmake -S \"" + engineRoot + "\" -B \"" + buildDir + "\" -DCMAKE_BUILD_TYPE=Release";
-    bool configureOk = RunShellCommand(configureCmd, configureOutput);
+    int configureRc = SafeProcess::Run(configureArgs, configureOutput, onOutput);
     result.output += configureOutput;
-    if (!configureOk) {
+    if (configureRc != 0) {
         result.success = false;
         result.error = "CMake configure failed";
         std::string hint = BuildDiagnostics::DiagnoseConfigureFailure(configureOutput);
@@ -115,13 +95,13 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
         return result;
     }
 
-    std::string cmd = "cmake --build \"" + buildDir + "\"";
-    if (!config.empty()) cmd += " --config \"" + config + "\"";
+    std::vector<std::string> buildArgs = {"cmake", "--build", buildDir};
+    if (!config.empty()) { buildArgs.push_back("--config"); buildArgs.push_back(config); }
 
     std::string buildOutput;
-    bool buildOk = RunShellCommand(cmd, buildOutput);
+    int buildRc = SafeProcess::Run(buildArgs, buildOutput, onOutput);
     result.output += buildOutput;
-    if (!buildOk) {
+    if (buildRc != 0) {
         result.success = false;
         result.error = "Build failed";
         return result;

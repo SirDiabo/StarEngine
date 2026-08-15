@@ -41,7 +41,8 @@ std::vector<std::string> TokenizeCommand(const std::string& cmd) {
     return args;
 }
 
-int Run(const std::vector<std::string>& argv, std::string& log) {
+int Run(const std::vector<std::string>& argv, std::string& log,
+        const std::function<void(const std::string&)>& onChunk) {
     if (argv.empty()) return -1;
 
     int exitCode = -1;
@@ -87,6 +88,7 @@ int Run(const std::vector<std::string>& argv, std::string& log) {
     while (ReadFile(readPipe, buffer, sizeof(buffer) - 1, &read, nullptr) && read > 0) {
         buffer[read] = '\0';
         log += buffer;
+        if (onChunk) onChunk(std::string(buffer, read));
     }
     CloseHandle(readPipe);
 
@@ -128,6 +130,7 @@ int Run(const std::vector<std::string>& argv, std::string& log) {
     while ((n = read(pipeFd[0], buffer, sizeof(buffer) - 1)) > 0) {
         buffer[n] = '\0';
         log += buffer;
+        if (onChunk) onChunk(std::string(buffer, (size_t)n));
     }
     close(pipeFd[0]);
 

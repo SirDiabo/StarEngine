@@ -2,6 +2,7 @@
 #include "MenuBar.h"
 #include "NativeFileDialog.h"
 #include "Core/PackageRunner.h"
+#include "LoadingPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "raygui.h"
@@ -30,6 +31,20 @@ static Rectangle SelectRow(float x, float y, float w, float h) {
 void PackageTab::Render(float x, float y, float width, float height) {
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel({x, y, width, height});
+
+    if (packageRunning) {
+        LoadingPanel::Get().SetStatusLine(packageTask.GetLatestLine());
+        bool taskSuccess = false;
+        std::string taskMessage;
+        if (packageTask.PollCompletion(taskSuccess, taskMessage)) {
+            packageRunning = false;
+            LoadingPanel::Get().Hide();
+            hasResult = true;
+            lastSuccess = taskSuccess;
+            resultMessage = taskMessage;
+            resultLog = packageTask.GetFullLog();
+        }
+    }
 
     Vector2 mp = GetMousePosition();
     float fx = x + 16;
@@ -131,7 +146,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     // Package button
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
-    if (UIWidget::Button(packageButton, "Package", platformReady) && !anyPopupOpen) {
+    if (UIWidget::Button(packageButton, "Package", platformReady && !packageRunning) && !anyPopupOpen) {
         RunPackage();
     }
     fy += 36;
@@ -189,14 +204,18 @@ void PackageTab::RunPackage() {
     options.cipher = cipher;
     options.format = format;
 
-    PackageResult result = PackageRunner::Package(options);
+    hasResult = false;
+    packageRunning = true;
+    LoadingPanel::Get().Show("Packaging Project");
 
-    hasResult = true;
-    lastSuccess = result.success;
-    resultLog = result.log;
-    resultMessage = result.success
-        ? "Packaged successfully: " + result.outputExecutable
-        : "Packaging failed: " + result.error;
+    packageTask.Start([options](const std::function<void(const std::string&)>& reportLine,
+                                 std::string& outFinalMessage) {
+        PackageResult result = PackageRunner::Package(options, reportLine);
+        outFinalMessage = result.success
+            ? "Packaged successfully: " + result.outputExecutable
+            : "Packaging failed: " + result.error;
+        return result.success;
+    });
 }
 
 void PackageTab::BuildMenus(MenuBar* menuBar) {

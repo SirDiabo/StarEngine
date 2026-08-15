@@ -11,6 +11,7 @@ struct ModuleManifest {
     bool enabledByDefault = true;
     bool engineModule = false;
     bool editorOnly = false;
+    bool requiresRestart = false;
 
     // Other module names this module requires to function.
     std::string repository;

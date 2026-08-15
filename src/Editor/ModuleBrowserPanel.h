@@ -2,9 +2,11 @@
 #include "Core/Panel.h"
 #include "Core/Module.h"
 #include "Core/ModuleImporter.h"
+#include "Core/AsyncTask.h"
 #include "ChoicePopup.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class LogPanel;
 
@@ -29,6 +31,8 @@ private:
     void BeginCatalogBrowse();
     void HandleImportedModule(const std::string& destDir);
     void FinishImport(bool success, const std::string& message);
+    void StartRebuildAsync();
+    void ApplyPendingToggles();
 
     LogPanel* logPanel = nullptr;
     std::string statusMessage;
@@ -45,4 +49,9 @@ private:
 
     ChoicePopup engineOrProjectPopup;
     std::string pendingRelocateDir;
+
+    std::unordered_map<std::string, bool> pendingToggles;
+
+    AsyncTask rebuildTask;
+    bool rebuildRunning = false;
 };

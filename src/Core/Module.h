@@ -13,10 +13,15 @@ public:
     const std::string& GetName() const { return name; }
     bool IsEnabled() const { return enabled; }
     void SetEnabled(bool value) { enabled = value; }
+    bool WasInitializedThisSession() const { return initializedThisSession; }
 
 protected:
     std::string name;
     bool enabled = true;
+
+private:
+    friend class ModuleManager;
+    bool initializedThisSession = false;
 };
 
 struct ModuleEntry {
@@ -41,6 +46,7 @@ public:
 
     void SetModuleEnabled(const std::string& moduleName, bool value);
     bool IsModuleEnabled(const std::string& moduleName) const;
+    bool NeedsRestartToApply(const std::string& moduleName, bool newEnabledState) const;
 
     std::vector<std::string> GetDisabledModuleNames() const;
     void ApplyDisabledModuleNames(const std::vector<std::string>& disabledNames);

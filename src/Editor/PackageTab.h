@@ -5,6 +5,7 @@
 #include "Core/PackageCipher.h"
 #include "Core/PackageRunner.h"
 #include "Core/Project.h"
+#include "Core/AsyncTask.h"
 #include <string>
 #include <vector>
 
@@ -37,4 +38,7 @@ private:
     std::string resultMessage;
     std::string resultLog;
     float logScrollOffset = 0.0f;
+
+    AsyncTask packageTask;
+    bool packageRunning = false;
 };

@@ -12,7 +12,8 @@ class BuildRunner {
 public:
     static BuildRunner& Get();
 
-    BuildResult RunBuild(const std::string& buildDir, const std::string& config = "");
+    BuildResult RunBuild(const std::string& buildDir, const std::string& config = "",
+                          const std::function<void(const std::string&)>& onOutput = nullptr);
 
     static std::string GetDefaultBuildDirectory();
 

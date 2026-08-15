@@ -20,6 +20,7 @@ bool ModuleManager::InitializeAll() {
     for (auto* module : modules) {
         if (!module->IsEnabled()) continue;
         if (!module->Initialize()) return false;
+        module->initializedThisSession = true;
     }
     return true;
 }
@@ -129,6 +130,17 @@ bool ModuleManager::IsModuleEnabled(const std::string& moduleName) const {
         if (entryName == moduleName) return entry.instance ? entry.instance->IsEnabled() : false;
     }
     return false;
+}
+
+bool ModuleManager::NeedsRestartToApply(const std::string& moduleName, bool newEnabledState) const {
+    for (const ModuleEntry& entry : entries) {
+        std::string entryName = entry.instance ? entry.instance->GetName() : entry.manifest.name;
+        if (entryName != moduleName) continue;
+        if (entry.manifest.requiresRestart) return true;
+        if (!newEnabledState) return false;
+        return !(entry.instance && entry.instance->WasInitializedThisSession());
+    }
+    return true;
 }
 
 std::vector<std::string> ModuleManager::GetDisabledModuleNames() const {

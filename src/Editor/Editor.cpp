@@ -20,6 +20,7 @@
 #include "SearchableListPopup.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
+#include "LoadingPanel.h"
 #include "Core/LayoutSerializer.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
@@ -133,6 +134,9 @@ void Editor::Render() {
     ChoicePopup::FlushDeferredDraws();
     ConfirmPopup::FlushDeferredDraws();
     SearchableListPopup::FlushDeferredDraws();
+
+    // Layer 9: loading overlay for async rebuild/packaging (blocks everything else visually).
+    LoadingPanel::Get().Render();
 }
 
 void Editor::RenderEditorTabBar(float x, float y, float width) {
