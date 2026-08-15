@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include <string>
 
 namespace UIWidget {
 
@@ -16,5 +17,7 @@ bool IconButton(Rectangle r, const char* label, bool enabled = true);
 
 void Panel(Rectangle r);
 Color SelectableBg(bool hovered, bool selected, Color idle);
+
+void ScrollableTextBox(Rectangle r, const std::string& content, float& scrollOffset);
 
 }

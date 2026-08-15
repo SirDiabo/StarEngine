@@ -3,6 +3,7 @@
 #include "Core/AssetTypeRegistry.h"
 #include "Core/StarMaterial.h"
 #include "AssetPickerPopup.h"
+#include "ColorPickerPopup.h"
 #include "ConfirmPopup.h"
 #include "raylib.h"
 #include <string>
@@ -114,4 +115,5 @@ private:
     char materialColorBuf[4][8] = {"", "", "", ""};
     int materialActiveField = 0;
     AssetPickerPopup materialTexturePicker;
+    ColorPickerPopup materialColorPicker;
 };

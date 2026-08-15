@@ -389,6 +389,7 @@ void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
     snprintf(materialColorBuf[3], 8, "%d", materialEditorData.baseColor.a);
     materialActiveField = 0;
     materialTexturePicker.Close();
+    materialColorPicker.Close();
     materialEditorOpen = true;
 }
 
@@ -396,11 +397,13 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     if (!materialEditorOpen) return;
 
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp);
-    Rectangle box = {bounds.x + bounds.width * 0.5f - 110, bounds.y + bounds.height * 0.5f - 111, 220, 222};
+    bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp) || materialColorPicker.ContainsPoint(mp);
+    float screenW = (float)GetScreenWidth();
+    float screenH = (float)GetScreenHeight();
+    Rectangle box = {screenW * 0.5f - 160, screenH * 0.5f - 111, 320, 222};
     const UIPalette& theme = UITheme::Get();
 
-    DrawRectangleRec({bounds.x, bounds.y, bounds.width, bounds.height}, {0, 0, 0, 120});
+    DrawRectangleRec({0, 0, screenW, screenH}, {0, 0, 0, 120});
     UIWidget::Panel(box);
 
     std::string title = fs::path(materialEditorPath).stem().string();
@@ -411,22 +414,51 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     y += 16;
 
     const char* channelLabels[4] = {"R", "G", "B", "A"};
+
+    if (materialColorPicker.IsOpen()) {
+        Color live = materialColorPicker.GetLiveColor();
+        snprintf(materialColorBuf[0], 8, "%d", live.r);
+        snprintf(materialColorBuf[1], 8, "%d", live.g);
+        snprintf(materialColorBuf[2], 8, "%d", live.b);
+        snprintf(materialColorBuf[3], 8, "%d", live.a);
+    }
+
     unsigned char* channels[4] = {&materialEditorData.baseColor.r, &materialEditorData.baseColor.g,
                                    &materialEditorData.baseColor.b, &materialEditorData.baseColor.a};
+
     float chW = (box.width - 16 - 3 * 6) / 4;
     for (int i = 0; i < 4; i++) {
         float cx = box.x + 8 + i * (chW + 6);
         DrawText(channelLabels[i], (int)cx, (int)y, 10, theme.textSecondary);
         Rectangle r = {cx, y + 12, chW, 18};
         int channelVal = *channels[i];
-        if (PropertyField::IntBox(r, materialColorBuf[i], 8, i + 1, materialActiveField, channelVal)) {
+        if (PropertyField::IntBox(r, materialColorBuf[i], 8, i + 1, materialActiveField, channelVal) && !materialColorPicker.IsOpen()) {
             *channels[i] = (unsigned char)(channelVal < 0 ? 0 : (channelVal > 255 ? 255 : channelVal));
         }
     }
     y += 38;
 
-    DrawRectangleRec({box.x + box.width - 34, y - 34, 24, 24}, materialEditorData.baseColor);
-    DrawRectangleLinesEx({box.x + box.width - 34, y - 34, 24, 24}, 1, theme.fieldBorder);
+    Color displayColor = materialColorPicker.IsOpen() ? materialColorPicker.GetLiveColor() : materialEditorData.baseColor;
+    Rectangle swatch = {box.x + box.width - 34, y - 34, 24, 24};
+    DrawRectangleRec(swatch, displayColor);
+    DrawRectangleLinesEx(swatch, 1, theme.fieldBorder);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, swatch) && !materialColorPicker.IsOpen()) {
+        materialColorPicker.Open({swatch.x, swatch.y + swatch.height}, materialEditorData.baseColor);
+    }
+
+    if (materialColorPicker.IsOpen()) {
+        Color pickerResult;
+        bool pickerConfirmed = false;
+        if (materialColorPicker.Render(pickerResult, pickerConfirmed)) {
+            if (pickerConfirmed) {
+                materialEditorData.baseColor = pickerResult;
+            }
+            snprintf(materialColorBuf[0], 8, "%d", materialEditorData.baseColor.r);
+            snprintf(materialColorBuf[1], 8, "%d", materialEditorData.baseColor.g);
+            snprintf(materialColorBuf[2], 8, "%d", materialEditorData.baseColor.b);
+            snprintf(materialColorBuf[3], 8, "%d", materialEditorData.baseColor.a);
+        }
+    }
 
     bool shadingAllowsLit = ShadingModel::ShouldUseLitShading();
     Color litLabelColor = shadingAllowsLit ? theme.textSecondary : theme.buttonDisabledText;

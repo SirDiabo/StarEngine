@@ -48,7 +48,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
 
     float fx = area.x + 16;
     float fy = area.y + 16;
-    float maxRowWidth = area.width - 32 > 460.0f ? 460.0f : area.width - 32;
+    float maxRowWidth = area.width - 32 > 800.0f ? 800.0f : area.width - 32;
 
     DrawText("Theme", (int)fx, (int)fy, 14, theme.accent);
     fy += 22;
@@ -101,7 +101,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
 
     Rectangle listArea = {area.x, fy, area.width, area.y + area.height - fy - 42};
     float rowH = 22.0f;
-    float rowWidth = area.width - 32 > 360.0f ? 360.0f : area.width - 32;
+    float rowWidth = area.width - 32 > 480.0f ? 480.0f : area.width - 32;
     float contentHeight = fieldCount * rowH;
 
     Vector2 mouse = GetMousePosition();

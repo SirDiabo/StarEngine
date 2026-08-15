@@ -34,7 +34,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     Vector2 mp = GetMousePosition();
     float fx = x + 16;
     float fy = y + 16;
-    float fw = width - 32 > 460.0f ? 460.0f : width - 32;
+    float fw = width - 32 > 640.0f ? 640.0f : width - 32;
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
                                cipherPopup.IsOpen() || formatPopup.IsOpen();
 
@@ -145,27 +145,19 @@ void PackageTab::Render(float x, float y, float width, float height) {
     if (hasResult) {
         Color resultColor = lastSuccess ? theme.success : theme.danger;
         DrawText(resultMessage.c_str(), (int)fx, (int)fy, 12, resultColor);
-        fy += 18;
+        fy += 22;
 
-        Rectangle logBox = {fx, fy, fw, 140};
-        DrawRectangleRec(logBox, theme.fieldBg);
-        DrawRectangleLinesEx(logBox, 1, theme.fieldBorder);
-
-        std::vector<std::string> lines;
-        std::string current;
-        for (char c : resultLog) {
-            if (c == '\n') { lines.push_back(current); current.clear(); }
-            else current += c;
+        Rectangle copyButton = {fx, fy, 100.0f, 20.0f};
+        if (UIWidget::Button(copyButton, "Copy Log") && !anyPopupOpen) {
+            SetClipboardText(resultLog.c_str());
         }
-        if (!current.empty()) lines.push_back(current);
+        fy += 26;
 
-        int maxLines = (int)(logBox.height / 12.0f);
-        int start = (int)lines.size() > maxLines ? (int)lines.size() - maxLines : 0;
-        float ly = logBox.y + 4;
-        for (int i = start; i < (int)lines.size(); i++) {
-            DrawText(lines[i].c_str(), (int)logBox.x + 6, (int)ly, 10, theme.textSecondary);
-            ly += 12;
-        }
+        float logHeight = (y + height) - fy - 12.0f;
+        if (logHeight < 100.0f) logHeight = 100.0f;
+        float logWidth = width - 32.0f;
+        Rectangle logBox = {fx, fy, logWidth, logHeight};
+        UIWidget::ScrollableTextBox(logBox, resultLog, logScrollOffset);
     }
 
     int platformChoice = 0;

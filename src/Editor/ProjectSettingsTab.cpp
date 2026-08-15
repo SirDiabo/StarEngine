@@ -56,7 +56,7 @@ void ProjectSettingsTab::RenderGeneralCategory(Rectangle area) {
 
     float fx = area.x + 16;
     float fy = area.y + 16;
-    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
 
     DrawText("General", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 24;
@@ -78,7 +78,7 @@ void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {
 
     float fx = area.x + 16;
     float fy = area.y + 16;
-    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
 
     DrawText("Maps", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 24;
@@ -107,7 +107,7 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
 
     float fx = area.x + 16;
     float fy = area.y + 16;
-    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
 
     ProjectSettings& settings = Project::Get().GetSettings();
 
@@ -218,7 +218,7 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
     float fx = area.x + 16;
     float fy = area.y + 16;
-    float fw = area.width - 32 > 420.0f ? 420.0f : area.width - 32;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
 
     DrawText("Save Files", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 24;

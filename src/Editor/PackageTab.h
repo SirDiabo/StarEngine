@@ -36,4 +36,5 @@ private:
     bool lastSuccess = false;
     std::string resultMessage;
     std::string resultLog;
+    float logScrollOffset = 0.0f;
 };

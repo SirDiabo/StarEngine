@@ -296,6 +296,7 @@ bool ColorPickerPopup::Render(Color& outColor, bool& outConfirmed) {
 
     bool decided = false;
     if (UIWidget::Button(cancelBtn, "Cancel")) {
+        outColor = original;
         outConfirmed = false;
         decided = true;
         Close();
