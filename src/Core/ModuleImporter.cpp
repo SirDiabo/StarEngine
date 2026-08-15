@@ -36,7 +36,7 @@ static bool IsValidRepoId(const std::string& ownerRepo) {
 }
 
 std::string ModuleImporter::GetCatalogUrl() {
-    return "https://raw.githubusercontent.com/starengine-modules/catalog/main/catalog.txt";
+    return "https://raw.githubusercontent.com/sirdiabo/starengine-catalog/main/catalog.txt";
 }
 
 bool ModuleImporter::FetchCatalog(std::vector<CatalogEntry>& outEntries, std::string& outError) {
