@@ -29,6 +29,8 @@ public:
 
     void ResetLayout();
     void TogglePanelVisible(const std::string& name);
+    void SaveLayout(const std::string& filePath) const;
+    void LoadLayout(const std::string& filePath);
 
 private:
     void BuildDefaultLayout();

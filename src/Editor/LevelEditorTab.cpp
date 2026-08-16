@@ -144,6 +144,7 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
 
 void LevelEditorTab::SaveLayout(const std::string& filePath) const {
     std::unordered_map<std::string, std::string> data;
+    LayoutSerializer::Load(filePath, data);
     dockArea.SaveLayout(data, "level");
     LayoutSerializer::Save(filePath, data);
 }

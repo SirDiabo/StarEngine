@@ -257,6 +257,7 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
         sgTab->SetSharedLogPanel(levelTab->GetLogPanel());
         sgTab->SetViewportPanel(levelTab->GetViewport());
         sgTab->Initialize();
+        sgTab->LoadLayout(GetLayoutPath());
         editorTabs.emplace_back(sgTab);
         editorTabs[activeEditorTab]->OnDeactivated();
         activeEditorTab = (int)editorTabs.size() - 1;
@@ -396,6 +397,10 @@ void Editor::HandleWindowMenuAction(const std::string& item) {
 
 void Editor::SaveLayout() const {
     levelTab->SaveLayout(GetLayoutPath());
+    if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
+        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[activeEditorTab].get());
+        if (sgTab) sgTab->SaveLayout(GetLayoutPath());
+    }
 }
 
 void Editor::LoadLayout() {

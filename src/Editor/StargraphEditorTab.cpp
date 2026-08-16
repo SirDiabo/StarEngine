@@ -6,6 +6,7 @@
 #include "StargraphDetailsPanel.h"
 #include "LogPanel.h"
 #include "MenuBar.h"
+#include "Core/LayoutSerializer.h"
 #include "raylib.h"
 #include <filesystem>
 
@@ -145,4 +146,17 @@ void StargraphEditorTab::ResetLayout() {
 void StargraphEditorTab::TogglePanelVisible(const std::string& name) {
     bool current = dockArea.IsPanelVisible(name);
     dockArea.SetPanelVisible(name, !current);
+}
+
+void StargraphEditorTab::SaveLayout(const std::string& filePath) const {
+    std::unordered_map<std::string, std::string> data;
+    LayoutSerializer::Load(filePath, data);
+    dockArea.SaveLayout(data, "stargraph");
+    LayoutSerializer::Save(filePath, data);
+}
+
+void StargraphEditorTab::LoadLayout(const std::string& filePath) {
+    std::unordered_map<std::string, std::string> data;
+    if (LayoutSerializer::Load(filePath, data))
+        dockArea.LoadLayout(data, "stargraph");
 }
