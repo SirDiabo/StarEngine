@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Panel.h"
+#include "raylib.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "GraphCanvas.h"
@@ -11,10 +11,9 @@
 
 class ViewportPanel;
 
-class StargraphEditorPanel : public Panel {
+class StargraphEditorPanel {
 public:
-    void Initialize() override;
-    void Render() override;
+    void Initialize();
 
     bool Open(const std::string& filePath);
     void Close();
@@ -22,18 +21,23 @@ public:
     const std::string& GetFilePath() const { return filePath; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
 
-private:
+    void SetScreenBounds(Rectangle b) { screenBounds = b; }
+
+    static float GetToolbarHeight() { return toolbarHeight; }
+
     void SaveGraph();
-    void RenderToolbar();
+    void RenderToolbar(Rectangle area);
     void RenderComponentOutliner(Rectangle area);
+    void RenderLeftPanel(Rectangle area);
+    void RenderGraph(Rectangle area);
+    void RenderRightPanel(Rectangle area);
+    void RenderNodeContextMenu();
+
+private:
     void RenderComponentDetails(Rectangle panel, float& y);
     void RenderCustomEventDetails(Rectangle panel, float y, Node& node);
     void RenderCallCustomEventDetails(Rectangle panel, float y, Node& node);
-    void RenderLeftPanel();
-    void RenderGraph();
-    void RenderRightPanel();
     void RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField);
-    void RenderNodeContextMenu();
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
 
@@ -117,11 +121,11 @@ private:
     static const float pinHeight;
     static const float pinRadius;
     static const float headerHeight;
-    static const float leftPanelWidth;
-    static const float rightPanelWidth;
     static const float toolbarHeight;
-    static const float componentOutlinerHeight;
     static const float primitiveNodeHeight;
+
+    Rectangle graphArea{};
+    Rectangle screenBounds{};
 
     int variableDragIndex = -1;
     Vector2 variableDragPos{0, 0};

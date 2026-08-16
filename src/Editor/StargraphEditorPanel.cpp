@@ -8,14 +8,10 @@ const float StargraphEditorPanel::minNodeWidth   = 160.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
 const float StargraphEditorPanel::pinRadius      = 5.0f;
 const float StargraphEditorPanel::headerHeight   = 26.0f;
-const float StargraphEditorPanel::leftPanelWidth = 200.0f;
-const float StargraphEditorPanel::rightPanelWidth= 210.0f;
 const float StargraphEditorPanel::toolbarHeight  = 30.0f;
-const float StargraphEditorPanel::componentOutlinerHeight = 130.0f;
 const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
 
 void StargraphEditorPanel::Initialize() {
-    name = "Stargraph";
 }
 
 bool StargraphEditorPanel::Open(const std::string& path) {
@@ -63,16 +59,16 @@ void StargraphEditorPanel::SaveGraph() {
     if (viewportPanel) viewportPanel->InvalidateClassGraph(filePath);
 }
 
-void StargraphEditorPanel::RenderToolbar() {
+void StargraphEditorPanel::RenderToolbar(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
 
-    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    Rectangle toolbar = {area.x, area.y, area.width, toolbarHeight};
     DrawRectangleRec(toolbar, theme.tabBar);
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
 
     float btnY = toolbar.y + 4;
-    float btnLeft = bounds.x + 8;
+    float btnLeft = area.x + 8;
 
     Rectangle saveBtn = {btnLeft, btnY, 50, 22};
     if (UIWidget::Button(saveBtn, "Save")) {
@@ -89,7 +85,7 @@ void StargraphEditorPanel::RenderToolbar() {
     DrawRectangleRec(selfBtn, selfColor);
     DrawText("Self", (int)selfBtn.x + 7, (int)selfBtn.y + 4, 13, WHITE);
 
-    float btnRight = bounds.x + bounds.width - 4;
+    float btnRight = area.x + area.width - 4;
 
     Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
     if (UIWidget::Button(closeBtn, "X")) {
@@ -143,15 +139,3 @@ void StargraphEditorPanel::RenderToolbar() {
     }
 }
 
-void StargraphEditorPanel::Render() {
-    if (!isOpen) return;
-
-    DrawRectangleRec(bounds, UITheme::Get().windowBg);
-
-    RenderToolbar();
-    RenderComponentOutliner({bounds.x, bounds.y + toolbarHeight, leftPanelWidth, componentOutlinerHeight});
-    RenderLeftPanel();
-    RenderGraph();
-    RenderNodeContextMenu();
-    RenderRightPanel();
-}

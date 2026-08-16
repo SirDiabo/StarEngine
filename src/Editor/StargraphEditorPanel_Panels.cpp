@@ -32,10 +32,8 @@ static std::vector<std::string> GetProjectInputMappingNames() {
     return NamedListRegistry::Get().GetList(InputMappingRegistry::Category());
 }
 
-void StargraphEditorPanel::RenderLeftPanel() {
+void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     const UIPalette& theme = UITheme::Get();
-    float topY = bounds.y + toolbarHeight + componentOutlinerHeight;
-    Rectangle panel = {bounds.x, topY, leftPanelWidth, bounds.height - toolbarHeight - componentOutlinerHeight};
     UIWidget::Panel(panel);
 
     Vector2 mousePos = GetMousePosition();
@@ -158,7 +156,7 @@ void StargraphEditorPanel::RenderLeftPanel() {
     }
 
     if (varContextMenuOpen) {
-        Rectangle popup = {panel.x + leftPanelWidth, 0, 110, 50};
+        Rectangle popup = {panel.x + panel.width, 0, 110, 50};
         for (size_t i = 0; i < vars.size(); i++) {
             if ((int)i == varContextMenuIndex) {
                 popup.y = panel.y + 8 + 24 + 22 + 8 + 24 + 8 + 24 + 8 + 24 + (float)i * 22 - 4;
@@ -309,10 +307,8 @@ void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, 
     }
 }
 
-void StargraphEditorPanel::RenderRightPanel() {
+void StargraphEditorPanel::RenderRightPanel(Rectangle panel) {
     const UIPalette& theme = UITheme::Get();
-    Rectangle panel = {bounds.x + bounds.width - rightPanelWidth, bounds.y + toolbarHeight,
-                       rightPanelWidth, bounds.height - toolbarHeight};
     UIWidget::Panel(panel);
 
     float y = panel.y + 8;
@@ -609,8 +605,6 @@ void StargraphEditorPanel::RenderRightPanel() {
 
 void StargraphEditorPanel::RenderKeyPickerPopup() {
     const UIPalette& theme = UITheme::Get();
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     Pin* targetPin = nullptr;
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {

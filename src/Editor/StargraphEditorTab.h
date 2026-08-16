@@ -1,8 +1,13 @@
 #pragma once
 #include "EditorTab.h"
+#include "DockArea.h"
 #include <string>
 
 class StargraphEditorPanel;
+class StargraphOutlinerPanel;
+class StargraphPanel;
+class StargraphGraphPanel;
+class StargraphDetailsPanel;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -16,19 +21,27 @@ public:
     void SetSharedLogPanel(LogPanel* shared) { logPanel = shared; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
     void Render(float x, float y, float width, float height) override;
+    void RenderOverlays();
     void BuildMenus(MenuBar* menuBar) override;
     bool IsOpen() const override;
 
     const std::string& GetAssetPath() const { return assetPath; }
 
+    void ResetLayout();
+    void TogglePanelVisible(const std::string& name);
+
 private:
+    void BuildDefaultLayout();
+
     std::string assetPath;
-    StargraphEditorPanel* panel = nullptr;
+
+    DockArea dockArea;
+
+    StargraphEditorPanel*    panel          = nullptr;
+    StargraphOutlinerPanel*  outlinerPanel  = nullptr;
+    StargraphPanel*          stargraphPanel = nullptr;
+    StargraphGraphPanel*     graphPanel     = nullptr;
+    StargraphDetailsPanel*   detailsPanel   = nullptr;
     LogPanel* logPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
-    float logSplitRatio = 0.75f;
-
-    bool resizingSplitter = false;
-    float splitterDragStart = 0.0f;
-    float ratioAtDragStart = 0.0f;
 };

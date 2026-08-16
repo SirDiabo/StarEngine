@@ -86,7 +86,7 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
         std::vector<SearchableListPopup::Entry> entries;
         for (const char* typeName : componentTypes) entries.push_back({"Components", typeName, typeName});
 
-        std::string picked = addComponentMenu.Render(entries, bounds);
+        std::string picked = addComponentMenu.Render(entries, screenBounds);
         if (!picked.empty()) {
             ComponentDecl comp;
             comp.componentType = picked;

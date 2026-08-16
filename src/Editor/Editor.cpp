@@ -118,6 +118,10 @@ void Editor::Render() {
 
     // Layer 4: floating panels, drag ghost, drop highlights (above panel content).
     levelTab->RenderOverlays();
+    if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
+        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[activeEditorTab].get());
+        if (sgTab) sgTab->RenderOverlays();
+    }
 
     // Layer 5: menu popup (above everything).
     menuBar->RenderPopup();
@@ -357,10 +361,27 @@ void Editor::HandleHelpMenuAction(const std::string& item) {
 }
 
 void Editor::HandleWindowMenuAction(const std::string& item) {
+    EditorTab* activeTab = (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size())
+                           ? editorTabs[activeEditorTab].get() : nullptr;
+    auto* sgTab = dynamic_cast<StargraphEditorTab*>(activeTab);
+    if (sgTab) {
+        if (item == "Reset Layout") { sgTab->ResetLayout(); sgTab->BuildMenus(menuBar); return; }
+        static const std::vector<std::string> sgPanelNames = {
+            "Components", "My Stargraph", "Graph", "Details", "Logs"
+        };
+        for (const auto& name : sgPanelNames) {
+            if (item == name) {
+                sgTab->TogglePanelVisible(name);
+                sgTab->BuildMenus(menuBar);
+                return;
+            }
+        }
+        return;
+    }
+
     if (item == "Reset Layout")      { levelTab->ResetLayout();          levelTab->BuildMenus(menuBar); return; }
     if (item == "Save Layout As")    { levelTab->SaveLayoutAs();         return; }
     if (item == "Load Layout")       { levelTab->LoadLayoutFromDialog();  return; }
-    // Toggle named panels in the level editor's dock area.
     static const std::vector<std::string> panelNames = {
         "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules"
     };

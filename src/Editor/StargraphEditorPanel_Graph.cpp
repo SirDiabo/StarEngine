@@ -116,9 +116,6 @@ float StargraphEditorPanel::GetPrimitiveNodeHeight() const {
 }
 
 Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
-
     float nodeX = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
     float nodeY = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
     float nodeH = GetNodeHeight(node) * canvasState.zoom;
@@ -387,8 +384,6 @@ void StargraphEditorPanel::PasteNodes() {
     if (clipboard.find("[StargraphCopy]\n") == std::string::npos) return;
 
     Vector2 mousePos = GetMousePosition();
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea, mousePos);
     float rawX = rawWorld.x;
@@ -589,8 +584,6 @@ void StargraphEditorPanel::DeleteSelected() {
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                            bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
         float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
         float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
@@ -626,9 +619,8 @@ void StargraphEditorPanel::RenderWireInProgress() {
     if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) CancelLink();
 }
 
-void StargraphEditorPanel::RenderGraph() {
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
+void StargraphEditorPanel::RenderGraph(Rectangle area) {
+    graphArea = area;
     Vector2 mousePos = GetMousePosition();
 
     if (keyPickerOpen) {
@@ -1175,8 +1167,6 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = nullptr;
                 const Variable& var = graph.GetVariables()[variableDragIndex];
@@ -1246,8 +1236,6 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                                   bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = graph.CreateNode("Get_Component");
                 node->title = "Get: " + comp.name;
@@ -1432,9 +1420,6 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     float totalItemsH = (float)entries.size() * itemH + (float)categoryCount * categoryHeaderH + 10;
     float listH   = (totalItemsH < maxVisibleH) ? totalItemsH : maxVisibleH;
     float menuH   = searchH + listH;
-
-    Rectangle graphArea = {bounds.x + leftPanelWidth, bounds.y + toolbarHeight,
-                           bounds.width - leftPanelWidth - rightPanelWidth, bounds.height - toolbarHeight};
 
     Rectangle popup = {nodeMenuPos.x, nodeMenuPos.y, menuW, menuH};
     if (popup.x + popup.width  > graphArea.x + graphArea.width)  popup.x = graphArea.x + graphArea.width  - popup.width;

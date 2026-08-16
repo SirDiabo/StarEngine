@@ -1,16 +1,15 @@
 #include "StargraphEditorTab.h"
 #include "StargraphEditorPanel.h"
+#include "StargraphOutlinerPanel.h"
+#include "StargraphPanel.h"
+#include "StargraphGraphPanel.h"
+#include "StargraphDetailsPanel.h"
 #include "LogPanel.h"
 #include "MenuBar.h"
-#include "UITheme.h"
 #include "raylib.h"
 #include <filesystem>
-#include <algorithm>
 
 namespace fs = std::filesystem;
-
-static const float LOG_MIN_H      = 60.0f;
-static const float SPLITTER_H     = 4.0f;
 
 StargraphEditorTab::StargraphEditorTab(const std::string& path)
     : assetPath(path) {
@@ -19,8 +18,11 @@ StargraphEditorTab::StargraphEditorTab(const std::string& path)
 }
 
 StargraphEditorTab::~StargraphEditorTab() {
+    delete outlinerPanel;
+    delete stargraphPanel;
+    delete graphPanel;
+    delete detailsPanel;
     delete panel;
-    // logPanel is owned by the Level Editor tab and shared across all editor tabs; not deleted here.
 }
 
 void StargraphEditorTab::Initialize() {
@@ -28,63 +30,119 @@ void StargraphEditorTab::Initialize() {
     panel->Initialize();
     panel->SetViewportPanel(viewportPanel);
     panel->Open(assetPath);
+
+    outlinerPanel  = new StargraphOutlinerPanel();
+    stargraphPanel = new StargraphPanel();
+    graphPanel     = new StargraphGraphPanel();
+    detailsPanel   = new StargraphDetailsPanel();
+
+    outlinerPanel->Initialize();
+    stargraphPanel->Initialize();
+    graphPanel->Initialize();
+    detailsPanel->Initialize();
+
+    outlinerPanel->SetSession(panel);
+    stargraphPanel->SetSession(panel);
+    graphPanel->SetSession(panel);
+    detailsPanel->SetSession(panel);
+
+    std::vector<Panel*> panels = { outlinerPanel, stargraphPanel, graphPanel, detailsPanel };
+    if (logPanel) panels.push_back(logPanel);
+    dockArea.SetPanels(panels);
+
+    BuildDefaultLayout();
+}
+
+void StargraphEditorTab::BuildDefaultLayout() {
+    auto outlinerLeaf = std::make_unique<DockNode>();
+    outlinerLeaf->panelNames = { "Components" };
+
+    auto stargraphLeaf = std::make_unique<DockNode>();
+    stargraphLeaf->panelNames = { "My Stargraph" };
+
+    auto leftCol = std::make_unique<DockNode>();
+    leftCol->type       = DockNode::Type::SplitV;
+    leftCol->splitRatio = 0.3f;
+    leftCol->first       = std::move(outlinerLeaf);
+    leftCol->second      = std::move(stargraphLeaf);
+
+    auto graphLeaf = std::make_unique<DockNode>();
+    graphLeaf->panelNames = { "Graph" };
+
+    auto detailsLeaf = std::make_unique<DockNode>();
+    detailsLeaf->panelNames = { "Details" };
+
+    auto centerRight = std::make_unique<DockNode>();
+    centerRight->type       = DockNode::Type::SplitH;
+    centerRight->splitRatio = 0.85f;
+    centerRight->first       = std::move(graphLeaf);
+    centerRight->second      = std::move(detailsLeaf);
+
+    auto topRow = std::make_unique<DockNode>();
+    topRow->type       = DockNode::Type::SplitH;
+    topRow->splitRatio = 0.15f;
+    topRow->first       = std::move(leftCol);
+    topRow->second      = std::move(centerRight);
+
+    if (logPanel) {
+        auto logsLeaf = std::make_unique<DockNode>();
+        logsLeaf->panelNames = { "Logs" };
+
+        auto root = std::make_unique<DockNode>();
+        root->type       = DockNode::Type::SplitV;
+        root->splitRatio = 0.75f;
+        root->first       = std::move(topRow);
+        root->second      = std::move(logsLeaf);
+
+        dockArea.SetDefaultLayout(std::move(root));
+    } else {
+        dockArea.SetDefaultLayout(std::move(topRow));
+    }
 }
 
 void StargraphEditorTab::Render(float x, float y, float width, float height) {
-    // Vertical split: graph editor on top, log panel on bottom.
-    float graphH    = (height - SPLITTER_H) * logSplitRatio;
-    float logH      = height - graphH - SPLITTER_H;
-    float splitterY = y + graphH;
+    float toolbarH = StargraphEditorPanel::GetToolbarHeight();
 
-    // Splitter interaction.
-    Rectangle splitter = { x, splitterY, width, SPLITTER_H };
-    Vector2 mouse = GetMousePosition();
-    bool hovered = CheckCollisionPointRec(mouse, splitter);
+    panel->SetScreenBounds({ x, y, width, height });
+    panel->RenderToolbar({ x, y, width, toolbarH });
 
-    DrawRectangleRec(splitter, (hovered || resizingSplitter) ? UITheme::Get().splitterHover : UITheme::Get().splitter);
+    dockArea.Render({ x, y + toolbarH, width, height - toolbarH });
+}
 
-    if ((hovered || resizingSplitter) && !resizingSplitter)
-        SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
-    else if (!resizingSplitter)
-        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-
-    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        resizingSplitter  = true;
-        splitterDragStart = mouse.y;
-        ratioAtDragStart  = logSplitRatio;
-    }
-    if (resizingSplitter) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
-            float delta    = mouse.y - splitterDragStart;
-            float newRatio = ratioAtDragStart + delta / height;
-            float minRatio = LOG_MIN_H / height;
-            logSplitRatio  = std::max(minRatio, std::min(1.0f - minRatio, newRatio));
-        } else {
-            resizingSplitter = false;
-            SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-        }
-    }
-
-    panel->bounds = { x, y, width, graphH };
-    panel->Render();
-
-    if (logPanel) {
-        logPanel->bounds = { x, splitterY + SPLITTER_H, width, logH };
-        logPanel->Render();
-    }
+void StargraphEditorTab::RenderOverlays() {
+    dockArea.RenderOverlays();
 }
 
 void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
+    std::vector<bool> windowChecked = {
+        dockArea.IsPanelVisible("Components"),
+        dockArea.IsPanelVisible("My Stargraph"),
+        dockArea.IsPanelVisible("Graph"),
+        dockArea.IsPanelVisible("Details"),
+        dockArea.IsPanelVisible("Logs"),
+        false, false,
+    };
+
     menuBar->SetMenus({
         { "File",   { "Save", "Save All" } },
         { "Asset",  { "Find in Content Browser" } },
         { "Debug",  { "Play Graph", "Stop" } },
-        { "Window", { } },
+        { "Window", { "Components", "My Stargraph", "Graph", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
 
 bool StargraphEditorTab::IsOpen() const {
     return panel && panel->IsOpen();
+}
+
+void StargraphEditorTab::ResetLayout() {
+    for (const std::string& name : { "Components", "My Stargraph", "Graph", "Details", "Logs" })
+        dockArea.SetPanelVisible(name, true);
+    BuildDefaultLayout();
+}
+
+void StargraphEditorTab::TogglePanelVisible(const std::string& name) {
+    bool current = dockArea.IsPanelVisible(name);
+    dockArea.SetPanelVisible(name, !current);
 }
