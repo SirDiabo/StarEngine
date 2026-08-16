@@ -17,6 +17,12 @@ public:
 
     virtual bool IsOpen() const { return true; }
 
+    virtual void SaveLayout(const std::string& filePath) const {}
+    virtual void LoadLayout(const std::string& filePath) {}
+    virtual void ResetLayout() {}
+    virtual void TogglePanelVisible(const std::string& name) {}
+    virtual void RenderOverlays() {}
+
     const std::string& GetTitle() const { return title; }
     bool IsPermanent() const { return permanent; }
 

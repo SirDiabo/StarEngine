@@ -108,6 +108,7 @@ void Editor::Render() {
         tab->Render(0, contentY, (float)w, contentH);
 
         if (!tab->IsOpen() && !tab->IsPermanent()) {
+            tab->SaveLayout(GetLayoutPath());
             editorTabs.erase(editorTabs.begin() + activeEditorTab);
             if (activeEditorTab >= (int)editorTabs.size())
                 activeEditorTab = (int)editorTabs.size() - 1;
@@ -119,8 +120,8 @@ void Editor::Render() {
     // Layer 4: floating panels, drag ghost, drop highlights (above panel content).
     levelTab->RenderOverlays();
     if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
-        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[activeEditorTab].get());
-        if (sgTab) sgTab->RenderOverlays();
+        EditorTab* active = editorTabs[activeEditorTab].get();
+        if (active != levelTab) active->RenderOverlays();
     }
 
     // Layer 5: menu popup (above everything).
@@ -181,6 +182,7 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
             closeHov = CheckCollisionPointRec(mouse, closeRect);
 
             if (closeClicked) {
+                editorTabs[i]->SaveLayout(GetLayoutPath());
                 editorTabs.erase(editorTabs.begin() + i);
                 if (activeEditorTab >= (int)editorTabs.size())
                     activeEditorTab = (int)editorTabs.size() - 1;
@@ -364,43 +366,26 @@ void Editor::HandleHelpMenuAction(const std::string& item) {
 void Editor::HandleWindowMenuAction(const std::string& item) {
     EditorTab* activeTab = (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size())
                            ? editorTabs[activeEditorTab].get() : nullptr;
-    auto* sgTab = dynamic_cast<StargraphEditorTab*>(activeTab);
-    if (sgTab) {
-        if (item == "Reset Layout") { sgTab->ResetLayout(); sgTab->BuildMenus(menuBar); return; }
-        static const std::vector<std::string> sgPanelNames = {
-            "Components", "My Stargraph", "Graph", "Details", "Logs"
-        };
-        for (const auto& name : sgPanelNames) {
-            if (item == name) {
-                sgTab->TogglePanelVisible(name);
-                sgTab->BuildMenus(menuBar);
-                return;
-            }
-        }
+    if (!activeTab) return;
+
+    if (activeTab == levelTab) {
+        if (item == "Save Layout As") { levelTab->SaveLayoutAs();         return; }
+        if (item == "Load Layout")    { levelTab->LoadLayoutFromDialog();  return; }
+    }
+
+    if (item == "Reset Layout") {
+        activeTab->ResetLayout();
+        activeTab->BuildMenus(menuBar);
         return;
     }
 
-    if (item == "Reset Layout")      { levelTab->ResetLayout();          levelTab->BuildMenus(menuBar); return; }
-    if (item == "Save Layout As")    { levelTab->SaveLayoutAs();         return; }
-    if (item == "Load Layout")       { levelTab->LoadLayoutFromDialog();  return; }
-    static const std::vector<std::string> panelNames = {
-        "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules"
-    };
-    for (const auto& name : panelNames) {
-        if (item == name) {
-            levelTab->TogglePanelVisible(name);
-            levelTab->BuildMenus(menuBar);
-            return;
-        }
-    }
+    activeTab->TogglePanelVisible(item);
+    activeTab->BuildMenus(menuBar);
 }
 
 void Editor::SaveLayout() const {
-    levelTab->SaveLayout(GetLayoutPath());
-    for (const auto& tab : editorTabs) {
-        auto* sgTab = dynamic_cast<StargraphEditorTab*>(tab.get());
-        if (sgTab) sgTab->SaveLayout(GetLayoutPath());
-    }
+    for (const auto& tab : editorTabs)
+        tab->SaveLayout(GetLayoutPath());
 }
 
 void Editor::LoadLayout() {
@@ -483,6 +468,7 @@ void Editor::ResetCancelFlag() {
 void Editor::CloseAllAssetEditorTabs() {
     for (int i = (int)editorTabs.size() - 1; i >= 0; i--) {
         if (editorTabs[i]->IsPermanent()) continue;
+        editorTabs[i]->SaveLayout(GetLayoutPath());
         editorTabs.erase(editorTabs.begin() + i);
     }
     activeEditorTab = 0;

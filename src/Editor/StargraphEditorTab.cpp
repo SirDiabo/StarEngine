@@ -67,38 +67,40 @@ void StargraphEditorTab::BuildDefaultLayout() {
     leftCol->first       = std::move(outlinerLeaf);
     leftCol->second      = std::move(stargraphLeaf);
 
-    auto graphLeaf = std::make_unique<DockNode>();
-    graphLeaf->panelNames = { "Graph" };
+    std::unique_ptr<DockNode> graphSide;
+    if (logPanel) {
+        auto graphLeaf = std::make_unique<DockNode>();
+        graphLeaf->panelNames = { "Graph" };
+
+        auto logsLeaf = std::make_unique<DockNode>();
+        logsLeaf->panelNames = { "Logs" };
+
+        graphSide = std::make_unique<DockNode>();
+        graphSide->type       = DockNode::Type::SplitV;
+        graphSide->splitRatio = 0.6912f;
+        graphSide->first       = std::move(graphLeaf);
+        graphSide->second      = std::move(logsLeaf);
+    } else {
+        graphSide = std::make_unique<DockNode>();
+        graphSide->panelNames = { "Graph" };
+    }
 
     auto detailsLeaf = std::make_unique<DockNode>();
     detailsLeaf->panelNames = { "Details" };
 
-    auto centerRight = std::make_unique<DockNode>();
-    centerRight->type       = DockNode::Type::SplitH;
-    centerRight->splitRatio = 0.85f;
-    centerRight->first       = std::move(graphLeaf);
-    centerRight->second      = std::move(detailsLeaf);
+    auto rightSide = std::make_unique<DockNode>();
+    rightSide->type       = DockNode::Type::SplitH;
+    rightSide->splitRatio = 0.85f;
+    rightSide->first       = std::move(graphSide);
+    rightSide->second      = std::move(detailsLeaf);
 
-    auto topRow = std::make_unique<DockNode>();
-    topRow->type       = DockNode::Type::SplitH;
-    topRow->splitRatio = 0.15f;
-    topRow->first       = std::move(leftCol);
-    topRow->second      = std::move(centerRight);
+    auto root = std::make_unique<DockNode>();
+    root->type       = DockNode::Type::SplitH;
+    root->splitRatio = 0.15f;
+    root->first       = std::move(leftCol);
+    root->second      = std::move(rightSide);
 
-    if (logPanel) {
-        auto logsLeaf = std::make_unique<DockNode>();
-        logsLeaf->panelNames = { "Logs" };
-
-        auto root = std::make_unique<DockNode>();
-        root->type       = DockNode::Type::SplitV;
-        root->splitRatio = 0.75f;
-        root->first       = std::move(topRow);
-        root->second      = std::move(logsLeaf);
-
-        dockArea.SetDefaultLayout(std::move(root));
-    } else {
-        dockArea.SetDefaultLayout(std::move(topRow));
-    }
+    dockArea.SetDefaultLayout(std::move(root));
 }
 
 void StargraphEditorTab::Render(float x, float y, float width, float height) {

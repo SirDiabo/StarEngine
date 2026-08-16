@@ -21,16 +21,16 @@ public:
     void SetSharedLogPanel(LogPanel* shared) { logPanel = shared; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
     void Render(float x, float y, float width, float height) override;
-    void RenderOverlays();
+    void RenderOverlays() override;
     void BuildMenus(MenuBar* menuBar) override;
     bool IsOpen() const override;
 
     const std::string& GetAssetPath() const { return assetPath; }
 
-    void ResetLayout();
-    void TogglePanelVisible(const std::string& name);
-    void SaveLayout(const std::string& filePath) const;
-    void LoadLayout(const std::string& filePath);
+    void ResetLayout() override;
+    void TogglePanelVisible(const std::string& name) override;
+    void SaveLayout(const std::string& filePath) const override;
+    void LoadLayout(const std::string& filePath) override;
 
 private:
     void BuildDefaultLayout();
