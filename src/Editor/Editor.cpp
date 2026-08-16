@@ -397,8 +397,8 @@ void Editor::HandleWindowMenuAction(const std::string& item) {
 
 void Editor::SaveLayout() const {
     levelTab->SaveLayout(GetLayoutPath());
-    if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
-        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[activeEditorTab].get());
+    for (const auto& tab : editorTabs) {
+        auto* sgTab = dynamic_cast<StargraphEditorTab*>(tab.get());
         if (sgTab) sgTab->SaveLayout(GetLayoutPath());
     }
 }
