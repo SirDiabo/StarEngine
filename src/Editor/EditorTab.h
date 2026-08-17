@@ -17,6 +17,8 @@ public:
 
     virtual bool IsOpen() const { return true; }
 
+    virtual std::string GetAssetPath() const { return ""; }
+
     virtual void SaveLayout(const std::string& filePath) const {}
     virtual void LoadLayout(const std::string& filePath) {}
     virtual void ResetLayout() {}

@@ -1,11 +1,11 @@
 #include "StargraphEditorPanel.h"
-#include "PropertyFields.h"
+#include "Editor/PropertyFields.h"
 #include "Modules/Stargraph/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/NamedListRegistry.h"
 #include "Core/SaveFileRegistry.h"
-#include "UITheme.h"
-#include "UIWidgets.h"
+#include "Editor/UITheme.h"
+#include "Editor/UIWidgets.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cstdlib>

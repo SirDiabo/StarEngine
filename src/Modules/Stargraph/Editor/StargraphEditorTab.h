@@ -1,6 +1,6 @@
 #pragma once
-#include "EditorTab.h"
-#include "DockArea.h"
+#include "Editor/EditorTab.h"
+#include "Editor/DockArea.h"
 #include <string>
 
 class StargraphEditorPanel;
@@ -25,7 +25,7 @@ public:
     void BuildMenus(MenuBar* menuBar) override;
     bool IsOpen() const override;
 
-    const std::string& GetAssetPath() const { return assetPath; }
+    std::string GetAssetPath() const override { return assetPath; }
 
     void ResetLayout() override;
     void TogglePanelVisible(const std::string& name) override;

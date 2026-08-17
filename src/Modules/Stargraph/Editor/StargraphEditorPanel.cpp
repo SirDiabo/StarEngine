@@ -1,7 +1,7 @@
 #include "StargraphEditorPanel.h"
-#include "ViewportPanel.h"
-#include "UITheme.h"
-#include "UIWidgets.h"
+#include "Editor/ViewportPanel.h"
+#include "Editor/UITheme.h"
+#include "Editor/UIWidgets.h"
 #include "raygui.h"
 
 const float StargraphEditorPanel::minNodeWidth   = 160.0f;

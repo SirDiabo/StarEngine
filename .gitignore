@@ -12,7 +12,7 @@ obj/
 *.dylib
 
 # Editor Modules
-Modules/
+/Modules/
 
 # IDE
 .vs/

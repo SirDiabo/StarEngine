@@ -31,6 +31,7 @@ add_custom_target(generate_modules ALL
 if(STARENGINE_BUILD_GAME)
     file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS "src/Core/*.cpp" "src/Runtime/*.cpp" "src/Modules/*.cpp")
     list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/Core/Application\\.cpp$")
+    list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/Modules/[^/]+/Editor/.*")
     list(APPEND GAME_SOURCES ${STARENGINE_MODULE_PLAIN_SOURCES})
 
     add_executable(StarEngineGame ${GAME_SOURCES} src/GameMain.cpp ${MODULES_GENERATED_FILE})

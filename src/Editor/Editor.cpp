@@ -1,7 +1,6 @@
 #include "Editor.h"
 #include "EditorTab.h"
 #include "LevelEditorTab.h"
-#include "StargraphEditorTab.h"
 #include "AssetPreviewTab.h"
 #include "AnimationPreviewTab.h"
 #include "ProjectSettingsTab.h"
@@ -13,6 +12,7 @@
 #include "ViewportPanel.h"
 #include "Core/ContentPathResolver.h"
 #include "Core/Project.h"
+#include "Core/EditorAssetHandlerRegistry.h"
 #include "AssetPickerPopup.h"
 #include "RegistryPickerPopup.h"
 #include "ChoicePopup.h"
@@ -243,28 +243,6 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
         activeEditorTab = (int)editorTabs.size() - 1;
         editorTabs[activeEditorTab]->OnActivated();
         editorTabs[activeEditorTab]->BuildMenus(menuBar);
-    } else if (extension == ".staractor" || extension == ".stargraph") {
-        // Check if already open.
-        for (int i = 0; i < (int)editorTabs.size(); i++) {
-            auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[i].get());
-            if (sgTab && sgTab->GetAssetPath() == fullPath) {
-                editorTabs[activeEditorTab]->OnDeactivated();
-                activeEditorTab = i;
-                editorTabs[activeEditorTab]->OnActivated();
-                editorTabs[activeEditorTab]->BuildMenus(menuBar);
-                return;
-            }
-        }
-        auto* sgTab = new StargraphEditorTab(fullPath);
-        sgTab->SetSharedLogPanel(levelTab->GetLogPanel());
-        sgTab->SetViewportPanel(levelTab->GetViewport());
-        sgTab->Initialize();
-        sgTab->LoadLayout(GetLayoutPath());
-        editorTabs.emplace_back(sgTab);
-        editorTabs[activeEditorTab]->OnDeactivated();
-        activeEditorTab = (int)editorTabs.size() - 1;
-        editorTabs[activeEditorTab]->OnActivated();
-        editorTabs[activeEditorTab]->BuildMenus(menuBar);
     } else if (extension == ".starmap") {
         // Map loads into the level editor tab.
         levelTab->GetViewport()->LoadMap(fullPath);
@@ -278,6 +256,32 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
                 break;
             }
         }
+    } else {
+        const EditorAssetHandlerInfo* handler = EditorAssetHandlerRegistry::Get().FindHandler(extension);
+        if (!handler) return;
+
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            if (editorTabs[i]->GetAssetPath() == fullPath) {
+                editorTabs[activeEditorTab]->OnDeactivated();
+                activeEditorTab = i;
+                editorTabs[activeEditorTab]->OnActivated();
+                editorTabs[activeEditorTab]->BuildMenus(menuBar);
+                return;
+            }
+        }
+
+        EditorServices services;
+        services.sharedLogPanel = levelTab->GetLogPanel();
+        services.sharedViewportPanel = levelTab->GetViewport();
+
+        EditorTab* tab = handler->createTab(fullPath, services);
+        tab->Initialize();
+        tab->LoadLayout(GetLayoutPath());
+        editorTabs.emplace_back(tab);
+        editorTabs[activeEditorTab]->OnDeactivated();
+        activeEditorTab = (int)editorTabs.size() - 1;
+        editorTabs[activeEditorTab]->OnActivated();
+        editorTabs[activeEditorTab]->BuildMenus(menuBar);
     }
 }
 
@@ -490,10 +494,8 @@ void Editor::SaveState() const {
 
     for (size_t i = 0; i < editorTabs.size(); i++) {
         if (editorTabs[i]->IsPermanent()) continue;
-        auto* sgTab = dynamic_cast<StargraphEditorTab*>(editorTabs[i].get());
-        if (sgTab) {
-            out << "openStargraph=" << sgTab->GetAssetPath() << "\n";
-        }
+        std::string path = editorTabs[i]->GetAssetPath();
+        if (!path.empty()) out << "openAsset=" << path << "\n";
     }
 }
 
@@ -513,8 +515,9 @@ void Editor::RestoreState() {
 
         if (key == "activeMap" && !value.empty()) {
             OpenAssetInTab(value, ".starmap");
-        } else if (key == "openStargraph" && !value.empty()) {
-            OpenAssetInTab(value, ".stargraph");
+        } else if (key == "openAsset" && !value.empty()) {
+            std::string ext = fs::path(value).extension().string();
+            if (!ext.empty()) OpenAssetInTab(value, ext);
         }
     }
 }

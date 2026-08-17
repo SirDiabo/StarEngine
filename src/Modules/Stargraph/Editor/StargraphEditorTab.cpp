@@ -4,8 +4,8 @@
 #include "StargraphPanel.h"
 #include "StargraphGraphPanel.h"
 #include "StargraphDetailsPanel.h"
-#include "LogPanel.h"
-#include "MenuBar.h"
+#include "Editor/LogPanel.h"
+#include "Editor/MenuBar.h"
 #include "Core/LayoutSerializer.h"
 #include "raylib.h"
 #include <filesystem>

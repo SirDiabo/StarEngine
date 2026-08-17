@@ -22,6 +22,11 @@
 #include "Nodes_Timers.h"
 #include "Nodes_Collision.h"
 
+#ifndef STARENGINE_GAME_BUILD
+#include "Core/EditorAssetHandlerRegistry.h"
+#include "Editor/StargraphEditorTab.h"
+#endif
+
 StargraphModule::StargraphModule() {
     name = "Stargraph";
 }
@@ -46,6 +51,7 @@ bool StargraphModule::Initialize() {
     RegisterInputComponentNodes();
     
     RegisterAssetType();
+    RegisterEditorTabs();
     return true;
 }
 
@@ -78,4 +84,23 @@ void StargraphModule::RegisterAssetType() {
     sound.category = "Audio";
     sound.moduleName = "Stargraph";
     AssetTypeRegistry::Get().RegisterType(sound);
+}
+
+void StargraphModule::RegisterEditorTabs() {
+#ifndef STARENGINE_GAME_BUILD
+    EditorAssetHandlerInfo handler;
+    handler.moduleName = "Stargraph";
+    handler.createTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
+        auto* tab = new StargraphEditorTab(fullPath);
+        tab->SetSharedLogPanel(services.sharedLogPanel);
+        tab->SetViewportPanel(services.sharedViewportPanel);
+        return tab;
+    };
+
+    handler.extension = ".staractor";
+    EditorAssetHandlerRegistry::Get().RegisterHandler(handler);
+
+    handler.extension = ".stargraph";
+    EditorAssetHandlerRegistry::Get().RegisterHandler(handler);
+#endif
 }

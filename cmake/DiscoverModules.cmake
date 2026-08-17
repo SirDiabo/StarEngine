@@ -71,7 +71,11 @@ foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
         else()
             file(GLOB_RECURSE _module_sources CONFIGURE_DEPENDS
                 "${_normalized_dir}/*.cpp" "${_normalized_dir}/*.c")
+            list(FILTER _module_sources EXCLUDE REGEX "/Editor/")
+            file(GLOB_RECURSE _module_editor_sources CONFIGURE_DEPENDS
+                "${_normalized_dir}/Editor/*.cpp" "${_normalized_dir}/Editor/*.c")
             list(APPEND STARENGINE_MODULE_PLAIN_SOURCES ${_module_sources})
+            list(APPEND STARENGINE_MODULE_PLAIN_SOURCES_EDITOR_ONLY ${_module_editor_sources})
         endif()
     endforeach()
 endforeach()

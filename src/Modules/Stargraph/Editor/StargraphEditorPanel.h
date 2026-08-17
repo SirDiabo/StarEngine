@@ -3,9 +3,9 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "GraphCanvas.h"
-#include "AssetPickerPopup.h"
-#include "RegistryPickerPopup.h"
-#include "SearchableListPopup.h"
+#include "Editor/AssetPickerPopup.h"
+#include "Editor/RegistryPickerPopup.h"
+#include "Editor/SearchableListPopup.h"
 #include <string>
 #include <vector>
 

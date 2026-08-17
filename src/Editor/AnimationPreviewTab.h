@@ -13,7 +13,7 @@ public:
     void Render(float x, float y, float width, float height) override;
     void BuildMenus(MenuBar* menuBar) override;
 
-    const std::string& GetAssetPath() const { return animPath; }
+    std::string GetAssetPath() const override { return animPath; }
 
 private:
     void RefreshCompatibleMeshes();
