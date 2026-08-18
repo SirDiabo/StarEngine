@@ -5,6 +5,7 @@
 #include "Runtime/Object.h"
 #include "Runtime/Actor.h"
 #include "Runtime/PrintMessageLog.h"
+#include "raylib.h"
 
 static std::string FormatNodeName(const Node& node) {
     std::string display = node.title.empty() ? node.type : node.title;
@@ -36,6 +37,7 @@ Object* ObjectPinRef::Resolve(const Node& node, const std::string& encodedValue,
         std::string text = "'" + FormatNodeName(node) + "' in '" + owner + "' received '" + kind +
                             "', expecting '" + requiredKind + "'";
         PrintMessageLog::Get().Add(PrintMessageType::Error, text, 6.0f);
+        TraceLog(LOG_ERROR, "%s", text.c_str());
         return nullptr;
     }
 

@@ -98,6 +98,7 @@ void StargraphModule::RegisterObjectKinds() {
     kinds.RegisterKind("MeshComponent", "SceneComponent");
     kinds.RegisterKind("CollisionComponent", "SceneComponent");
     kinds.RegisterKind("InputComponent", "SceneComponent");
+    kinds.RegisterKind("LightComponent", "SceneComponent");
 }
 
 void StargraphModule::RegisterEditorTabs() {

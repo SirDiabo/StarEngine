@@ -15,7 +15,8 @@ std::string ObjectKindRegistry::GetParentKind(const std::string& kind) const {
 }
 
 bool ObjectKindRegistry::IsCompatible(const std::string& candidateKind, const std::string& requiredKind) const {
-    if (requiredKind.empty() || candidateKind == requiredKind) return true;
+    if (candidateKind == requiredKind) return true;
+    if (requiredKind.empty() || candidateKind.empty()) return false;
 
     std::string current = candidateKind;
     for (int guard = 0; guard < 32; guard++) {

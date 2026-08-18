@@ -717,7 +717,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 bool linked = false;
                 for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
                 DrawCircleV({nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(outputPin->id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -752,7 +752,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (IsKeyDown(KEY_LEFT_CONTROL)) {
                         bool found = false;
                         for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
@@ -853,7 +853,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 bool isDraggingLink = linkFromPin != -1;
                 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                     DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                         if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                             RemoveLinkFromPin(pin.id);
                         } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -963,6 +963,32 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         editingPinId = 0;
                         listeningForKeyPinId = 0;
                     }
+                } else if (pin.name == "Class" && (node.type == "Cast_To_Class" || node.type == "Get_Actor_Of_Class" || node.type == "For_Each_Actor_Of_Class")) {
+                    std::string classPath = pin.defaultValue.c_str();
+                    std::string display = "None";
+                    if (!classPath.empty()) {
+                        size_t slash = classPath.find_last_of("/\\");
+                        std::string filename = (slash == std::string::npos) ? classPath : classPath.substr(slash + 1);
+                        size_t dot = filename.find_last_of('.');
+                        display = (dot == std::string::npos) ? filename : filename.substr(0, dot);
+                    }
+                    DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                    DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                    DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                        actorClassPickerPinId = pin.id;
+                        actorClassPicker.Open({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor");
+                        editingPinId = 0;
+                    }
+                    if (actorClassPickerPinId == pin.id) {
+                        std::string pickedClass;
+                        if (actorClassPicker.Render(pickedClass)) {
+                            pin.defaultValue = pickedClass;
+                            isDirty = true;
+                            actorClassPickerPinId = 0;
+                        }
+                    }
                 } else if (node.type == "Override_Input" && pin.name == "Mapping") {
                     if (!keyPickerOpen || keyPickerPinId != pin.id) {
                         std::string display = pin.defaultValue;
@@ -1038,7 +1064,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1053,7 +1079,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
 
         if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                 if (IsKeyDown(KEY_LEFT_CONTROL)) {
                     bool found = false;
                     for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
@@ -1260,7 +1286,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         componentDragIndex = -1;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen && !nodeMenuOpen) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
         if (!GetNodeAtPos(mousePos)) {
             if (!IsKeyDown(KEY_LEFT_CONTROL)) {
                 selectedNodeId = -1;
@@ -1296,7 +1322,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
         if (!canvasState.didPan) {
         filterCompatibleWithPin = -1;
         nodeMenuOpen = true;
@@ -1533,24 +1559,33 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 if (filterCompatibleWithPin != -1) {
                     const Pin* fromPin = nullptr;
                     bool fromIsOutput = false;
+                    const Node* fromNode = nullptr;
                     for (const Node& n : graph.GetNodes()) {
-                        for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; }
-                        for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; }
+                        for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; fromNode = &n; }
+                        for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; fromNode = &n; }
                     }
                     if (fromPin) {
+                        std::string sourceKind = (fromNode && !fromNode->componentClass.empty())
+                                                  ? fromNode->componentClass : fromPin->objectKind;
                         if (fromIsOutput) {
                             for (const Pin& p : node->inputs) {
-                                if (p.type == fromPin->type || p.type == PinType::Wildcard) {
-                                    graph.AddLink({filterCompatibleWithPin, p.id});
-                                    break;
+                                if (p.type == PinType::Wildcard) { graph.AddLink({filterCompatibleWithPin, p.id}); break; }
+                                if (p.type != fromPin->type) continue;
+                                if (p.type == PinType::Object) {
+                                    if (!ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) continue;
                                 }
+                                graph.AddLink({filterCompatibleWithPin, p.id});
+                                break;
                             }
                         } else {
                             for (const Pin& p : node->outputs) {
-                                if (p.type == fromPin->type || p.type == PinType::Wildcard) {
-                                    graph.AddLink({p.id, filterCompatibleWithPin});
-                                    break;
+                                if (p.type == PinType::Wildcard) { graph.AddLink({p.id, filterCompatibleWithPin}); break; }
+                                if (p.type != fromPin->type) continue;
+                                if (p.type == PinType::Object) {
+                                    if (!ObjectKindRegistry::Get().IsCompatible(p.objectKind, sourceKind)) continue;
                                 }
+                                graph.AddLink({p.id, filterCompatibleWithPin});
+                                break;
                             }
                         }
                         RefreshWildcardPins(node);
