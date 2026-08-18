@@ -5,7 +5,7 @@
 #include "Runtime/World.h"
 #include "raylib.h"
 #include "raymath.h"
-#include "Runtime/PointerUtil.h"
+#include "Modules/Stargraph/ObjectPinRef.h"
 
 void RegisterCameraComponentNodes() {
     NodeTemplate setCameraFov;
@@ -13,10 +13,9 @@ void RegisterCameraComponentNodes() {
     setCameraFov.category = "Camera";
     setCameraFov.moduleName = "Stargraph";
     setCameraFov.hideFromContextMenu = true;
-    setCameraFov.requiresComponentClass = "CameraComponent";
     setCameraFov.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->inputs.push_back({"FOV", PinType::Float, true, false, 0, "50.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -25,7 +24,7 @@ void RegisterCameraComponentNodes() {
         float fov = 50.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
             if (p.name == "FOV" && !p.defaultValue.empty()) fov = p.defaultValue.AsFloat();
         }
@@ -42,16 +41,15 @@ void RegisterCameraComponentNodes() {
     getCameraFov.category = "Camera";
     getCameraFov.moduleName = "Stargraph";
     getCameraFov.hideFromContextMenu = true;
-    getCameraFov.requiresComponentClass = "CameraComponent";
     getCameraFov.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->outputs.push_back({"FOV", PinType::Float, false, true});
     };
     getCameraFov.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
         }
         if (!target) return;
@@ -68,10 +66,9 @@ void RegisterCameraComponentNodes() {
     setCameraOrtho.category = "Camera";
     setCameraOrtho.moduleName = "Stargraph";
     setCameraOrtho.hideFromContextMenu = true;
-    setCameraOrtho.requiresComponentClass = "CameraComponent";
     setCameraOrtho.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->inputs.push_back({"Orthographic", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -80,7 +77,7 @@ void RegisterCameraComponentNodes() {
         bool ortho = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
             if (p.name == "Orthographic") ortho = (p.defaultValue == "true" || p.defaultValue == "1");
         }
@@ -97,16 +94,15 @@ void RegisterCameraComponentNodes() {
     getCameraOrtho.category = "Camera";
     getCameraOrtho.moduleName = "Stargraph";
     getCameraOrtho.hideFromContextMenu = true;
-    getCameraOrtho.requiresComponentClass = "CameraComponent";
     getCameraOrtho.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->outputs.push_back({"Orthographic", PinType::Boolean, false, true});
     };
     getCameraOrtho.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
         }
         if (!target) return;
@@ -122,10 +118,9 @@ void RegisterCameraComponentNodes() {
     setCameraClip.category = "Camera";
     setCameraClip.moduleName = "Stargraph";
     setCameraClip.hideFromContextMenu = true;
-    setCameraClip.requiresComponentClass = "CameraComponent";
     setCameraClip.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->inputs.push_back({"Near", PinType::Float, true, false, 0, "0.1"});
         node->inputs.push_back({"Far", PinType::Float, true, false, 0, "4000.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -136,7 +131,7 @@ void RegisterCameraComponentNodes() {
         float farClip = 4000.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
             if (p.name == "Near" && !p.defaultValue.empty()) nearClip = p.defaultValue.AsFloat();
             if (p.name == "Far" && !p.defaultValue.empty()) farClip = p.defaultValue.AsFloat();
@@ -155,9 +150,8 @@ void RegisterCameraComponentNodes() {
     getCameraClip.category = "Camera";
     getCameraClip.moduleName = "Stargraph";
     getCameraClip.hideFromContextMenu = true;
-    getCameraClip.requiresComponentClass = "CameraComponent";
     getCameraClip.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
         node->outputs.push_back({"Near", PinType::Float, false, true});
         node->outputs.push_back({"Far", PinType::Float, false, true});
     };
@@ -165,7 +159,7 @@ void RegisterCameraComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
             }
         }
         if (!target) return;
@@ -186,7 +180,7 @@ void RegisterCameraComponentNodes() {
     getCameraMatrix.category = "Camera";
     getCameraMatrix.moduleName = "Stargraph";
     getCameraMatrix.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"View Matrix", PinType::Vec3, false, true});
         node->outputs.push_back({"Projection Matrix", PinType::Vec3, false, true});
     };
@@ -194,7 +188,7 @@ void RegisterCameraComponentNodes() {
         Actor* targetActor = World::Get().GetViewTarget();
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
+                targetActor = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
         }
         if (!targetActor) {
@@ -255,14 +249,14 @@ void RegisterCameraComponentNodes() {
     updateCamera.hideFromContextMenu = true;
     updateCamera.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     updateCamera.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* targetActor = World::Get().GetViewTarget();
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
+                targetActor = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
         }
         if (!targetActor) {
@@ -280,14 +274,14 @@ void RegisterCameraComponentNodes() {
     cameraToTarget.hideFromContextMenu = true;
     cameraToTarget.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     cameraToTarget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* targetActor = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                targetActor = StarPointer::FromHex<Actor>(p.defaultValue);
+                targetActor = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
         }
         if (!targetActor) return;

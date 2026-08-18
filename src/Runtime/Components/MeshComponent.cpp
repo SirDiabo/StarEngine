@@ -5,7 +5,7 @@
 #include "Runtime/AssetCache.h"
 #include <cmath>
 #include <cstdlib>
-#include "Runtime/PointerUtil.h"
+#include "Modules/Stargraph/ObjectPinRef.h"
 
 void RegisterMeshComponentNodes() {
     NodeTemplate setStaticMesh;
@@ -13,10 +13,9 @@ void RegisterMeshComponentNodes() {
     setStaticMesh.category = "Mesh";
     setStaticMesh.moduleName = "Stargraph";
     setStaticMesh.hideFromContextMenu = true;
-    setStaticMesh.requiresComponentClass = "MeshComponent";
     setStaticMesh.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
         node->inputs.push_back({"Static Mesh", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -25,7 +24,7 @@ void RegisterMeshComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
             if (p.name == "Static Mesh") path = p.defaultValue;
         }
@@ -41,10 +40,9 @@ void RegisterMeshComponentNodes() {
     setMaterial.category = "Mesh";
     setMaterial.moduleName = "Stargraph";
     setMaterial.hideFromContextMenu = true;
-    setMaterial.requiresComponentClass = "MeshComponent";
     setMaterial.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
         node->inputs.push_back({"Material", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -53,7 +51,7 @@ void RegisterMeshComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
             if (p.name == "Material") path = p.defaultValue;
         }
@@ -68,10 +66,9 @@ void RegisterMeshComponentNodes() {
     playAnim.type = "Play_Animation";
     playAnim.category = "Mesh";
     playAnim.moduleName = "Stargraph";
-    playAnim.requiresComponentClass = "MeshComponent";
     playAnim.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
         node->inputs.push_back({"Anim", PinType::String, true, false, 0, ""});
         node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -82,7 +79,7 @@ void RegisterMeshComponentNodes() {
         bool looping = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
             if (p.name == "Anim") animPath = p.defaultValue;
             if (p.name == "Looping") looping = p.defaultValue.AsBool();
@@ -98,17 +95,16 @@ void RegisterMeshComponentNodes() {
     stopAnim.type = "Stop_Animation";
     stopAnim.category = "Mesh";
     stopAnim.moduleName = "Stargraph";
-    stopAnim.requiresComponentClass = "MeshComponent";
     stopAnim.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     stopAnim.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
         }
         if (!target) return;
@@ -122,10 +118,9 @@ void RegisterMeshComponentNodes() {
     setAnimRate.type = "Set_Anim_Play_Rate";
     setAnimRate.category = "Mesh";
     setAnimRate.moduleName = "Stargraph";
-    setAnimRate.requiresComponentClass = "MeshComponent";
     setAnimRate.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
         node->inputs.push_back({"Rate", PinType::Float, true, false, 0, "1.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -134,7 +129,7 @@ void RegisterMeshComponentNodes() {
         float rate = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
             if (p.name == "Rate") rate = p.defaultValue.AsFloat();
         }

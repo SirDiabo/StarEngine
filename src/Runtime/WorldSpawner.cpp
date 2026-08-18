@@ -18,6 +18,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
 
     if (!inst.graphAssetPath.empty()) {
+        actor->SetActorClass(inst.graphAssetPath);
         if (const Stargraph* cachedGraph = StargraphAssetCache::Get().GetOrLoad(inst.graphAssetPath)) {
             auto* behavior = new StargraphBehavior(*cachedGraph);
             actor->SetGraphBehavior(behavior);

@@ -1,14 +1,16 @@
 #include "Nodes_Actor.h"
 #include "NodeRegistry.h"
+#include "GraphExecutor.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "StargraphBehavior.h"
 #include "Core/CookedFile.h"
+#include "Core/ObjectKindRegistry.h"
 #include "raymath.h"
 #include <cstdlib>
 #include <fstream>
-#include "Runtime/PointerUtil.h"
+#include "ObjectPinRef.h"
 
 void RegisterActorNodes() {
     NodeTemplate getActorLocation;
@@ -16,7 +18,7 @@ void RegisterActorNodes() {
     getActorLocation.category = "Actor";
     getActorLocation.moduleName = "Stargraph";
     getActorLocation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Location", PinType::Vec3, false, true});
     };
     getActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -24,7 +26,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -41,7 +43,7 @@ void RegisterActorNodes() {
     setActorLocation.moduleName = "Stargraph";
     setActorLocation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
-        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Location", PinType::Vec3, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
@@ -50,7 +52,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -69,7 +71,7 @@ void RegisterActorNodes() {
     getActorRotation.category = "Actor";
     getActorRotation.moduleName = "Stargraph";
     getActorRotation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
     };
     getActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -77,7 +79,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -95,7 +97,7 @@ void RegisterActorNodes() {
     setActorRotation.moduleName = "Stargraph";
     setActorRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
-        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
@@ -104,7 +106,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -123,7 +125,7 @@ void RegisterActorNodes() {
     getActorScale.category = "Actor";
     getActorScale.moduleName = "Stargraph";
     getActorScale.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Scale", PinType::Vec3, false, true});
     };
     getActorScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -131,7 +133,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -149,7 +151,7 @@ void RegisterActorNodes() {
     setActorScale.moduleName = "Stargraph";
     setActorScale.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
-        node->inputs.push_back({"Target", PinType::Object, true,  false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Scale", PinType::Vec3, true,  false, 0, "1,1,1"});
         node->outputs.push_back({"Out",  PinType::Exec, false, true});
     };
@@ -158,7 +160,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -177,7 +179,7 @@ void RegisterActorNodes() {
     getActorForward.category = "Actor";
     getActorForward.moduleName = "Stargraph";
     getActorForward.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Forward", PinType::Vec3, false, true});
     };
     getActorForward.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -185,7 +187,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -206,7 +208,7 @@ void RegisterActorNodes() {
     getActorRight.category = "Actor";
     getActorRight.moduleName = "Stargraph";
     getActorRight.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Right", PinType::Vec3, false, true});
     };
     getActorRight.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -214,7 +216,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -234,7 +236,7 @@ void RegisterActorNodes() {
     getActorUp.category = "Actor";
     getActorUp.moduleName = "Stargraph";
     getActorUp.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Up", PinType::Vec3, false, true});
     };
     getActorUp.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -242,7 +244,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -264,13 +266,13 @@ void RegisterActorNodes() {
     destroyActor.moduleName = "Stargraph";
     destroyActor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
     };
     destroyActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -289,7 +291,7 @@ void RegisterActorNodes() {
         node->inputs.push_back({"Class Name", PinType::String, true, false, 0, "Actor"});
         node->inputs.push_back({"Graph Path", PinType::String, false, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
-        node->outputs.push_back({"Spawned Actor", PinType::Object, false, true});
+        node->outputs.push_back({"Spawned Actor", PinType::Object, false, true, 0, "", false, "Actor"});
     };
     spawnActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string className = "Actor";
@@ -302,6 +304,7 @@ void RegisterActorNodes() {
         if (spawned) {
             spawned->SetName(className + "_Instance");
             if (!graphPath.empty()) {
+                spawned->SetActorClass(graphPath);
                 Stargraph loadedGraph;
                 if (loadedGraph.LoadFromFile(graphPath)) {
                     spawned->SetGraphBehavior(new StargraphBehavior(std::move(loadedGraph)));
@@ -323,9 +326,7 @@ void RegisterActorNodes() {
 
             for (Pin& p : node.outputs) {
                 if (p.name == "Spawned Actor") {
-                    char buf[64];
-                    snprintf(buf, sizeof(buf), "%p", (void*)spawned);
-                    p.defaultValue = buf;
+                    p.defaultValue = ObjectPinRef::Encode(spawned->GetObjectKind(), spawned->GetObjectId());
                     break;
                 }
             }
@@ -338,7 +339,7 @@ void RegisterActorNodes() {
     getShowMouseCursor.category = "Actor";
     getShowMouseCursor.moduleName = "Stargraph";
     getShowMouseCursor.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Show", PinType::Boolean, false, true});
     };
     getShowMouseCursor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -346,7 +347,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -364,7 +365,7 @@ void RegisterActorNodes() {
     setShowMouseCursor.moduleName = "Stargraph";
     setShowMouseCursor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Show", PinType::Boolean, true, false, 0, "1"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -373,7 +374,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -392,14 +393,14 @@ void RegisterActorNodes() {
     getViewTarget.category = "Actor";
     getViewTarget.moduleName = "Stargraph";
     getViewTarget.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
-        node->outputs.push_back({"Out", PinType::Object, false, true});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->outputs.push_back({"Out", PinType::Object, false, true, 0, "", false, "Actor"});
     };
     getViewTarget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -407,9 +408,7 @@ void RegisterActorNodes() {
             target = World::Get().GetViewTarget();
         }
         if (!target) return;
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%p", (void*)target);
-        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = buf;
+        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = ObjectPinRef::Encode(target->GetObjectKind(), target->GetObjectId());
     };
     NodeRegistry::Get().RegisterNode(getViewTarget);
 
@@ -418,14 +417,14 @@ void RegisterActorNodes() {
     getInputFocus.category = "Actor";
     getInputFocus.moduleName = "Stargraph";
     getInputFocus.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
-        node->outputs.push_back({"Out", PinType::Object, false, true});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->outputs.push_back({"Out", PinType::Object, false, true, 0, "", false, "Actor"});
     };
     getInputFocus.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -433,9 +432,7 @@ void RegisterActorNodes() {
             target = World::Get().GetInputFocus();
         }
         if (!target) return;
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%p", (void*)target);
-        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = buf;
+        for (Pin& p : node.outputs) if (p.name == "Out") p.defaultValue = ObjectPinRef::Encode(target->GetObjectKind(), target->GetObjectId());
     };
     NodeRegistry::Get().RegisterNode(getInputFocus);
 
@@ -445,14 +442,14 @@ void RegisterActorNodes() {
     setInputFocus.moduleName = "Stargraph";
     setInputFocus.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setInputFocus.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -466,7 +463,7 @@ void RegisterActorNodes() {
     addMovementInput.moduleName = "Stargraph";
     addMovementInput.createPins = [](Node* node) {
         node->inputs.push_back({"In",             PinType::Exec, true,  false});
-        node->inputs.push_back({"Target",         PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"World Direction", PinType::Vec3, true, false, 0, "0,0,1"});
         node->inputs.push_back({"Scale Value",     PinType::Float, true, false, 0, "1.0"});
         node->outputs.push_back({"Out",           PinType::Exec, false, true});
@@ -477,7 +474,7 @@ void RegisterActorNodes() {
         float scaleValue = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
             if (p.name == "World Direction") ReadVec3(p, dir.x, dir.y, dir.z);
@@ -493,14 +490,14 @@ void RegisterActorNodes() {
     getMovementSpeed.category = "Actor";
     getMovementSpeed.moduleName = "Stargraph";
     getMovementSpeed.createPins = [](Node* node) {
-        node->inputs.push_back({"Target",         PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Speed",           PinType::Float, true, false, 0, "0.0"});
     };
     getMovementSpeed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -516,7 +513,7 @@ void RegisterActorNodes() {
     setMovementSpeed.moduleName = "Stargraph";
     setMovementSpeed.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"New Speed", PinType::Float, true, false, 0, "600.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -525,7 +522,7 @@ void RegisterActorNodes() {
         float newSpeed = 600.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
             if (p.name == "New Speed") newSpeed = p.defaultValue.AsFloat();
         }
@@ -540,7 +537,7 @@ void RegisterActorNodes() {
     addControlYawInput.moduleName = "Stargraph";
     addControlYawInput.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Out",  PinType::Exec, false, true});
     };
@@ -549,7 +546,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -564,7 +561,7 @@ void RegisterActorNodes() {
     addControlPitchInput.moduleName = "Stargraph";
     addControlPitchInput.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Out",  PinType::Exec, false, true});
     };
@@ -573,7 +570,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -588,7 +585,7 @@ void RegisterActorNodes() {
     addControlRollInput.moduleName = "Stargraph";
     addControlRollInput.createPins = [](Node* node) {
         node->inputs.push_back({"In",    PinType::Exec, true,  false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Out",  PinType::Exec, false, true});
     };
@@ -597,7 +594,7 @@ void RegisterActorNodes() {
         float value = 0.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             }
             if (p.name == "Value") value = p.defaultValue.AsFloat();
         }
@@ -611,14 +608,14 @@ void RegisterActorNodes() {
     getControlRotation.category = "Actor";
     getControlRotation.moduleName = "Stargraph";
     getControlRotation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
     };
     getControlRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -636,7 +633,7 @@ void RegisterActorNodes() {
     setControlRotation.moduleName = "Stargraph";
     setControlRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
-        node->inputs.push_back({"Target",   PinType::Object, true,  false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
@@ -644,7 +641,7 @@ void RegisterActorNodes() {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
@@ -666,18 +663,96 @@ void RegisterActorNodes() {
     setViewTarget.moduleName = "Stargraph";
     setViewTarget.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setViewTarget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Actor>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
                 break;
             }
         }
         if (target) World::Get().SetViewTarget(target);
     };
     NodeRegistry::Get().RegisterNode(setViewTarget);
+
+    NodeTemplate castToClass;
+    castToClass.type = "Cast_To_Class";
+    castToClass.category = "Actor";
+    castToClass.moduleName = "Stargraph";
+    castToClass.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->inputs.push_back({"Class", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Success", PinType::Exec, false, true});
+        node->outputs.push_back({"Failed", PinType::Exec, false, true});
+        node->outputs.push_back({"As", PinType::Object, false, true, 0, "", false, "Actor"});
+    };
+    castToClass.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ctx.actor;
+        std::string className;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
+            if (p.name == "Class") className = p.defaultValue;
+        }
+        bool success = target && ObjectKindRegistry::Get().IsCompatible(target->GetObjectKind(), className);
+        for (Pin& p : node.outputs) {
+            if (p.name == "As") p.defaultValue = success ? ObjectPinRef::Encode(target->GetObjectKind(), target->GetObjectId()) : "";
+        }
+        GraphExecutor::RunFromPin(graph, &node, ctx, success ? "Success" : "Failed");
+    };
+    NodeRegistry::Get().RegisterNode(castToClass);
+
+    NodeTemplate getActorOfClass;
+    getActorOfClass.type = "Get_Actor_Of_Class";
+    getActorOfClass.category = "Actor";
+    getActorOfClass.moduleName = "Stargraph";
+    getActorOfClass.createPins = [](Node* node) {
+        node->inputs.push_back({"Class", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Object, false, true, 0, "", false, "Actor"});
+    };
+    getActorOfClass.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string className;
+        for (const Pin& p : node.inputs) if (p.name == "Class") className = p.defaultValue;
+
+        Actor* found = nullptr;
+        for (const auto& actorPtr : World::Get().GetActors()) {
+            if (ObjectKindRegistry::Get().IsCompatible(actorPtr->GetObjectKind(), className)) { found = actorPtr.get(); break; }
+        }
+        for (Pin& p : node.outputs) {
+            if (p.name == "Out") p.defaultValue = found ? ObjectPinRef::Encode(found->GetObjectKind(), found->GetObjectId()) : "";
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getActorOfClass);
+
+    NodeTemplate forEachActorOfClass;
+    forEachActorOfClass.type = "For_Each_Actor_Of_Class";
+    forEachActorOfClass.category = "Actor";
+    forEachActorOfClass.moduleName = "Stargraph";
+    forEachActorOfClass.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Class", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Loop Body", PinType::Exec, false, true});
+        node->outputs.push_back({"Current Actor", PinType::Object, false, true, 0, "", false, "Actor"});
+        node->outputs.push_back({"Completed", PinType::Exec, false, true});
+    };
+    forEachActorOfClass.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string className;
+        for (const Pin& p : node.inputs) if (p.name == "Class") className = p.defaultValue;
+
+        std::vector<Actor*> matches;
+        for (const auto& actorPtr : World::Get().GetActors()) {
+            if (ObjectKindRegistry::Get().IsCompatible(actorPtr->GetObjectKind(), className)) matches.push_back(actorPtr.get());
+        }
+        for (Actor* actor : matches) {
+            for (Pin& p : node.outputs) {
+                if (p.name == "Current Actor") p.defaultValue = ObjectPinRef::Encode(actor->GetObjectKind(), actor->GetObjectId());
+            }
+            GraphExecutor::RunFromPin(graph, &node, ctx, "Loop Body");
+        }
+        GraphExecutor::RunFromPin(graph, &node, ctx, "Completed");
+    };
+    NodeRegistry::Get().RegisterNode(forEachActorOfClass);
 }

@@ -1,6 +1,7 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/ObjectKindRegistry.h"
 #include "Editor/PropertyFields.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
@@ -160,9 +161,12 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
         for (const Pin& pin : node.inputs)  if (pin.id == inputPinId)  in  = &pin;
     }
     if (!out || !in) return false;
-    if (out->type == in->type) return true;
     if (out->type == PinType::Wildcard || in->type == PinType::Wildcard) return true;
-    return false;
+    if (out->type != in->type) return false;
+    if (out->type == PinType::Object) {
+        return ObjectKindRegistry::Get().IsCompatible(out->objectKind, in->objectKind);
+    }
+    return true;
 }
 
 void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
@@ -1348,19 +1352,27 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             }
             if (fromPin) {
                 bool hasCompatible = false;
+                std::string sourceKind = (sourceNode && !sourceNode->componentClass.empty())
+                                          ? sourceNode->componentClass : fromPin->objectKind;
                 if (fromIsOutput) {
-                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{})
-                        if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
+                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{}) {
+                        if (p.type == PinType::Wildcard) { hasCompatible = true; break; }
+                        if (p.type != fromPin->type) continue;
+                        if (p.type == PinType::Object) {
+                            if (ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) { hasCompatible = true; break; }
+                        } else {
+                            hasCompatible = true; break;
+                        }
+                    }
                 } else {
-                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{})
-                        if (p.type == fromPin->type || p.type == PinType::Wildcard) { hasCompatible = true; break; }
-                }
-
-                if (hasCompatible && sourceNode && !sourceNode->componentClass.empty()) {
-                    if (t.category == "Actor") {
-                        hasCompatible = false;
-                    } else if (!t.requiresComponentClass.empty()) {
-                        hasCompatible = (t.requiresComponentClass == sourceNode->componentClass);
+                    for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{}) {
+                        if (p.type == PinType::Wildcard) { hasCompatible = true; break; }
+                        if (p.type != fromPin->type) continue;
+                        if (p.type == PinType::Object) {
+                            if (ObjectKindRegistry::Get().IsCompatible(p.objectKind, fromPin->objectKind)) { hasCompatible = true; break; }
+                        } else {
+                            hasCompatible = true; break;
+                        }
                     }
                 }
 

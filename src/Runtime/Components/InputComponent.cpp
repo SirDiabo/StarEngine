@@ -5,7 +5,7 @@
 #include "Core/InputMappingRegistry.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
-#include "Runtime/PointerUtil.h"
+#include "Modules/Stargraph/ObjectPinRef.h"
 #include "raylib.h"
 #include <cstdio>
 
@@ -19,7 +19,7 @@ Component* ResolveTargetComponent(Node& node, ExecutionContext& ctx) {
 
     Component* target = nullptr;
     if (!componentRef.empty()) {
-        target = StarPointer::FromHex<Component>(componentRef);
+        target = ObjectPinRef::ResolveAs<Component>(node, componentRef, "InputComponent", ctx);
         if (!target && ctx.actor) target = ctx.actor->FindComponentByName(componentRef);
     }
     if (!target && ctx.actor) target = ctx.actor->GetInputComponent();
@@ -44,7 +44,7 @@ void RegisterInputComponentNodes() {
     inputMapping.isEvent = true;
     inputMapping.hideFromContextMenu = true; // listed per mapping name, see RenderNodeContextMenu
     inputMapping.createPins = [](Node* node) {
-        node->inputs.push_back({"Component", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, "InputComponent"});
         node->inputs.push_back({"Mapping", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Triggered", PinType::Exec, false, true});
         node->outputs.push_back({"Started", PinType::Exec, false, true});
@@ -105,7 +105,7 @@ void RegisterInputComponentNodes() {
     overrideInput.moduleName = "Stargraph";
     overrideInput.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, "InputComponent"});
         node->inputs.push_back({"Mapping", PinType::String, true, false, 0, ""});
         node->inputs.push_back({"New Key", PinType::String, true, false, 0, "W"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -135,7 +135,7 @@ void RegisterInputComponentNodes() {
     registerUnclaimed.moduleName = "Stargraph";
     registerUnclaimed.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Component", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, "InputComponent"});
         node->outputs.push_back({"Claimed", PinType::Exec, false, true});
         node->outputs.push_back({"Unclaimed", PinType::Exec, false, true});
     };

@@ -4,7 +4,7 @@
 #include "Runtime/AudioCore.h"
 #include "raylib.h"
 #include <cstdlib>
-#include "Runtime/PointerUtil.h"
+#include "Modules/Stargraph/ObjectPinRef.h"
 
 void RegisterAudioComponentNodes() {
     NodeTemplate setSoundPath;
@@ -12,10 +12,9 @@ void RegisterAudioComponentNodes() {
     setSoundPath.category = "Audio";
     setSoundPath.moduleName = "Stargraph";
     setSoundPath.hideFromContextMenu = true;
-    setSoundPath.requiresComponentClass = "AudioComponent";
     setSoundPath.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->inputs.push_back({"Sound Path", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -24,7 +23,7 @@ void RegisterAudioComponentNodes() {
         std::string path;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
             if (p.name == "Sound Path") path = p.defaultValue;
         }
@@ -40,10 +39,9 @@ void RegisterAudioComponentNodes() {
     setVolume.category = "Audio";
     setVolume.moduleName = "Stargraph";
     setVolume.hideFromContextMenu = true;
-    setVolume.requiresComponentClass = "AudioComponent";
     setVolume.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->inputs.push_back({"Volume", PinType::Float, true, false, 0, "1.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -52,7 +50,7 @@ void RegisterAudioComponentNodes() {
         float volume = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
             if (p.name == "Volume" && !p.defaultValue.empty()) volume = p.defaultValue.AsFloat();
         }
@@ -68,10 +66,9 @@ void RegisterAudioComponentNodes() {
     setLooping.category = "Audio";
     setLooping.moduleName = "Stargraph";
     setLooping.hideFromContextMenu = true;
-    setLooping.requiresComponentClass = "AudioComponent";
     setLooping.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -80,7 +77,7 @@ void RegisterAudioComponentNodes() {
         bool looping = false;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
             if (p.name == "Looping") looping = (p.defaultValue == "true" || p.defaultValue == "1");
         }
@@ -96,10 +93,9 @@ void RegisterAudioComponentNodes() {
     setPitch.category = "Audio";
     setPitch.moduleName = "Stargraph";
     setPitch.hideFromContextMenu = true;
-    setPitch.requiresComponentClass = "AudioComponent";
     setPitch.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -108,7 +104,7 @@ void RegisterAudioComponentNodes() {
         float pitch = 1.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
             if (p.name == "Pitch" && !p.defaultValue.empty()) pitch = p.defaultValue.AsFloat();
         }
@@ -123,17 +119,16 @@ void RegisterAudioComponentNodes() {
     playAudio.type = "Play_Audio";
     playAudio.category = "Audio";
     playAudio.moduleName = "Stargraph";
-    playAudio.requiresComponentClass = "AudioComponent";
     playAudio.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     playAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
         }
         if (!target) return;
@@ -147,17 +142,16 @@ void RegisterAudioComponentNodes() {
     stopAudio.type = "Stop_Audio";
     stopAudio.category = "Audio";
     stopAudio.moduleName = "Stargraph";
-    stopAudio.requiresComponentClass = "AudioComponent";
     stopAudio.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     stopAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
         }
         if (!target) return;
@@ -171,17 +165,16 @@ void RegisterAudioComponentNodes() {
     pauseAudio.type = "Pause_Audio";
     pauseAudio.category = "Audio";
     pauseAudio.moduleName = "Stargraph";
-    pauseAudio.requiresComponentClass = "AudioComponent";
     pauseAudio.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     pauseAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
         }
         if (!target) return;
@@ -195,17 +188,16 @@ void RegisterAudioComponentNodes() {
     resumeAudio.type = "Resume_Audio";
     resumeAudio.category = "Audio";
     resumeAudio.moduleName = "Stargraph";
-    resumeAudio.requiresComponentClass = "AudioComponent";
     resumeAudio.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     resumeAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
             }
         }
         if (!target) return;

@@ -5,7 +5,7 @@
 #include "Runtime/Components/MeshComponent.h"
 #include "raymath.h"
 #include <cstdlib>
-#include "Runtime/PointerUtil.h"
+#include "ObjectPinRef.h"
 
 void RegisterComponentNodes() {
     NodeTemplate getComponent;
@@ -15,7 +15,7 @@ void RegisterComponentNodes() {
     getComponent.hideFromContextMenu = true;
     getComponent.createPins = [](Node* node) {
         node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
-        node->outputs.push_back({"Component", PinType::Object, false, true});
+        node->outputs.push_back({"Component", PinType::Object, false, true, 0, "", false, "Component"});
     };
     getComponent.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string compName;
@@ -25,10 +25,8 @@ void RegisterComponentNodes() {
         if (!ctx.actor || compName.empty()) return;
         Component* comp = ctx.actor->FindComponentByName(compName);
         if (!comp) return;
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%p", (void*)comp);
         for (Pin& p : node.outputs) {
-            if (p.name == "Component") { p.defaultValue = buf; break; }
+            if (p.name == "Component") { p.defaultValue = ObjectPinRef::Encode(comp->GetObjectKind(), comp->GetObjectId()); break; }
         }
     };
     NodeRegistry::Get().RegisterNode(getComponent);
@@ -40,7 +38,7 @@ void RegisterComponentNodes() {
     setCompLocation.hideFromContextMenu = true;
     setCompLocation.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->inputs.push_back({"Location", PinType::Vec3, true, false, 0, "0,0,0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -50,7 +48,7 @@ void RegisterComponentNodes() {
         Vector3 loc = {0, 0, 0};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
             if (p.name == "Location") ReadVec3(p, loc.x, loc.y, loc.z);
         }
@@ -66,7 +64,7 @@ void RegisterComponentNodes() {
     setCompRotation.hideFromContextMenu = true;
     setCompRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->inputs.push_back({"Rotation", PinType::Vec3, true, false, 0, "0,0,0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -76,7 +74,7 @@ void RegisterComponentNodes() {
         Vector3 rot = {0, 0, 0};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
             if (p.name == "Rotation") ReadVec3(p, rot.x, rot.y, rot.z);
         }
@@ -92,7 +90,7 @@ void RegisterComponentNodes() {
     setCompScale.hideFromContextMenu = true;
     setCompScale.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->inputs.push_back({"Scale", PinType::Vec3, true, false, 0, "1,1,1"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -102,7 +100,7 @@ void RegisterComponentNodes() {
         Vector3 scl = {1, 1, 1};
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
             if (p.name == "Scale") ReadVec3(p, scl.x, scl.y, scl.z);
         }
@@ -117,14 +115,14 @@ void RegisterComponentNodes() {
     getCompLocation.moduleName = "Stargraph";
     getCompLocation.hideFromContextMenu = true;
     getCompLocation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->outputs.push_back({"Location", PinType::Vec3, false, true});
     };
     getCompLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
         }
         if (!target) return;
@@ -140,14 +138,14 @@ void RegisterComponentNodes() {
     getCompRotation.moduleName = "Stargraph";
     getCompRotation.hideFromContextMenu = true;
     getCompRotation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
     };
     getCompRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
         }
         if (!target) return;
@@ -163,14 +161,14 @@ void RegisterComponentNodes() {
     getCompScale.moduleName = "Stargraph";
     getCompScale.hideFromContextMenu = true;
     getCompScale.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->outputs.push_back({"Scale", PinType::Vec3, false, true});
     };
     getCompScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
         }
         if (!target) return;
@@ -186,7 +184,7 @@ void RegisterComponentNodes() {
     getCompWorldLocation.moduleName = "Stargraph";
     getCompWorldLocation.hideFromContextMenu = true;
     getCompWorldLocation.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
         node->outputs.push_back({"Location", PinType::Vec3, false, true});
     };
     getCompWorldLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -194,7 +192,7 @@ void RegisterComponentNodes() {
         Component* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
             }
         }
         if (!target) return;

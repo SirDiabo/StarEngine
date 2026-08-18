@@ -18,7 +18,11 @@ public:
     ~Actor() override;
 
     const char* GetClassName() const override { return "Actor"; }
+    std::string GetObjectKind() const override { return actorClass.empty() ? "Actor" : actorClass; }
     void GetProperties(PropertyList& outProperties) override;
+
+    const std::string& GetActorClass() const { return actorClass; }
+    void SetActorClass(const std::string& newClass);
 
     void BeginPlay();
     void Tick(float deltaTime);
@@ -89,6 +93,7 @@ private:
     }
 
     GraphBehavior* graphBehavior = nullptr;
+    std::string actorClass;
     std::vector<Component*> components;
     Component* rootComponent = nullptr;
     uint32_t netId = 0;

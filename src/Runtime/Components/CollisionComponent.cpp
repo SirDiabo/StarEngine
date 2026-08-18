@@ -1,7 +1,7 @@
 #include "CollisionComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
-#include "Runtime/PointerUtil.h"
+#include "Modules/Stargraph/ObjectPinRef.h"
 
 void RegisterCollisionComponentNodes() {
     NodeTemplate setCollisionRadius;
@@ -9,10 +9,9 @@ void RegisterCollisionComponentNodes() {
     setCollisionRadius.category = "Collision";
     setCollisionRadius.moduleName = "Stargraph";
     setCollisionRadius.hideFromContextMenu = true;
-    setCollisionRadius.requiresComponentClass = "CollisionComponent";
     setCollisionRadius.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CollisionComponent"});
         node->inputs.push_back({"Radius", PinType::Float, true, false, 0, "50.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -21,7 +20,7 @@ void RegisterCollisionComponentNodes() {
         float radius = 50.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CollisionComponent", ctx);
             }
             if (p.name == "Radius" && !p.defaultValue.empty()) radius = p.defaultValue.AsFloat();
         }
@@ -37,10 +36,9 @@ void RegisterCollisionComponentNodes() {
     setCollisionHeight.category = "Collision";
     setCollisionHeight.moduleName = "Stargraph";
     setCollisionHeight.hideFromContextMenu = true;
-    setCollisionHeight.requiresComponentClass = "CollisionComponent";
     setCollisionHeight.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CollisionComponent"});
         node->inputs.push_back({"Height", PinType::Float, true, false, 0, "100.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -49,7 +47,7 @@ void RegisterCollisionComponentNodes() {
         float height = 100.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = StarPointer::FromHex<Component>(p.defaultValue);
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CollisionComponent", ctx);
             }
             if (p.name == "Height" && !p.defaultValue.empty()) height = p.defaultValue.AsFloat();
         }

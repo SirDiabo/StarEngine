@@ -1,6 +1,7 @@
 #include "Nodes_Collision.h"
 #include "NodeRegistry.h"
 #include "Stargraph.h"
+#include "ObjectPinRef.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/Components/MeshComponent.h"
@@ -45,7 +46,7 @@ void RegisterCollisionNodes() {
         node->inputs.push_back({"DrawDebug",  PinType::Boolean, true,  false, 0, "false"});
         node->outputs.push_back({"Out",              PinType::Exec,    false, true});
         node->outputs.push_back({"Did Overlap",      PinType::Boolean, false, true});
-        node->outputs.push_back({"Overlap Object",   PinType::Object,  false, true});
+        node->outputs.push_back({"Overlap Object",   PinType::Object,  false, true, 0, "", false, "Actor"});
         node->outputs.push_back({"Overlap Location", PinType::Vec3,    false, true});
         node->outputs.push_back({"Overlap Normal",   PinType::Vec3,    false, true});
         node->outputs.push_back({"Distance",         PinType::Float,   false, true});
@@ -70,8 +71,7 @@ void RegisterCollisionNodes() {
             if (p.name == "Did Overlap") p.defaultValue = hit ? "true" : "false";
             else if (p.name == "Overlap Object") {
                 if (hit) {
-                    char buf[32]; snprintf(buf, sizeof(buf), "%p", (void*)hitActor);
-                    p.defaultValue = buf;
+                    p.defaultValue = ObjectPinRef::Encode(hitActor->GetObjectKind(), hitActor->GetObjectId());
                 } else {
                     p.defaultValue = "";
                 }

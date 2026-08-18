@@ -114,6 +114,7 @@ struct Pin {
     int id = 0;
     PinValue defaultValue;
     bool isWildcard = false;
+    std::string objectKind;
 };
 
 inline std::string operator+(const std::string& lhs, const PinValue& rhs) { return lhs + (const std::string&)rhs; }

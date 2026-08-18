@@ -21,6 +21,7 @@
 #include "Nodes_Audio.h"
 #include "Nodes_Timers.h"
 #include "Nodes_Collision.h"
+#include "Core/ObjectKindRegistry.h"
 
 #ifndef STARENGINE_GAME_BUILD
 #include "Core/EditorAssetHandlerRegistry.h"
@@ -49,7 +50,8 @@ bool StargraphModule::Initialize() {
     RegisterCollisionNodes();
     RegisterAudioComponentNodes();
     RegisterInputComponentNodes();
-    
+
+    RegisterObjectKinds();
     RegisterAssetType();
     RegisterEditorTabs();
     return true;
@@ -84,6 +86,18 @@ void StargraphModule::RegisterAssetType() {
     sound.category = "Audio";
     sound.moduleName = "Stargraph";
     AssetTypeRegistry::Get().RegisterType(sound);
+}
+
+void StargraphModule::RegisterObjectKinds() {
+    ObjectKindRegistry& kinds = ObjectKindRegistry::Get();
+    kinds.RegisterKind("Actor", "");
+    kinds.RegisterKind("Component", "");
+    kinds.RegisterKind("SceneComponent", "Component");
+    kinds.RegisterKind("CameraComponent", "SceneComponent");
+    kinds.RegisterKind("AudioComponent", "SceneComponent");
+    kinds.RegisterKind("MeshComponent", "SceneComponent");
+    kinds.RegisterKind("CollisionComponent", "SceneComponent");
+    kinds.RegisterKind("InputComponent", "SceneComponent");
 }
 
 void StargraphModule::RegisterEditorTabs() {

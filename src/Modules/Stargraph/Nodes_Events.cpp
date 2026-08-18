@@ -5,7 +5,7 @@
 #include "Runtime/Networking/NetworkBackend.h"
 #include "GraphExecutor.h"
 #include "StargraphBehavior.h"
-#include "Runtime/PointerUtil.h"
+#include "ObjectPinRef.h"
 
 void RegisterEventNodes() {
     NodeTemplate beginPlay;
@@ -99,7 +99,7 @@ void RegisterEventNodes() {
     callCustomEvent.moduleName = "Stargraph";
     callCustomEvent.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Event Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -111,7 +111,7 @@ void RegisterEventNodes() {
         std::vector<std::pair<std::string, std::string>> params;
         for (const Pin& p : node.inputs) {
             if (p.name == "Event Name") eventName = p.defaultValue;
-            else if (p.name == "Target" && !p.defaultValue.empty()) target = StarPointer::FromHex<Actor>(p.defaultValue);
+            else if (p.name == "Target" && !p.defaultValue.empty()) target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             else if (p.name != "In") params.emplace_back(p.name, p.defaultValue);
         }
         if (eventName.empty() || !target) return;

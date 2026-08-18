@@ -5,9 +5,11 @@
 
 class Object {
 public:
-    virtual ~Object() = default;
+    Object();
+    virtual ~Object();
 
     virtual const char* GetClassName() const { return "Object"; }
+    virtual std::string GetObjectKind() const { return GetClassName(); }
     virtual void GetProperties(PropertyList& outProperties) {
         outProperties.AddString("Name", &name);
     }
@@ -21,7 +23,7 @@ protected:
     std::string name = "Object";
 
 private:
-    unsigned int objectId = GenerateObjectId();
+    unsigned int objectId;
     static unsigned int GenerateObjectId() {
         static std::atomic<unsigned int> nextId{1};
         return nextId.fetch_add(1);

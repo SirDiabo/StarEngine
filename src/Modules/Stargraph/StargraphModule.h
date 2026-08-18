@@ -13,6 +13,7 @@ private:
     void RegisterDefaultNodes();
     void RegisterAssetType();
     void RegisterEditorTabs();
+    void RegisterObjectKinds();
 };
 
 void RegisterEventNodes();

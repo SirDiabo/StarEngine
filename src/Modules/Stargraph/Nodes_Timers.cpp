@@ -4,7 +4,7 @@
 #include "TimerManager.h"
 #include "Runtime/Actor.h"
 #include <cstdlib>
-#include "Runtime/PointerUtil.h"
+#include "ObjectPinRef.h"
 
 static StargraphBehavior* ResolveOwner(ExecutionContext& ctx) {
     if (!ctx.actor) return nullptr;
@@ -15,7 +15,7 @@ static Actor* ResolveTarget(Node& node, ExecutionContext& ctx) {
     Actor* target = ctx.actor;
     for (const Pin& p : node.inputs) {
         if (p.name == "Target" && !p.defaultValue.empty()) {
-            target = StarPointer::FromHex<Actor>(p.defaultValue);
+            target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             break;
         }
     }
@@ -102,7 +102,7 @@ void RegisterTimerNodes() {
     timerByName.moduleName = "Stargraph";
     timerByName.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Function Name", PinType::String, true, false, 0, ""});
         node->inputs.push_back({"Rate", PinType::Float, true, false, 0, "1.0"});
         node->inputs.push_back({"Loop", PinType::Boolean, true, false, 0, "false"});
@@ -137,7 +137,7 @@ void RegisterTimerNodes() {
     pauseTimer.moduleName = "Stargraph";
     pauseTimer.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Function Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -158,7 +158,7 @@ void RegisterTimerNodes() {
     resumeTimer.moduleName = "Stargraph";
     resumeTimer.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Function Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -179,7 +179,7 @@ void RegisterTimerNodes() {
     clearTimer.moduleName = "Stargraph";
     clearTimer.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Function Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };

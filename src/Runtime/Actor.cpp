@@ -1,10 +1,16 @@
 #include "Actor.h"
 #include "Components/Component.h"
 #include "Components/SceneComponent.h"
+#include "Core/ObjectKindRegistry.h"
 #include "raymath.h"
 #include <algorithm>
 #include <unordered_map>
 #include <mutex>
+
+void Actor::SetActorClass(const std::string& newClass) {
+    actorClass = newClass;
+    if (!newClass.empty()) ObjectKindRegistry::Get().RegisterKind(newClass, "Actor");
+}
 
 static std::unordered_map<uint32_t, Actor*>& NetIdRegistry() {
     static std::unordered_map<uint32_t, Actor*> registry;

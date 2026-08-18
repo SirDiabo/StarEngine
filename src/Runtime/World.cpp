@@ -16,6 +16,7 @@ Actor* World::SpawnActor(const std::string& className, const std::string& name) 
     std::unique_ptr<Actor> actor = std::make_unique<Actor>();
 
     if (!name.empty()) actor->SetName(name);
+    if (!className.empty()) actor->SetActorClass(className);
 
     Actor* raw = actor.get();
     actors.push_back(std::move(actor));
