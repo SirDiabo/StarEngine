@@ -14,7 +14,7 @@ void RegisterAudioNodes() {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
-        node->outputs.push_back({"Sound", PinType::Object, false, true});
+        node->outputs.push_back({"Sound", PinType::Object, false, true, 0, "", false, "Sound"});
     };
     playSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;
@@ -37,7 +37,7 @@ void RegisterAudioNodes() {
     stopSound.moduleName = "Stargraph";
     stopSound.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     stopSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -55,7 +55,7 @@ void RegisterAudioNodes() {
     pauseSound.moduleName = "Stargraph";
     pauseSound.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     pauseSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -73,7 +73,7 @@ void RegisterAudioNodes() {
     resumeSound.moduleName = "Stargraph";
     resumeSound.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     resumeSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -90,7 +90,7 @@ void RegisterAudioNodes() {
     isSoundPlaying.category = "Audio";
     isSoundPlaying.moduleName = "Stargraph";
     isSoundPlaying.createPins = [](Node* node) {
-        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Sound", PinType::Object, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Playing", PinType::Boolean, false, true});
     };
     isSoundPlaying.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -127,7 +127,7 @@ void RegisterAudioNodes() {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
-        node->outputs.push_back({"Music", PinType::Object, false, true});
+        node->outputs.push_back({"Music", PinType::Object, false, true, 0, "", false, "Music"});
     };
     loadMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;
@@ -149,7 +149,7 @@ void RegisterAudioNodes() {
     unloadMusic.moduleName = "Stargraph";
     unloadMusic.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Music", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Music", PinType::Object, true, false, 0, "", false, "Music"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     unloadMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -167,7 +167,7 @@ void RegisterAudioNodes() {
     playMusic.moduleName = "Stargraph";
     playMusic.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Music", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Music", PinType::Object, true, false, 0, "", false, "Music"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     playMusic.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -185,7 +185,7 @@ void RegisterAudioNodes() {
     setMusicVolume.moduleName = "Stargraph";
     setMusicVolume.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Music", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Music", PinType::Object, true, false, 0, "", false, "Music"});
         node->inputs.push_back({"Volume", PinType::Float, true, false, 0, "1.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
@@ -206,7 +206,7 @@ void RegisterAudioNodes() {
     seekMusic.moduleName = "Stargraph";
     seekMusic.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Music", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Music", PinType::Object, true, false, 0, "", false, "Music"});
         node->inputs.push_back({"Position", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };

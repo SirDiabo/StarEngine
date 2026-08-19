@@ -436,6 +436,50 @@ void StargraphEditorPanel::RenderRightPanel(Rectangle panel) {
         }
         y += 24;
 
+        if (var.type == PinType::Object) {
+            DrawText("Kind", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+            y += 14;
+
+            Rectangle kindRect = {panel.x + 8, y, panel.width - 16, 18};
+            DrawRectangleRec(kindRect, {35, 35, 40, 255});
+            DrawRectangleLinesEx(kindRect, 1, {60, 60, 70, 255});
+            std::string kindLabel = var.objectKind;
+            if (kindLabel.empty()) {
+                kindLabel = "Any";
+            } else {
+                size_t slash = kindLabel.find_last_of("/\\");
+                if (slash != std::string::npos) kindLabel = kindLabel.substr(slash + 1);
+                size_t dot = kindLabel.find_last_of('.');
+                if (dot != std::string::npos) kindLabel = kindLabel.substr(0, dot);
+            }
+            DrawText(kindLabel.c_str(), (int)kindRect.x + 4, (int)kindRect.y + 3, 11, theme.textPrimary);
+
+            Rectangle clearRect = {kindRect.x + kindRect.width - 20, kindRect.y, 20, 18};
+            if (!var.objectKind.empty()) {
+                DrawText("x", (int)clearRect.x + 6, (int)clearRect.y + 3, 11, theme.textSecondary);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), clearRect)) {
+                    var.objectKind = "";
+                    isDirty = true;
+                }
+            }
+
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), kindRect) &&
+                !CheckCollisionPointRec(GetMousePosition(), clearRect) && !savePicker.IsOpen()) {
+                actorClassPickerVarIndex = selectedVariableIndex;
+                actorClassPickerPinId = 0;
+                actorClassPicker.Open({kindRect.x, kindRect.y + kindRect.height}, ".staractor");
+            }
+            if (actorClassPickerVarIndex == selectedVariableIndex) {
+                std::string pickedClass;
+                if (actorClassPicker.Render(pickedClass)) {
+                    var.objectKind = pickedClass;
+                    isDirty = true;
+                    actorClassPickerVarIndex = -1;
+                }
+            }
+            y += 26;
+        }
+
         DrawText("Array", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         {

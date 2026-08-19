@@ -168,6 +168,7 @@ struct Variable {
     std::string name;
     PinType type = PinType::None;
     std::string value;
+    std::string objectKind;
     bool isArray = false;
     std::vector<std::string> arrayValues;
 

@@ -978,6 +978,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
+                        actorClassPickerVarIndex = -1;
                         actorClassPicker.Open({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor");
                         editingPinId = 0;
                     }
@@ -1208,7 +1209,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
                     }
                     for (Pin& p : node->outputs) {
-                        if (p.name == "Value") p.type = var.type;
+                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else if (ctrl) {
                     node = graph.CreateNode("Save_Variable");
@@ -1223,14 +1224,14 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
                     }
                     for (Pin& p : node->outputs) {
-                        if (p.name == "Value") p.type = var.type;
+                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else if (IsKeyDown(KEY_LEFT_ALT)) {
                     node = graph.CreateNode("Set_Variable");
                     node->title = "Set: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
-                        if (p.name == "Value")         p.type = var.type;
+                        if (p.name == "Value")         { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else {
                     node = graph.CreateNode("Get_Variable");
@@ -1239,7 +1240,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
                     }
                     for (Pin& p : node->outputs) {
-                        if (p.name == "Value") p.type = var.type;
+                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 }
 

@@ -920,7 +920,7 @@ void RegisterUtilityNodes() {
     drawBillboard.moduleName = "Stargraph";
     drawBillboard.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"Size", PinType::Float, true, false, 0, "100.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -966,7 +966,7 @@ void RegisterUtilityNodes() {
     drawBillboardPro.moduleName = "Stargraph";
     drawBillboardPro.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"Size", PinType::Vec3, true, false, 0, "100,100,0"});
         node->inputs.push_back({"Rotation", PinType::Float, true, false, 0, "0.0"});
@@ -1027,7 +1027,7 @@ void RegisterUtilityNodes() {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
-        node->outputs.push_back({"Texture", PinType::Object, false, true});
+        node->outputs.push_back({"Texture", PinType::Object, false, true, 0, "", false, "Texture"});
     };
     loadTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;
@@ -1058,7 +1058,7 @@ void RegisterUtilityNodes() {
     unloadTexture.moduleName = "Stargraph";
     unloadTexture.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     unloadTexture.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -1080,7 +1080,7 @@ void RegisterUtilityNodes() {
     getTextureSize.category = "Texture";
     getTextureSize.moduleName = "Stargraph";
     getTextureSize.createPins = [](Node* node) {
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->outputs.push_back({"Width", PinType::Integer, false, true});
         node->outputs.push_back({"Height", PinType::Integer, false, true});
     };
@@ -1106,7 +1106,7 @@ void RegisterUtilityNodes() {
     drawTexture.moduleName = "Stargraph";
     drawTexture.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"Tint", PinType::Vec3, true, false, 0, "1,1,1"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
@@ -1135,7 +1135,7 @@ void RegisterUtilityNodes() {
     drawTexturePro.moduleName = "Stargraph";
     drawTexturePro.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, ""});
+        node->inputs.push_back({"Texture", PinType::Object, true, false, 0, "", false, "Texture"});
         node->inputs.push_back({"SourcePosition", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"SourceSize", PinType::Vec3, true, false, 0, "0,0,0"});
         node->inputs.push_back({"DestPosition", PinType::Vec3, true, false, 0, "0,0,0"});

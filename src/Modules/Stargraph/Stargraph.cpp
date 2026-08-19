@@ -359,6 +359,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "[Variable" << i << "]\n";
         out << "Name=" << var.name << "\n";
         out << "Type=" << PinTypeToString(var.type) << "\n";
+        if (var.type == PinType::Object && !var.objectKind.empty()) out << "ObjectKind=" << var.objectKind << "\n";
         out << "IsArray=" << (var.isArray ? "true" : "false") << "\n";
         if (var.isArray) {
             out << "ArrayCount=" << var.arrayValues.size() << "\n";
@@ -409,10 +410,14 @@ bool Stargraph::SaveToFile(const std::string& path) const {
             if (pin.type == PinType::Exec) continue;
             out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
             out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
+            if (pin.type == PinType::Object && !pin.objectKind.empty())
+                out << "PinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         for (const Pin& pin : node.outputs) {
             if (pin.type == PinType::Exec) continue;
             out << "OutPinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
+            if (pin.type == PinType::Object && !pin.objectKind.empty())
+                out << "OutPinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         out << "\n";
     }
@@ -598,6 +603,16 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                     for (Pin& pin : node->outputs) {
                         if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
                     }
+                } else if (entry.first.rfind("PinKind.", 0) == 0) {
+                    std::string pinName = entry.first.substr(8);
+                    for (Pin& pin : node->inputs) {
+                        if (pin.name == pinName) { pin.objectKind = entry.second; break; }
+                    }
+                } else if (entry.first.rfind("OutPinKind.", 0) == 0) {
+                    std::string pinName = entry.first.substr(11);
+                    for (Pin& pin : node->outputs) {
+                        if (pin.name == pinName) { pin.objectKind = entry.second; break; }
+                    }
                 }
             }
 
@@ -606,6 +621,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             Variable var;
             if (const std::string* v = FindEntry(section, "Name")) var.name = *v;
             if (const std::string* v = FindEntry(section, "Type")) var.type = PinTypeFromString(*v);
+            if (const std::string* v = FindEntry(section, "ObjectKind")) var.objectKind = *v;
             if (const std::string* v = FindEntry(section, "IsArray")) var.isArray = (*v == "true");
             if (var.isArray) {
                 int count = 0;

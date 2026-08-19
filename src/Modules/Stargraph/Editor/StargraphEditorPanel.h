@@ -146,6 +146,7 @@ private:
     AssetPickerPopup audioPathPicker;
     AssetPickerPopup actorClassPicker;
     int actorClassPickerPinId = 0;
+    int actorClassPickerVarIndex = -1;
     ViewportPanel* viewportPanel = nullptr;
     int lastComponentDetailIndex = -1;
     int componentActiveField = 0;
