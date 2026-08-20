@@ -14,16 +14,19 @@ void RegisterComponentNodes() {
     getComponent.moduleName = "Stargraph";
     getComponent.hideFromContextMenu = true;
     getComponent.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Component_Name", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Component", PinType::Object, false, true, 0, "", false, "Component"});
     };
     getComponent.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string compName;
+        Actor* targetActor = ctx.actor;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Component_Name") { compName = p.defaultValue; break; }
+            if (p.name == "Component_Name") compName = p.defaultValue;
+            if (p.name == "Target" && !p.defaultValue.empty()) targetActor = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
         }
-        if (!ctx.actor || compName.empty()) return;
-        Component* comp = ctx.actor->FindComponentByName(compName);
+        if (!targetActor || compName.empty()) return;
+        Component* comp = targetActor->FindComponentByName(compName);
         if (!comp) return;
         for (Pin& p : node.outputs) {
             if (p.name == "Component") { p.defaultValue = ObjectPinRef::Encode(comp->GetObjectKind(), comp->GetObjectId()); break; }

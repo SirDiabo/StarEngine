@@ -3,6 +3,7 @@
 #include "ComponentFields.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
+#include "Core/ObjectKindRegistry.h"
 #include <fstream>
 #include <sstream>
 
@@ -117,6 +118,10 @@ Node* Stargraph::FindNodeById(int id) {
         if (node.id == idStr) return &node;
     }
     return nullptr;
+}
+
+static void RegisterActorKindIfAsset(const std::string& kind) {
+    if (kind.find('.') != std::string::npos) ObjectKindRegistry::Get().RegisterKind(kind, "Actor");
 }
 
 Node* Stargraph::FindCustomEventByName(const std::string& eventName) {
@@ -608,11 +613,13 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                     for (Pin& pin : node->inputs) {
                         if (pin.name == pinName) { pin.objectKind = entry.second; break; }
                     }
+                    RegisterActorKindIfAsset(entry.second);
                 } else if (entry.first.rfind("OutPinKind.", 0) == 0) {
                     std::string pinName = entry.first.substr(11);
                     for (Pin& pin : node->outputs) {
                         if (pin.name == pinName) { pin.objectKind = entry.second; break; }
                     }
+                    RegisterActorKindIfAsset(entry.second);
                 }
             }
 
@@ -621,7 +628,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             Variable var;
             if (const std::string* v = FindEntry(section, "Name")) var.name = *v;
             if (const std::string* v = FindEntry(section, "Type")) var.type = PinTypeFromString(*v);
-            if (const std::string* v = FindEntry(section, "ObjectKind")) var.objectKind = *v;
+            if (const std::string* v = FindEntry(section, "ObjectKind")) { var.objectKind = *v; RegisterActorKindIfAsset(*v); }
             if (const std::string* v = FindEntry(section, "IsArray")) var.isArray = (*v == "true");
             if (var.isArray) {
                 int count = 0;
