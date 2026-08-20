@@ -25,11 +25,11 @@ static std::string NodeMenuDisplayLabel(const std::string& rawType) {
     } else if (display.rfind("Input_Mapping:", 0) == 0) {
         display = "Key " + display.substr(14);
     } else if (display.rfind("Get_External_Var:", 0) == 0) {
-        display = "Get " + display.substr(18);
+        display = "Get " + display.substr(17);
     } else if (display.rfind("Set_External_Var:", 0) == 0) {
-        display = "Set " + display.substr(18);
+        display = "Set " + display.substr(17);
     } else if (display.rfind("Get_External_Component:", 0) == 0) {
-        display = "Get " + display.substr(24);
+        display = "Get " + display.substr(23);
     }
     for (char& c : display) if (c == '_') c = ' ';
     return display;
@@ -741,13 +741,16 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             for (const Pin& p : node.inputs) {
                 if (p.name == "Target") { targetPin = &p; break; }
             }
+            bool targetLinked = false;
+            if (targetPin) {
+                for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == targetPin->id) { targetLinked = true; break; }
+            }
+            bool showTargetPin = targetPin && (targetLinked || linkFromPin != -1 || CheckCollisionPointRec(mousePos, nodeBounds));
 
-            if (targetPin && CheckCollisionPointCircle(mousePos, {nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
-                bool linked = false;
-                for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == targetPin->id) { linked = true; break; }
+            if (showTargetPin && CheckCollisionPointCircle(mousePos, {nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV({nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
-                    if (linked && IsKeyDown(KEY_LEFT_ALT)) {
+                    if (targetLinked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(targetPin->id);
                     } else if (linkFromPin == -1) {
                         linkFromPin = targetPin->id; linkFromIsOutput = false;
@@ -778,12 +781,10 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             DrawRectangleLinesEx(nodeBounds, isSelected ? 2.0f : 1.0f,
                                  isSelected ? Color{100, 160, 230, 255} : GetPinColor(outputPin ? outputPin->type : PinType::Object));
             
-            if (targetPin) {
+            if (showTargetPin) {
                 Vector2 pinPos = {nx + scaledRadius + 2, ny + scaledHeight * 0.5f};
                 Color pinColor = GetPinColor(targetPin->type);
-                bool linked = false;
-                for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == targetPin->id) { linked = true; break; }
-                if (linked) {
+                if (targetLinked) {
                     DrawCircleV(pinPos, scaledRadius, pinColor);
                 } else {
                     DrawCircleV(pinPos, scaledRadius, {40, 40, 42, 255});
@@ -1635,14 +1636,14 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                     mappingName = nodeType.substr(14);
                     nodeType = "Input_Mapping";
                 } else if (nodeType.rfind("Get_External_Var:", 0) == 0) {
-                    externalVarName = nodeType.substr(18);
+                    externalVarName = nodeType.substr(17);
                     nodeType = "Get_Variable";
                 } else if (nodeType.rfind("Set_External_Var:", 0) == 0) {
-                    externalVarName = nodeType.substr(18);
+                    externalVarName = nodeType.substr(17);
                     nodeType = "Set_Variable";
                     isExternalSet = true;
                 } else if (nodeType.rfind("Get_External_Component:", 0) == 0) {
-                    externalCompName = nodeType.substr(24);
+                    externalCompName = nodeType.substr(23);
                     nodeType = "Get_Component";
                 }
                 Node* node = graph.CreateNode(nodeType);
