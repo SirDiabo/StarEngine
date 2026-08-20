@@ -10,4 +10,7 @@ namespace ShadingModel {
     void UpdateLightUniforms();
 
     const char* GetLightingGLSL();
+
+    void ResetShadowSource();
+    void SetShadowSource(unsigned int shadowDepthTextureId, Matrix lightViewProj, Vector3 lightDirToSurface, int shadowMapSize, float strength);
 }

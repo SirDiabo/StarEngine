@@ -35,11 +35,12 @@ struct Light {
 uniform Light lights[MAX_LIGHTS];
 uniform int lightCount;
 
-vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal) {
-    vec3 accum = vec3(0.0);
+vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal, float shadowFactor) {
+    vec3 ambient = vec3(0.0);
+    vec3 direct = vec3(0.0);
     for (int i = 0; i < lightCount; i++) {
         if (lights[i].type == LIGHT_GLOBAL) {
-            accum += lights[i].color * lights[i].intensity;
+            ambient += lights[i].color * lights[i].intensity;
             continue;
         }
 
@@ -64,9 +65,47 @@ vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal) {
         }
 
         float ndotl = max(dot(worldNormal, toLight), 0.0);
-        accum += lights[i].color * lights[i].intensity * ndotl * atten;
+        direct += lights[i].color * lights[i].intensity * ndotl * atten;
     }
-    return accum;
+    return ambient + direct * shadowFactor;
+}
+)glsl";
+
+const char* kShadowGLSL = R"glsl(
+uniform sampler2D shadowMap;
+uniform int shadowMapEnabled;
+uniform mat4 shadowLightViewProj;
+uniform vec3 shadowLightDir;
+uniform float shadowTexelSize;
+uniform float shadowStrength;
+
+float ComputeShadowFactor(vec3 worldPos, vec3 worldNormal) {
+    if (shadowMapEnabled == 0) return 1.0;
+
+    vec4 lsPos = shadowLightViewProj * vec4(worldPos, 1.0);
+    vec3 proj = lsPos.xyz / lsPos.w;
+    proj = proj * 0.5 + 0.5;
+
+    if (proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0 || proj.z > 1.0) return 1.0;
+
+    float ndotl = max(dot(worldNormal, shadowLightDir), 0.0);
+    float bias = max(0.0035 * (1.0 - ndotl), 0.0008);
+
+    vec2 poissonDisk[4] = vec2[](
+        vec2(-0.94201624, -0.39906216),
+        vec2(0.94558609, -0.76890725),
+        vec2(-0.094184101, -0.92938870),
+        vec2(0.34495938, 0.29387760)
+    );
+
+    float occluded = 0.0;
+    for (int i = 0; i < 4; i++) {
+        vec2 offset = poissonDisk[i] * shadowTexelSize * 1.5;
+        float mapDepth = texture(shadowMap, proj.xy + offset).r;
+        occluded += (proj.z - bias > mapDepth) ? 0.25 : 0.0;
+    }
+
+    return 1.0 - occluded * shadowStrength;
 }
 )glsl";
 
@@ -127,7 +166,7 @@ void main() {
     vec3 worldPos = vec3(matModel * vec4(vertexPosition, 1.0));
     vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
 
-    fragLight = ComputeLighting(worldPos, worldNormal);
+    fragLight = ComputeLighting(worldPos, worldNormal, 1.0);
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -143,11 +182,13 @@ std::string BuildPerPixelVS() {
 
 std::string BuildPerPixelFS() {
     return std::string("#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\nin vec3 fragWorldPos;\nin vec3 fragWorldNormal;\n")
-        + kSampleAndOutput + kLightingGLSL + R"glsl(
+        + kSampleAndOutput + kLightingGLSL + kShadowGLSL + R"glsl(
 void main() {
     vec4 texelColor = texture(texture0, fragTexCoord);
     if (texelColor.a < 0.5) discard;
-    vec3 lightAccum = ComputeLighting(fragWorldPos, normalize(fragWorldNormal));
+    vec3 normal = normalize(fragWorldNormal);
+    float shadowFactor = ComputeShadowFactor(fragWorldPos, normal);
+    vec3 lightAccum = ComputeLighting(fragWorldPos, normal, shadowFactor);
     finalColor = texelColor * colDiffuse * fragColor * vec4(lightAccum, 1.0);
 }
 )glsl";
@@ -180,6 +221,13 @@ struct LitVariant {
     int lightCountLoc = -1;
     LightLocs lightLocs[kMaxLights];
 
+    int shadowMapLoc = -1;
+    int shadowMapEnabledLoc = -1;
+    int shadowLightViewProjLoc = -1;
+    int shadowLightDirLoc = -1;
+    int shadowTexelSizeLoc = -1;
+    int shadowStrengthLoc = -1;
+
     void EnsureLoaded(const std::string& vs, const std::string& fs) {
         if (loaded) return;
         shader = LoadShaderFromMemory(vs.c_str(), fs.c_str());
@@ -194,6 +242,12 @@ struct LitVariant {
             lightLocs[i].innerCos  = GetShaderLocation(shader, TextFormat("lights[%d].innerCos", i));
             lightLocs[i].outerCos  = GetShaderLocation(shader, TextFormat("lights[%d].outerCos", i));
         }
+        shadowMapLoc = GetShaderLocation(shader, "shadowMap");
+        shadowMapEnabledLoc = GetShaderLocation(shader, "shadowMapEnabled");
+        shadowLightViewProjLoc = GetShaderLocation(shader, "shadowLightViewProj");
+        shadowLightDirLoc = GetShaderLocation(shader, "shadowLightDir");
+        shadowTexelSizeLoc = GetShaderLocation(shader, "shadowTexelSize");
+        shadowStrengthLoc = GetShaderLocation(shader, "shadowStrength");
         loaded = true;
     }
 };
@@ -215,6 +269,13 @@ struct UnlitVariant {
 };
 
 UnlitVariant unlitVariant;
+
+bool shadowSourceActive = false;
+unsigned int shadowSourceTextureId = 0;
+Matrix shadowSourceLightViewProj = MatrixIdentity();
+Vector3 shadowSourceLightDir = {0.0f, -1.0f, 0.0f};
+float shadowSourceTexelSize = 0.0f;
+float shadowSourceStrength = 0.0f;
 
 LitVariant& ActiveVariant() {
     if (RenderSettings::Get().GetLightingQuality() == LightingQuality::PerPixel) {
@@ -288,4 +349,30 @@ void ShadingModel::UpdateLightUniforms() {
     }
 
     SetShaderValue(variant.shader, variant.lightCountLoc, &count, SHADER_UNIFORM_INT);
+
+    int shadowEnabledInt = shadowSourceActive ? 1 : 0;
+    SetShaderValue(variant.shader, variant.shadowMapEnabledLoc, &shadowEnabledInt, SHADER_UNIFORM_INT);
+    if (shadowSourceActive) {
+        Texture2D shadowTex = {0};
+        shadowTex.id = shadowSourceTextureId;
+        SetShaderValueTexture(variant.shader, variant.shadowMapLoc, shadowTex);
+        SetShaderValueMatrix(variant.shader, variant.shadowLightViewProjLoc, shadowSourceLightViewProj);
+        float dir[3] = {shadowSourceLightDir.x, shadowSourceLightDir.y, shadowSourceLightDir.z};
+        SetShaderValue(variant.shader, variant.shadowLightDirLoc, dir, SHADER_UNIFORM_VEC3);
+        SetShaderValue(variant.shader, variant.shadowTexelSizeLoc, &shadowSourceTexelSize, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(variant.shader, variant.shadowStrengthLoc, &shadowSourceStrength, SHADER_UNIFORM_FLOAT);
+    }
+}
+
+void ShadingModel::ResetShadowSource() {
+    shadowSourceActive = false;
+}
+
+void ShadingModel::SetShadowSource(unsigned int shadowDepthTextureId, Matrix lightViewProj, Vector3 lightDirToSurface, int shadowMapSize, float strength) {
+    shadowSourceActive = true;
+    shadowSourceTextureId = shadowDepthTextureId;
+    shadowSourceLightViewProj = lightViewProj;
+    shadowSourceLightDir = lightDirToSurface;
+    shadowSourceTexelSize = shadowMapSize > 0 ? 1.0f / (float)shadowMapSize : 0.0f;
+    shadowSourceStrength = strength;
 }

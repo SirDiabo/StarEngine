@@ -3,11 +3,17 @@
 #include "PostProcessPass.h"
 #include "ShadingTechniqueRegistry.h"
 #include "RenderSettings.h"
+#include "ShadingModel.h"
 
 namespace RenderPipeline {
 
 void Render(Camera3D camera, RenderTexture2D target, Color clearColor, bool showPlaceholders) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
+
+    ShadingModel::ResetShadowSource();
+    if (activeTechnique && activeTechnique->renderPrePass) {
+        activeTechnique->renderPrePass(camera, {(float)target.texture.width, (float)target.texture.height});
+    }
 
     BeginTextureMode(target);
     ClearBackground(clearColor);

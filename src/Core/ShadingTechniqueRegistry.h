@@ -8,6 +8,7 @@ struct ShadingTechnique {
     std::string id;
     std::string displayName;
     std::string moduleName;
+    std::function<void(Camera3D, Vector2)> renderPrePass;
     std::function<void(Camera3D, RenderTexture2D)> renderInWorld;
     std::function<void(RenderTexture2D)> renderOverlay;
 };
