@@ -1,0 +1,9 @@
+name=ShadowMap
+version=1.0
+description=Real-time shadow mapping. Requires Lighting Quality = Per-Pixel.
+author=StarEngine
+category=Rendering
+enabledByDefault=true
+dependencies=
+assetTypes=
+nodeCategories=
