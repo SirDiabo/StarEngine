@@ -20,6 +20,10 @@ bool ShadowMapModule::Initialize() {
     technique.displayName = "Shadow Map";
     technique.moduleName = "ShadowMap";
     technique.renderPrePass = [](Camera3D camera, Vector2) { ShadowMapPrePass::Run(camera); };
+    technique.collectPackagedSettings = []() { return ShadowMapSettings::Get().ToKeyValues(); };
+    technique.applyPackagedSettings = [](const std::unordered_map<std::string, std::string>& values) {
+        ShadowMapSettings::Get().ApplyKeyValues(values);
+    };
 #ifndef STARENGINE_GAME_BUILD
     technique.renderSettings = ShadowMapSettingsUI::Render;
 #endif

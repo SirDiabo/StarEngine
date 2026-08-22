@@ -22,6 +22,7 @@ bool PackagedGameConfig::LoadFromText(const std::string& text, PackagedGameConfi
         else if (key == "renderer") out.renderer = value;
         else if (key == "cipher") out.cipher = value;
         else if (key == "cipherKey") out.cipherKey = value;
+        else if (key.rfind("module.", 0) == 0) out.moduleSettings[key.substr(7)] = value;
     }
     return true;
 }
@@ -45,5 +46,8 @@ std::string PackagedGameConfig::ToText() const {
     out << "renderer=" << renderer << "\n";
     out << "cipher=" << cipher << "\n";
     out << "cipherKey=" << cipherKey << "\n";
+    for (const auto& entry : moduleSettings) {
+        out << "module." << entry.first << "=" << entry.second << "\n";
+    }
     return out.str();
 }

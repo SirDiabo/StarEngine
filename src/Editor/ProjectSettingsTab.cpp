@@ -31,6 +31,7 @@ void ProjectSettingsTab::RefreshFromProject() {
     rendererPopup.Close();
     shadingTypePopup.Close();
     moduleSettingsPopupOpen = false;
+    moduleSettingsSectionHeight = 0.0f;
 }
 
 static std::string MapDisplayName(const std::string& path) {
@@ -171,14 +172,6 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
         RenderSettings::Get().SetShadingType(shadingOptionIds[shadingChoice]);
     }
 
-    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(currentShadingId);
-    moduleSettingsPopupOpen = false;
-    if (activeTechnique && activeTechnique->renderSettings) {
-        ModuleSettingsResult result = activeTechnique->renderSettings(fx, fy, fw, activeField, anyPopupOpen);
-        fy = result.nextY;
-        moduleSettingsPopupOpen = result.popupOpen;
-    }
-
     DrawText("Render Scale", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle scaleRow = {fx, fy, 100.0f, 20};
@@ -194,6 +187,26 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
     DrawText("Percentage of the window resolution the 3D scene renders at, upscaled with nearest-neighbor.",
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
+
+    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(currentShadingId);
+    moduleSettingsPopupOpen = false;
+    if (activeTechnique && activeTechnique->renderSettings) {
+        const float sectionPadding = 10.0f;
+        float sectionStartY = fy;
+        Rectangle sectionBg = {
+            fx - sectionPadding, sectionStartY - sectionPadding,
+            fw + sectionPadding * 2.0f, moduleSettingsSectionHeight + sectionPadding * 2.0f
+        };
+        DrawRectangleRec(sectionBg, ColorBrightness(theme.panelBg, -0.12f));
+
+        ModuleSettingsResult result = activeTechnique->renderSettings(fx, fy, fw, activeField, anyPopupOpen);
+        fy = result.nextY;
+        moduleSettingsPopupOpen = result.popupOpen;
+        moduleSettingsSectionHeight = fy - sectionStartY;
+        fy += sectionPadding;
+    } else {
+        moduleSettingsSectionHeight = 0.0f;
+    }
 }
 
 void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {

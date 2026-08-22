@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <functional>
 
 struct ModuleSettingsResult {
@@ -17,6 +18,8 @@ struct ShadingTechnique {
     std::function<void(Camera3D, RenderTexture2D)> renderInWorld;
     std::function<void(RenderTexture2D)> renderOverlay;
     std::function<ModuleSettingsResult(float x, float y, float width, int& activeField, bool otherPopupOpen)> renderSettings;
+    std::function<std::unordered_map<std::string, std::string>()> collectPackagedSettings;
+    std::function<void(const std::unordered_map<std::string, std::string>&)> applyPackagedSettings;
 };
 
 class ShadingTechniqueRegistry {

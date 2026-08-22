@@ -16,6 +16,7 @@
 #include "Runtime/Components/CameraComponent.h"
 #include "Core/RenderPipeline.h"
 #include "Core/RenderSettings.h"
+#include "Core/ShadingTechniqueRegistry.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -81,6 +82,11 @@ int main(int argc, char* argv[]) {
     RenderSettings::Get().SetRenderScale(config.renderScale);
     RenderSettings::Get().SetShadingType(config.shadingType);
     RenderSettings::Get().SetLightingQuality(LightingQualityFromName(config.lightingQuality));
+
+    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(config.shadingType);
+    if (activeTechnique && activeTechnique->applyPackagedSettings) {
+        activeTechnique->applyPackagedSettings(config.moduleSettings);
+    }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, config.name.c_str());

@@ -8,6 +8,7 @@
 
 namespace {
     ChoicePopup resolutionPopup;
+    ChoicePopup aaMethodPopup;
     char sunCoverageBuf[16] = "";
     char shadowStrengthBuf[16] = "";
     bool buffersInitialized = false;
@@ -19,6 +20,7 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
     const UIPalette& theme = UITheme::Get();
     Vector2 mp = GetMousePosition();
     ShadowMapSettings& settings = ShadowMapSettings::Get();
+    bool localAnyOpen = otherPopupOpen || resolutionPopup.IsOpen() || aaMethodPopup.IsOpen();
 
     if (!buffersInitialized) {
         snprintf(sunCoverageBuf, sizeof(sunCoverageBuf), "%.0f", settings.GetSunCoverageHalfSize());
@@ -26,21 +28,13 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
         buffersInitialized = true;
     }
 
-    DrawText("Lighting Quality", (int)x, (int)y, 11, theme.buttonDisabledText);
-    y += 14;
-    Rectangle qualityRow = {x, y, width, 20};
-    DrawRectangleRec(qualityRow, theme.fieldBg);
-    DrawRectangleLinesEx(qualityRow, 1, theme.fieldBorder);
-    DrawText("Per Pixel (required by Shadow Map)", (int)qualityRow.x + 6, (int)qualityRow.y + 4, 12, theme.buttonDisabledText);
-    y += 44;
-
     DrawText("Shadow Map Resolution", (int)x, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle resRow = {x, y, width, 20};
     DrawRectangleRec(resRow, theme.fieldBg);
     DrawRectangleLinesEx(resRow, 1, theme.fieldBorder);
     DrawText(TextFormat("%d", settings.GetShadowMapSize()), (int)resRow.x + 6, (int)resRow.y + 4, 12, theme.textPrimary);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, resRow) && !otherPopupOpen) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, resRow) && !localAnyOpen) {
         resolutionPopup.Open({resRow.x, resRow.y + resRow.height}, width, {
             {"1024", true, ""},
             {"2048", true, ""},
@@ -81,9 +75,32 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
               (int)x, (int)y, 10, theme.textSecondary);
     y += 24;
 
+    DrawText("Shadow Anti-Aliasing Method", (int)x, (int)y, 11, theme.textSecondary);
+    y += 14;
+    Rectangle aaRow = {x, y, width, 20};
+    DrawRectangleRec(aaRow, theme.fieldBg);
+    DrawRectangleLinesEx(aaRow, 1, theme.fieldBorder);
+    DrawText(ShadowAAMethodName(settings.GetShadowAAMethod()).c_str(), (int)aaRow.x + 6, (int)aaRow.y + 4, 12, theme.textPrimary);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, aaRow) && !localAnyOpen) {
+        aaMethodPopup.Open({aaRow.x, aaRow.y + aaRow.height}, width, {
+            {"None", true, ""},
+            {"Low", true, ""},
+            {"High", true, ""},
+        });
+    }
+    y += 20;
+    DrawText("Smooths jagged shadow edges at a given resolution. High costs more per pixel and doesn't add detail, only smoothness.",
+              (int)x, (int)y, 10, theme.textSecondary);
+    y += 24;
+    int aaChoice = 0;
+    if (aaMethodPopup.Render(aaChoice)) {
+        static const ShadowAAMethod methods[3] = {ShadowAAMethod::None, ShadowAAMethod::Low, ShadowAAMethod::High};
+        settings.SetShadowAAMethod(methods[aaChoice]);
+    }
+
     ModuleSettingsResult result;
     result.nextY = y;
-    result.popupOpen = resolutionPopup.IsOpen();
+    result.popupOpen = resolutionPopup.IsOpen() || aaMethodPopup.IsOpen();
     return result;
 }
 

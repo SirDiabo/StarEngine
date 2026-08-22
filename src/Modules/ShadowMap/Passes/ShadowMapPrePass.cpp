@@ -230,7 +230,7 @@ void DrawShadowCasters(Actor* excludeActor) {
     }
 }
 
-void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor, float shadowStrength) {
+void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor, float shadowStrength, int aaMethod) {
     BeginTextureMode(shadowTarget);
     ClearBackground(BLANK);
     BeginMode3D(lightCamera);
@@ -244,10 +244,10 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* exclu
     EndTextureMode();
 
     Matrix lightViewProj = MatrixMultiply(lightView, lightProj);
-    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, shadowTargetSize, shadowStrength);
+    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, shadowTargetSize, shadowStrength, aaMethod);
 }
 
-void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength) {
+void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength, int aaMethod) {
     EnsureCubeFacesLoaded();
 
     unsigned int faceTextureIds[6];
@@ -273,7 +273,7 @@ void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength) {
         faceViewProj[face] = MatrixMultiply(faceView, faceProj);
     }
 
-    ShadingModel::SetShadowSourceCube(lightPos, faceTextureIds, faceViewProj, cubeFaceSize, shadowStrength);
+    ShadingModel::SetShadowSourceCube(lightPos, faceTextureIds, faceViewProj, cubeFaceSize, shadowStrength, aaMethod);
 }
 
 } // namespace
@@ -294,6 +294,7 @@ void Run(Camera3D camera) {
     double savedNear = rlGetCullDistanceNear();
     double savedFar = rlGetCullDistanceFar();
     float shadowStrength = ShadowMapSettings::Get().GetShadowStrength();
+    int aaMethod = (int)ShadowMapSettings::Get().GetShadowAAMethod();
 
     if (caster.type == LightComponent::Sun) {
         float halfSize = ShadowMapSettings::Get().GetSunCoverageHalfSize();
@@ -302,17 +303,17 @@ void Run(Camera3D camera) {
         Camera3D lightCamera{};
         Vector3 lightDirToSurface;
         BuildSunCamera(camera, caster, halfSize, pullback, lightCamera, lightDirToSurface);
-        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor, shadowStrength);
+        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor, shadowStrength, aaMethod);
     } else if (caster.type == LightComponent::Spot) {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
         Camera3D lightCamera{};
         BuildSpotCamera(caster, lightCamera);
-        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor, shadowStrength);
+        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor, shadowStrength, aaMethod);
     } else {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
-        RunCubePass(caster.position, caster.ownerActor, shadowStrength);
+        RunCubePass(caster.position, caster.ownerActor, shadowStrength, aaMethod);
     }
 
     rlSetClipPlanes(savedNear, savedFar);

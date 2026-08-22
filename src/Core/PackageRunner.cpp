@@ -7,6 +7,7 @@
 #include "BuildDiagnostics.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
+#include "ShadingTechniqueRegistry.h"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -247,6 +248,11 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     bootConfig.renderer = rendererKey;
     bootConfig.cipher = CookCipherName(options.cipher);
     bootConfig.cipherKey = cipherKey;
+
+    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
+    if (activeTechnique && activeTechnique->collectPackagedSettings) {
+        bootConfig.moduleSettings = activeTechnique->collectPackagedSettings();
+    }
 
     if (options.format == PackageFormat::SingleFile) {
         fs::path pakTempPath = buildDir / "content.starpak";

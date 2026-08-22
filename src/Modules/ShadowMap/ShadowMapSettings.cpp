@@ -5,19 +5,40 @@
 
 namespace fs = std::filesystem;
 
+std::string ShadowAAMethodName(ShadowAAMethod method) {
+    switch (method) {
+        case ShadowAAMethod::None: return "None";
+        case ShadowAAMethod::High: return "High";
+        case ShadowAAMethod::Low:
+        default: return "Low";
+    }
+}
+
+ShadowAAMethod ShadowAAMethodFromName(const std::string& name) {
+    if (name == "None") return ShadowAAMethod::None;
+    if (name == "High") return ShadowAAMethod::High;
+    return ShadowAAMethod::Low;
+}
+
 ShadowMapSettings& ShadowMapSettings::Get() {
     static ShadowMapSettings instance;
     return instance;
 }
 
-void ShadowMapSettings::Load(const std::string& projectRoot) {
+std::unordered_map<std::string, std::string> ShadowMapSettings::ToKeyValues() const {
+    std::unordered_map<std::string, std::string> raw;
+    raw["shadowMapSize"] = std::to_string(shadowMapSize);
+    raw["sunCoverageHalfSize"] = std::to_string(sunCoverageHalfSize);
+    raw["shadowStrength"] = std::to_string(shadowStrength);
+    raw["shadowAAMethod"] = ShadowAAMethodName(shadowAAMethod);
+    return raw;
+}
+
+void ShadowMapSettings::ApplyKeyValues(const std::unordered_map<std::string, std::string>& raw) {
     shadowMapSize = 2048;
     sunCoverageHalfSize = 4000.0f;
     shadowStrength = 0.75f;
-    filePath = (fs::path(projectRoot) / "Saved" / "ShadowMapSettings.cfg").string();
-
-    std::unordered_map<std::string, std::string> raw;
-    if (!LayoutSerializer::Load(filePath, raw)) return;
+    shadowAAMethod = ShadowAAMethod::Low;
 
     auto it = raw.find("shadowMapSize");
     if (it != raw.end()) shadowMapSize = SafeParse::ToInt(it->second, 2048);
@@ -31,16 +52,25 @@ void ShadowMapSettings::Load(const std::string& projectRoot) {
     if (it != raw.end()) shadowStrength = SafeParse::ToFloat(it->second, 0.75f);
     if (shadowStrength < 0.0f) shadowStrength = 0.0f;
     if (shadowStrength > 1.0f) shadowStrength = 1.0f;
+
+    it = raw.find("shadowAAMethod");
+    if (it != raw.end()) shadowAAMethod = ShadowAAMethodFromName(it->second);
+}
+
+void ShadowMapSettings::Load(const std::string& projectRoot) {
+    filePath = (fs::path(projectRoot) / "Saved" / "ShadowMapSettings.cfg").string();
+
+    std::unordered_map<std::string, std::string> raw;
+    if (!LayoutSerializer::Load(filePath, raw)) {
+        ApplyKeyValues({});
+        return;
+    }
+    ApplyKeyValues(raw);
 }
 
 void ShadowMapSettings::Save() const {
     if (filePath.empty()) return;
-
-    std::unordered_map<std::string, std::string> raw;
-    raw["shadowMapSize"] = std::to_string(shadowMapSize);
-    raw["sunCoverageHalfSize"] = std::to_string(sunCoverageHalfSize);
-    raw["shadowStrength"] = std::to_string(shadowStrength);
-    LayoutSerializer::Save(filePath, raw);
+    LayoutSerializer::Save(filePath, ToKeyValues());
 }
 
 void ShadowMapSettings::SetShadowMapSize(int value) {
@@ -58,5 +88,10 @@ void ShadowMapSettings::SetShadowStrength(float value) {
     if (value < 0.0f) value = 0.0f;
     if (value > 1.0f) value = 1.0f;
     shadowStrength = value;
+    Save();
+}
+
+void ShadowMapSettings::SetShadowAAMethod(ShadowAAMethod value) {
+    shadowAAMethod = value;
     Save();
 }

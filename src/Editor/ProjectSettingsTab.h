@@ -28,6 +28,7 @@ private:
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
     bool moduleSettingsPopupOpen = false;
+    float moduleSettingsSectionHeight = 0.0f;
 
     std::vector<std::string> shadingOptionIds;
 

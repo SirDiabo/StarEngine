@@ -73,6 +73,7 @@ vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal, float shadowFactor) {
 
 const char* kShadowGLSL = R"glsl(
 uniform int shadowMode;
+uniform int shadowAAMethod;
 uniform float shadowTexelSize;
 uniform float shadowStrength;
 
@@ -103,6 +104,23 @@ float SampleShadowMap(sampler2D map, mat4 lightViewProj, vec3 worldPos, vec3 wor
 
     float ndotl = max(dot(worldNormal, lightDir), 0.0);
     float bias = max(0.0035 * (1.0 - ndotl), 0.0008);
+
+    if (shadowAAMethod == 0) {
+        float mapDepth = texture(map, proj.xy).r;
+        return (proj.z - bias > mapDepth) ? (1.0 - shadowStrength) : 1.0;
+    }
+
+    if (shadowAAMethod == 2) {
+        float occluded = 0.0;
+        for (int ix = -1; ix <= 2; ix++) {
+            for (int iy = -1; iy <= 2; iy++) {
+                vec2 offset = vec2(float(ix) - 0.5, float(iy) - 0.5) * shadowTexelSize * 1.5;
+                float mapDepth = texture(map, proj.xy + offset).r;
+                occluded += (proj.z - bias > mapDepth) ? (1.0 / 16.0) : 0.0;
+            }
+        }
+        return 1.0 - occluded * shadowStrength;
+    }
 
     vec2 poissonDisk[4] = vec2[](
         vec2(-0.94201624, -0.39906216),
@@ -261,6 +279,7 @@ struct LitVariant {
     LightLocs lightLocs[kMaxLights];
 
     int shadowModeLoc = -1;
+    int shadowAAMethodLoc = -1;
     int shadowTexelSizeLoc = -1;
     int shadowStrengthLoc = -1;
 
@@ -287,6 +306,7 @@ struct LitVariant {
             lightLocs[i].outerCos  = GetShaderLocation(shader, TextFormat("lights[%d].outerCos", i));
         }
         shadowModeLoc = GetShaderLocation(shader, "shadowMode");
+        shadowAAMethodLoc = GetShaderLocation(shader, "shadowAAMethod");
         shadowTexelSizeLoc = GetShaderLocation(shader, "shadowTexelSize");
         shadowStrengthLoc = GetShaderLocation(shader, "shadowStrength");
         shadowMapLoc = GetShaderLocation(shader, "shadowMap");
@@ -331,6 +351,7 @@ Matrix shadowSourceCubeViewProj[6] = {MatrixIdentity(), MatrixIdentity(), Matrix
 
 float shadowSourceTexelSize = 0.0f;
 float shadowSourceStrength = 0.0f;
+int shadowSourceAAMethod = 1;
 
 LitVariant& ActiveVariant() {
     if (RenderSettings::Get().GetLightingQuality() == LightingQuality::PerPixel) {
@@ -406,6 +427,7 @@ void ShadingModel::UpdateLightUniforms() {
     SetShaderValue(variant.shader, variant.lightCountLoc, &count, SHADER_UNIFORM_INT);
 
     SetShaderValue(variant.shader, variant.shadowModeLoc, &shadowMode, SHADER_UNIFORM_INT);
+    SetShaderValue(variant.shader, variant.shadowAAMethodLoc, &shadowSourceAAMethod, SHADER_UNIFORM_INT);
     if (shadowMode == 1) {
         Texture2D shadowTex = {0};
         shadowTex.id = shadowSourceTextureId;
@@ -433,16 +455,17 @@ void ShadingModel::ResetShadowSource() {
     shadowMode = 0;
 }
 
-void ShadingModel::SetShadowSource(unsigned int shadowDepthTextureId, Matrix lightViewProj, Vector3 lightDirToSurface, int shadowMapSize, float strength) {
+void ShadingModel::SetShadowSource(unsigned int shadowDepthTextureId, Matrix lightViewProj, Vector3 lightDirToSurface, int shadowMapSize, float strength, int aaMethod) {
     shadowMode = 1;
     shadowSourceTextureId = shadowDepthTextureId;
     shadowSourceLightViewProj = lightViewProj;
     shadowSourceLightDir = lightDirToSurface;
     shadowSourceTexelSize = shadowMapSize > 0 ? 1.0f / (float)shadowMapSize : 0.0f;
     shadowSourceStrength = strength;
+    shadowSourceAAMethod = aaMethod;
 }
 
-void ShadingModel::SetShadowSourceCube(Vector3 lightPos, const unsigned int faceTextureIds[6], const Matrix faceViewProj[6], int shadowMapSize, float strength) {
+void ShadingModel::SetShadowSourceCube(Vector3 lightPos, const unsigned int faceTextureIds[6], const Matrix faceViewProj[6], int shadowMapSize, float strength, int aaMethod) {
     shadowMode = 2;
     shadowSourceLightPos = lightPos;
     for (int i = 0; i < 6; i++) {
@@ -451,4 +474,5 @@ void ShadingModel::SetShadowSourceCube(Vector3 lightPos, const unsigned int face
     }
     shadowSourceTexelSize = shadowMapSize > 0 ? 1.0f / (float)shadowMapSize : 0.0f;
     shadowSourceStrength = strength;
+    shadowSourceAAMethod = aaMethod;
 }
