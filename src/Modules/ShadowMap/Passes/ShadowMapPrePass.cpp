@@ -10,13 +10,17 @@
 namespace {
 
 const int kShadowMapSize = 2048;
-const float kSunOrthoHalfSize = 900.0f;
-const float kSunPullback = 1200.0f;
-const float kPointLightFovy = 100.0f;
+const int kPointCubeFaceSize = 1024;
+const float kSunOrthoHalfSize = 4000.0f;
+const float kSunPullback = 6000.0f;
+const float kSunNear = 1.0f;
 const float kShadowStrength = 0.75f;
 
 RenderTexture2D shadowTarget = {0};
 bool shadowTargetLoaded = false;
+
+RenderTexture2D cubeFaceTargets[6];
+bool cubeFacesLoaded = false;
 
 Shader depthShader = {0};
 Material depthMaterial = {0};
@@ -58,15 +62,33 @@ void EnsureResourcesLoaded() {
     }
 }
 
+void EnsureCubeFacesLoaded() {
+    if (cubeFacesLoaded) return;
+    for (int i = 0; i < 6; i++) {
+        cubeFaceTargets[i] = LoadDepthOnlyRenderTexture(kPointCubeFaceSize);
+    }
+    cubeFacesLoaded = true;
+}
+
 struct ShadowCasterLight {
-    bool isSun = false;
+    LightComponent::LightType type = LightComponent::Sun;
+    Actor* ownerActor = nullptr;
     Vector3 position{0.0f, 0.0f, 0.0f};
     Vector3 direction{0.0f, -1.0f, 0.0f};
+    float outerConeAngle = 35.0f;
+    float radius = 500.0f;
 };
+
+Vector3 DirectionFromRotation(Vector3 rot) {
+    float yr = rot.y * DEG2RAD;
+    float pr = rot.x * DEG2RAD;
+    return Vector3Normalize({cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)});
+}
 
 bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
     bool haveSun = false;
     ShadowCasterLight sun;
+    sun.type = LightComponent::Sun;
 
     bool haveNearest = false;
     ShadowCasterLight nearest;
@@ -81,11 +103,8 @@ bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
 
             if (lc->lightType == LightComponent::Sun) {
                 if (!haveSun) {
-                    Vector3 rot = actor->GetComponentWorldRotation(lc);
-                    float yr = rot.y * DEG2RAD;
-                    float pr = rot.x * DEG2RAD;
-                    sun.isSun = true;
-                    sun.direction = Vector3Normalize({cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)});
+                    sun.ownerActor = actor;
+                    sun.direction = DirectionFromRotation(actor->GetComponentWorldRotation(lc));
                     haveSun = true;
                 }
                 continue;
@@ -95,8 +114,14 @@ bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
             float distSq = Vector3DistanceSqr(pos, aroundPos);
             if (distSq < bestDistSq) {
                 bestDistSq = distSq;
-                nearest.isSun = false;
+                nearest.type = lc->lightType;
+                nearest.ownerActor = actor;
                 nearest.position = pos;
+                nearest.outerConeAngle = lc->outerConeAngle;
+                nearest.radius = lc->radius;
+                if (lc->lightType == LightComponent::Spot) {
+                    nearest.direction = DirectionFromRotation(actor->GetComponentWorldRotation(lc));
+                }
                 haveNearest = true;
             }
         }
@@ -107,52 +132,67 @@ bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
     return false;
 }
 
-void BuildLightCamera(Camera3D camera, const ShadowCasterLight& caster, Camera3D& outLightCamera, Vector3& outLightDirToSurface) {
-    if (caster.isSun) {
-        Vector3 lightDir = caster.direction;
-        Vector3 up0 = fabsf(lightDir.y) > 0.99f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
-        Vector3 rightAxis = Vector3Normalize(Vector3CrossProduct(lightDir, up0));
-        Vector3 upAxis = Vector3CrossProduct(rightAxis, lightDir);
+void BuildSunCamera(Camera3D camera, const ShadowCasterLight& caster, Camera3D& outLightCamera, Vector3& outLightDirToSurface) {
+    Vector3 lightDir = caster.direction;
+    Vector3 up0 = fabsf(lightDir.y) > 0.99f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
+    Vector3 rightAxis = Vector3Normalize(Vector3CrossProduct(lightDir, up0));
+    Vector3 upAxis = Vector3CrossProduct(rightAxis, lightDir);
 
-        float texelWorldSize = (kSunOrthoHalfSize * 2.0f) / (float)kShadowMapSize;
-        float rightDist = Vector3DotProduct(camera.position, rightAxis);
-        float upDist = Vector3DotProduct(camera.position, upAxis);
-        float snappedRight = floorf(rightDist / texelWorldSize) * texelWorldSize;
-        float snappedUp = floorf(upDist / texelWorldSize) * texelWorldSize;
-        float forwardDist = Vector3DotProduct(camera.position, lightDir);
+    float texelWorldSize = (kSunOrthoHalfSize * 2.0f) / (float)kShadowMapSize;
+    float rightDist = Vector3DotProduct(camera.position, rightAxis);
+    float upDist = Vector3DotProduct(camera.position, upAxis);
+    float snappedRight = floorf(rightDist / texelWorldSize) * texelWorldSize;
+    float snappedUp = floorf(upDist / texelWorldSize) * texelWorldSize;
+    float forwardDist = Vector3DotProduct(camera.position, lightDir);
 
-        Vector3 focus = Vector3Add(
-            Vector3Add(Vector3Scale(rightAxis, snappedRight), Vector3Scale(upAxis, snappedUp)),
-            Vector3Scale(lightDir, forwardDist));
+    Vector3 focus = Vector3Add(
+        Vector3Add(Vector3Scale(rightAxis, snappedRight), Vector3Scale(upAxis, snappedUp)),
+        Vector3Scale(lightDir, forwardDist));
 
-        outLightCamera.position = Vector3Subtract(focus, Vector3Scale(lightDir, kSunPullback));
-        outLightCamera.target = focus;
-        outLightCamera.up = upAxis;
-        outLightCamera.fovy = kSunOrthoHalfSize * 2.0f;
-        outLightCamera.projection = CAMERA_ORTHOGRAPHIC;
+    outLightCamera.position = Vector3Subtract(focus, Vector3Scale(lightDir, kSunPullback));
+    outLightCamera.target = focus;
+    outLightCamera.up = upAxis;
+    outLightCamera.fovy = kSunOrthoHalfSize * 2.0f;
+    outLightCamera.projection = CAMERA_ORTHOGRAPHIC;
 
-        outLightDirToSurface = Vector3Negate(lightDir);
-        return;
-    }
-
-    Vector3 toFocus = Vector3Subtract(camera.position, caster.position);
-    float dist = Vector3Length(toFocus);
-    Vector3 forward = dist > 0.001f ? Vector3Scale(toFocus, 1.0f / dist) : Vector3{0.0f, -1.0f, 0.0f};
-    Vector3 up = fabsf(forward.y) > 0.99f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
-
-    outLightCamera.position = caster.position;
-    outLightCamera.target = camera.position;
-    outLightCamera.up = up;
-    outLightCamera.fovy = kPointLightFovy;
-    outLightCamera.projection = CAMERA_PERSPECTIVE;
-
-    outLightDirToSurface = Vector3Negate(forward);
+    outLightDirToSurface = Vector3Negate(lightDir);
 }
 
-void DrawShadowCasters() {
+void BuildSpotCamera(const ShadowCasterLight& caster, Camera3D& outLightCamera) {
+    Vector3 dir = caster.direction;
+    Vector3 up = fabsf(dir.y) > 0.99f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
+
+    outLightCamera.position = caster.position;
+    outLightCamera.target = Vector3Add(caster.position, dir);
+    outLightCamera.up = up;
+    outLightCamera.fovy = Clamp(caster.outerConeAngle * 2.0f + 5.0f, 20.0f, 170.0f);
+    outLightCamera.projection = CAMERA_PERSPECTIVE;
+}
+
+void BuildCubeFaceCamera(Vector3 lightPos, int face, Camera3D& outLightCamera) {
+    static const Vector3 dirs[6] = {
+        {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f},
+    };
+    static const Vector3 ups[6] = {
+        {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f},
+        {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f},
+    };
+
+    outLightCamera.position = lightPos;
+    outLightCamera.target = Vector3Add(lightPos, dirs[face]);
+    outLightCamera.up = ups[face];
+    outLightCamera.fovy = 90.0f;
+    outLightCamera.projection = CAMERA_PERSPECTIVE;
+}
+
+void DrawShadowCasters(Actor* excludeActor) {
+    rlEnableBackfaceCulling();
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
-        if (!actor) continue;
+        if (!actor || actor == excludeActor) continue;
         for (Component* comp : actor->GetComponents()) {
             MeshComponent* mc = dynamic_cast<MeshComponent*>(comp);
             if (!mc || !mc->castsShadow) continue;
@@ -175,6 +215,52 @@ void DrawShadowCasters() {
     }
 }
 
+void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor) {
+    BeginTextureMode(shadowTarget);
+    ClearBackground(BLANK);
+    BeginMode3D(lightCamera);
+
+    Matrix lightView = rlGetMatrixModelview();
+    Matrix lightProj = rlGetMatrixProjection();
+
+    DrawShadowCasters(excludeActor);
+
+    EndMode3D();
+    EndTextureMode();
+
+    Matrix lightViewProj = MatrixMultiply(lightView, lightProj);
+    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, kShadowMapSize, kShadowStrength);
+}
+
+void RunCubePass(Vector3 lightPos, Actor* excludeActor) {
+    EnsureCubeFacesLoaded();
+
+    unsigned int faceTextureIds[6];
+    Matrix faceViewProj[6];
+
+    for (int face = 0; face < 6; face++) {
+        Camera3D faceCamera{};
+        BuildCubeFaceCamera(lightPos, face, faceCamera);
+
+        BeginTextureMode(cubeFaceTargets[face]);
+        ClearBackground(BLANK);
+        BeginMode3D(faceCamera);
+
+        Matrix faceView = rlGetMatrixModelview();
+        Matrix faceProj = rlGetMatrixProjection();
+
+        DrawShadowCasters(excludeActor);
+
+        EndMode3D();
+        EndTextureMode();
+
+        faceTextureIds[face] = cubeFaceTargets[face].depth.id;
+        faceViewProj[face] = MatrixMultiply(faceView, faceProj);
+    }
+
+    ShadingModel::SetShadowSourceCube(lightPos, faceTextureIds, faceViewProj, kPointCubeFaceSize, kShadowStrength);
+}
+
 } // namespace
 
 namespace ShadowMapPrePass {
@@ -186,24 +272,28 @@ void Run(Camera3D camera) {
     ShadowCasterLight caster;
     if (!FindShadowCasterLight(camera.position, caster)) return;
 
-    Camera3D lightCamera{};
-    Vector3 lightDirToSurface;
-    BuildLightCamera(camera, caster, lightCamera, lightDirToSurface);
+    double savedNear = rlGetCullDistanceNear();
+    double savedFar = rlGetCullDistanceFar();
 
-    BeginTextureMode(shadowTarget);
-    ClearBackground(BLANK);
-    BeginMode3D(lightCamera);
+    if (caster.type == LightComponent::Sun) {
+        rlSetClipPlanes(kSunNear, kSunPullback * 2.5);
+        Camera3D lightCamera{};
+        Vector3 lightDirToSurface;
+        BuildSunCamera(camera, caster, lightCamera, lightDirToSurface);
+        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor);
+    } else if (caster.type == LightComponent::Spot) {
+        float near = fmaxf(caster.radius * 0.01f, 2.0f);
+        rlSetClipPlanes(near, caster.radius);
+        Camera3D lightCamera{};
+        BuildSpotCamera(caster, lightCamera);
+        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor);
+    } else {
+        float near = fmaxf(caster.radius * 0.01f, 2.0f);
+        rlSetClipPlanes(near, caster.radius);
+        RunCubePass(caster.position, caster.ownerActor);
+    }
 
-    Matrix lightView = rlGetMatrixModelview();
-    Matrix lightProj = rlGetMatrixProjection();
-
-    DrawShadowCasters();
-
-    EndMode3D();
-    EndTextureMode();
-
-    Matrix lightViewProj = MatrixMultiply(lightView, lightProj);
-    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, kShadowMapSize, kShadowStrength);
+    rlSetClipPlanes(savedNear, savedFar);
 }
 
 void Shutdown() {
@@ -216,6 +306,15 @@ void Shutdown() {
     }
     shadowTarget = RenderTexture2D{0};
     shadowTargetLoaded = false;
+
+    if (cubeFacesLoaded) {
+        for (int i = 0; i < 6; i++) {
+            if (cubeFaceTargets[i].id != 0) rlUnloadFramebuffer(cubeFaceTargets[i].id);
+            cubeFaceTargets[i] = RenderTexture2D{0};
+        }
+        cubeFacesLoaded = false;
+    }
+
     ShadingModel::ResetShadowSource();
 }
 

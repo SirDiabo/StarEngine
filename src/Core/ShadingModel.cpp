@@ -72,23 +72,36 @@ vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal, float shadowFactor) {
 )glsl";
 
 const char* kShadowGLSL = R"glsl(
-uniform sampler2D shadowMap;
-uniform int shadowMapEnabled;
-uniform mat4 shadowLightViewProj;
-uniform vec3 shadowLightDir;
+uniform int shadowMode;
 uniform float shadowTexelSize;
 uniform float shadowStrength;
 
-float ComputeShadowFactor(vec3 worldPos, vec3 worldNormal) {
-    if (shadowMapEnabled == 0) return 1.0;
+uniform sampler2D shadowMap;
+uniform mat4 shadowLightViewProj;
+uniform vec3 shadowLightDir;
 
-    vec4 lsPos = shadowLightViewProj * vec4(worldPos, 1.0);
+uniform vec3 shadowLightPos;
+uniform sampler2D shadowCubeMap0;
+uniform sampler2D shadowCubeMap1;
+uniform sampler2D shadowCubeMap2;
+uniform sampler2D shadowCubeMap3;
+uniform sampler2D shadowCubeMap4;
+uniform sampler2D shadowCubeMap5;
+uniform mat4 shadowCubeViewProj0;
+uniform mat4 shadowCubeViewProj1;
+uniform mat4 shadowCubeViewProj2;
+uniform mat4 shadowCubeViewProj3;
+uniform mat4 shadowCubeViewProj4;
+uniform mat4 shadowCubeViewProj5;
+
+float SampleShadowMap(sampler2D map, mat4 lightViewProj, vec3 worldPos, vec3 worldNormal, vec3 lightDir) {
+    vec4 lsPos = lightViewProj * vec4(worldPos, 1.0);
     vec3 proj = lsPos.xyz / lsPos.w;
     proj = proj * 0.5 + 0.5;
 
     if (proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0 || proj.z > 1.0) return 1.0;
 
-    float ndotl = max(dot(worldNormal, shadowLightDir), 0.0);
+    float ndotl = max(dot(worldNormal, lightDir), 0.0);
     float bias = max(0.0035 * (1.0 - ndotl), 0.0008);
 
     vec2 poissonDisk[4] = vec2[](
@@ -101,11 +114,37 @@ float ComputeShadowFactor(vec3 worldPos, vec3 worldNormal) {
     float occluded = 0.0;
     for (int i = 0; i < 4; i++) {
         vec2 offset = poissonDisk[i] * shadowTexelSize * 1.5;
-        float mapDepth = texture(shadowMap, proj.xy + offset).r;
+        float mapDepth = texture(map, proj.xy + offset).r;
         occluded += (proj.z - bias > mapDepth) ? 0.25 : 0.0;
     }
 
     return 1.0 - occluded * shadowStrength;
+}
+
+float ComputeShadowFactor(vec3 worldPos, vec3 worldNormal) {
+    if (shadowMode == 0) return 1.0;
+
+    if (shadowMode == 1) {
+        return SampleShadowMap(shadowMap, shadowLightViewProj, worldPos, worldNormal, shadowLightDir);
+    }
+
+    vec3 toFrag = worldPos - shadowLightPos;
+    vec3 lightDir = normalize(-toFrag);
+    vec3 a = abs(toFrag);
+
+    if (a.x >= a.y && a.x >= a.z) {
+        return toFrag.x > 0.0
+            ? SampleShadowMap(shadowCubeMap0, shadowCubeViewProj0, worldPos, worldNormal, lightDir)
+            : SampleShadowMap(shadowCubeMap1, shadowCubeViewProj1, worldPos, worldNormal, lightDir);
+    }
+    if (a.y >= a.x && a.y >= a.z) {
+        return toFrag.y > 0.0
+            ? SampleShadowMap(shadowCubeMap2, shadowCubeViewProj2, worldPos, worldNormal, lightDir)
+            : SampleShadowMap(shadowCubeMap3, shadowCubeViewProj3, worldPos, worldNormal, lightDir);
+    }
+    return toFrag.z > 0.0
+        ? SampleShadowMap(shadowCubeMap4, shadowCubeViewProj4, worldPos, worldNormal, lightDir)
+        : SampleShadowMap(shadowCubeMap5, shadowCubeViewProj5, worldPos, worldNormal, lightDir);
 }
 )glsl";
 
@@ -221,12 +260,17 @@ struct LitVariant {
     int lightCountLoc = -1;
     LightLocs lightLocs[kMaxLights];
 
-    int shadowMapLoc = -1;
-    int shadowMapEnabledLoc = -1;
-    int shadowLightViewProjLoc = -1;
-    int shadowLightDirLoc = -1;
+    int shadowModeLoc = -1;
     int shadowTexelSizeLoc = -1;
     int shadowStrengthLoc = -1;
+
+    int shadowMapLoc = -1;
+    int shadowLightViewProjLoc = -1;
+    int shadowLightDirLoc = -1;
+
+    int shadowLightPosLoc = -1;
+    int shadowCubeMapLoc[6] = {-1, -1, -1, -1, -1, -1};
+    int shadowCubeViewProjLoc[6] = {-1, -1, -1, -1, -1, -1};
 
     void EnsureLoaded(const std::string& vs, const std::string& fs) {
         if (loaded) return;
@@ -242,12 +286,17 @@ struct LitVariant {
             lightLocs[i].innerCos  = GetShaderLocation(shader, TextFormat("lights[%d].innerCos", i));
             lightLocs[i].outerCos  = GetShaderLocation(shader, TextFormat("lights[%d].outerCos", i));
         }
-        shadowMapLoc = GetShaderLocation(shader, "shadowMap");
-        shadowMapEnabledLoc = GetShaderLocation(shader, "shadowMapEnabled");
-        shadowLightViewProjLoc = GetShaderLocation(shader, "shadowLightViewProj");
-        shadowLightDirLoc = GetShaderLocation(shader, "shadowLightDir");
+        shadowModeLoc = GetShaderLocation(shader, "shadowMode");
         shadowTexelSizeLoc = GetShaderLocation(shader, "shadowTexelSize");
         shadowStrengthLoc = GetShaderLocation(shader, "shadowStrength");
+        shadowMapLoc = GetShaderLocation(shader, "shadowMap");
+        shadowLightViewProjLoc = GetShaderLocation(shader, "shadowLightViewProj");
+        shadowLightDirLoc = GetShaderLocation(shader, "shadowLightDir");
+        shadowLightPosLoc = GetShaderLocation(shader, "shadowLightPos");
+        for (int i = 0; i < 6; i++) {
+            shadowCubeMapLoc[i] = GetShaderLocation(shader, TextFormat("shadowCubeMap%d", i));
+            shadowCubeViewProjLoc[i] = GetShaderLocation(shader, TextFormat("shadowCubeViewProj%d", i));
+        }
         loaded = true;
     }
 };
@@ -270,10 +319,16 @@ struct UnlitVariant {
 
 UnlitVariant unlitVariant;
 
-bool shadowSourceActive = false;
+int shadowMode = 0; // 0 = none, 1 = single map, 2 = six-face cube
+
 unsigned int shadowSourceTextureId = 0;
 Matrix shadowSourceLightViewProj = MatrixIdentity();
 Vector3 shadowSourceLightDir = {0.0f, -1.0f, 0.0f};
+
+Vector3 shadowSourceLightPos = {0.0f, 0.0f, 0.0f};
+unsigned int shadowSourceCubeTextureIds[6] = {0, 0, 0, 0, 0, 0};
+Matrix shadowSourceCubeViewProj[6] = {MatrixIdentity(), MatrixIdentity(), MatrixIdentity(), MatrixIdentity(), MatrixIdentity(), MatrixIdentity()};
+
 float shadowSourceTexelSize = 0.0f;
 float shadowSourceStrength = 0.0f;
 
@@ -350,9 +405,8 @@ void ShadingModel::UpdateLightUniforms() {
 
     SetShaderValue(variant.shader, variant.lightCountLoc, &count, SHADER_UNIFORM_INT);
 
-    int shadowEnabledInt = shadowSourceActive ? 1 : 0;
-    SetShaderValue(variant.shader, variant.shadowMapEnabledLoc, &shadowEnabledInt, SHADER_UNIFORM_INT);
-    if (shadowSourceActive) {
+    SetShaderValue(variant.shader, variant.shadowModeLoc, &shadowMode, SHADER_UNIFORM_INT);
+    if (shadowMode == 1) {
         Texture2D shadowTex = {0};
         shadowTex.id = shadowSourceTextureId;
         SetShaderValueTexture(variant.shader, variant.shadowMapLoc, shadowTex);
@@ -361,18 +415,40 @@ void ShadingModel::UpdateLightUniforms() {
         SetShaderValue(variant.shader, variant.shadowLightDirLoc, dir, SHADER_UNIFORM_VEC3);
         SetShaderValue(variant.shader, variant.shadowTexelSizeLoc, &shadowSourceTexelSize, SHADER_UNIFORM_FLOAT);
         SetShaderValue(variant.shader, variant.shadowStrengthLoc, &shadowSourceStrength, SHADER_UNIFORM_FLOAT);
+    } else if (shadowMode == 2) {
+        float pos[3] = {shadowSourceLightPos.x, shadowSourceLightPos.y, shadowSourceLightPos.z};
+        SetShaderValue(variant.shader, variant.shadowLightPosLoc, pos, SHADER_UNIFORM_VEC3);
+        for (int i = 0; i < 6; i++) {
+            Texture2D faceTex = {0};
+            faceTex.id = shadowSourceCubeTextureIds[i];
+            SetShaderValueTexture(variant.shader, variant.shadowCubeMapLoc[i], faceTex);
+            SetShaderValueMatrix(variant.shader, variant.shadowCubeViewProjLoc[i], shadowSourceCubeViewProj[i]);
+        }
+        SetShaderValue(variant.shader, variant.shadowTexelSizeLoc, &shadowSourceTexelSize, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(variant.shader, variant.shadowStrengthLoc, &shadowSourceStrength, SHADER_UNIFORM_FLOAT);
     }
 }
 
 void ShadingModel::ResetShadowSource() {
-    shadowSourceActive = false;
+    shadowMode = 0;
 }
 
 void ShadingModel::SetShadowSource(unsigned int shadowDepthTextureId, Matrix lightViewProj, Vector3 lightDirToSurface, int shadowMapSize, float strength) {
-    shadowSourceActive = true;
+    shadowMode = 1;
     shadowSourceTextureId = shadowDepthTextureId;
     shadowSourceLightViewProj = lightViewProj;
     shadowSourceLightDir = lightDirToSurface;
+    shadowSourceTexelSize = shadowMapSize > 0 ? 1.0f / (float)shadowMapSize : 0.0f;
+    shadowSourceStrength = strength;
+}
+
+void ShadingModel::SetShadowSourceCube(Vector3 lightPos, const unsigned int faceTextureIds[6], const Matrix faceViewProj[6], int shadowMapSize, float strength) {
+    shadowMode = 2;
+    shadowSourceLightPos = lightPos;
+    for (int i = 0; i < 6; i++) {
+        shadowSourceCubeTextureIds[i] = faceTextureIds[i];
+        shadowSourceCubeViewProj[i] = faceViewProj[i];
+    }
     shadowSourceTexelSize = shadowMapSize > 0 ? 1.0f / (float)shadowMapSize : 0.0f;
     shadowSourceStrength = strength;
 }
