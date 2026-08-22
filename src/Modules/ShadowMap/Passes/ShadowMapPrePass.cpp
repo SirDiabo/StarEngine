@@ -1,5 +1,7 @@
 #include "ShadowMapPrePass.h"
 #include "Core/ShadingModel.h"
+#include "Core/RenderSettings.h"
+#include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/MeshComponent.h"
@@ -9,18 +11,17 @@
 
 namespace {
 
-const int kShadowMapSize = 2048;
-const int kPointCubeFaceSize = 1024;
-const float kSunOrthoHalfSize = 4000.0f;
-const float kSunPullback = 6000.0f;
 const float kSunNear = 1.0f;
-const float kShadowStrength = 0.75f;
+const float kSunPullbackRatio = 1.5f;
+const int kMinCubeFaceSize = 256;
 
 RenderTexture2D shadowTarget = {0};
 bool shadowTargetLoaded = false;
+int shadowTargetSize = 0;
 
 RenderTexture2D cubeFaceTargets[6];
 bool cubeFacesLoaded = false;
+int cubeFaceSize = 0;
 
 Shader depthShader = {0};
 Material depthMaterial = {0};
@@ -48,9 +49,12 @@ RenderTexture2D LoadDepthOnlyRenderTexture(int size) {
 }
 
 void EnsureResourcesLoaded() {
-    if (!shadowTargetLoaded) {
-        shadowTarget = LoadDepthOnlyRenderTexture(kShadowMapSize);
-        shadowTargetLoaded = true;
+    int desiredSize = ShadowMapSettings::Get().GetShadowMapSize();
+    if (shadowTarget.id == 0 || shadowTargetSize != desiredSize) {
+        if (shadowTarget.id != 0) rlUnloadFramebuffer(shadowTarget.id);
+        shadowTarget = LoadDepthOnlyRenderTexture(desiredSize);
+        shadowTargetSize = desiredSize;
+        shadowTargetLoaded = shadowTarget.id != 0;
     }
     if (!depthMaterialLoaded) {
         depthShader = LoadShaderFromMemory(
@@ -63,10 +67,20 @@ void EnsureResourcesLoaded() {
 }
 
 void EnsureCubeFacesLoaded() {
-    if (cubeFacesLoaded) return;
-    for (int i = 0; i < 6; i++) {
-        cubeFaceTargets[i] = LoadDepthOnlyRenderTexture(kPointCubeFaceSize);
+    int desiredFaceSize = ShadowMapSettings::Get().GetShadowMapSize() / 2;
+    if (desiredFaceSize < kMinCubeFaceSize) desiredFaceSize = kMinCubeFaceSize;
+
+    if (cubeFacesLoaded && cubeFaceSize == desiredFaceSize) return;
+
+    if (cubeFacesLoaded) {
+        for (int i = 0; i < 6; i++) {
+            if (cubeFaceTargets[i].id != 0) rlUnloadFramebuffer(cubeFaceTargets[i].id);
+        }
     }
+    for (int i = 0; i < 6; i++) {
+        cubeFaceTargets[i] = LoadDepthOnlyRenderTexture(desiredFaceSize);
+    }
+    cubeFaceSize = desiredFaceSize;
     cubeFacesLoaded = true;
 }
 
@@ -132,13 +146,14 @@ bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
     return false;
 }
 
-void BuildSunCamera(Camera3D camera, const ShadowCasterLight& caster, Camera3D& outLightCamera, Vector3& outLightDirToSurface) {
+void BuildSunCamera(Camera3D camera, const ShadowCasterLight& caster, float halfSize, float pullback,
+                     Camera3D& outLightCamera, Vector3& outLightDirToSurface) {
     Vector3 lightDir = caster.direction;
     Vector3 up0 = fabsf(lightDir.y) > 0.99f ? Vector3{0.0f, 0.0f, 1.0f} : Vector3{0.0f, 1.0f, 0.0f};
     Vector3 rightAxis = Vector3Normalize(Vector3CrossProduct(lightDir, up0));
     Vector3 upAxis = Vector3CrossProduct(rightAxis, lightDir);
 
-    float texelWorldSize = (kSunOrthoHalfSize * 2.0f) / (float)kShadowMapSize;
+    float texelWorldSize = (halfSize * 2.0f) / (float)shadowTargetSize;
     float rightDist = Vector3DotProduct(camera.position, rightAxis);
     float upDist = Vector3DotProduct(camera.position, upAxis);
     float snappedRight = floorf(rightDist / texelWorldSize) * texelWorldSize;
@@ -149,10 +164,10 @@ void BuildSunCamera(Camera3D camera, const ShadowCasterLight& caster, Camera3D& 
         Vector3Add(Vector3Scale(rightAxis, snappedRight), Vector3Scale(upAxis, snappedUp)),
         Vector3Scale(lightDir, forwardDist));
 
-    outLightCamera.position = Vector3Subtract(focus, Vector3Scale(lightDir, kSunPullback));
+    outLightCamera.position = Vector3Subtract(focus, Vector3Scale(lightDir, pullback));
     outLightCamera.target = focus;
     outLightCamera.up = upAxis;
-    outLightCamera.fovy = kSunOrthoHalfSize * 2.0f;
+    outLightCamera.fovy = halfSize * 2.0f;
     outLightCamera.projection = CAMERA_ORTHOGRAPHIC;
 
     outLightDirToSurface = Vector3Negate(lightDir);
@@ -215,7 +230,7 @@ void DrawShadowCasters(Actor* excludeActor) {
     }
 }
 
-void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor) {
+void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor, float shadowStrength) {
     BeginTextureMode(shadowTarget);
     ClearBackground(BLANK);
     BeginMode3D(lightCamera);
@@ -229,10 +244,10 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* exclu
     EndTextureMode();
 
     Matrix lightViewProj = MatrixMultiply(lightView, lightProj);
-    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, kShadowMapSize, kShadowStrength);
+    ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, shadowTargetSize, shadowStrength);
 }
 
-void RunCubePass(Vector3 lightPos, Actor* excludeActor) {
+void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength) {
     EnsureCubeFacesLoaded();
 
     unsigned int faceTextureIds[6];
@@ -258,7 +273,7 @@ void RunCubePass(Vector3 lightPos, Actor* excludeActor) {
         faceViewProj[face] = MatrixMultiply(faceView, faceProj);
     }
 
-    ShadingModel::SetShadowSourceCube(lightPos, faceTextureIds, faceViewProj, kPointCubeFaceSize, kShadowStrength);
+    ShadingModel::SetShadowSourceCube(lightPos, faceTextureIds, faceViewProj, cubeFaceSize, shadowStrength);
 }
 
 } // namespace
@@ -269,28 +284,35 @@ void Run(Camera3D camera) {
     EnsureResourcesLoaded();
     if (!shadowTargetLoaded || shadowTarget.id == 0) return;
 
+    if (RenderSettings::Get().GetLightingQuality() != LightingQuality::PerPixel) {
+        RenderSettings::Get().SetLightingQuality(LightingQuality::PerPixel);
+    }
+
     ShadowCasterLight caster;
     if (!FindShadowCasterLight(camera.position, caster)) return;
 
     double savedNear = rlGetCullDistanceNear();
     double savedFar = rlGetCullDistanceFar();
+    float shadowStrength = ShadowMapSettings::Get().GetShadowStrength();
 
     if (caster.type == LightComponent::Sun) {
-        rlSetClipPlanes(kSunNear, kSunPullback * 2.5);
+        float halfSize = ShadowMapSettings::Get().GetSunCoverageHalfSize();
+        float pullback = halfSize * kSunPullbackRatio;
+        rlSetClipPlanes(kSunNear, pullback * 2.5);
         Camera3D lightCamera{};
         Vector3 lightDirToSurface;
-        BuildSunCamera(camera, caster, lightCamera, lightDirToSurface);
-        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor);
+        BuildSunCamera(camera, caster, halfSize, pullback, lightCamera, lightDirToSurface);
+        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor, shadowStrength);
     } else if (caster.type == LightComponent::Spot) {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
         Camera3D lightCamera{};
         BuildSpotCamera(caster, lightCamera);
-        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor);
+        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor, shadowStrength);
     } else {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
-        RunCubePass(caster.position, caster.ownerActor);
+        RunCubePass(caster.position, caster.ownerActor, shadowStrength);
     }
 
     rlSetClipPlanes(savedNear, savedFar);
@@ -306,6 +328,7 @@ void Shutdown() {
     }
     shadowTarget = RenderTexture2D{0};
     shadowTargetLoaded = false;
+    shadowTargetSize = 0;
 
     if (cubeFacesLoaded) {
         for (int i = 0; i < 6; i++) {
@@ -313,6 +336,7 @@ void Shutdown() {
             cubeFaceTargets[i] = RenderTexture2D{0};
         }
         cubeFacesLoaded = false;
+        cubeFaceSize = 0;
     }
 
     ShadingModel::ResetShadowSource();

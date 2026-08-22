@@ -27,7 +27,7 @@ private:
     AssetPickerPopup mapPicker;
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
-    ChoicePopup lightingQualityPopup;
+    bool moduleSettingsPopupOpen = false;
 
     std::vector<std::string> shadingOptionIds;
 

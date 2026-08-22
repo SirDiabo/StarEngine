@@ -6,7 +6,6 @@
 #include "Core/SaveFileRegistry.h"
 #include "Core/RenderSettings.h"
 #include "Core/ShadingTechniqueRegistry.h"
-#include "Core/ShadingModel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "raygui.h"
@@ -31,6 +30,7 @@ void ProjectSettingsTab::RefreshFromProject() {
     mapPicker.Close();
     rendererPopup.Close();
     shadingTypePopup.Close();
+    moduleSettingsPopupOpen = false;
 }
 
 static std::string MapDisplayName(const std::string& path) {
@@ -103,7 +103,7 @@ void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {
 void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
     Vector2 mp = GetMousePosition();
-    const bool anyPopupOpen = rendererPopup.IsOpen() || shadingTypePopup.IsOpen() || lightingQualityPopup.IsOpen();
+    const bool anyPopupOpen = rendererPopup.IsOpen() || shadingTypePopup.IsOpen() || moduleSettingsPopupOpen;
 
     float fx = area.x + 16;
     float fy = area.y + 16;
@@ -171,30 +171,12 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
         RenderSettings::Get().SetShadingType(shadingOptionIds[shadingChoice]);
     }
 
-    bool lightingEnabled = ShadingModel::ShouldUseLitShading();
-    Color lightingLabelColor = lightingEnabled ? theme.textSecondary : theme.buttonDisabledText;
-    DrawText("Lighting Quality", (int)fx, (int)fy, 11, lightingLabelColor);
-    fy += 14;
-    Rectangle lightingRow = {fx, fy, fw, 20};
-    DrawRectangleRec(lightingRow, theme.fieldBg);
-    DrawRectangleLinesEx(lightingRow, 1, theme.fieldBorder);
-    LightingQuality lightingQuality = RenderSettings::Get().GetLightingQuality();
-    std::string lightingLabel = lightingQuality == LightingQuality::PerPixel ? "Per Pixel" : "Per Vertex";
-    DrawText(lightingLabel.c_str(), (int)lightingRow.x + 6, (int)lightingRow.y + 4, 12,
-              lightingEnabled ? theme.textPrimary : theme.buttonDisabledText);
-    if (lightingEnabled && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, lightingRow) && !anyPopupOpen) {
-        lightingQualityPopup.Open({lightingRow.x, lightingRow.y + lightingRow.height}, fw, {
-            {"Per Vertex", true, ""},
-            {"Per Pixel", true, ""},
-        });
-    }
-    fy += 20;
-    DrawText("Per Vertex is cheap but can look faceted on low-poly meshes. Per Pixel costs more, looks smoother.",
-              (int)fx, (int)fy, 10, theme.textSecondary);
-    fy += 24;
-    int lightingChoice = 0;
-    if (lightingQualityPopup.Render(lightingChoice)) {
-        RenderSettings::Get().SetLightingQuality(lightingChoice == 1 ? LightingQuality::PerPixel : LightingQuality::PerVertex);
+    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(currentShadingId);
+    moduleSettingsPopupOpen = false;
+    if (activeTechnique && activeTechnique->renderSettings) {
+        ModuleSettingsResult result = activeTechnique->renderSettings(fx, fy, fw, activeField, anyPopupOpen);
+        fy = result.nextY;
+        moduleSettingsPopupOpen = result.popupOpen;
     }
 
     DrawText("Render Scale", (int)fx, (int)fy, 11, theme.textSecondary);

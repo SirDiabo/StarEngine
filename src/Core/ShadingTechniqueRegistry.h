@@ -4,6 +4,11 @@
 #include <vector>
 #include <functional>
 
+struct ModuleSettingsResult {
+    float nextY = 0.0f;
+    bool popupOpen = false;
+};
+
 struct ShadingTechnique {
     std::string id;
     std::string displayName;
@@ -11,6 +16,7 @@ struct ShadingTechnique {
     std::function<void(Camera3D, Vector2)> renderPrePass;
     std::function<void(Camera3D, RenderTexture2D)> renderInWorld;
     std::function<void(RenderTexture2D)> renderOverlay;
+    std::function<ModuleSettingsResult(float x, float y, float width, int& activeField, bool otherPopupOpen)> renderSettings;
 };
 
 class ShadingTechniqueRegistry {
