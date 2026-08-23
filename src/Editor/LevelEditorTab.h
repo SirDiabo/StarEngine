@@ -23,6 +23,9 @@ public:
     ViewportPanel*       GetViewport()     const { return viewportPanel; }
     ContentBrowserPanel* GetContentPanel() const { return contentPanel; }
 
+    bool HasUnsavedLevelChanges() const;
+    void SaveLevel();
+
     void TogglePanelVisible(const std::string& name) override;
 
     void SetPackageCallback(std::function<void()> callback);

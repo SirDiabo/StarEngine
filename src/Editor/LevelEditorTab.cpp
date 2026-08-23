@@ -190,3 +190,11 @@ void LevelEditorTab::TogglePanelVisible(const std::string& name) {
 void LevelEditorTab::SetPackageCallback(std::function<void()> callback) {
     if (viewportPanel) viewportPanel->SetPackageCallback(callback);
 }
+
+bool LevelEditorTab::HasUnsavedLevelChanges() const {
+    return viewportPanel && viewportPanel->IsMapLoaded() && viewportPanel->IsMapDirty();
+}
+
+void LevelEditorTab::SaveLevel() {
+    if (viewportPanel) viewportPanel->SaveMap();
+}

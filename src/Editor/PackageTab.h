@@ -1,11 +1,13 @@
 #pragma once
 #include "EditorTab.h"
 #include "ChoicePopup.h"
+#include "ConfirmPopup.h"
 #include "Core/PackagePlatform.h"
 #include "Core/PackageCipher.h"
 #include "Core/PackageRunner.h"
 #include "Core/Project.h"
 #include "Core/AsyncTask.h"
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,9 @@ public:
     void Initialize() override;
     void Render(float x, float y, float width, float height) override;
     void BuildMenus(MenuBar* menuBar) override;
+
+    void SetUnsavedLevelCheck(std::function<bool()> checkFn) { hasUnsavedLevelChanges = checkFn; }
+    void SetSaveLevelCallback(std::function<void()> saveFn) { saveLevelCallback = saveFn; }
 
 private:
     void RunPackage();
@@ -32,6 +37,10 @@ private:
     ChoicePopup cipherPopup;
     
     ChoicePopup formatPopup;
+    ConfirmPopup unsavedLevelPopup;
+
+    std::function<bool()> hasUnsavedLevelChanges;
+    std::function<void()> saveLevelCallback;
 
     bool hasResult = false;
     bool lastSuccess = false;

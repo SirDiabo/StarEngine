@@ -51,7 +51,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     float fy = y + 16;
     float fw = width - 32 > 640.0f ? 640.0f : width - 32;
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
-                               cipherPopup.IsOpen() || formatPopup.IsOpen();
+                               cipherPopup.IsOpen() || formatPopup.IsOpen() || unsavedLevelPopup.IsOpen();
 
     DrawText("Package Project", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 26;
@@ -147,7 +147,13 @@ void PackageTab::Render(float x, float y, float width, float height) {
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
     if (UIWidget::Button(packageButton, "Package", platformReady && !packageRunning) && !anyPopupOpen) {
-        RunPackage();
+        if (hasUnsavedLevelChanges && hasUnsavedLevelChanges()) {
+            unsavedLevelPopup.Open(
+                "The open level has unsaved changes. The packaged build will use the version last saved to disk unless you save first.",
+                "Save and Package");
+        } else {
+            RunPackage();
+        }
     }
     fy += 36;
 
@@ -192,6 +198,12 @@ void PackageTab::Render(float x, float y, float width, float height) {
     int formatChoice = 0;
     if (formatPopup.Render(formatChoice)) {
         format = formatChoice == 1 ? PackageFormat::LooseFolder : PackageFormat::SingleFile;
+    }
+
+    bool unsavedConfirmed = false;
+    if (unsavedLevelPopup.Render(unsavedConfirmed) && unsavedConfirmed) {
+        if (saveLevelCallback) saveLevelCallback();
+        RunPackage();
     }
 }
 

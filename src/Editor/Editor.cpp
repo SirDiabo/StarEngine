@@ -335,6 +335,13 @@ void Editor::OpenPackageTab() {
     }
     auto* tab = new PackageTab();
     tab->Initialize();
+    for (auto& existingTab : editorTabs) {
+        if (auto* levelTab = dynamic_cast<LevelEditorTab*>(existingTab.get())) {
+            tab->SetUnsavedLevelCheck([levelTab]() { return levelTab->HasUnsavedLevelChanges(); });
+            tab->SetSaveLevelCallback([levelTab]() { levelTab->SaveLevel(); });
+            break;
+        }
+    }
     editorTabs.emplace_back(tab);
     editorTabs[activeEditorTab]->OnDeactivated();
     activeEditorTab = (int)editorTabs.size() - 1;

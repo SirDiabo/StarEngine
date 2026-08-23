@@ -25,6 +25,7 @@ public:
     int* GetSelectedActorIndexPtr() { return &selectedActorIndex; }
     const std::string& GetMapPath() const { return mapPath; }
     bool IsMapLoaded() const { return mapLoaded; }
+    bool IsMapDirty() const { return mapDirty; }
 
     bool IsPlaying() const { return playing; }
 
