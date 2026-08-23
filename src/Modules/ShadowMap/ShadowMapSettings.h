@@ -6,6 +6,7 @@ enum class ShadowAAMethod {
     None,
     Low,
     High,
+    Sharp,
 };
 
 std::string ShadowAAMethodName(ShadowAAMethod method);

@@ -110,7 +110,7 @@ float SampleShadowMap(sampler2D map, mat4 lightViewProj, vec3 worldPos, vec3 wor
         return (proj.z - bias > mapDepth) ? (1.0 - shadowStrength) : 1.0;
     }
 
-    if (shadowAAMethod == 2) {
+    if (shadowAAMethod == 2 || shadowAAMethod == 3) {
         float occluded = 0.0;
         for (int ix = -1; ix <= 2; ix++) {
             for (int iy = -1; iy <= 2; iy++) {
@@ -118,6 +118,9 @@ float SampleShadowMap(sampler2D map, mat4 lightViewProj, vec3 worldPos, vec3 wor
                 float mapDepth = texture(map, proj.xy + offset).r;
                 occluded += (proj.z - bias > mapDepth) ? (1.0 / 16.0) : 0.0;
             }
+        }
+        if (shadowAAMethod == 3) {
+            return (occluded > 0.5) ? (1.0 - shadowStrength) : 1.0;
         }
         return 1.0 - occluded * shadowStrength;
     }

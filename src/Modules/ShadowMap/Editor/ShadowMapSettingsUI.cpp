@@ -86,15 +86,16 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
             {"None", true, ""},
             {"Low", true, ""},
             {"High", true, ""},
+            {"Sharp", true, ""},
         });
     }
     y += 20;
-    DrawText("Smooths jagged shadow edges at a given resolution. High costs more per pixel and doesn't add detail, only smoothness.",
+    DrawText("Smooths jagged shadow edges. Low/High blend gradually; Sharp keeps a hard edge but positions it more accurately than None.",
               (int)x, (int)y, 10, theme.textSecondary);
     y += 24;
     int aaChoice = 0;
     if (aaMethodPopup.Render(aaChoice)) {
-        static const ShadowAAMethod methods[3] = {ShadowAAMethod::None, ShadowAAMethod::Low, ShadowAAMethod::High};
+        static const ShadowAAMethod methods[4] = {ShadowAAMethod::None, ShadowAAMethod::Low, ShadowAAMethod::High, ShadowAAMethod::Sharp};
         settings.SetShadowAAMethod(methods[aaChoice]);
     }
 

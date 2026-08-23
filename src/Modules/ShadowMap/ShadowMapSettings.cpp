@@ -9,6 +9,7 @@ std::string ShadowAAMethodName(ShadowAAMethod method) {
     switch (method) {
         case ShadowAAMethod::None: return "None";
         case ShadowAAMethod::High: return "High";
+        case ShadowAAMethod::Sharp: return "Sharp";
         case ShadowAAMethod::Low:
         default: return "Low";
     }
@@ -17,6 +18,7 @@ std::string ShadowAAMethodName(ShadowAAMethod method) {
 ShadowAAMethod ShadowAAMethodFromName(const std::string& name) {
     if (name == "None") return ShadowAAMethod::None;
     if (name == "High") return ShadowAAMethod::High;
+    if (name == "Sharp") return ShadowAAMethod::Sharp;
     return ShadowAAMethod::Low;
 }
 
