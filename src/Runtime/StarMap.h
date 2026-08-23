@@ -1,4 +1,5 @@
 #pragma once
+#include "Modules/Stargraph/Stargraph.h"
 #include <string>
 #include <vector>
 
@@ -9,6 +10,10 @@ struct ActorInstance {
     std::string meshAssetPath;
     std::vector<std::string> materialAssetPaths;
     bool castsShadow = true;
+
+    bool hasComponent = false;
+    ComponentDecl component;
+
     float posX = 0, posY = 0, posZ = 0;
     float rotX = 0, rotY = 0, rotZ = 0;
     float scaleX = 1, scaleY = 1, scaleZ = 1;

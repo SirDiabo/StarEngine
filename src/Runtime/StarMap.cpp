@@ -1,6 +1,7 @@
 #include "StarMap.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
+#include "Modules/Stargraph/ComponentFields.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -29,6 +30,32 @@ bool StarMap::SaveToFile(const std::string& path) const {
         out << "MaterialCount=" << inst.materialAssetPaths.size() << "\n";
         for (size_t m = 0; m < inst.materialAssetPaths.size(); m++) {
             out << "Material" << m << "=" << inst.materialAssetPaths[m] << "\n";
+        }
+        out << "HasComponent=" << (inst.hasComponent ? "true" : "false") << "\n";
+        if (inst.hasComponent) {
+            out << "ComponentType=" << inst.component.componentType << "\n";
+            for (const ComponentFieldDesc& fd : GetComponentFields()) {
+                if (fd.componentType != inst.component.componentType) continue;
+                std::string key = std::string("Comp.") + fd.key;
+                switch (fd.type) {
+                    case ComponentFieldType::String:
+                        out << key << "=" << inst.component.*(fd.stringField) << "\n";
+                        break;
+                    case ComponentFieldType::Float:
+                        out << key << "=" << inst.component.*(fd.floatField) << "\n";
+                        break;
+                    case ComponentFieldType::Bool:
+                        out << key << "=" << ((inst.component.*(fd.boolField)) ? "true" : "false") << "\n";
+                        break;
+                    case ComponentFieldType::StringArray: {
+                        const std::vector<std::string>& arr = inst.component.*(fd.stringArrayField);
+                        out << key << ".Count=" << arr.size() << "\n";
+                        for (size_t a = 0; a < arr.size(); a++)
+                            out << key << "." << a << "=" << arr[a] << "\n";
+                        break;
+                    }
+                }
+            }
         }
         out << "PosX=" << inst.posX << "\n";
         out << "PosY=" << inst.posY << "\n";
@@ -99,6 +126,31 @@ bool StarMap::LoadFromFile(const std::string& path) {
                 for (int m = 0; m < count; m++) {
                     if (const std::string* mv = Find(section, "Material" + std::to_string(m)))
                         inst.materialAssetPaths[m] = *mv;
+                }
+            }
+            if (const std::string* v = Find(section, "HasComponent")) inst.hasComponent = (*v == "true");
+            if (const std::string* v = Find(section, "ComponentType")) inst.component.componentType = *v;
+            if (inst.hasComponent) {
+                for (const ComponentFieldDesc& fd : GetComponentFields()) {
+                    if (fd.componentType != inst.component.componentType) continue;
+                    std::string key = std::string("Comp.") + fd.key;
+                    if (fd.type == ComponentFieldType::StringArray) {
+                        if (const std::string* cv = Find(section, key + ".Count")) {
+                            int count = SafeParse::ToInt(*cv);
+                            std::vector<std::string>& arr = inst.component.*(fd.stringArrayField);
+                            if (count > 0) arr.resize((size_t)count);
+                            for (int a = 0; a < count; a++) {
+                                if (const std::string* av = Find(section, key + "." + std::to_string(a)))
+                                    arr[(size_t)a] = *av;
+                            }
+                        }
+                        continue;
+                    }
+                    const std::string* v = Find(section, key);
+                    if (!v) continue;
+                    if (fd.type == ComponentFieldType::String) inst.component.*(fd.stringField) = *v;
+                    else if (fd.type == ComponentFieldType::Float) inst.component.*(fd.floatField) = SafeParse::ToFloat(*v);
+                    else if (fd.type == ComponentFieldType::Bool) inst.component.*(fd.boolField) = (*v == "true");
                 }
             }
             if (const std::string* v = Find(section, "PosX"))   inst.posX   = SafeParse::ToFloat(*v);

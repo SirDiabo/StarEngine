@@ -5,6 +5,7 @@
 #include "ContentBrowserPanel.h"
 #include "LogPanel.h"
 #include "ModuleBrowserPanel.h"
+#include "PlaceActorsPanel.h"
 #include "MenuBar.h"
 #include "Core/LayoutSerializer.h"
 #include "NativeFileDialog.h"
@@ -14,12 +15,13 @@ void LevelEditorTab::Initialize() {
     title     = "Level Editor";
     permanent = true;
 
-    viewportPanel  = new ViewportPanel();
-    detailsPanel   = new DetailsPanel();
-    outlinerPanel  = new OutlinerPanel();
-    contentPanel   = new ContentBrowserPanel();
-    logPanel       = new LogPanel();
-    modulePanel    = new ModuleBrowserPanel();
+    viewportPanel    = new ViewportPanel();
+    detailsPanel     = new DetailsPanel();
+    outlinerPanel    = new OutlinerPanel();
+    contentPanel     = new ContentBrowserPanel();
+    logPanel         = new LogPanel();
+    modulePanel      = new ModuleBrowserPanel();
+    placeActorsPanel = new PlaceActorsPanel();
 
     viewportPanel->Initialize();
     detailsPanel->Initialize();
@@ -27,6 +29,7 @@ void LevelEditorTab::Initialize() {
     contentPanel->Initialize();
     logPanel->Initialize();
     modulePanel->Initialize();
+    placeActorsPanel->Initialize();
 
     modulePanel->SetLogPanel(logPanel);
     viewportPanel->SetLogPanel(logPanel);
@@ -36,6 +39,9 @@ void LevelEditorTab::Initialize() {
     detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     detailsPanel->onOpenAsset = [this](const std::string& path, const std::string& ext) {
         if (onAssetOpened) onAssetOpened(path, ext);
+    };
+    detailsPanel->onEdited = [this]() {
+        viewportPanel->MarkDirty();
     };
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
@@ -51,18 +57,22 @@ void LevelEditorTab::Initialize() {
             viewportPanel->DropStaticMeshAsset(path, dropPos);
     };
 
+    placeActorsPanel->onActorDragged = [this](const BasicActorDef& def, Vector2 dropPos) {
+        viewportPanel->DropBasicActor(def, dropPos);
+    };
+
     dockArea.SetPanels({
-        viewportPanel, detailsPanel, outlinerPanel, contentPanel, logPanel, modulePanel
+        viewportPanel, detailsPanel, outlinerPanel, contentPanel, logPanel, modulePanel, placeActorsPanel
     });
 
     BuildDefaultLayout();
 }
 
 void LevelEditorTab::BuildDefaultLayout() {
-    // Layout from user spec (level.cfg):
-    // Root splits vertically at 0.75: left column (0) and right column (1).
-    // Left column (0) splits vertically at 0.70: Viewport (0.0) on top, Content+Logs (0.1) on bottom.
-    // Right column (1) splits vertically at 0.333: Outliner (1.0) on top, Details (1.1) on bottom.
+
+    auto placeActorsLeaf = std::make_unique<DockNode>();
+    placeActorsLeaf->panelNames = { "Place Actors" };
+    placeActorsLeaf->activeTab  = 0;
 
     auto viewportLeaf = std::make_unique<DockNode>();
     viewportLeaf->panelNames = { "Viewport" };
@@ -92,11 +102,17 @@ void LevelEditorTab::BuildDefaultLayout() {
     rightCol->first      = std::move(outlinerLeaf);
     rightCol->second     = std::move(detailsLeaf);
 
+    auto mainArea = std::make_unique<DockNode>();
+    mainArea->type       = DockNode::Type::SplitH;
+    mainArea->splitRatio = 0.75f;
+    mainArea->first      = std::move(leftCol);
+    mainArea->second     = std::move(rightCol);
+
     auto root = std::make_unique<DockNode>();
     root->type       = DockNode::Type::SplitH;
-    root->splitRatio = 0.75f;
-    root->first      = std::move(leftCol);
-    root->second     = std::move(rightCol);
+    root->splitRatio = 0.16f;
+    root->first      = std::move(placeActorsLeaf);
+    root->second     = std::move(mainArea);
 
     dockArea.SetDefaultLayout(std::move(root));
 }
@@ -131,13 +147,14 @@ void LevelEditorTab::BuildMenus(MenuBar* menuBar) {
         dockArea.IsPanelVisible("Content Browser"),
         dockArea.IsPanelVisible("Logs"),
         dockArea.IsPanelVisible("Modules"),
+        dockArea.IsPanelVisible("Place Actors"),
         false, false, false, false,
     };
 
     menuBar->SetMenus({
         { "File",   { "New Project", "Open Project", "Save Project" } },
         { "Edit",   { "Editor Settings", "Project Settings" } },
-        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "---", "Reset Layout", "Save Layout As", "Load Layout" }, windowChecked },
+        { "Window", { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "Place Actors", "---", "Reset Layout", "Save Layout As", "Load Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -156,7 +173,7 @@ void LevelEditorTab::LoadLayout(const std::string& filePath) {
 }
 
 void LevelEditorTab::ResetLayout() {
-    for (const std::string& name : { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules" })
+    for (const std::string& name : { "Viewport", "Details", "Outliner", "Content Browser", "Logs", "Modules", "Place Actors" })
         dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
 }

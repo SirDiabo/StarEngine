@@ -31,10 +31,27 @@ void DetailsPanel::RefreshFromSelection(const ActorInstance& inst) {
     snprintf(scaleXBuf, sizeof(scaleXBuf), "%.2f", inst.scaleX);
     snprintf(scaleYBuf, sizeof(scaleYBuf), "%.2f", inst.scaleY);
     snprintf(scaleZBuf, sizeof(scaleZBuf), "%.2f", inst.scaleZ);
+
+    snprintf(compLightColorBuf[0], 32, "%.2f", inst.component.lightColorR);
+    snprintf(compLightColorBuf[1], 32, "%.2f", inst.component.lightColorG);
+    snprintf(compLightColorBuf[2], 32, "%.2f", inst.component.lightColorB);
+    snprintf(compLightIntensityBuf, sizeof(compLightIntensityBuf), "%.2f", inst.component.lightIntensity);
+    snprintf(compLightRadiusBuf, sizeof(compLightRadiusBuf), "%.2f", inst.component.lightRadius);
+    snprintf(compLightInnerConeBuf, sizeof(compLightInnerConeBuf), "%.2f", inst.component.lightInnerConeAngle);
+    snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", inst.component.lightOuterConeAngle);
+    snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", inst.component.lightWidth);
+    snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", inst.component.lightHeight);
+    snprintf(compCameraFovBuf, sizeof(compCameraFovBuf), "%.2f", inst.component.cameraFov);
+    snprintf(compCameraNearBuf, sizeof(compCameraNearBuf), "%.2f", inst.component.cameraNearClip);
+    snprintf(compCameraFarBuf, sizeof(compCameraFarBuf), "%.2f", inst.component.cameraFarClip);
+    snprintf(compAudioVolumeBuf, sizeof(compAudioVolumeBuf), "%.2f", inst.component.volume);
+    snprintf(compAudioPitchBuf, sizeof(compAudioPitchBuf), "%.2f", inst.component.pitch);
+
     activeField = 0;
     meshPicker.Close();
     materialPicker.Close();
     materialSlotPickerIndex = -1;
+    audioPathPicker.Close();
 }
 
 void DetailsPanel::Render() {
@@ -62,7 +79,9 @@ void DetailsPanel::Render() {
     auto vec3Row = [&](char bufX[32], char bufY[32], char bufZ[32], int fieldBase,
                         float& vx, float& vy, float& vz) {
         Rectangle row = {x + 8, y, w - 16, 18};
-        PropertyField::Vec3Row(row, bufX, bufY, bufZ, fieldBase, activeField, vx, vy, vz);
+        if (PropertyField::Vec3Row(row, bufX, bufY, bufZ, fieldBase, activeField, vx, vy, vz)) {
+            if (onEdited) onEdited();
+        }
         y += 22;
     };
 
@@ -75,6 +94,7 @@ void DetailsPanel::Render() {
     std::string instName = inst.name;
     if (PropertyField::StringBox(nameRect, nameEditBuf, sizeof(nameEditBuf), 1, activeField, instName)) {
         inst.name = instName;
+        if (onEdited) onEdited();
     }
     y += 26;
 
@@ -96,7 +116,9 @@ void DetailsPanel::Render() {
 
     if (!inst.graphAssetPath.empty()) {
         RenderClassComponentsSection(inst, x, y, w);
-    } else if (!inst.meshAssetPath.empty()) {
+    } else if (inst.hasComponent) {
+        RenderInlineComponentSection(inst, x, y, w);
+    } else if (inst.className == "StaticMeshActor") {
         RenderStaticMeshSection(inst, x, y, w);
     }
 }
@@ -121,7 +143,10 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     }
     y += 22;
     std::string pickedMesh;
-    if (meshPicker.Render(pickedMesh)) inst.meshAssetPath = pickedMesh;
+    if (meshPicker.Render(pickedMesh)) {
+        inst.meshAssetPath = pickedMesh;
+        if (onEdited) onEdited();
+    }
 
     std::vector<MaterialSlot> meshSlots;
     if (!inst.meshAssetPath.empty()) {
@@ -133,6 +158,7 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     bool castsShadow = inst.castsShadow;
     if (GuiCheckBox({x + 8, y, 18, 18}, "Casts Shadow", &castsShadow) && !anyPickerOpen) {
         inst.castsShadow = castsShadow;
+        if (onEdited) onEdited();
     }
     y += 24;
 
@@ -163,6 +189,105 @@ void DetailsPanel::RenderStaticMeshSection(ActorInstance& inst, float x, float& 
     if (materialPicker.Render(pickedMat)) {
         if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)inst.materialAssetPaths.size())
             inst.materialAssetPaths[materialSlotPickerIndex] = pickedMat;
+        if (onEdited) onEdited();
+    }
+}
+
+void DetailsPanel::RenderInlineComponentSection(ActorInstance& inst, float x, float& y, float w) {
+    const UIPalette& theme = UITheme::Get();
+    Vector2 mp = GetMousePosition();
+    ComponentDecl& comp = inst.component;
+
+    DrawText((comp.componentType + " Component").c_str(), (int)x + 8, (int)y, 12, theme.sectionHeader);
+    y += 18;
+
+    auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal) {
+        DrawText(label, (int)x + 8, (int)y, 11, theme.textSecondary);
+        y += 14;
+        Rectangle r = {x + 8, y, w - 16, 18};
+        if (PropertyField::FloatBox(r, buf, bufSize, fieldId, activeField, outVal)) {
+            if (onEdited) onEdited();
+        }
+        y += 22;
+    };
+
+    if (comp.componentType == "LightComponent") {
+        DrawText("Light Type", (int)x + 8, (int)y, 11, theme.textSecondary);
+        y += 14;
+        if (UIWidget::Button({x + 8, y, w - 16, 18}, comp.lightType.c_str())) {
+            if (comp.lightType == "Point") comp.lightType = "Rectangle";
+            else if (comp.lightType == "Rectangle") comp.lightType = "Spot";
+            else if (comp.lightType == "Spot") comp.lightType = "Global";
+            else if (comp.lightType == "Global") comp.lightType = "Sun";
+            else comp.lightType = "Point";
+            if (onEdited) onEdited();
+        }
+        y += 24;
+
+        DrawText("Light Color", (int)x + 8, (int)y, 11, theme.sectionHeader);
+        y += 14;
+        Rectangle colorRow = {x + 8, y, w - 16, 18};
+        if (PropertyField::Vec3Row(colorRow, compLightColorBuf[0], compLightColorBuf[1], compLightColorBuf[2],
+                                    16, activeField, comp.lightColorR, comp.lightColorG, comp.lightColorB)) {
+            if (onEdited) onEdited();
+        }
+        y += 22;
+
+        floatField("Intensity", compLightIntensityBuf, sizeof(compLightIntensityBuf), 19, comp.lightIntensity);
+
+        if (comp.lightType != "Global" && comp.lightType != "Sun") {
+            floatField("Radius", compLightRadiusBuf, sizeof(compLightRadiusBuf), 20, comp.lightRadius);
+        }
+        if (comp.lightType == "Spot") {
+            floatField("Inner Cone Angle", compLightInnerConeBuf, sizeof(compLightInnerConeBuf), 21, comp.lightInnerConeAngle);
+            floatField("Outer Cone Angle", compLightOuterConeBuf, sizeof(compLightOuterConeBuf), 22, comp.lightOuterConeAngle);
+        }
+        if (comp.lightType == "Rectangle") {
+            floatField("Width", compLightWidthBuf, sizeof(compLightWidthBuf), 23, comp.lightWidth);
+            floatField("Height", compLightHeightBuf, sizeof(compLightHeightBuf), 24, comp.lightHeight);
+        }
+    } else if (comp.componentType == "CameraComponent") {
+        floatField("FOV", compCameraFovBuf, sizeof(compCameraFovBuf), 25, comp.cameraFov);
+        floatField("Near Clip", compCameraNearBuf, sizeof(compCameraNearBuf), 26, comp.cameraNearClip);
+        floatField("Far Clip", compCameraFarBuf, sizeof(compCameraFarBuf), 27, comp.cameraFarClip);
+        bool ortho = comp.cameraOrthographic;
+        if (GuiCheckBox({x + 8, y, 18, 18}, "Orthographic", &ortho)) {
+            comp.cameraOrthographic = ortho;
+            if (onEdited) onEdited();
+        }
+        y += 24;
+    } else if (comp.componentType == "AudioComponent") {
+        DrawText("Sound", (int)x + 8, (int)y, 11, theme.textSecondary);
+        y += 14;
+        Rectangle r = {x + 8, y, w - 16, 18};
+        DrawRectangleRec(r, theme.fieldBg);
+        DrawRectangleLinesEx(r, 1, theme.fieldBorder);
+        DrawText(AssetDisplayName(comp.soundAssetPath).c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !audioPathPicker.IsOpen()) {
+            audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
+        }
+        y += 22;
+        std::string pickedSound;
+        if (audioPathPicker.Render(pickedSound)) {
+            comp.soundAssetPath = pickedSound;
+            if (onEdited) onEdited();
+        }
+
+        floatField("Volume", compAudioVolumeBuf, sizeof(compAudioVolumeBuf), 28, comp.volume);
+        floatField("Pitch", compAudioPitchBuf, sizeof(compAudioPitchBuf), 29, comp.pitch);
+
+        bool autoPlay = comp.autoPlay;
+        if (GuiCheckBox({x + 8, y, 18, 18}, "Auto Play", &autoPlay)) {
+            comp.autoPlay = autoPlay;
+            if (onEdited) onEdited();
+        }
+        y += 24;
+        bool looping = comp.looping;
+        if (GuiCheckBox({x + 8, y, 18, 18}, "Looping", &looping)) {
+            comp.looping = looping;
+            if (onEdited) onEdited();
+        }
+        y += 24;
     }
 }
 

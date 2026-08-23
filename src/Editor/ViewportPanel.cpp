@@ -221,6 +221,48 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     mapDirty = true;
 }
 
+void ViewportPanel::DropBasicActor(const BasicActorDef& def, Vector2 screenPos) {
+    if (!mapLoaded) return;
+
+    Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
+    Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
+
+    if (!CheckCollisionPointRec(screenPos, client)) return;
+
+    float u = (screenPos.x - client.x) / client.width;
+    float v = (screenPos.y - client.y) / client.height;
+
+    Ray ray = GetScreenToWorldRayEx(
+        {u * (float)renderTargetWidth, v * (float)renderTargetHeight},
+        camera, renderTargetWidth, renderTargetHeight);
+
+    float worldX = 0, worldZ = 0;
+    if (fabsf(ray.direction.y) > 0.001f) {
+        float t = -ray.position.y / ray.direction.y;
+        worldX = ray.position.x + ray.direction.x * t;
+        worldZ = ray.position.z + ray.direction.z * t;
+    }
+
+    ActorInstance inst;
+    inst.name = def.label + "_" + std::to_string(starMap.GetInstances().size() + 1);
+    inst.posX = worldX;
+    inst.posY = 0;
+    inst.posZ = worldZ;
+    inst.scaleX = inst.scaleY = inst.scaleZ = 1.0f;
+
+    if (def.isMeshActor) {
+        inst.className = "StaticMeshActor";
+    } else {
+        inst.className = "Actor";
+        inst.hasComponent = true;
+        inst.component = def.defaultComponent;
+    }
+
+    starMap.AddInstance(inst);
+    selectedActorIndex = (int)starMap.GetInstances().size() - 1;
+    mapDirty = true;
+}
+
 void ViewportPanel::SaveMap() {
     if (!mapPath.empty()) {
         starMap.SaveToFile(mapPath);
@@ -427,6 +469,9 @@ void ViewportPanel::RenderScene() {
                 Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
                 DrawInstanceOrMesh("", {}, pos, rot, boxSize, false, fallbackColor);
             }
+        } else if (inst.hasComponent) {
+            Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
+            DrawInstanceOrMesh("", {}, pos, rot, boxSize, selected, fallbackColor);
         } else {
             DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
         }

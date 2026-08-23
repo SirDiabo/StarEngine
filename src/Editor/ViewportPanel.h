@@ -2,6 +2,7 @@
 #include "Core/Panel.h"
 #include "Runtime/StarMap.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "BasicActorDefs.h"
 #include "raylib.h"
 #include <string>
 #include <unordered_map>
@@ -19,8 +20,10 @@ public:
 
     void LoadMap(const std::string& path);
     void SaveMap();
+    void MarkDirty() { mapDirty = true; }
     void DropActorAsset(const std::string& assetPath, Vector2 screenPos);
     void DropStaticMeshAsset(const std::string& assetPath, Vector2 screenPos);
+    void DropBasicActor(const BasicActorDef& def, Vector2 screenPos);
     const StarMap* GetStarMap() const { return &starMap; }
     int* GetSelectedActorIndexPtr() { return &selectedActorIndex; }
     const std::string& GetMapPath() const { return mapPath; }

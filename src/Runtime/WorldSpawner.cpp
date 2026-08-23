@@ -63,6 +63,21 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
         actor->AddComponent(meshComp);
     }
 
+    if (inst.hasComponent && !inst.component.componentType.empty()) {
+        Component* comp = nullptr;
+        for (const ComponentTypeDesc& td : GetComponentTypes()) {
+            if (inst.component.componentType == td.componentType) { comp = td.factory(); break; }
+        }
+        if (comp) {
+            for (const ComponentFieldDesc& fd : GetComponentFields()) {
+                if (fd.componentType == inst.component.componentType && fd.applyToComponent)
+                    fd.applyToComponent(*comp, inst.component);
+            }
+            comp->SetName(inst.component.componentType);
+            actor->AddComponent(comp);
+        }
+    }
+
     return actor;
 }
 
