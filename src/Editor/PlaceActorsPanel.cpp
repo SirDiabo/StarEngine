@@ -42,7 +42,7 @@ void PlaceActorsPanel::Render() {
 
     DrawText("Place Actors", (int)bounds.x + 8, (int)bounds.y + 6, 12, theme.textSecondary);
 
-    float rowHeight = 30.0f;
+    float rowHeight = 60.0f;
     float y = bounds.y + 26;
 
     for (size_t i = 0; i < defs.size(); i++) {
