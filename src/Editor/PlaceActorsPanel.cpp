@@ -1,12 +1,39 @@
 #include "PlaceActorsPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
+#include "Core/EmbeddedAssets.h"
+
+PlaceActorsPanel::~PlaceActorsPanel() {
+    UnloadIcons();
+}
 
 void PlaceActorsPanel::Initialize() {
     name = "Place Actors";
 }
 
+void PlaceActorsPanel::LoadIcons() {
+    for (const BasicActorDef& def : GetBasicActorDefs()) {
+        if (def.iconFile.empty() || icons.count(def.iconFile)) continue;
+        Texture2D tex = EmbeddedAssets::Get().LoadTextureAsset(def.iconFile);
+        if (tex.id != 0) icons[def.iconFile] = tex;
+    }
+    iconsLoaded = true;
+}
+
+void PlaceActorsPanel::UnloadIcons() {
+    for (auto& kv : icons) UnloadTexture(kv.second);
+    icons.clear();
+}
+
+Texture2D PlaceActorsPanel::GetIconForDef(const BasicActorDef& def) const {
+    auto it = icons.find(def.iconFile);
+    if (it != icons.end()) return it->second;
+    return Texture2D{};
+}
+
 void PlaceActorsPanel::Render() {
+    if (!iconsLoaded && IsWindowReady()) LoadIcons();
+
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel(bounds);
 
@@ -25,7 +52,15 @@ void PlaceActorsPanel::Render() {
         DrawRectangleRounded(row, 0.15f, 4, UIWidget::SelectableBg(hovered, false, theme.buttonBg));
 
         Rectangle iconRect = {row.x + 6, row.y + 5, rowHeight - 14, rowHeight - 14};
-        DrawRectangleRounded(iconRect, 0.25f, 4, defs[i].accentColor);
+        Texture2D icon = GetIconForDef(defs[i]);
+        if (icon.id != 0) {
+            DrawTexturePro(icon,
+                {0, 0, (float)icon.width, (float)icon.height},
+                iconRect,
+                {0, 0}, 0, WHITE);
+        } else {
+            DrawRectangleRounded(iconRect, 0.25f, 4, defs[i].accentColor);
+        }
 
         DrawText(defs[i].label.c_str(), (int)iconRect.x + (int)iconRect.width + 8,
                   (int)row.y + (int)(row.height * 0.5f) - 5, 11, theme.textPrimary);
@@ -51,7 +86,15 @@ void PlaceActorsPanel::Render() {
                 int lw = MeasureText(def.label.c_str(), 12) + 16;
                 DrawRectangleRec({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, {55, 55, 75, 220});
                 DrawRectangleLinesEx({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, 1, {120, 120, 200, 255});
-                DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, def.accentColor);
+                Texture2D dragIcon = GetIconForDef(def);
+                if (dragIcon.id != 0) {
+                    DrawTexturePro(dragIcon,
+                        {0, 0, (float)dragIcon.width, (float)dragIcon.height},
+                        {mousePos.x + 14, mousePos.y + 2, 10, 10},
+                        {0, 0}, 0, WHITE);
+                } else {
+                    DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, def.accentColor);
+                }
                 DrawText(def.label.c_str(), (int)mousePos.x + 28, (int)mousePos.y + 1, 12, WHITE);
             } else {
                 if (onActorDragged) onActorDragged(defs[dragIndex], mousePos);

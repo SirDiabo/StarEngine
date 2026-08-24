@@ -53,6 +53,8 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 if (it != componentsByName.end() && it->second != comp) comp->parent = it->second;
             }
         }
+    } else if (!inst.actorKind.empty()) {
+        actor->SetActorClass(inst.actorKind);
     }
 
     if (!inst.meshAssetPath.empty()) {

@@ -11,11 +11,21 @@ namespace fs = std::filesystem;
 std::vector<std::function<void()>> AssetPickerPopup::deferredDraws;
 
 void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
+    OpenWithExtras(anchorPos, ext, {});
+}
+
+void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
+                                       const std::vector<std::pair<std::string, std::string>>& extras) {
     open = true;
     justOpened = true;
     extension = ext;
     displayNames.clear();
     contentPaths.clear();
+
+    for (const auto& extra : extras) {
+        displayNames.push_back(extra.first);
+        contentPaths.push_back(extra.second);
+    }
 
     fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
     if (fs::exists(contentRoot)) {

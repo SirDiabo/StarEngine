@@ -32,6 +32,7 @@ bool StarMap::SaveToFile(const std::string& path) const {
             out << "Material" << m << "=" << inst.materialAssetPaths[m] << "\n";
         }
         out << "HasComponent=" << (inst.hasComponent ? "true" : "false") << "\n";
+        out << "ActorKind=" << inst.actorKind << "\n";
         if (inst.hasComponent) {
             out << "ComponentType=" << inst.component.componentType << "\n";
             for (const ComponentFieldDesc& fd : GetComponentFields()) {
@@ -129,6 +130,7 @@ bool StarMap::LoadFromFile(const std::string& path) {
                 }
             }
             if (const std::string* v = Find(section, "HasComponent")) inst.hasComponent = (*v == "true");
+            if (const std::string* v = Find(section, "ActorKind")) inst.actorKind = *v;
             if (const std::string* v = Find(section, "ComponentType")) inst.component.componentType = *v;
             if (inst.hasComponent) {
                 for (const ComponentFieldDesc& fd : GetComponentFields()) {

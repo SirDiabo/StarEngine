@@ -78,6 +78,12 @@ void LevelEditorTab::BuildDefaultLayout() {
     viewportLeaf->panelNames = { "Viewport" };
     viewportLeaf->activeTab  = 0;
 
+    auto topRow = std::make_unique<DockNode>();
+    topRow->type       = DockNode::Type::SplitH;
+    topRow->splitRatio = 0.2230f;
+    topRow->first      = std::move(placeActorsLeaf);
+    topRow->second     = std::move(viewportLeaf);
+
     auto bottomLeaf = std::make_unique<DockNode>();
     bottomLeaf->panelNames = { "Content Browser", "Logs", "Modules" };
     bottomLeaf->activeTab  = 0;
@@ -85,7 +91,7 @@ void LevelEditorTab::BuildDefaultLayout() {
     auto leftCol = std::make_unique<DockNode>();
     leftCol->type       = DockNode::Type::SplitV;
     leftCol->splitRatio = 0.70f;
-    leftCol->first      = std::move(viewportLeaf);
+    leftCol->first      = std::move(topRow);
     leftCol->second     = std::move(bottomLeaf);
 
     auto outlinerLeaf = std::make_unique<DockNode>();
@@ -102,17 +108,11 @@ void LevelEditorTab::BuildDefaultLayout() {
     rightCol->first      = std::move(outlinerLeaf);
     rightCol->second     = std::move(detailsLeaf);
 
-    auto mainArea = std::make_unique<DockNode>();
-    mainArea->type       = DockNode::Type::SplitH;
-    mainArea->splitRatio = 0.75f;
-    mainArea->first      = std::move(leftCol);
-    mainArea->second     = std::move(rightCol);
-
     auto root = std::make_unique<DockNode>();
     root->type       = DockNode::Type::SplitH;
-    root->splitRatio = 0.16f;
-    root->first      = std::move(placeActorsLeaf);
-    root->second     = std::move(mainArea);
+    root->splitRatio = 0.75f;
+    root->first       = std::move(leftCol);
+    root->second      = std::move(rightCol);
 
     dockArea.SetDefaultLayout(std::move(root));
 }

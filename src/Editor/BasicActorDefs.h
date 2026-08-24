@@ -7,10 +7,9 @@
 struct BasicActorDef {
     std::string label;
     Color accentColor;
+    std::string iconFile;
+    std::string kindName;
 
-    // True for the Mesh entry, which reuses the existing StaticMeshActor path
-    // (className="StaticMeshActor", meshAssetPath left empty for the user to assign
-    // via the Details panel) instead of the generic inline-component path below.
     bool isMeshActor = false;
 
     std::string componentType;

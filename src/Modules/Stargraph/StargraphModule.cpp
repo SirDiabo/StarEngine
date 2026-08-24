@@ -102,6 +102,14 @@ void StargraphModule::RegisterObjectKinds() {
     kinds.RegisterKind("Sound", "");
     kinds.RegisterKind("Music", "");
     kinds.RegisterKind("Texture", "");
+    kinds.RegisterKind("MeshActor", "Actor");
+    kinds.RegisterKind("PointLightActor", "Actor");
+    kinds.RegisterKind("SunLightActor", "Actor");
+    kinds.RegisterKind("SpotLightActor", "Actor");
+    kinds.RegisterKind("RectLightActor", "Actor");
+    kinds.RegisterKind("GlobalLightActor", "Actor");
+    kinds.RegisterKind("CameraActor", "Actor");
+    kinds.RegisterKind("AudioActor", "Actor");
 }
 
 void StargraphModule::RegisterEditorTabs() {

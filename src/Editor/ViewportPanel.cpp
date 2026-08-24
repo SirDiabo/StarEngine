@@ -204,6 +204,7 @@ void ViewportPanel::DropStaticMeshAsset(const std::string& assetPath, Vector2 sc
     inst.name = baseName + "_" + std::to_string(starMap.GetInstances().size() + 1);
     inst.className = "StaticMeshActor";
     inst.meshAssetPath = ContentPathResolver::MakeRelative(assetPath);
+    inst.actorKind = "MeshActor";
     inst.posX = worldX + asset.importPosX;
     inst.posY = asset.importPosY;
     inst.posZ = worldZ + asset.importPosZ;
@@ -257,6 +258,7 @@ void ViewportPanel::DropBasicActor(const BasicActorDef& def, Vector2 screenPos) 
         inst.hasComponent = true;
         inst.component = def.defaultComponent;
     }
+    inst.actorKind = def.kindName;
 
     starMap.AddInstance(inst);
     selectedActorIndex = (int)starMap.GetInstances().size() - 1;

@@ -2,11 +2,14 @@
 #include "raylib.h"
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 class AssetPickerPopup {
 public:
     void Open(Vector2 anchorPos, const std::string& extension);
+    void OpenWithExtras(Vector2 anchorPos, const std::string& extension,
+                         const std::vector<std::pair<std::string, std::string>>& extras);
     void Close();
     bool IsOpen() const { return open; }
     bool ContainsPoint(Vector2 point) const { return open && CheckCollisionPointRec(point, area); }

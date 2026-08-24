@@ -6,12 +6,22 @@
 #include "Editor/PropertyFields.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
+#include "Editor/BasicActorDefs.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
 #include <sstream>
+
+static const std::vector<std::pair<std::string, std::string>>& BasicActorClassPickerEntries() {
+    static const std::vector<std::pair<std::string, std::string>> entries = [] {
+        std::vector<std::pair<std::string, std::string>> list;
+        for (const BasicActorDef& def : GetBasicActorDefs()) list.emplace_back(def.label, def.kindName);
+        return list;
+    }();
+    return entries;
+}
 
 static bool IsTimerFunctionNameNode(const std::string& type) {
     return type == "Timer_By_Function_Name" || type == "Pause_Timer_By_Function_Name" ||
@@ -1037,7 +1047,8 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
                         actorClassPickerVarIndex = -1;
-                        actorClassPicker.Open({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor");
+                        actorClassPicker.OpenWithExtras({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor",
+                                                         BasicActorClassPickerEntries());
                         editingPinId = 0;
                     }
                     if (actorClassPickerPinId == pin.id) {
