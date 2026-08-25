@@ -40,10 +40,8 @@ void PlaceActorsPanel::Render() {
     Vector2 mousePos = GetMousePosition();
     const std::vector<BasicActorDef>& defs = GetBasicActorDefs();
 
-    DrawText("Place Actors", (int)bounds.x + 8, (int)bounds.y + 6, 12, theme.textSecondary);
-
     float rowHeight = 60.0f;
-    float y = bounds.y + 26;
+    float y = bounds.y + 6;
 
     for (size_t i = 0; i < defs.size(); i++) {
         Rectangle row = {bounds.x + 4, y, bounds.width - 8, rowHeight - 4};

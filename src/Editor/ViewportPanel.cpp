@@ -531,14 +531,18 @@ void ViewportPanel::RenderGizmo(Vector3 pos, Vector3 rot) {
     Vector3 axes[3] = {axisX, axisY, axisZ};
     Color colors[3] = { {230, 60, 60, 255}, {70, 210, 90, 255}, {70, 130, 240, 255} };
     float len = GetGizmoWorldScale(pos);
+    float worldPerPixel = GetWorldPerPixel(pos);
+
+    rlDrawRenderBatchActive();
+    rlDisableDepthTest();
 
     if (gizmoMode == GizmoMode::Move) {
         for (int a = 0; a < 3; a++) {
             bool active = (gizmoHoverAxis == a || gizmoDragAxis == a);
             float shaftLen = len * 0.75f;
             float tipLen = len * 0.25f;
-            float shaftRadius = active ? 4.0f : 2.5f;
-            float tipRadius = active ? 12.0f : 8.0f;
+            float shaftRadius = (active ? 4.0f : 2.5f) * worldPerPixel;
+            float tipRadius = (active ? 12.0f : 8.0f) * worldPerPixel;
             Color c = active ? BrightenColor(colors[a]) : colors[a];
 
             Vector3 shaftEnd = Vector3Add(pos, Vector3Scale(axes[a], shaftLen));
@@ -551,8 +555,8 @@ void ViewportPanel::RenderGizmo(Vector3 pos, Vector3 rot) {
         for (int a = 0; a < 3; a++) {
             bool active = (gizmoHoverAxis == a || gizmoDragAxis == a);
             float shaftLen = len * 0.8f;
-            float shaftRadius = active ? 4.0f : 2.5f;
-            float cubeSize = active ? 16.0f : 11.0f;
+            float shaftRadius = (active ? 4.0f : 2.5f) * worldPerPixel;
+            float cubeSize = (active ? 16.0f : 11.0f) * worldPerPixel;
             Color c = active ? BrightenColor(colors[a]) : colors[a];
 
             Vector3 shaftEnd = Vector3Add(pos, Vector3Scale(axes[a], shaftLen));
@@ -576,6 +580,9 @@ void ViewportPanel::RenderGizmo(Vector3 pos, Vector3 rot) {
             }
         }
     }
+
+    rlDrawRenderBatchActive();
+    rlEnableDepthTest();
 }
 
 int ViewportPanel::PickGizmoHandle(Vector2 localMp, Vector3 pos, Vector3 rot) const {
@@ -653,6 +660,8 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
 
             if (gizmoMode == GizmoMode::Rotate) {
                 gizmoDragStartScreenAngle = atan2f(localMp.y - originScreen.y, localMp.x - originScreen.x);
+                Vector3 toCamera = Vector3Normalize(Vector3Subtract(camera.position, pos));
+                gizmoDragRotSign = (Vector3DotProduct(toCamera, axes[gizmoDragAxis]) >= 0.0f) ? 1.0f : -1.0f;
             }
             return true;
         }
@@ -673,6 +682,11 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
         GetGizmoAxes(gizmoDragStartRot, axisX, axisY, axisZ);
         Vector3 axes[3] = {axisX, axisY, axisZ};
         Vector3 newPos = Vector3Add(gizmoDragStartPos, Vector3Scale(axes[gizmoDragAxis], worldDelta));
+        if (IsKeyDown(KEY_LEFT_CONTROL)) {
+            newPos.x = roundf(newPos.x);
+            newPos.y = roundf(newPos.y);
+            newPos.z = roundf(newPos.z);
+        }
         inst.posX = newPos.x;
         inst.posY = newPos.y;
         inst.posZ = newPos.z;
@@ -684,6 +698,7 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
 
         float newScale[3] = {gizmoDragStartScale.x, gizmoDragStartScale.y, gizmoDragStartScale.z};
         newScale[gizmoDragAxis] += scaleDelta;
+        if (IsKeyDown(KEY_LEFT_CONTROL)) newScale[gizmoDragAxis] = roundf(newScale[gizmoDragAxis] / 0.1f) * 0.1f;
         if (newScale[gizmoDragAxis] < 0.01f) newScale[gizmoDragAxis] = 0.01f;
         inst.scaleX = newScale[0];
         inst.scaleY = newScale[1];
@@ -691,10 +706,11 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
     } else if (gizmoMode == GizmoMode::Rotate) {
         Vector2 originScreen = WorldToScreenPoint(gizmoDragStartPos);
         float currentAngle = atan2f(localMp.y - originScreen.y, localMp.x - originScreen.x);
-        float deltaDeg = (currentAngle - gizmoDragStartScreenAngle) * RAD2DEG;
+        float deltaDeg = gizmoDragRotSign * (gizmoDragStartScreenAngle - currentAngle) * RAD2DEG;
 
         float newRot[3] = {gizmoDragStartRot.x, gizmoDragStartRot.y, gizmoDragStartRot.z};
         newRot[gizmoDragAxis] += deltaDeg;
+        if (IsKeyDown(KEY_LEFT_CONTROL)) newRot[gizmoDragAxis] = roundf(newRot[gizmoDragAxis]);
         inst.rotX = newRot[0];
         inst.rotY = newRot[1];
         inst.rotZ = newRot[2];
@@ -836,10 +852,8 @@ void ViewportPanel::RenderToolbar() {
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
 
-    DrawText(name, (int)bounds.x + 6, (int)bounds.y + 8, 13, theme.textPrimary);
-
     if (mapLoaded && !playing) {
-        float bx = bounds.x + 6 + (float)MeasureText(name, 13) + 16;
+        float bx = bounds.x + 6;
         float by = toolbar.y + 3;
         float bs = 22;
 

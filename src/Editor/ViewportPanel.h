@@ -114,6 +114,7 @@ private:
     float gizmoDragWorldPerPixel = 1.0f;
     float gizmoDragHandleLen = 1.0f;
     float gizmoDragStartScreenAngle = 0.0f;
+    float gizmoDragRotSign = 1.0f;
 
     static const float toolbarHeight;
 };
