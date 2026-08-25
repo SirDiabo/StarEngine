@@ -707,13 +707,20 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
         Vector2 originScreen = WorldToScreenPoint(gizmoDragStartPos);
         float currentAngle = atan2f(localMp.y - originScreen.y, localMp.x - originScreen.x);
         float deltaDeg = gizmoDragRotSign * (gizmoDragStartScreenAngle - currentAngle) * RAD2DEG;
+        if (IsKeyDown(KEY_LEFT_CONTROL)) deltaDeg = roundf(deltaDeg);
 
-        float newRot[3] = {gizmoDragStartRot.x, gizmoDragStartRot.y, gizmoDragStartRot.z};
-        newRot[gizmoDragAxis] += deltaDeg;
-        if (IsKeyDown(KEY_LEFT_CONTROL)) newRot[gizmoDragAxis] = roundf(newRot[gizmoDragAxis]);
-        inst.rotX = newRot[0];
-        inst.rotY = newRot[1];
-        inst.rotZ = newRot[2];
+        Vector3 axisX, axisY, axisZ;
+        GetGizmoAxes(gizmoDragStartRot, axisX, axisY, axisZ);
+        Vector3 axes[3] = {axisX, axisY, axisZ};
+
+        Quaternion startQuat = QuaternionFromEuler(gizmoDragStartRot.x * DEG2RAD, gizmoDragStartRot.y * DEG2RAD, gizmoDragStartRot.z * DEG2RAD);
+        Quaternion deltaQuat = QuaternionFromAxisAngle(axes[gizmoDragAxis], deltaDeg * DEG2RAD);
+        Quaternion newQuat = QuaternionMultiply(deltaQuat, startQuat);
+        Vector3 newRotRad = QuaternionToEuler(newQuat);
+
+        inst.rotX = newRotRad.x * RAD2DEG;
+        inst.rotY = newRotRad.y * RAD2DEG;
+        inst.rotZ = newRotRad.z * RAD2DEG;
     }
 
     mapDirty = true;
@@ -745,6 +752,10 @@ void ViewportPanel::RenderScene() {
     DrawGrid(40, 100.0f);
 
     const auto& instances = starMap.GetInstances();
+    Vector3 selectedPos{0, 0, 0};
+    Vector3 selectedRot{0, 0, 0};
+    bool haveSelected = false;
+
     for (size_t i = 0; i < instances.size(); i++) {
         const ActorInstance& inst = instances[i];
         Vector3 pos = {inst.posX, inst.posY, inst.posZ};
@@ -793,9 +804,13 @@ void ViewportPanel::RenderScene() {
 
         if (selected) {
             DrawCircle3D(pos, 30.0f, {1, 0, 0}, 90.0f, {255, 200, 50, 255});
-            RenderGizmo(pos, rot);
+            selectedPos = pos;
+            selectedRot = rot;
+            haveSelected = true;
         }
     }
+
+    if (haveSelected) RenderGizmo(selectedPos, selectedRot);
 
     DrawAndClearCollisionDebug();
 
