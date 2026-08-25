@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <cmath>
 #include <cstdio>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -455,6 +456,272 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
     }
 }
 
+static void BuildOrthonormalBasis(Vector3 n, Vector3& u, Vector3& v) {
+    Vector3 helper = (fabsf(n.y) < 0.99f) ? Vector3{0, 1, 0} : Vector3{1, 0, 0};
+    u = Vector3Normalize(Vector3CrossProduct(helper, n));
+    v = Vector3CrossProduct(n, u);
+}
+
+static float DistancePointToSegment2D(Vector2 p, Vector2 a, Vector2 b) {
+    Vector2 ab = {b.x - a.x, b.y - a.y};
+    float len2 = ab.x * ab.x + ab.y * ab.y;
+    float t = 0.0f;
+    if (len2 > 0.0001f) {
+        t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2;
+        if (t < 0.0f) t = 0.0f;
+        if (t > 1.0f) t = 1.0f;
+    }
+    Vector2 proj = {a.x + ab.x * t, a.y + ab.y * t};
+    return Vector2Distance(p, proj);
+}
+
+static Color BrightenColor(Color c) {
+    auto lift = [](unsigned char v) { return (unsigned char)std::min(255, (int)v + 70); };
+    return {lift(c.r), lift(c.g), lift(c.b), 255};
+}
+
+Vector2 ViewportPanel::WorldToScreenPoint(Vector3 worldPos) const {
+    Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
+    Matrix proj = MatrixPerspective(camera.fovy * DEG2RAD, fboSize.x / fboSize.y, 1.0f, 50000.0f);
+    Matrix view = MatrixLookAt(camera.position, camera.target, camera.up);
+    Matrix mvp  = MatrixMultiply(view, proj);
+
+    Vector4 clip = {
+        worldPos.x * mvp.m0 + worldPos.y * mvp.m4 + worldPos.z * mvp.m8  + mvp.m12,
+        worldPos.x * mvp.m1 + worldPos.y * mvp.m5 + worldPos.z * mvp.m9  + mvp.m13,
+        worldPos.x * mvp.m2 + worldPos.y * mvp.m6 + worldPos.z * mvp.m10 + mvp.m14,
+        worldPos.x * mvp.m3 + worldPos.y * mvp.m7 + worldPos.z * mvp.m11 + mvp.m15
+    };
+
+    if (clip.w <= 0.0001f) return {-99999.0f, -99999.0f};
+
+    Vector2 ndc = {clip.x / clip.w, clip.y / clip.w};
+    return { (ndc.x + 1.0f) * 0.5f * fboSize.x, (1.0f - ndc.y) * 0.5f * fboSize.y };
+}
+
+float ViewportPanel::GetWorldPerPixel(Vector3 pos) const {
+    float dist = Vector3Distance(camera.position, pos);
+    return dist * tanf(camera.fovy * 0.5f * DEG2RAD) / ((float)renderTargetHeight * 0.5f);
+}
+
+float ViewportPanel::GetGizmoWorldScale(Vector3 pos) const {
+    const float desiredPixels = 90.0f;
+    return desiredPixels * GetWorldPerPixel(pos);
+}
+
+void ViewportPanel::GetGizmoAxes(Vector3 rot, Vector3& axisX, Vector3& axisY, Vector3& axisZ) const {
+    if (gizmoSpace == GizmoSpace::World) {
+        axisX = {1, 0, 0};
+        axisY = {0, 1, 0};
+        axisZ = {0, 0, 1};
+        return;
+    }
+
+    Matrix rotMat = MatrixRotateXYZ({rot.x * DEG2RAD, rot.y * DEG2RAD, rot.z * DEG2RAD});
+    axisX = Vector3Transform({1, 0, 0}, rotMat);
+    axisY = Vector3Transform({0, 1, 0}, rotMat);
+    axisZ = Vector3Transform({0, 0, 1}, rotMat);
+}
+
+void ViewportPanel::RenderGizmo(Vector3 pos, Vector3 rot) {
+    if (gizmoMode == GizmoMode::Select) return;
+
+    Vector3 axisX, axisY, axisZ;
+    GetGizmoAxes(rot, axisX, axisY, axisZ);
+    Vector3 axes[3] = {axisX, axisY, axisZ};
+    Color colors[3] = { {230, 60, 60, 255}, {70, 210, 90, 255}, {70, 130, 240, 255} };
+    float len = GetGizmoWorldScale(pos);
+
+    if (gizmoMode == GizmoMode::Move) {
+        for (int a = 0; a < 3; a++) {
+            bool active = (gizmoHoverAxis == a || gizmoDragAxis == a);
+            float shaftLen = len * 0.75f;
+            float tipLen = len * 0.25f;
+            float shaftRadius = active ? 4.0f : 2.5f;
+            float tipRadius = active ? 12.0f : 8.0f;
+            Color c = active ? BrightenColor(colors[a]) : colors[a];
+
+            Vector3 shaftEnd = Vector3Add(pos, Vector3Scale(axes[a], shaftLen));
+            Vector3 tipEnd = Vector3Add(pos, Vector3Scale(axes[a], shaftLen + tipLen));
+
+            DrawCylinderEx(pos, shaftEnd, shaftRadius, shaftRadius, 8, c);
+            DrawCylinderEx(shaftEnd, tipEnd, tipRadius, 0.0f, 12, c);
+        }
+    } else if (gizmoMode == GizmoMode::Scale) {
+        for (int a = 0; a < 3; a++) {
+            bool active = (gizmoHoverAxis == a || gizmoDragAxis == a);
+            float shaftLen = len * 0.8f;
+            float shaftRadius = active ? 4.0f : 2.5f;
+            float cubeSize = active ? 16.0f : 11.0f;
+            Color c = active ? BrightenColor(colors[a]) : colors[a];
+
+            Vector3 shaftEnd = Vector3Add(pos, Vector3Scale(axes[a], shaftLen));
+            DrawCylinderEx(pos, shaftEnd, shaftRadius, shaftRadius, 8, c);
+            DrawCube(shaftEnd, cubeSize, cubeSize, cubeSize, c);
+        }
+    } else if (gizmoMode == GizmoMode::Rotate) {
+        const int segments = 32;
+        for (int a = 0; a < 3; a++) {
+            bool active = (gizmoHoverAxis == a || gizmoDragAxis == a);
+            Color c = active ? BrightenColor(colors[a]) : colors[a];
+
+            Vector3 u, v;
+            BuildOrthonormalBasis(axes[a], u, v);
+            Vector3 prevPoint = Vector3Add(pos, Vector3Scale(u, len));
+            for (int s = 1; s <= segments; s++) {
+                float t = (float)s / (float)segments * 2.0f * PI;
+                Vector3 pt = Vector3Add(pos, Vector3Add(Vector3Scale(u, cosf(t) * len), Vector3Scale(v, sinf(t) * len)));
+                DrawLine3D(prevPoint, pt, c);
+                prevPoint = pt;
+            }
+        }
+    }
+}
+
+int ViewportPanel::PickGizmoHandle(Vector2 localMp, Vector3 pos, Vector3 rot) const {
+    if (gizmoMode == GizmoMode::Select) return -1;
+
+    Vector3 axisX, axisY, axisZ;
+    GetGizmoAxes(rot, axisX, axisY, axisZ);
+    Vector3 axes[3] = {axisX, axisY, axisZ};
+    float len = GetGizmoWorldScale(pos);
+
+    float bestDist = 12.0f;
+    int bestAxis = -1;
+
+    if (gizmoMode == GizmoMode::Rotate) {
+        const int segments = 32;
+        for (int a = 0; a < 3; a++) {
+            Vector3 u, v;
+            BuildOrthonormalBasis(axes[a], u, v);
+            Vector2 prevScreen = WorldToScreenPoint(Vector3Add(pos, Vector3Scale(u, len)));
+            for (int s = 1; s <= segments; s++) {
+                float t = (float)s / (float)segments * 2.0f * PI;
+                Vector3 pt = Vector3Add(pos, Vector3Add(Vector3Scale(u, cosf(t) * len), Vector3Scale(v, sinf(t) * len)));
+                Vector2 ptScreen = WorldToScreenPoint(pt);
+                float d = DistancePointToSegment2D(localMp, prevScreen, ptScreen);
+                if (d < bestDist) { bestDist = d; bestAxis = a; }
+                prevScreen = ptScreen;
+            }
+        }
+    } else {
+        Vector2 originScreen = WorldToScreenPoint(pos);
+        for (int a = 0; a < 3; a++) {
+            Vector2 tipScreen = WorldToScreenPoint(Vector3Add(pos, Vector3Scale(axes[a], len)));
+            float d = DistancePointToSegment2D(localMp, originScreen, tipScreen);
+            if (d < bestDist) { bestDist = d; bestAxis = a; }
+        }
+    }
+
+    return bestAxis;
+}
+
+bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
+    if (gizmoMode == GizmoMode::Select || selectedActorIndex < 0 ||
+        selectedActorIndex >= (int)starMap.GetInstances().size()) {
+        gizmoHoverAxis = -1;
+        gizmoDragAxis = -1;
+        return false;
+    }
+
+    Vector2 mp = GetMousePosition();
+    Vector2 localMp = {mp.x - client.x, mp.y - client.y};
+    ActorInstance& inst = starMap.GetInstances()[(size_t)selectedActorIndex];
+    Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+    Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
+
+    if (gizmoDragAxis == -1) {
+        gizmoHoverAxis = CheckCollisionPointRec(mp, client) ? PickGizmoHandle(localMp, pos, rot) : -1;
+
+        if (gizmoHoverAxis != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            gizmoDragAxis = gizmoHoverAxis;
+            gizmoDragStartMouse = localMp;
+            gizmoDragStartPos = pos;
+            gizmoDragStartRot = rot;
+            gizmoDragStartScale = {inst.scaleX, inst.scaleY, inst.scaleZ};
+            gizmoDragHandleLen = GetGizmoWorldScale(pos);
+            gizmoDragWorldPerPixel = GetWorldPerPixel(pos);
+
+            Vector3 axisX, axisY, axisZ;
+            GetGizmoAxes(rot, axisX, axisY, axisZ);
+            Vector3 axes[3] = {axisX, axisY, axisZ};
+            Vector2 originScreen = WorldToScreenPoint(pos);
+            Vector2 tipScreen = WorldToScreenPoint(Vector3Add(pos, Vector3Scale(axes[gizmoDragAxis], gizmoDragHandleLen)));
+            Vector2 dir2D = {tipScreen.x - originScreen.x, tipScreen.y - originScreen.y};
+            float mag = sqrtf(dir2D.x * dir2D.x + dir2D.y * dir2D.y);
+            gizmoDragAxisDir2D = (mag > 0.001f) ? Vector2{dir2D.x / mag, dir2D.y / mag} : Vector2{1, 0};
+
+            if (gizmoMode == GizmoMode::Rotate) {
+                gizmoDragStartScreenAngle = atan2f(localMp.y - originScreen.y, localMp.x - originScreen.x);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        gizmoDragAxis = -1;
+        return false;
+    }
+
+    if (gizmoMode == GizmoMode::Move) {
+        Vector2 delta = {localMp.x - gizmoDragStartMouse.x, localMp.y - gizmoDragStartMouse.y};
+        float t = delta.x * gizmoDragAxisDir2D.x + delta.y * gizmoDragAxisDir2D.y;
+        float worldDelta = t * gizmoDragWorldPerPixel;
+
+        Vector3 axisX, axisY, axisZ;
+        GetGizmoAxes(gizmoDragStartRot, axisX, axisY, axisZ);
+        Vector3 axes[3] = {axisX, axisY, axisZ};
+        Vector3 newPos = Vector3Add(gizmoDragStartPos, Vector3Scale(axes[gizmoDragAxis], worldDelta));
+        inst.posX = newPos.x;
+        inst.posY = newPos.y;
+        inst.posZ = newPos.z;
+    } else if (gizmoMode == GizmoMode::Scale) {
+        Vector2 delta = {localMp.x - gizmoDragStartMouse.x, localMp.y - gizmoDragStartMouse.y};
+        float t = delta.x * gizmoDragAxisDir2D.x + delta.y * gizmoDragAxisDir2D.y;
+        float worldDelta = t * gizmoDragWorldPerPixel;
+        float scaleDelta = worldDelta / gizmoDragHandleLen;
+
+        float newScale[3] = {gizmoDragStartScale.x, gizmoDragStartScale.y, gizmoDragStartScale.z};
+        newScale[gizmoDragAxis] += scaleDelta;
+        if (newScale[gizmoDragAxis] < 0.01f) newScale[gizmoDragAxis] = 0.01f;
+        inst.scaleX = newScale[0];
+        inst.scaleY = newScale[1];
+        inst.scaleZ = newScale[2];
+    } else if (gizmoMode == GizmoMode::Rotate) {
+        Vector2 originScreen = WorldToScreenPoint(gizmoDragStartPos);
+        float currentAngle = atan2f(localMp.y - originScreen.y, localMp.x - originScreen.x);
+        float deltaDeg = (currentAngle - gizmoDragStartScreenAngle) * RAD2DEG;
+
+        float newRot[3] = {gizmoDragStartRot.x, gizmoDragStartRot.y, gizmoDragStartRot.z};
+        newRot[gizmoDragAxis] += deltaDeg;
+        inst.rotX = newRot[0];
+        inst.rotY = newRot[1];
+        inst.rotZ = newRot[2];
+    }
+
+    mapDirty = true;
+    return true;
+}
+
+bool ViewportPanel::GizmoToggleButton(Rectangle r, const std::string& iconFile, bool active) {
+    const UIPalette& theme = UITheme::Get();
+    Vector2 mp = GetMousePosition();
+    bool hovered = CheckCollisionPointRec(mp, r);
+
+    Color bg = active ? theme.buttonPressed : (hovered ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleRec(r, bg);
+    DrawRectangleLinesEx(r, 1, active ? theme.success : theme.buttonBorder);
+
+    Texture2D tex = GetOrLoadEditorIcon(iconFile);
+    if (tex.id != 0) {
+        Rectangle dst = {r.x + 3, r.y + 3, r.width - 6, r.height - 6};
+        DrawTexturePro(tex, {0, 0, (float)tex.width, (float)tex.height}, dst, {0, 0}, 0, WHITE);
+    }
+
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
 void ViewportPanel::RenderScene() {
     rlSetClipPlanes(0.1, 5000000.0);
     BeginMode3D(camera);
@@ -510,6 +777,7 @@ void ViewportPanel::RenderScene() {
 
         if (selected) {
             DrawCircle3D(pos, 30.0f, {1, 0, 0}, 90.0f, {255, 200, 50, 255});
+            RenderGizmo(pos, rot);
         }
     }
 
@@ -521,46 +789,34 @@ void ViewportPanel::RenderScene() {
 void ViewportPanel::HandleMapInteraction(Rectangle client) {
     if (!mapLoaded || flying || orbiting) return;
     Vector2 mp = GetMousePosition();
-    if (!CheckCollisionPointRec(mp, client)) return;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    bool gizmoActive = playing ? false : UpdateGizmoDrag(client);
+
+    if (!CheckCollisionPointRec(mp, client) && gizmoDragAxis == -1) return;
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !gizmoActive) {
         selectedActorIndex = -1;
 
         Vector2 localMp = {mp.x - client.x, mp.y - client.y};
-        Camera3D projCam = camera;
-        projCam.fovy = camera.fovy;
 
         const auto& instances = starMap.GetInstances();
         for (size_t i = 0; i < instances.size(); i++) {
             const ActorInstance& inst = instances[i];
             Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-
-Vector2 fboSize = {(float)renderTargetWidth, (float)renderTargetHeight};
-            Matrix proj = MatrixPerspective(projCam.fovy * DEG2RAD,
-                                             fboSize.x / fboSize.y, 1.0f, 50000.0f);
-            Matrix view = MatrixLookAt(projCam.position, projCam.target, projCam.up);
-            Matrix mvp  = MatrixMultiply(view, proj);
-
-            Vector4 clip = {
-                pos.x * mvp.m0 + pos.y * mvp.m4 + pos.z * mvp.m8  + mvp.m12,
-                pos.x * mvp.m1 + pos.y * mvp.m5 + pos.z * mvp.m9  + mvp.m13,
-                pos.x * mvp.m2 + pos.y * mvp.m6 + pos.z * mvp.m10 + mvp.m14,
-                pos.x * mvp.m3 + pos.y * mvp.m7 + pos.z * mvp.m11 + mvp.m15
-            };
-
-            if (clip.w <= 0) continue;
-
-            Vector2 ndc = {clip.x / clip.w, clip.y / clip.w};
-            Vector2 screen = {
-                (ndc.x + 1.0f) * 0.5f * fboSize.x,
-                (1.0f - ndc.y) * 0.5f * fboSize.y
-            };
+            Vector2 screen = WorldToScreenPoint(pos);
 
             if (CheckCollisionPointCircle(localMp, screen, 20.0f)) {
                 selectedActorIndex = (int)i;
                 break;
             }
         }
+    }
+
+    if (!playing) {
+        if (IsKeyPressed(KEY_Q)) gizmoMode = GizmoMode::Select;
+        if (IsKeyPressed(KEY_W)) gizmoMode = GizmoMode::Move;
+        if (IsKeyPressed(KEY_E)) gizmoMode = GizmoMode::Rotate;
+        if (IsKeyPressed(KEY_R)) gizmoMode = GizmoMode::Scale;
     }
 
     if (IsKeyPressed(KEY_DELETE) && selectedActorIndex >= 0) {
@@ -581,6 +837,25 @@ void ViewportPanel::RenderToolbar() {
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
 
     DrawText(name, (int)bounds.x + 6, (int)bounds.y + 8, 13, theme.textPrimary);
+
+    if (mapLoaded && !playing) {
+        float bx = bounds.x + 6 + (float)MeasureText(name, 13) + 16;
+        float by = toolbar.y + 3;
+        float bs = 22;
+
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_select.png", gizmoMode == GizmoMode::Select)) gizmoMode = GizmoMode::Select;
+        bx += bs + 2;
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_move.png", gizmoMode == GizmoMode::Move)) gizmoMode = GizmoMode::Move;
+        bx += bs + 2;
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_rotate.png", gizmoMode == GizmoMode::Rotate)) gizmoMode = GizmoMode::Rotate;
+        bx += bs + 2;
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_scale.png", gizmoMode == GizmoMode::Scale)) gizmoMode = GizmoMode::Scale;
+        bx += bs + 10;
+
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_world.png", gizmoSpace == GizmoSpace::World)) gizmoSpace = GizmoSpace::World;
+        bx += bs + 2;
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_local.png", gizmoSpace == GizmoSpace::Local)) gizmoSpace = GizmoSpace::Local;
+    }
 
     float btnRight = bounds.x + bounds.width - 4;
     float btnY = toolbar.y + 3;

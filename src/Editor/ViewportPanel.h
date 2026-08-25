@@ -12,6 +12,9 @@
 class Actor;
 class LogPanel;
 
+enum class GizmoMode { Select, Move, Rotate, Scale };
+enum class GizmoSpace { World, Local };
+
 class ViewportPanel : public Panel {
 public:
     void Initialize() override;
@@ -49,6 +52,15 @@ private:
     void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
     void DrawActorBillboard(const std::string& iconFile, Vector3 pos, Color tint);
     Texture2D GetOrLoadEditorIcon(const std::string& iconFile);
+
+    Vector2 WorldToScreenPoint(Vector3 worldPos) const;
+    float GetWorldPerPixel(Vector3 pos) const;
+    float GetGizmoWorldScale(Vector3 pos) const;
+    void GetGizmoAxes(Vector3 rot, Vector3& axisX, Vector3& axisY, Vector3& axisZ) const;
+    void RenderGizmo(Vector3 pos, Vector3 rot);
+    int PickGizmoHandle(Vector2 localMp, Vector3 pos, Vector3 rot) const;
+    bool UpdateGizmoDrag(Rectangle client);
+    bool GizmoToggleButton(Rectangle r, const std::string& iconFile, bool active);
 
     Camera3D camera{};
     RenderTexture2D renderTarget{};
@@ -89,6 +101,19 @@ private:
     Vector3 savedCameraTarget{0, 0, 0};
 
     std::unordered_map<std::string, Texture2D> editorIcons;
+
+    GizmoMode gizmoMode = GizmoMode::Select;
+    GizmoSpace gizmoSpace = GizmoSpace::World;
+    int gizmoHoverAxis = -1;
+    int gizmoDragAxis = -1;
+    Vector2 gizmoDragStartMouse{0, 0};
+    Vector3 gizmoDragStartPos{0, 0, 0};
+    Vector3 gizmoDragStartRot{0, 0, 0};
+    Vector3 gizmoDragStartScale{0, 0, 0};
+    Vector2 gizmoDragAxisDir2D{1, 0};
+    float gizmoDragWorldPerPixel = 1.0f;
+    float gizmoDragHandleLen = 1.0f;
+    float gizmoDragStartScreenAngle = 0.0f;
 
     static const float toolbarHeight;
 };
