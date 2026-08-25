@@ -76,6 +76,20 @@ void DetailsPanel::Render() {
         lastActorIndex = *selectedActorIndex;
     }
 
+    auto refreshField = [&](char* buf, size_t bufSize, int fieldId, float val) {
+        if (activeField == fieldId) return;
+        snprintf(buf, bufSize, "%.2f", val);
+    };
+    refreshField(posXBuf, sizeof(posXBuf), 2, inst.posX);
+    refreshField(posYBuf, sizeof(posYBuf), 3, inst.posY);
+    refreshField(posZBuf, sizeof(posZBuf), 4, inst.posZ);
+    refreshField(rotXBuf, sizeof(rotXBuf), 5, inst.rotX);
+    refreshField(rotYBuf, sizeof(rotYBuf), 6, inst.rotY);
+    refreshField(rotZBuf, sizeof(rotZBuf), 7, inst.rotZ);
+    refreshField(scaleXBuf, sizeof(scaleXBuf), 8, inst.scaleX);
+    refreshField(scaleYBuf, sizeof(scaleYBuf), 9, inst.scaleY);
+    refreshField(scaleZBuf, sizeof(scaleZBuf), 10, inst.scaleZ);
+
     auto vec3Row = [&](char bufX[32], char bufY[32], char bufZ[32], int fieldBase,
                         float& vx, float& vy, float& vz) {
         Rectangle row = {x + 8, y, w - 16, 18};
