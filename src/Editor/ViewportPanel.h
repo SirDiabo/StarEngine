@@ -47,6 +47,8 @@ private:
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
                              Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
     void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
+    void DrawActorBillboard(const std::string& iconFile, Vector3 pos, Color tint);
+    Texture2D GetOrLoadEditorIcon(const std::string& iconFile);
 
     Camera3D camera{};
     RenderTexture2D renderTarget{};
@@ -85,6 +87,8 @@ private:
     float savedPitch = 35.0f;
     float savedOrbitRadius = 800.0f;
     Vector3 savedCameraTarget{0, 0, 0};
+
+    std::unordered_map<std::string, Texture2D> editorIcons;
 
     static const float toolbarHeight;
 };

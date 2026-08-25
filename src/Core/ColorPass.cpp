@@ -4,9 +4,9 @@
 
 namespace ColorPass {
 
-void Run(Camera3D camera, bool showPlaceholders) {
+void Run(Camera3D camera) {
     ShadingModel::UpdateLightUniforms();
-    SceneRenderer::DrawWorldActors(showPlaceholders);
+    SceneRenderer::DrawWorldActors(camera);
 }
 
 }

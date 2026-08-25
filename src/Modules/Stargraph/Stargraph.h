@@ -232,6 +232,12 @@ struct ComponentDecl {
     std::vector<std::string> inputMappingNames;
     std::string inputDevice = "Unclaimed";
 
+    // BillboardComponent
+    std::string billboardTexturePath;
+    float billboardWidth = 50.0f;
+    float billboardHeight = 50.0f;
+    bool billboardHiddenInGame = true;
+
     // SaveFileRegistry
     std::unordered_map<std::string, std::string> savableFields;
 };

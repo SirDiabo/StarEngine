@@ -13,6 +13,7 @@
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/ContentPathResolver.h"
+#include "Core/EmbeddedAssets.h"
 #include "LogPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
@@ -49,6 +50,7 @@ void ViewportPanel::Initialize() {
 ViewportPanel::~ViewportPanel() {
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
     if (pieRenderTarget.id != 0) UnloadRenderTexture(pieRenderTarget);
+    for (auto& kv : editorIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
 }
 
 const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
@@ -77,13 +79,13 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
         AssetCache::ApplyMaterialSlots(model, materialAssetPaths);
         DrawModel(*model, pos, 1.0f, WHITE);
         if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
-    } else {
+    } else if (!meshAssetPath.empty()) {
+        // A mesh is referenced but couldn't be resolved.
         DrawCube(pos, scale.x, scale.y, scale.z, fallbackColor);
         DrawCubeWires(pos, scale.x, scale.y, scale.z, {0, 0, 0, 120});
-        if (!meshAssetPath.empty()) {
-            // A mesh is referenced but couldn't be resolved.
-            DrawCubeWires(pos, scale.x * 1.08f, scale.y * 1.08f, scale.z * 1.08f, {220, 40, 200, 200});
-        }
+        DrawCubeWires(pos, scale.x * 1.08f, scale.y * 1.08f, scale.z * 1.08f, {220, 40, 200, 200});
+    } else {
+        DrawActorBillboard("icon_actor_mesh.png", pos, WHITE);
     }
 }
 
@@ -106,6 +108,22 @@ void ViewportPanel::DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, V
     }
 
     rlPopMatrix();
+}
+
+Texture2D ViewportPanel::GetOrLoadEditorIcon(const std::string& iconFile) {
+    if (iconFile.empty()) return Texture2D{};
+    auto it = editorIcons.find(iconFile);
+    if (it != editorIcons.end()) return it->second;
+    Texture2D tex = EmbeddedAssets::Get().LoadTextureAsset(iconFile);
+    editorIcons[iconFile] = tex;
+    return tex;
+}
+
+void ViewportPanel::DrawActorBillboard(const std::string& iconFile, Vector3 pos, Color tint) {
+    Texture2D tex = GetOrLoadEditorIcon(iconFile);
+    if (tex.id == 0) return;
+    const float billboardSize = 40.0f;
+    DrawBillboardRec(camera, tex, {0, 0, (float)tex.width, (float)tex.height}, pos, {billboardSize, billboardSize}, tint);
 }
 
 void ViewportPanel::EnsureRenderTarget(int width, int height) {
@@ -403,6 +421,13 @@ static Color ClassColor(const std::string& className) {
     return {200, 160, 80, 255};
 }
 
+static std::string IconForActorKind(const std::string& kind) {
+    for (const BasicActorDef& def : GetBasicActorDefs()) {
+        if (def.kindName == kind) return def.iconFile;
+    }
+    return "icon_actor.png";
+}
+
 static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, const ComponentDecl& target,
                                        Vector3 basePos, Vector3 baseRot, Vector3 baseScale,
                                        Vector3& outPos, Vector3& outRot, Vector3& outScale) {
@@ -431,8 +456,6 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 }
 
 void ViewportPanel::RenderScene() {
-    const float placeholderSize = 50.0f;
-
     rlSetClipPlanes(0.1, 5000000.0);
     BeginMode3D(camera);
 
@@ -450,6 +473,7 @@ void ViewportPanel::RenderScene() {
         if (!inst.graphAssetPath.empty()) {
             const Stargraph* classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
             bool drewAnyMesh = false;
+            bool drewBillboard = false;
 
             if (classGraph) {
                 for (const ComponentDecl& comp : classGraph->GetComponents()) {
@@ -463,19 +487,29 @@ void ViewportPanel::RenderScene() {
                         drewAnyMesh = true;
                     } else if (comp.componentType == "CollisionComponent" && selected) {
                         DrawCollisionShape(comp, compPos, compRot, {90, 200, 255, 200});
+                    } else if (comp.componentType == "BillboardComponent") {
+                        Texture2D* tex = comp.billboardTexturePath.empty() ? nullptr
+                                        : AssetCache::Get().GetOrLoadTexture(comp.billboardTexturePath);
+                        if (tex) {
+                            DrawBillboardRec(camera, *tex, {0, 0, (float)tex->width, (float)tex->height},
+                                              compPos, {comp.billboardWidth, comp.billboardHeight}, WHITE);
+                            drewBillboard = true;
+                        }
                     }
                 }
             }
 
-            if (!drewAnyMesh) {
-                Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
-                DrawInstanceOrMesh("", {}, pos, rot, boxSize, false, fallbackColor);
+            if (!drewAnyMesh && !drewBillboard) {
+                DrawActorBillboard("icon_actor.png", pos, WHITE);
             }
         } else if (inst.hasComponent) {
-            Vector3 boxSize = {placeholderSize * scl.x, placeholderSize * scl.y, placeholderSize * scl.z};
-            DrawInstanceOrMesh("", {}, pos, rot, boxSize, selected, fallbackColor);
+            DrawActorBillboard(IconForActorKind(inst.actorKind), pos, WHITE);
         } else {
             DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
+        }
+
+        if (selected) {
+            DrawCircle3D(pos, 30.0f, {1, 0, 0}, 90.0f, {255, 200, 50, 255});
         }
     }
 
@@ -633,7 +667,7 @@ void ViewportPanel::Render() {
             if (pieHeight < 1) pieHeight = 1;
             EnsurePieRenderTarget(pieWidth, pieHeight);
 
-            RenderPipeline::Render(camera, pieRenderTarget, clearColor, true);
+            RenderPipeline::Render(camera, pieRenderTarget, clearColor);
 
             BeginTextureMode(renderTarget);
             Rectangle pieSource = {0, 0, (float)pieRenderTarget.texture.width, -(float)pieRenderTarget.texture.height};

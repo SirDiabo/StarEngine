@@ -99,6 +99,7 @@ void StargraphModule::RegisterObjectKinds() {
     kinds.RegisterKind("CollisionComponent", "SceneComponent");
     kinds.RegisterKind("InputComponent", "SceneComponent");
     kinds.RegisterKind("LightComponent", "SceneComponent");
+    kinds.RegisterKind("BillboardComponent", "SceneComponent");
     kinds.RegisterKind("Sound", "");
     kinds.RegisterKind("Music", "");
     kinds.RegisterKind("Texture", "");

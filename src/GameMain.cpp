@@ -189,7 +189,7 @@ int main(int argc, char* argv[]) {
         }
 
         double perfRenderStart = GetTime();
-        RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255}, false);
+        RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255});
         perfRenderAccum += GetTime() - perfRenderStart;
 
         double perfPresentStart = GetTime();

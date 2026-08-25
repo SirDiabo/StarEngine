@@ -7,7 +7,7 @@
 
 namespace RenderPipeline {
 
-void Render(Camera3D camera, RenderTexture2D target, Color clearColor, bool showPlaceholders) {
+void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
 
     ShadingModel::ResetShadowSource();
@@ -19,7 +19,7 @@ void Render(Camera3D camera, RenderTexture2D target, Color clearColor, bool show
     ClearBackground(clearColor);
 
     BeginMode3D(camera);
-    ColorPass::Run(camera, showPlaceholders);
+    ColorPass::Run(camera);
     if (activeTechnique && activeTechnique->renderInWorld) activeTechnique->renderInWorld(camera, target);
     EndMode3D();
 

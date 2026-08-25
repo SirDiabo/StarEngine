@@ -5,6 +5,7 @@
 #include "Runtime/Components/CameraComponent.h"
 #include "Runtime/Components/LightComponent.h"
 #include "Runtime/Components/InputComponent.h"
+#include "Runtime/Components/BillboardComponent.h"
 
 namespace {
 
@@ -140,6 +141,15 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
             [](Component& c, const ComponentDecl& d) { static_cast<InputComponent&>(c).mappingNames = d.inputMappingNames; }),
         Str("InputComponent", "InputDevice", &ComponentDecl::inputDevice,
             [](Component& c, const ComponentDecl& d) { static_cast<InputComponent&>(c).device = d.inputDevice; }),
+
+        Str("BillboardComponent", "BillboardTexture", &ComponentDecl::billboardTexturePath,
+            [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).texturePath = d.billboardTexturePath; }),
+        Flt("BillboardComponent", "BillboardWidth", &ComponentDecl::billboardWidth,
+            [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).width = d.billboardWidth; }),
+        Flt("BillboardComponent", "BillboardHeight", &ComponentDecl::billboardHeight,
+            [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).height = d.billboardHeight; }),
+        Bln("BillboardComponent", "BillboardHiddenInGame", &ComponentDecl::billboardHiddenInGame,
+            [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).hiddenInGame = d.billboardHiddenInGame; }),
     };
     return table;
 }
@@ -152,6 +162,7 @@ const std::vector<ComponentTypeDesc>& GetComponentTypes() {
         { "CameraComponent",    []() -> Component* { return new CameraComponent(); } },
         { "LightComponent",     []() -> Component* { return new LightComponent(); } },
         { "InputComponent",     []() -> Component* { return new InputComponent(); } },
+        { "BillboardComponent", []() -> Component* { return new BillboardComponent(); } },
     };
     return table;
 }
