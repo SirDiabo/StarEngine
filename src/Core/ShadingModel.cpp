@@ -5,6 +5,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/LightComponent.h"
+#include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "rlgl.h"
 #include "raymath.h"
 #include <string>
@@ -73,6 +74,7 @@ vec3 ComputeLighting(vec3 worldPos, vec3 worldNormal, float shadowFactor) {
 
 const char* kShadowGLSL = R"glsl(
 uniform int shadowMode;
+uniform int shadowDebugView;
 uniform int shadowAAMethod;
 uniform float shadowTexelSize;
 uniform float shadowStrength;
@@ -167,6 +169,19 @@ float ComputeShadowFactor(vec3 worldPos, vec3 worldNormal) {
         ? SampleShadowMap(shadowCubeMap4, shadowCubeViewProj4, worldPos, worldNormal, lightDir)
         : SampleShadowMap(shadowCubeMap5, shadowCubeViewProj5, worldPos, worldNormal, lightDir);
 }
+
+vec3 DebugRawShadowDepth(vec3 worldPos) {
+    if (shadowMode != 1) return vec3(1.0, 0.0, 1.0);
+
+    vec4 lsPos = shadowLightViewProj * vec4(worldPos, 1.0);
+    vec3 proj = lsPos.xyz / lsPos.w;
+    proj = proj * 0.5 + 0.5;
+
+    if (proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0 || proj.z > 1.0) return vec3(0.0, 1.0, 0.0);
+
+    float mapDepth = texture(shadowMap, proj.xy).r;
+    return vec3(mapDepth);
+}
 )glsl";
 
 const char* kAttribsAndVaryings = R"glsl(
@@ -247,6 +262,10 @@ void main() {
     vec4 texelColor = texture(texture0, fragTexCoord);
     if (texelColor.a < 0.5) discard;
     vec3 normal = normalize(fragWorldNormal);
+    if (shadowDebugView == 1) {
+        finalColor = vec4(DebugRawShadowDepth(fragWorldPos), 1.0);
+        return;
+    }
     float shadowFactor = ComputeShadowFactor(fragWorldPos, normal);
     vec3 lightAccum = ComputeLighting(fragWorldPos, normal, shadowFactor);
     finalColor = texelColor * colDiffuse * fragColor * vec4(lightAccum, 1.0);
@@ -282,6 +301,7 @@ struct LitVariant {
     LightLocs lightLocs[kMaxLights];
 
     int shadowModeLoc = -1;
+    int shadowDebugViewLoc = -1;
     int shadowAAMethodLoc = -1;
     int shadowTexelSizeLoc = -1;
     int shadowStrengthLoc = -1;
@@ -309,6 +329,7 @@ struct LitVariant {
             lightLocs[i].outerCos  = GetShaderLocation(shader, TextFormat("lights[%d].outerCos", i));
         }
         shadowModeLoc = GetShaderLocation(shader, "shadowMode");
+        shadowDebugViewLoc = GetShaderLocation(shader, "shadowDebugView");
         shadowAAMethodLoc = GetShaderLocation(shader, "shadowAAMethod");
         shadowTexelSizeLoc = GetShaderLocation(shader, "shadowTexelSize");
         shadowStrengthLoc = GetShaderLocation(shader, "shadowStrength");
@@ -430,27 +451,33 @@ void ShadingModel::UpdateLightUniforms() {
     SetShaderValue(variant.shader, variant.lightCountLoc, &count, SHADER_UNIFORM_INT);
 
     SetShaderValue(variant.shader, variant.shadowModeLoc, &shadowMode, SHADER_UNIFORM_INT);
+    int debugView = ShadowMapSettings::Get().GetDebugVisualize() ? 1 : 0;
+    SetShaderValue(variant.shader, variant.shadowDebugViewLoc, &debugView, SHADER_UNIFORM_INT);
     SetShaderValue(variant.shader, variant.shadowAAMethodLoc, &shadowSourceAAMethod, SHADER_UNIFORM_INT);
     if (shadowMode == 1) {
-        Texture2D shadowTex = {0};
-        shadowTex.id = shadowSourceTextureId;
-        SetShaderValueTexture(variant.shader, variant.shadowMapLoc, shadowTex);
+        int unit = 1;
+        rlActiveTextureSlot(unit);
+        rlEnableTexture(shadowSourceTextureId);
+        SetShaderValue(variant.shader, variant.shadowMapLoc, &unit, SHADER_UNIFORM_INT);
         SetShaderValueMatrix(variant.shader, variant.shadowLightViewProjLoc, shadowSourceLightViewProj);
         float dir[3] = {shadowSourceLightDir.x, shadowSourceLightDir.y, shadowSourceLightDir.z};
         SetShaderValue(variant.shader, variant.shadowLightDirLoc, dir, SHADER_UNIFORM_VEC3);
         SetShaderValue(variant.shader, variant.shadowTexelSizeLoc, &shadowSourceTexelSize, SHADER_UNIFORM_FLOAT);
         SetShaderValue(variant.shader, variant.shadowStrengthLoc, &shadowSourceStrength, SHADER_UNIFORM_FLOAT);
+        rlActiveTextureSlot(0);
     } else if (shadowMode == 2) {
         float pos[3] = {shadowSourceLightPos.x, shadowSourceLightPos.y, shadowSourceLightPos.z};
         SetShaderValue(variant.shader, variant.shadowLightPosLoc, pos, SHADER_UNIFORM_VEC3);
         for (int i = 0; i < 6; i++) {
-            Texture2D faceTex = {0};
-            faceTex.id = shadowSourceCubeTextureIds[i];
-            SetShaderValueTexture(variant.shader, variant.shadowCubeMapLoc[i], faceTex);
+            int unit = 1 + i;
+            rlActiveTextureSlot(unit);
+            rlEnableTexture(shadowSourceCubeTextureIds[i]);
+            SetShaderValue(variant.shader, variant.shadowCubeMapLoc[i], &unit, SHADER_UNIFORM_INT);
             SetShaderValueMatrix(variant.shader, variant.shadowCubeViewProjLoc[i], shadowSourceCubeViewProj[i]);
         }
         SetShaderValue(variant.shader, variant.shadowTexelSizeLoc, &shadowSourceTexelSize, SHADER_UNIFORM_FLOAT);
         SetShaderValue(variant.shader, variant.shadowStrengthLoc, &shadowSourceStrength, SHADER_UNIFORM_FLOAT);
+        rlActiveTextureSlot(0);
     }
 }
 

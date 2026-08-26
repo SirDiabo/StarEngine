@@ -34,10 +34,14 @@ public:
     ShadowAAMethod GetShadowAAMethod() const { return shadowAAMethod; }
     void SetShadowAAMethod(ShadowAAMethod value);
 
+    bool GetDebugVisualize() const { return debugVisualize; }
+    void SetDebugVisualize(bool value) { debugVisualize = value; }
+
 private:
     std::string filePath;
     int shadowMapSize = 2048;
     float sunCoverageHalfSize = 4000.0f;
     float shadowStrength = 0.75f;
     ShadowAAMethod shadowAAMethod = ShadowAAMethod::Low;
+    bool debugVisualize = false;
 };

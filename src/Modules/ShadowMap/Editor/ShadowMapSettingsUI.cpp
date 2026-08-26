@@ -4,6 +4,7 @@
 #include "Editor/ChoicePopup.h"
 #include "Editor/PropertyFields.h"
 #include "raylib.h"
+#include "raygui.h"
 #include <cstdio>
 
 namespace {
@@ -98,6 +99,15 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
         static const ShadowAAMethod methods[4] = {ShadowAAMethod::None, ShadowAAMethod::Low, ShadowAAMethod::High, ShadowAAMethod::Sharp};
         settings.SetShadowAAMethod(methods[aaChoice]);
     }
+
+    bool debugVisualize = settings.GetDebugVisualize();
+    if (GuiCheckBox({x, y, 18, 18}, "Debug: visualize raw shadow map depth", &debugVisualize)) {
+        settings.SetDebugVisualize(debugVisualize);
+    }
+    y += 22;
+    DrawText("Paints the raw shadow-map values. Magenta = No Active Lights. Green = Outside of shadow map's coverage area. Grayscale = Depth Value read from the shadow map.",
+              (int)x, (int)y, 10, theme.textSecondary);
+    y += 24;
 
     ModuleSettingsResult result;
     result.nextY = y;
