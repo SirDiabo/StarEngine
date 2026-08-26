@@ -17,6 +17,7 @@
 #include "LogPanel.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
+#include "PropertyFields.h"
 #include "raygui.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -682,10 +683,11 @@ bool ViewportPanel::UpdateGizmoDrag(Rectangle client) {
         GetGizmoAxes(gizmoDragStartRot, axisX, axisY, axisZ);
         Vector3 axes[3] = {axisX, axisY, axisZ};
         Vector3 newPos = Vector3Add(gizmoDragStartPos, Vector3Scale(axes[gizmoDragAxis], worldDelta));
-        if (IsKeyDown(KEY_LEFT_CONTROL)) {
-            newPos.x = roundf(newPos.x);
-            newPos.y = roundf(newPos.y);
-            newPos.z = roundf(newPos.z);
+        if (gridSnapEnabled || IsKeyDown(KEY_LEFT_CONTROL)) {
+            float step = (gridStepSize > 0.001f) ? gridStepSize : 1.0f;
+            newPos.x = roundf(newPos.x / step) * step;
+            newPos.y = roundf(newPos.y / step) * step;
+            newPos.z = roundf(newPos.z / step) * step;
         }
         inst.posX = newPos.x;
         inst.posY = newPos.y;
@@ -749,7 +751,13 @@ void ViewportPanel::RenderScene() {
     rlSetClipPlanes(0.1, 5000000.0);
     BeginMode3D(camera);
 
-    DrawGrid(40, 100.0f);
+    float gridStep = (gridStepSize > 0.001f) ? gridStepSize : 100.0f;
+    float snappedGridX = floorf(camera.position.x / gridStep) * gridStep;
+    float snappedGridZ = floorf(camera.position.z / gridStep) * gridStep;
+    rlPushMatrix();
+    rlTranslatef(snappedGridX, 0.0f, snappedGridZ);
+    DrawGrid(40, gridStep);
+    rlPopMatrix();
 
     const auto& instances = starMap.GetInstances();
     Vector3 selectedPos{0, 0, 0};
@@ -884,6 +892,16 @@ void ViewportPanel::RenderToolbar() {
         if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_world.png", gizmoSpace == GizmoSpace::World)) gizmoSpace = GizmoSpace::World;
         bx += bs + 2;
         if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_local.png", gizmoSpace == GizmoSpace::Local)) gizmoSpace = GizmoSpace::Local;
+        bx += bs + 10;
+
+        if (GizmoToggleButton({bx, by, bs, bs}, "icon_gizmo_grid_snap.png", gridSnapEnabled)) gridSnapEnabled = !gridSnapEnabled;
+        bx += bs + 4;
+
+        Rectangle stepFieldRect = {bx, by + 2, 56, bs - 4};
+        float stepValue = gridStepSize;
+        if (PropertyField::FloatBox(stepFieldRect, gridStepBuf, sizeof(gridStepBuf), 1, toolbarActiveField, stepValue)) {
+            if (stepValue > 0.001f) gridStepSize = stepValue;
+        }
     }
 
     float btnRight = bounds.x + bounds.width - 4;

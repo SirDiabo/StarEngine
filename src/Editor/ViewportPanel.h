@@ -116,5 +116,10 @@ private:
     float gizmoDragStartScreenAngle = 0.0f;
     float gizmoDragRotSign = 1.0f;
 
+    bool gridSnapEnabled = false;
+    float gridStepSize = 100.0f;
+    char gridStepBuf[32] = "100.0";
+    int toolbarActiveField = 0;
+
     static const float toolbarHeight;
 };
