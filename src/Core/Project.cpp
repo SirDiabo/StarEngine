@@ -5,6 +5,7 @@
 #include "SaveFileRegistry.h"
 #include "InputMappingRegistry.h"
 #include "RenderSettings.h"
+#include "ContentPathResolver.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -74,6 +75,7 @@ bool Project::Load(const std::string& path) {
 
     projectFilePath = path;
     rootPath = fs::path(path).parent_path().string();
+    ContentPathResolver::SetContentRoot(rootPath + "/Content");
     settings = ProjectSettings();
     settings.name = GetFileNameWithoutExt(path.c_str());
 

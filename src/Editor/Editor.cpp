@@ -356,8 +356,6 @@ void Editor::HandlePackageMenuAction(const std::string& item) {
 void Editor::OpenDefaultMapIfSet() {
     const std::string& mapPath = Project::Get().GetSettings().defaultMapPath;
     if (mapPath.empty()) return;
-    std::string contentRoot = Project::Get().GetRootPath() + "/Content";
-    ContentPathResolver::SetContentRoot(contentRoot);
     std::string resolvedPath = ContentPathResolver::Resolve(mapPath);
     if (!fs::exists(resolvedPath)) return;
     OpenAssetInTab(resolvedPath, ".starmap");
