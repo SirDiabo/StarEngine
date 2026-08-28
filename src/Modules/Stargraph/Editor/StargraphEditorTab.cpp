@@ -63,31 +63,22 @@ void StargraphEditorTab::Initialize() {
 }
 
 void StargraphEditorTab::BuildDefaultLayout() {
-    auto previewLeaf = std::make_unique<DockNode>();
-    previewLeaf->panelNames = { "Preview" };
-
     auto outlinerLeaf = std::make_unique<DockNode>();
     outlinerLeaf->panelNames = { "Components" };
 
     auto stargraphLeaf = std::make_unique<DockNode>();
     stargraphLeaf->panelNames = { "My Stargraph" };
 
-    auto innerCol = std::make_unique<DockNode>();
-    innerCol->type       = DockNode::Type::SplitV;
-    innerCol->splitRatio = 0.3f;
-    innerCol->first       = std::move(outlinerLeaf);
-    innerCol->second      = std::move(stargraphLeaf);
-
     auto leftCol = std::make_unique<DockNode>();
     leftCol->type       = DockNode::Type::SplitV;
-    leftCol->splitRatio = 0.35f;
-    leftCol->first       = std::move(previewLeaf);
-    leftCol->second      = std::move(innerCol);
+    leftCol->splitRatio = 0.3f;
+    leftCol->first       = std::move(outlinerLeaf);
+    leftCol->second      = std::move(stargraphLeaf);
 
     std::unique_ptr<DockNode> graphSide;
     if (logPanel) {
         auto graphLeaf = std::make_unique<DockNode>();
-        graphLeaf->panelNames = { "Graph" };
+        graphLeaf->panelNames = { "Graph", "Preview" };
 
         auto logsLeaf = std::make_unique<DockNode>();
         logsLeaf->panelNames = { "Logs" };
@@ -99,7 +90,7 @@ void StargraphEditorTab::BuildDefaultLayout() {
         graphSide->second      = std::move(logsLeaf);
     } else {
         graphSide = std::make_unique<DockNode>();
-        graphSide->panelNames = { "Graph" };
+        graphSide->panelNames = { "Graph", "Preview" };
     }
 
     auto detailsLeaf = std::make_unique<DockNode>();
