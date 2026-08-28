@@ -55,6 +55,25 @@ void DockArea::Render(Rectangle area) {
     // Reset cursor each frame; hover checks below will override if still applicable.
     if (!dragging && !pendingDrag && !activeSplitter)
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+
+    if (!maximizedPanelName.empty()) {
+        Panel* p = GetPanel(maximizedPanelName);
+        if (p && p->IsVisible()) {
+            const UIPalette& theme = UITheme::Get();
+            Rectangle bar = { area.x, area.y, area.width, DOCK_TAB_HEIGHT };
+            DrawRectangleRec(bar, theme.tabBar);
+            DrawText(p->GetName(), (int)bar.x + 10, (int)bar.y + 5, 11, theme.textPrimary);
+
+            Rectangle content = area;
+            content.y      += DOCK_TAB_HEIGHT;
+            content.height -= DOCK_TAB_HEIGHT;
+            p->bounds = content;
+            p->Render();
+            return;
+        }
+        maximizedPanelName.clear();
+    }
+
     LayoutNode(root.get(), area);
     RenderNode(root.get());
 }

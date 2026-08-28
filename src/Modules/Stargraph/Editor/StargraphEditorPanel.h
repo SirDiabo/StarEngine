@@ -6,14 +6,18 @@
 #include "Editor/AssetPickerPopup.h"
 #include "Editor/RegistryPickerPopup.h"
 #include "Editor/SearchableListPopup.h"
+#include "Editor/GizmoRenderer.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <functional>
 
 class ViewportPanel;
 
 class StargraphEditorPanel {
 public:
     void Initialize();
+    ~StargraphEditorPanel();
 
     bool Open(const std::string& filePath);
     void Close();
@@ -32,6 +36,10 @@ public:
     void RenderGraph(Rectangle area);
     void RenderRightPanel(Rectangle area);
     void RenderNodeContextMenu();
+
+    void RenderPreviewViewport(Rectangle area);
+    void SetPreviewFullscreen(bool v) { previewFullscreen = v; }
+    void SetOnTogglePreviewFullscreen(std::function<void()> cb) { onTogglePreviewFullscreen = cb; }
 
 private:
     void RenderComponentDetails(Rectangle panel, float& y);
@@ -188,4 +196,38 @@ private:
     std::string saveTargetFieldKey;
 
     bool showSelfActorDetails = false;
+
+    void UpdatePreviewCamera(Rectangle client);
+    void RenderPreviewScene();
+    void HandlePreviewInteraction(Rectangle client);
+    void RenderPreviewToolbar(Rectangle toolbarArea);
+    void EnsurePreviewRenderTarget(int width, int height);
+    Texture2D GetOrLoadPreviewIcon(const std::string& iconFile);
+
+    Camera3D previewCamera{};
+    RenderTexture2D previewRenderTarget{};
+    int previewRenderTargetWidth = 0;
+    int previewRenderTargetHeight = 0;
+
+    bool previewFlying = false;
+    bool previewOrbiting = false;
+    Vector2 previewLookStart{0, 0};
+    Vector2 previewOrbitStart{0, 0};
+    Vector3 previewFlyPosition{0, 0, 0};
+    float previewYaw = 45.0f;
+    float previewPitch = 35.0f;
+    float previewOrbitRadius = 400.0f;
+    float previewFlySpeed = 400.0f;
+    Vector3 previewCameraTarget{0, 0, 0};
+
+    std::unordered_map<std::string, Texture2D> previewIcons;
+
+    GizmoMode previewGizmoMode = GizmoMode::Select;
+    GizmoSpace previewGizmoSpace = GizmoSpace::World;
+    GizmoDragState previewGizmoState;
+
+    bool previewFullscreen = false;
+    std::function<void()> onTogglePreviewFullscreen;
+
+    static const float previewToolbarHeight;
 };

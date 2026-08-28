@@ -8,6 +8,7 @@ class StargraphOutlinerPanel;
 class StargraphPanel;
 class StargraphGraphPanel;
 class StargraphDetailsPanel;
+class StargraphPreviewPanel;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -44,6 +45,7 @@ private:
     StargraphPanel*          stargraphPanel = nullptr;
     StargraphGraphPanel*     graphPanel     = nullptr;
     StargraphDetailsPanel*   detailsPanel   = nullptr;
+    StargraphPreviewPanel*   previewPanel   = nullptr;
     LogPanel* logPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
 };

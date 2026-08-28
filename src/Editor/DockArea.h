@@ -41,6 +41,13 @@ public:
     void SetPanelVisible(const std::string& name, bool visible);
     bool IsPanelVisible(const std::string& name) const;
 
+    void SetMaximizedPanel(const std::string& name) { maximizedPanelName = name; }
+    void ToggleMaximizedPanel(const std::string& name) {
+        maximizedPanelName = (maximizedPanelName == name) ? "" : name;
+    }
+    bool IsPanelMaximized(const std::string& name) const { return maximizedPanelName == name; }
+    bool HasMaximizedPanel() const { return !maximizedPanelName.empty(); }
+
 private:
     void LayoutNode(DockNode* node, Rectangle area);
     // Renders panel content only (no overlays).
@@ -80,6 +87,8 @@ private:
     std::unique_ptr<DockNode> root;
     std::vector<Panel*> panels;
     std::vector<FloatingPanel> floating;
+
+    std::string maximizedPanelName;
 
     Rectangle lastArea = { 0, 0, 0, 0 };
 };

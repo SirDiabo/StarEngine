@@ -43,6 +43,9 @@ void LevelEditorTab::Initialize() {
     detailsPanel->onEdited = [this]() {
         viewportPanel->MarkDirty();
     };
+    viewportPanel->onToggleFullscreen = [this]() {
+        dockArea.ToggleMaximizedPanel("Viewport");
+    };
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
 
@@ -123,6 +126,7 @@ void LevelEditorTab::Render(float x, float y, float width, float height) {
     detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
+    viewportPanel->isFullscreen = dockArea.IsPanelMaximized("Viewport");
 
     // Update tab title to reflect the currently open map.
     if (viewportPanel->IsMapLoaded()) {

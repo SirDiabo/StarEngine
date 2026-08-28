@@ -4,6 +4,7 @@
 #include "StargraphPanel.h"
 #include "StargraphGraphPanel.h"
 #include "StargraphDetailsPanel.h"
+#include "StargraphPreviewPanel.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
 #include "Core/LayoutSerializer.h"
@@ -23,6 +24,7 @@ StargraphEditorTab::~StargraphEditorTab() {
     delete stargraphPanel;
     delete graphPanel;
     delete detailsPanel;
+    delete previewPanel;
     delete panel;
 }
 
@@ -31,23 +33,29 @@ void StargraphEditorTab::Initialize() {
     panel->Initialize();
     panel->SetViewportPanel(viewportPanel);
     panel->Open(assetPath);
+    panel->SetOnTogglePreviewFullscreen([this]() {
+        dockArea.ToggleMaximizedPanel("Preview");
+    });
 
     outlinerPanel  = new StargraphOutlinerPanel();
     stargraphPanel = new StargraphPanel();
     graphPanel     = new StargraphGraphPanel();
     detailsPanel   = new StargraphDetailsPanel();
+    previewPanel   = new StargraphPreviewPanel();
 
     outlinerPanel->Initialize();
     stargraphPanel->Initialize();
     graphPanel->Initialize();
     detailsPanel->Initialize();
+    previewPanel->Initialize();
 
     outlinerPanel->SetSession(panel);
     stargraphPanel->SetSession(panel);
     graphPanel->SetSession(panel);
     detailsPanel->SetSession(panel);
+    previewPanel->SetSession(panel);
 
-    std::vector<Panel*> panels = { outlinerPanel, stargraphPanel, graphPanel, detailsPanel };
+    std::vector<Panel*> panels = { outlinerPanel, stargraphPanel, graphPanel, detailsPanel, previewPanel };
     if (logPanel) panels.push_back(logPanel);
     dockArea.SetPanels(panels);
 
@@ -55,17 +63,26 @@ void StargraphEditorTab::Initialize() {
 }
 
 void StargraphEditorTab::BuildDefaultLayout() {
+    auto previewLeaf = std::make_unique<DockNode>();
+    previewLeaf->panelNames = { "Preview" };
+
     auto outlinerLeaf = std::make_unique<DockNode>();
     outlinerLeaf->panelNames = { "Components" };
 
     auto stargraphLeaf = std::make_unique<DockNode>();
     stargraphLeaf->panelNames = { "My Stargraph" };
 
+    auto innerCol = std::make_unique<DockNode>();
+    innerCol->type       = DockNode::Type::SplitV;
+    innerCol->splitRatio = 0.3f;
+    innerCol->first       = std::move(outlinerLeaf);
+    innerCol->second      = std::move(stargraphLeaf);
+
     auto leftCol = std::make_unique<DockNode>();
     leftCol->type       = DockNode::Type::SplitV;
-    leftCol->splitRatio = 0.3f;
-    leftCol->first       = std::move(outlinerLeaf);
-    leftCol->second      = std::move(stargraphLeaf);
+    leftCol->splitRatio = 0.35f;
+    leftCol->first       = std::move(previewLeaf);
+    leftCol->second      = std::move(innerCol);
 
     std::unique_ptr<DockNode> graphSide;
     if (logPanel) {
@@ -108,6 +125,7 @@ void StargraphEditorTab::Render(float x, float y, float width, float height) {
 
     panel->SetScreenBounds({ x, y, width, height });
     panel->RenderToolbar({ x, y, width, toolbarH });
+    panel->SetPreviewFullscreen(dockArea.IsPanelMaximized("Preview"));
 
     dockArea.Render({ x, y + toolbarH, width, height - toolbarH });
 }
@@ -118,6 +136,7 @@ void StargraphEditorTab::RenderOverlays() {
 
 void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
     std::vector<bool> windowChecked = {
+        dockArea.IsPanelVisible("Preview"),
         dockArea.IsPanelVisible("Components"),
         dockArea.IsPanelVisible("My Stargraph"),
         dockArea.IsPanelVisible("Graph"),
@@ -130,7 +149,7 @@ void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
         { "File",   { "Save", "Save All" } },
         { "Asset",  { "Find in Content Browser" } },
         { "Debug",  { "Play Graph", "Stop" } },
-        { "Window", { "Components", "My Stargraph", "Graph", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
+        { "Window", { "Preview", "Components", "My Stargraph", "Graph", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -140,7 +159,7 @@ bool StargraphEditorTab::IsOpen() const {
 }
 
 void StargraphEditorTab::ResetLayout() {
-    for (const std::string& name : { "Components", "My Stargraph", "Graph", "Details", "Logs" })
+    for (const std::string& name : { "Preview", "Components", "My Stargraph", "Graph", "Details", "Logs" })
         dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
 }
