@@ -204,7 +204,7 @@ private:
     void EnsurePreviewRenderTarget(int width, int height);
     Texture2D GetOrLoadPreviewIcon(const std::string& iconFile);
 
-    Camera3D previewCamera{};
+    Camera3D previewCamera{{0, 0, 0}, {0, 0, 0}, {0, 1, 0}, 50.0f, CAMERA_PERSPECTIVE};
     RenderTexture2D previewRenderTarget{};
     int previewRenderTargetWidth = 0;
     int previewRenderTargetHeight = 0;
