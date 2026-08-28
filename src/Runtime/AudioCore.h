@@ -20,6 +20,7 @@ public:
 
     void TickMusicStreams();
     void StopAndClearMusic();
+    void StopAllSounds();
 
 private:
     bool deviceInitialized = false;

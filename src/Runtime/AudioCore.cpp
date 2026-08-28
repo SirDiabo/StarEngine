@@ -99,3 +99,8 @@ void AudioCore::StopAndClearMusic() {
     }
     activeMusic.clear();
 }
+
+void AudioCore::StopAllSounds() {
+    for (auto& kv : soundCache) StopSound(kv.second);
+    for (auto& kv : cookedSoundCache) StopSound(kv.second);
+}

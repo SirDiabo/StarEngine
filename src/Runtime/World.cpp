@@ -110,6 +110,7 @@ void World::EndPlay() {
     viewTarget = nullptr;
     ShowCursor();
     AudioCore::Get().StopAndClearMusic();
+    AudioCore::Get().StopAllSounds();
     PrintMessageLog::Get().Clear();
 }
 
