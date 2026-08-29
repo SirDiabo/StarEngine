@@ -10,6 +10,7 @@ public:
     static AssetCache& Get();
 
     Model* GetOrLoadModel(const std::string& sourceMeshPath);
+    Model LoadPrivateModel(const std::string& sourceMeshPath);
     Texture2D* GetOrLoadTexture(const std::string& textureAssetPath);
     const StarMaterial* GetOrLoadMaterial(const std::string& materialAssetPath);
     ModelAnimation* GetOrLoadAnimation(const std::string& animAssetPath);

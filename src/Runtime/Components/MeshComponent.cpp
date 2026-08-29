@@ -151,6 +151,10 @@ void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Anim Play Rate", &animPlayRate);
 }
 
+MeshComponent::~MeshComponent() {
+    ReleaseAnimModelInstance();
+}
+
 void MeshComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
 
@@ -202,6 +206,7 @@ void MeshComponent::PlayAnimation(const std::string& animPath, bool loop) {
     animTime = 0.0f;
     animLooping = loop;
     animPlaying = true;
+    EnsureAnimModelInstance();
 }
 
 void MeshComponent::StopAnimation() {
@@ -231,6 +236,10 @@ ModelAnimation* MeshComponent::GetCurrentAnimation() {
 }
 
 Model* MeshComponent::GetCachedModel() {
+    if (hasAnimModelInstance && meshPath != animModelInstancePath) ReleaseAnimModelInstance();
+    if (!hasAnimModelInstance && (animPlaying || !currentAnimPath.empty())) EnsureAnimModelInstance();
+    if (hasAnimModelInstance) return &animModelInstance;
+
     if (meshPath == cachedModelPath && cachedModel) return cachedModel;
 
     cachedModel = nullptr;
@@ -243,4 +252,34 @@ Model* MeshComponent::GetCachedModel() {
         cachedModelPath = meshPath;
     }
     return cachedModel;
+}
+
+void MeshComponent::EnsureAnimModelInstance() {
+    if (hasAnimModelInstance && animModelInstancePath == meshPath) return;
+    ReleaseAnimModelInstance();
+    if (meshPath.empty()) return;
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(meshPath, asset) || asset.assetType != "StaticMesh") return;
+
+    Model model = AssetCache::Get().LoadPrivateModel(asset.ResolveSourcePath());
+    if (model.meshCount == 0) return;
+
+    animModelInstance = model;
+    animModelInstancePath = meshPath;
+    hasAnimModelInstance = true;
+}
+
+void MeshComponent::ReleaseAnimModelInstance() {
+    if (!hasAnimModelInstance) return;
+    UnloadModel(animModelInstance);
+    animModelInstance = Model{};
+    animModelInstancePath.clear();
+    hasAnimModelInstance = false;
+}
+
+void MeshComponent::InvalidateCachedModel() {
+    cachedModel = nullptr;
+    cachedModelPath.clear();
+    ReleaseAnimModelInstance();
 }

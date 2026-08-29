@@ -28,11 +28,19 @@ public:
     void SetAnimPlayRate(float rate);
 
     Model* GetCachedModel();
-    void InvalidateCachedModel() { cachedModel = nullptr; cachedModelPath.clear(); }
+    void InvalidateCachedModel();
+
+    ~MeshComponent();
 
 private:
     std::string cachedModelPath;
     Model* cachedModel = nullptr;
+
+    bool hasAnimModelInstance = false;
+    std::string animModelInstancePath;
+    Model animModelInstance{};
+    void EnsureAnimModelInstance();
+    void ReleaseAnimModelInstance();
 
     std::string cachedAnimMetaPath;
     float cachedAnimFps = 30.0f;

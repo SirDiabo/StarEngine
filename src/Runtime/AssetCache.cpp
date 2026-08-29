@@ -29,6 +29,20 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
     return &inserted.first->second;
 }
 
+Model AssetCache::LoadPrivateModel(const std::string& sourceMeshPath) {
+    std::string normalized = CookedFile::Open(sourceMeshPath);
+    if (normalized.empty()) normalized = sourceMeshPath;
+
+    if (normalized.empty() || !FileExists(normalized.c_str())) return Model{};
+
+    Model model = LoadModel(normalized.c_str());
+    if (model.meshCount == 0) {
+        UnloadModel(model);
+        return Model{};
+    }
+    return model;
+}
+
 Texture2D* AssetCache::GetOrLoadTexture(const std::string& textureAssetPath) {
     auto it = textureCache.find(textureAssetPath);
     if (it != textureCache.end()) return &it->second;
