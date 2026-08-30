@@ -3,6 +3,7 @@
 #include "NodeRegistry.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Runtime/World.h"
+#include "raylib.h"
 #include <cstdlib>
 #include <vector>
 
@@ -250,7 +251,10 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
                                  const std::vector<std::pair<std::string, std::string>>& args,
                                  std::vector<std::pair<std::string, std::string>>& outResults) {
     if (!ctx.rootGraph) ctx.rootGraph = &classGraph;
-    if (ctx.callDepth > 32) return false;
+    if (ctx.callDepth > 32) {
+        TraceLog(LOG_WARNING, "GraphExecutor: function call depth exceeded 32 (recursive Call_Function?), stopping at \"%s\"", functionName.c_str());
+        return false;
+    }
 
     FunctionDef* fn = classGraph.FindFunction(functionName);
     if (!fn) return false;
@@ -297,4 +301,4 @@ bool GraphExecutor::EnteredViaPin(const Node& node, const ExecutionContext& ctx,
         if (pin.name == pinName) return ctx.enteredExecPin == pin.id;
     }
     return false;
-}
+}

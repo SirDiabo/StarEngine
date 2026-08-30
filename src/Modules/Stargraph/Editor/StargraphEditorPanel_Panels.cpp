@@ -885,6 +885,13 @@ void StargraphEditorPanel::RenderRightPanel(Rectangle panel) {
         return;
     }
 
+    std::vector<FunctionDef>& funcsForDetails = graph.GetFunctions();
+    if (lastValidFunctionIndex >= (int)funcsForDetails.size()) lastValidFunctionIndex = -1;
+    if (lastValidFunctionIndex >= 0) {
+        RenderFunctionDetails(panel, y, funcsForDetails[lastValidFunctionIndex], lastValidFunctionIndex);
+        return;
+    }
+
     if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
         std::vector<Variable>& localVars = ActiveGraph().GetVariables();
         if (lastValidLocalVariableIndex >= (int)localVars.size()) lastValidLocalVariableIndex = -1;
@@ -1067,4 +1074,4 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         float barY = listArea.y + scrollRatio * (listH - barH);
         DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
     }
-}
+}

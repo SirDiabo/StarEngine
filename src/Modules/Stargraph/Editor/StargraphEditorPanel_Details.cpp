@@ -197,6 +197,20 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         listeningForInputBindingIndex = -1;
     }
 
+    auto refreshField = [&](char* buf, size_t bufSize, int fieldId, float val) {
+        if (componentActiveField == fieldId) return;
+        snprintf(buf, bufSize, "%.2f", val);
+    };
+    refreshField(compPosBuf[0], 32, 2, comp.posX);
+    refreshField(compPosBuf[1], 32, 3, comp.posY);
+    refreshField(compPosBuf[2], 32, 4, comp.posZ);
+    refreshField(compRotBuf[0], 32, 5, comp.rotX);
+    refreshField(compRotBuf[1], 32, 6, comp.rotY);
+    refreshField(compRotBuf[2], 32, 7, comp.rotZ);
+    refreshField(compScaleBuf[0], 32, 8, comp.scaleX);
+    refreshField(compScaleBuf[1], 32, 9, comp.scaleY);
+    refreshField(compScaleBuf[2], 32, 10, comp.scaleZ);
+
     auto saveButton = [&](Rectangle fieldRect, const char* fieldKey) {
         Rectangle btn = {fieldRect.x + fieldRect.width + 4, fieldRect.y, 18, 18};
         bool has = comp.savableFields.count(fieldKey) && !comp.savableFields[fieldKey].empty();
@@ -920,5 +934,156 @@ void StargraphEditorPanel::RenderCallFunctionDetails(Rectangle panel, float y, N
         if (pin.type == PinType::Exec) continue;
         DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 16;
+    }
+}
+void StargraphEditorPanel::RenderFunctionDetails(Rectangle panel, float y, FunctionDef& fn, int detailIndex) {
+    const UIPalette& theme = UITheme::Get();
+
+    Node* entryNode = fn.graph.FindNodeByType("Function_Entry");
+    Node* returnNode = fn.graph.FindNodeByType("Return");
+
+    if (lastFuncDetailIndex != detailIndex) {
+        snprintf(funcNameEditBuf, sizeof(funcNameEditBuf), "%s", fn.name.c_str());
+        int row = 0;
+        if (entryNode) {
+            for (const Pin& pin : entryNode->outputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (row < 8) snprintf(funcInputNameBuf[row], 64, "%s", pin.name.c_str());
+                row++;
+            }
+        }
+        row = 0;
+        if (returnNode) {
+            for (const Pin& pin : returnNode->inputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (row < 8) snprintf(funcOutputNameBuf[row], 64, "%s", pin.name.c_str());
+                row++;
+            }
+        }
+        lastFuncDetailIndex = detailIndex;
+        funcDetailActiveField = 0;
+    }
+
+    DrawText("Name", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+    y += 14;
+    Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+    std::string nameVal = fn.name;
+    if (PropertyField::StringBox(nameRect, funcNameEditBuf, sizeof(funcNameEditBuf), 1, funcDetailActiveField, nameVal)) {
+        if (!nameVal.empty()) graph.RenameFunction(detailIndex, nameVal);
+        isDirty = true;
+    }
+    y += 26;
+
+    y += 6;
+    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
+    y += 10;
+    DrawText("Inputs", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
+    y += 18;
+
+    if (entryNode) {
+        std::string pinToRemove;
+        int row = 0;
+        for (Pin& pin : entryNode->outputs) {
+            if (pin.type == PinType::Exec) continue;
+
+            if (row < 8) {
+                Rectangle nameR = {panel.x + 8, y, panel.width - 16 - 66, 18};
+                std::string pname = pin.name;
+                if (PropertyField::StringBox(nameR, funcInputNameBuf[row], 64, 10 + row, funcDetailActiveField, pname)) {
+                    pin.name = pname;
+                    isDirty = true;
+                }
+            }
+
+            Rectangle typeR = {panel.x + panel.width - 54, y, 30, 18};
+            if (UIWidget::Button(typeR, ParamTypeShortName(pin.type))) {
+                pin.type = NextParamType(pin.type);
+                isDirty = true;
+            }
+
+            Rectangle delR = {panel.x + panel.width - 20, y, 18, 18};
+            if (UIWidget::Button(delR, "X")) pinToRemove = pin.name;
+
+            y += 22;
+            row++;
+        }
+
+        if (!pinToRemove.empty()) {
+            fn.graph.RemoveDynamicPin(*entryNode, true, pinToRemove);
+            isDirty = true;
+        }
+
+        y += 6;
+        if (row < 8) {
+            if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 20}, "+ Add Input")) {
+                std::string newName;
+                int n = 1;
+                do {
+                    newName = "Input" + std::to_string(n++);
+                    bool taken = false;
+                    for (const Pin& p : entryNode->outputs) if (p.name == newName) { taken = true; break; }
+                    if (!taken) break;
+                } while (n < 100);
+                fn.graph.AddDynamicPin(*entryNode, true, newName, PinType::Float);
+                isDirty = true;
+            }
+            y += 26;
+        }
+    }
+
+    y += 6;
+    DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
+    y += 10;
+    DrawText("Outputs", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
+    y += 18;
+
+    if (returnNode) {
+        std::string pinToRemove;
+        int row = 0;
+        for (Pin& pin : returnNode->inputs) {
+            if (pin.type == PinType::Exec) continue;
+
+            if (row < 8) {
+                Rectangle nameR = {panel.x + 8, y, panel.width - 16 - 66, 18};
+                std::string pname = pin.name;
+                if (PropertyField::StringBox(nameR, funcOutputNameBuf[row], 64, 20 + row, funcDetailActiveField, pname)) {
+                    pin.name = pname;
+                    isDirty = true;
+                }
+            }
+
+            Rectangle typeR = {panel.x + panel.width - 54, y, 30, 18};
+            if (UIWidget::Button(typeR, ParamTypeShortName(pin.type))) {
+                pin.type = NextParamType(pin.type);
+                isDirty = true;
+            }
+
+            Rectangle delR = {panel.x + panel.width - 20, y, 18, 18};
+            if (UIWidget::Button(delR, "X")) pinToRemove = pin.name;
+
+            y += 22;
+            row++;
+        }
+
+        if (!pinToRemove.empty()) {
+            fn.graph.RemoveDynamicPin(*returnNode, false, pinToRemove);
+            isDirty = true;
+        }
+
+        y += 6;
+        if (row < 8) {
+            if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 20}, "+ Add Output")) {
+                std::string newName;
+                int n = 1;
+                do {
+                    newName = "Output" + std::to_string(n++);
+                    bool taken = false;
+                    for (const Pin& p : returnNode->inputs) if (p.name == newName) { taken = true; break; }
+                    if (!taken) break;
+                } while (n < 100);
+                fn.graph.AddDynamicPin(*returnNode, false, newName, PinType::Float);
+                isDirty = true;
+            }
+        }
     }
 }

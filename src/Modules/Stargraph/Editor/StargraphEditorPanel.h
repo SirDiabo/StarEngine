@@ -48,6 +48,7 @@ private:
     void RenderCallFunctionDetails(Rectangle panel, float y, Node& node);
     void RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField);
     void RenderVariableDetailsBody(Rectangle panel, float y, Variable& var, int detailIndex, bool isLocal);
+    void RenderFunctionDetails(Rectangle panel, float y, FunctionDef& fn, int detailIndex);
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
 
@@ -236,6 +237,12 @@ private:
     char funcCallNameBuf[128] = "";
     int funcCallActiveField = 0;
     char eventParamNameBuf[8][64] = {};
+
+    int lastFuncDetailIndex = -1;
+    char funcNameEditBuf[128] = "";
+    int funcDetailActiveField = 0;
+    char funcInputNameBuf[8][64] = {};
+    char funcOutputNameBuf[8][64] = {};
 
     RegistryPickerPopup savePicker;
     std::string saveTargetFieldKey;
