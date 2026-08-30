@@ -35,6 +35,7 @@ static std::vector<std::string> GetProjectInputMappingNames() {
 void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel(panel);
+    leftPanelBounds = panel;
 
     Vector2 mousePos = GetMousePosition();
     float y = panel.y + 8;
@@ -161,33 +162,6 @@ void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     }
     y += 24;
 
-    if (funcContextMenuOpen) {
-        Rectangle popup = {panel.x + panel.width, funcContextMenuAnchorY - 4, 110, 50};
-        UIWidget::Panel(popup);
-
-        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        if (UIWidget::Button(renameBtn, "Rename")) {
-            snprintf(funcNameBuffer, sizeof(funcNameBuffer), "%s", funcs[funcContextMenuIndex].name.c_str());
-            PropertyField::ForceActivate(funcNameBuffer, sizeof(funcNameBuffer));
-            renamingFunctionIndex = funcContextMenuIndex;
-            functionNameActiveField = 1;
-            funcContextMenuOpen = false;
-        }
-        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
-            graph.RemoveFunction(funcContextMenuIndex);
-            selectedFunctionIndex = -1;
-            if (lastValidFunctionIndex == funcContextMenuIndex) lastValidFunctionIndex = -1;
-            if (openFunctionIndex == funcContextMenuIndex) CloseFunctionGraph();
-            else if (openFunctionIndex > funcContextMenuIndex) openFunctionIndex--;
-            funcContextMenuOpen = false;
-            isDirty = true;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            funcContextMenuOpen = false;
-        }
-    }
-
     if (!funcContextMenuWasOpenThisFrame && !wasAddingFunctionThisFrame && !leftClickConsumedByFunction &&
         selectedFunctionIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         selectedFunctionIndex = -1;
@@ -307,31 +281,6 @@ void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     }
     y += 24;
 
-    if (varContextMenuOpen) {
-        Rectangle popup = {panel.x + panel.width, varContextMenuAnchorY - 4, 110, 50};
-        UIWidget::Panel(popup);
-
-        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        if (UIWidget::Button(renameBtn, "Rename")) {
-            snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
-            PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
-            renamingVariableIndex = varContextMenuIndex;
-            variableNameActiveField = 1;
-            varContextMenuOpen = false;
-        }
-        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
-            vars.erase(vars.begin() + varContextMenuIndex);
-            selectedVariableIndex = -1;
-            if (lastValidVariableIndex == varContextMenuIndex) lastValidVariableIndex = -1;
-            varContextMenuOpen = false;
-            isDirty = true;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            varContextMenuOpen = false;
-        }
-    }
-
     if (!varContextMenuWasOpenThisFrame && !wasAddingVariableThisFrame && !leftClickConsumedByVariable &&
         selectedVariableIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         selectedVariableIndex = -1;
@@ -441,31 +390,6 @@ void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
             localVariableNameActiveField = 1;
         }
         y += 24;
-
-        if (localVarContextMenuOpen) {
-            Rectangle popup = {panel.x + panel.width, localVarContextMenuAnchorY - 4, 110, 50};
-            UIWidget::Panel(popup);
-
-            Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-            if (UIWidget::Button(renameBtn, "Rename")) {
-                snprintf(localVarNameBuffer, sizeof(localVarNameBuffer), "%s", localVars[localVarContextMenuIndex].name.c_str());
-                PropertyField::ForceActivate(localVarNameBuffer, sizeof(localVarNameBuffer));
-                renamingLocalVariableIndex = localVarContextMenuIndex;
-                localVariableNameActiveField = 1;
-                localVarContextMenuOpen = false;
-            }
-            if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
-                localVars.erase(localVars.begin() + localVarContextMenuIndex);
-                selectedLocalVariableIndex = -1;
-                if (lastValidLocalVariableIndex == localVarContextMenuIndex) lastValidLocalVariableIndex = -1;
-                localVarContextMenuOpen = false;
-                isDirty = true;
-            }
-
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-                localVarContextMenuOpen = false;
-            }
-        }
 
         if (!localVarContextMenuWasOpenThisFrame && !wasAddingLocalVariableThisFrame && !leftClickConsumedByLocalVariable &&
             selectedLocalVariableIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -1075,3 +999,87 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
     }
 }
+void StargraphEditorPanel::RenderLeftPanelPopups() {
+    Rectangle panel = leftPanelBounds;
+    Vector2 mousePos = GetMousePosition();
+
+    if (funcContextMenuOpen) {
+        std::vector<FunctionDef>& funcs = graph.GetFunctions();
+        Rectangle popup = {panel.x + panel.width, funcContextMenuAnchorY - 4, 110, 50};
+        UIWidget::Panel(popup);
+
+        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
+        if (UIWidget::Button(renameBtn, "Rename") && funcContextMenuIndex < (int)funcs.size()) {
+            snprintf(funcNameBuffer, sizeof(funcNameBuffer), "%s", funcs[funcContextMenuIndex].name.c_str());
+            PropertyField::ForceActivate(funcNameBuffer, sizeof(funcNameBuffer));
+            renamingFunctionIndex = funcContextMenuIndex;
+            functionNameActiveField = 1;
+            funcContextMenuOpen = false;
+        }
+        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
+            graph.RemoveFunction(funcContextMenuIndex);
+            selectedFunctionIndex = -1;
+            if (lastValidFunctionIndex == funcContextMenuIndex) lastValidFunctionIndex = -1;
+            if (openFunctionIndex == funcContextMenuIndex) CloseFunctionGraph();
+            else if (openFunctionIndex > funcContextMenuIndex) openFunctionIndex--;
+            funcContextMenuOpen = false;
+            isDirty = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            funcContextMenuOpen = false;
+        }
+    }
+
+    if (varContextMenuOpen) {
+        std::vector<Variable>& vars = graph.GetVariables();
+        Rectangle popup = {panel.x + panel.width, varContextMenuAnchorY - 4, 110, 50};
+        UIWidget::Panel(popup);
+
+        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
+        if (UIWidget::Button(renameBtn, "Rename") && varContextMenuIndex < (int)vars.size()) {
+            snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
+            PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
+            renamingVariableIndex = varContextMenuIndex;
+            variableNameActiveField = 1;
+            varContextMenuOpen = false;
+        }
+        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete") && varContextMenuIndex < (int)vars.size()) {
+            vars.erase(vars.begin() + varContextMenuIndex);
+            selectedVariableIndex = -1;
+            if (lastValidVariableIndex == varContextMenuIndex) lastValidVariableIndex = -1;
+            varContextMenuOpen = false;
+            isDirty = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            varContextMenuOpen = false;
+        }
+    }
+
+    if (localVarContextMenuOpen && openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
+        std::vector<Variable>& localVars = ActiveGraph().GetVariables();
+        Rectangle popup = {panel.x + panel.width, localVarContextMenuAnchorY - 4, 110, 50};
+        UIWidget::Panel(popup);
+
+        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
+        if (UIWidget::Button(renameBtn, "Rename") && localVarContextMenuIndex < (int)localVars.size()) {
+            snprintf(localVarNameBuffer, sizeof(localVarNameBuffer), "%s", localVars[localVarContextMenuIndex].name.c_str());
+            PropertyField::ForceActivate(localVarNameBuffer, sizeof(localVarNameBuffer));
+            renamingLocalVariableIndex = localVarContextMenuIndex;
+            localVariableNameActiveField = 1;
+            localVarContextMenuOpen = false;
+        }
+        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete") && localVarContextMenuIndex < (int)localVars.size()) {
+            localVars.erase(localVars.begin() + localVarContextMenuIndex);
+            selectedLocalVariableIndex = -1;
+            if (lastValidLocalVariableIndex == localVarContextMenuIndex) lastValidLocalVariableIndex = -1;
+            localVarContextMenuOpen = false;
+            isDirty = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
+            localVarContextMenuOpen = false;
+        }
+    }
+}

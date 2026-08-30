@@ -33,6 +33,7 @@ public:
     void RenderToolbar(Rectangle area);
     void RenderComponentOutliner(Rectangle area);
     void RenderLeftPanel(Rectangle area);
+    void RenderLeftPanelPopups();
     void RenderGraph(Rectangle area);
     void RenderRightPanel(Rectangle area);
     void RenderNodeContextMenu();
@@ -80,6 +81,7 @@ private:
     bool isDirty = false;
 
     int openFunctionIndex = -1;
+    Rectangle leftPanelBounds{};
     Stargraph& ActiveGraph() {
         if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size())
             return graph.GetFunctions()[openFunctionIndex].graph;

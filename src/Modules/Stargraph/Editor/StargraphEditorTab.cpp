@@ -125,6 +125,7 @@ void StargraphEditorTab::Render(float x, float y, float width, float height) {
 
 void StargraphEditorTab::RenderOverlays() {
     dockArea.RenderOverlays();
+    if (panel) panel->RenderLeftPanelPopups();
 }
 
 void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
