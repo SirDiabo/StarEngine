@@ -35,7 +35,11 @@ void RegisterVariableNodes() {
         }
         Stargraph* targetGraph = ResolveVariableGraph(node, graph, ctx);
         if (!targetGraph) return;
-        if (Variable* v = targetGraph->FindVariable(varName)) {
+        Variable* v = targetGraph->FindVariable(varName);
+        if (!v && targetGraph == &graph && ctx.rootGraph && ctx.rootGraph != &graph) {
+            v = ctx.rootGraph->FindVariable(varName);
+        }
+        if (v) {
             for (Pin& p : node.outputs) {
                 if (p.name == "Value") { p.defaultValue = v->value; break; }
             }
@@ -63,7 +67,11 @@ void RegisterVariableNodes() {
         }
         Stargraph* targetGraph = ResolveVariableGraph(node, graph, ctx);
         if (!targetGraph) return;
-        if (Variable* v = targetGraph->FindVariable(varName)) {
+        Variable* v = targetGraph->FindVariable(varName);
+        if (!v && targetGraph == &graph && ctx.rootGraph && ctx.rootGraph != &graph) {
+            v = ctx.rootGraph->FindVariable(varName);
+        }
+        if (v) {
             if (v->replication == ReplicationMode::ServerOnly && !NetworkBackendRegistry::Get().HasAuthority()) return;
             v->value = value;
         }

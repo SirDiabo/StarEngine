@@ -81,6 +81,39 @@ void Stargraph::RenameVariable(size_t index, const std::string& newName) {
     InvalidateCaches();
 }
 
+FunctionDef* Stargraph::AddFunction(const std::string& name) {
+    functions.emplace_back();
+    FunctionDef* fn = &functions.back();
+    fn->name = name;
+    fn->graph.assetName = name;
+
+    Node* entry = fn->graph.CreateNode("Function_Entry");
+    if (entry) { entry->posX = 80; entry->posY = 120; }
+
+    Node* ret = fn->graph.CreateNode("Return");
+    if (ret) { ret->posX = 520; ret->posY = 120; }
+
+    return fn;
+}
+
+void Stargraph::RemoveFunction(size_t index) {
+    if (index < functions.size()) functions.erase(functions.begin() + index);
+}
+
+void Stargraph::RenameFunction(size_t index, const std::string& newName) {
+    if (index < functions.size()) functions[index].name = newName;
+}
+
+FunctionDef* Stargraph::FindFunction(const std::string& name) {
+    for (FunctionDef& fn : functions) if (fn.name == name) return &fn;
+    return nullptr;
+}
+
+const FunctionDef* Stargraph::FindFunction(const std::string& name) const {
+    for (const FunctionDef& fn : functions) if (fn.name == name) return &fn;
+    return nullptr;
+}
+
 void Stargraph::AddComponent(const ComponentDecl& comp) {
     components.push_back(comp);
 }
@@ -356,12 +389,29 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "\n";
     }
 
-    out << "[Variables]\n";
+    SaveGraphContent(out, "");
+
+    out << "[Functions]\n";
+    out << "Count=" << functions.size() << "\n";
+    for (size_t i = 0; i < functions.size(); i++) {
+        out << "Name" << i << "=" << functions[i].name << "\n";
+    }
+    out << "\n";
+
+    for (size_t i = 0; i < functions.size(); i++) {
+        functions[i].graph.SaveGraphContent(out, "Function" + std::to_string(i) + ".");
+    }
+
+    return true;
+}
+
+void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) const {
+    out << "[" << prefix << "Variables]\n";
     out << "Count=" << variables.size() << "\n";
     out << "\n";
     for (size_t i = 0; i < variables.size(); i++) {
         const Variable& var = variables[i];
-        out << "[Variable" << i << "]\n";
+        out << "[" << prefix << "Variable" << i << "]\n";
         out << "Name=" << var.name << "\n";
         out << "Type=" << PinTypeToString(var.type) << "\n";
         if (var.type == PinType::Object && !var.objectKind.empty()) out << "ObjectKind=" << var.objectKind << "\n";
@@ -379,12 +429,12 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "\n";
     }
 
-    out << "[Nodes]\n";
+    out << "[" << prefix << "Nodes]\n";
     out << "Count=" << nodes.size() << "\n";
     out << "\n";
     for (size_t i = 0; i < nodes.size(); i++) {
         const Node& node = nodes[i];
-        out << "[Node" << i << "]\n";
+        out << "[" << prefix << "Node" << i << "]\n";
         out << "Type=" << node.type << "\n";
         out << "Title=" << node.title << "\n";
         out << "PosX=" << node.posX << "\n";
@@ -427,7 +477,7 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         out << "\n";
     }
 
-    out << "[Links]\n";
+    out << "[" << prefix << "Links]\n";
     out << "Count=" << links.size() << "\n";
     out << "\n";
     for (size_t i = 0; i < links.size(); i++) {
@@ -436,22 +486,17 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         if (!FindPinLocation(nodes, links[i].outputPinId, fromIndex, fromPin)) continue;
         if (!FindPinLocation(nodes, links[i].inputPinId, toIndex, toPin)) continue;
 
-        out << "[Link" << i << "]\n";
+        out << "[" << prefix << "Link" << i << "]\n";
         out << "FromNode=" << fromIndex << "\n";
         out << "FromPin=" << fromPin << "\n";
         out << "ToNode=" << toIndex << "\n";
         out << "ToPin=" << toPin << "\n";
         out << "\n";
     }
-
-    return true;
 }
 
 namespace {
-    struct ParsedSection {
-        std::string name;
-        std::vector<std::pair<std::string, std::string>> entries;
-    };
+    using StargraphIO::ParsedSection;
 
     std::vector<ParsedSection> ParseSections(std::ifstream& in) {
         std::vector<ParsedSection> sections;
@@ -491,15 +536,10 @@ bool Stargraph::LoadFromFile(const std::string& path) {
     std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
 
-    nodes.clear();
-    InvalidateCaches();
-    links.clear();
-    variables.clear();
     components.clear();
-    nextPinId = 1;
+    functions.clear();
 
     std::vector<ParsedSection> sections = ParseSections(in);
-    std::vector<Node*> createdNodes;
 
     for (const ParsedSection& section : sections) {
         if (section.name == "Stargraph") {
@@ -556,7 +596,41 @@ bool Stargraph::LoadFromFile(const std::string& path) {
                 }
             }
             components.push_back(comp);
-        } else if (section.name != "Nodes" && section.name.rfind("Node", 0) == 0) {
+        } else if (section.name == "Functions") {
+            int count = 0;
+            if (const std::string* v = FindEntry(section, "Count")) count = SafeParse::ToInt(*v);
+            for (int i = 0; i < count; i++) {
+                if (const std::string* v = FindEntry(section, "Name" + std::to_string(i))) {
+                    FunctionDef* fn = AddFunction(*v);
+                    fn->graph.LoadGraphContent(sections, "Function" + std::to_string(i) + ".");
+                }
+            }
+        }
+    }
+
+    LoadGraphContent(sections, "");
+
+    return true;
+}
+
+bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& sections, const std::string& prefix) {
+    nodes.clear();
+    InvalidateCaches();
+    links.clear();
+    variables.clear();
+    nextPinId = 1;
+
+    const std::string nodesHeader     = prefix + "Nodes";
+    const std::string nodePrefix      = prefix + "Node";
+    const std::string variablesHeader = prefix + "Variables";
+    const std::string variablePrefix  = prefix + "Variable";
+    const std::string linksHeader     = prefix + "Links";
+    const std::string linkPrefix      = prefix + "Link";
+
+    std::vector<Node*> createdNodes;
+
+    for (const ParsedSection& section : sections) {
+        if (section.name != nodesHeader && section.name.rfind(nodePrefix, 0) == 0) {
             const std::string* typeValue = FindEntry(section, "Type");
             if (!typeValue) continue;
 
@@ -624,7 +698,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             }
 
             createdNodes.push_back(node);
-        } else if (section.name != "Variables" && section.name.rfind("Variable", 0) == 0) {
+        } else if (section.name != variablesHeader && section.name.rfind(variablePrefix, 0) == 0) {
             Variable var;
             if (const std::string* v = FindEntry(section, "Name")) var.name = *v;
             if (const std::string* v = FindEntry(section, "Type")) var.type = PinTypeFromString(*v);
@@ -649,7 +723,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
     }
 
     for (const ParsedSection& section : sections) {
-        if (section.name == "Links" || section.name.rfind("Link", 0) != 0) continue;
+        if (section.name == linksHeader || section.name.rfind(linkPrefix, 0) != 0) continue;
 
         const std::string* fromNodeStr = FindEntry(section, "FromNode");
         const std::string* fromPinStr = FindEntry(section, "FromPin");

@@ -11,6 +11,7 @@
 #include "Stargraph.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Nodes_Events.h"
+#include "Nodes_Functions.h"
 #include "Nodes_Flow.h"
 #include "Nodes_Math.h"
 #include "Nodes_Actor.h"
@@ -34,6 +35,7 @@ StargraphModule::StargraphModule() {
 
 bool StargraphModule::Initialize() {
     RegisterEventNodes();
+    RegisterFunctionNodes();
     RegisterFlowNodes();
     RegisterMathNodes();
     RegisterActorNodes();

@@ -45,7 +45,9 @@ private:
     void RenderComponentDetails(Rectangle panel, float& y);
     void RenderCustomEventDetails(Rectangle panel, float y, Node& node);
     void RenderCallCustomEventDetails(Rectangle panel, float y, Node& node);
+    void RenderCallFunctionDetails(Rectangle panel, float y, Node& node);
     void RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField);
+    void RenderVariableDetailsBody(Rectangle panel, float y, Variable& var, int detailIndex, bool isLocal);
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
 
@@ -76,6 +78,20 @@ private:
     bool isOpen = false;
     bool isDirty = false;
 
+    int openFunctionIndex = -1;
+    Stargraph& ActiveGraph() {
+        if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size())
+            return graph.GetFunctions()[openFunctionIndex].graph;
+        return graph;
+    }
+    const Stargraph& ActiveGraph() const {
+        if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size())
+            return graph.GetFunctions()[openFunctionIndex].graph;
+        return graph;
+    }
+    void OpenFunctionGraph(int index);
+    void CloseFunctionGraph();
+
     GraphCanvas::PanZoomState canvasState;
 
     int selectedNodeId = -1;
@@ -104,13 +120,38 @@ private:
     std::vector<std::string> varValueSnapshot;
 
     int selectedVariableIndex = -1;
+    int lastValidVariableIndex = -1;
     bool varContextMenuOpen = false;
     int varContextMenuIndex = -1;
+    float varContextMenuAnchorY = 0;
     int renamingVariableIndex = -1;
     char varNameBuffer[128] = "";
     bool addingVariable = false;
     int variableNameActiveField = 0;
+    bool variableDragIsLocal = false;
     int listeningForKeyPinId = 0;
+
+    int selectedFunctionIndex = -1;
+    int lastValidFunctionIndex = -1;
+    bool funcContextMenuOpen = false;
+    int funcContextMenuIndex = -1;
+    float funcContextMenuAnchorY = 0;
+    int renamingFunctionIndex = -1;
+    char funcNameBuffer[128] = "";
+    bool addingFunction = false;
+    int functionNameActiveField = 0;
+    int lastFunctionClickIndex = -1;
+    float lastFunctionClickTime = -1;
+
+    int selectedLocalVariableIndex = -1;
+    int lastValidLocalVariableIndex = -1;
+    bool localVarContextMenuOpen = false;
+    int localVarContextMenuIndex = -1;
+    float localVarContextMenuAnchorY = 0;
+    int renamingLocalVariableIndex = -1;
+    char localVarNameBuffer[128] = "";
+    bool addingLocalVariable = false;
+    int localVariableNameActiveField = 0;
 
     struct ArrayElemBuf { char text[3][64] = {"", "", ""}; };
     std::vector<ArrayElemBuf> varArrayBufs;
@@ -190,6 +231,10 @@ private:
     int lastEventDetailNodeId = -1;
     char eventNameBuf[128] = "";
     int eventActiveField = 0;
+
+    int lastFuncCallDetailNodeId = -1;
+    char funcCallNameBuf[128] = "";
+    int funcCallActiveField = 0;
     char eventParamNameBuf[8][64] = {};
 
     RegistryPickerPopup savePicker;

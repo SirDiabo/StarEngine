@@ -180,6 +180,8 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
 }
 
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
+    if (!ctx.rootGraph) ctx.rootGraph = &graph;
+
     if (eventType == "Event_Tick") {
         for (Node* node : graph.GetNodesOfType("Input_Key")) {
             ProcessHeldEventNode(*node, graph, ctx);
@@ -225,7 +227,8 @@ void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, Execution
 
 void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventName, ExecutionContext ctx,
                                     const std::vector<std::pair<std::string, std::string>>& params) {
-    if (graph.customEventDepth > 32) return;
+    if (!ctx.rootGraph) ctx.rootGraph = &graph;
+    if (graph.customEventDepth > 32 || ctx.callDepth > 32) return;
 
     Node* eventNode = graph.FindCustomEventByName(eventName);
     if (!eventNode) return;
@@ -237,8 +240,44 @@ void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventNam
     }
 
     graph.customEventDepth++;
+    ctx.callDepth++;
     ExecuteFromNode(graph, eventNode, ctx);
+    ctx.callDepth--;
     graph.customEventDepth--;
+}
+
+bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functionName, ExecutionContext ctx,
+                                 const std::vector<std::pair<std::string, std::string>>& args,
+                                 std::vector<std::pair<std::string, std::string>>& outResults) {
+    if (!ctx.rootGraph) ctx.rootGraph = &classGraph;
+    if (ctx.callDepth > 32) return false;
+
+    FunctionDef* fn = classGraph.FindFunction(functionName);
+    if (!fn) return false;
+
+    Node* entry = fn->graph.FindNodeByType("Function_Entry");
+    Node* ret   = fn->graph.FindNodeByType("Return");
+    if (!entry || !ret) return false;
+
+    for (const auto& arg : args) {
+        for (Pin& p : entry->outputs) {
+            if (p.name == arg.first) { p.defaultValue = arg.second; break; }
+        }
+    }
+
+    ctx.callDepth++;
+    ExecuteFromNode(fn->graph, entry, ctx);
+
+    GraphExecutor::PropagateDataPins(fn->graph, ret, ctx);
+    ctx.callDepth--;
+
+    outResults.clear();
+    for (const Pin& p : ret->inputs) {
+        if (p.type == PinType::Exec) continue;
+        outResults.emplace_back(p.name, (const std::string&)p.defaultValue);
+    }
+
+    return true;
 }
 
 Node* GraphExecutor::FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName, int* outPinId) {

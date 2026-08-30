@@ -53,6 +53,11 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             selectedNodeId = -1;
             selectedNodeIds.clear();
             selectedVariableIndex = -1;
+            lastValidVariableIndex = -1;
+            selectedFunctionIndex = -1;
+            lastValidFunctionIndex = -1;
+            selectedLocalVariableIndex = -1;
+            lastValidLocalVariableIndex = -1;
             componentDragIndex = (int)i;
             componentDragActive = false;
             componentDragPos = mousePos;
@@ -97,12 +102,17 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             selectedNodeId = -1;
             selectedNodeIds.clear();
             selectedVariableIndex = -1;
+            lastValidVariableIndex = -1;
+            selectedFunctionIndex = -1;
+            lastValidFunctionIndex = -1;
+            selectedLocalVariableIndex = -1;
+            lastValidLocalVariableIndex = -1;
             isDirty = true;
         }
     }
 
     if (!popupWasOpenThisFrame && !leftClickConsumedByComponent && selectedComponentIndex != -1 &&
-        IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        previewGizmoState.hoverAxis == -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         selectedComponentIndex = -1;
     }
 }
@@ -797,7 +807,7 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
             std::vector<std::string> keep = {"Target", "Event Name"};
             for (const Pin& srcPin : targetEvent->outputs) {
                 if (srcPin.type == PinType::Exec) continue;
-                graph.AddDynamicPin(node, false, srcPin.name, srcPin.type);
+                ActiveGraph().AddDynamicPin(node, false, srcPin.name, srcPin.type);
                 keep.push_back(srcPin.name);
             }
             std::vector<std::string> toRemove;
@@ -807,7 +817,7 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
                 for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
                 if (!keepIt) toRemove.push_back(p.name);
             }
-            for (const std::string& n : toRemove) graph.RemoveDynamicPin(node, false, n);
+            for (const std::string& n : toRemove) ActiveGraph().RemoveDynamicPin(node, false, n);
             isDirty = true;
         }
     }
@@ -818,6 +828,96 @@ void StargraphEditorPanel::RenderCallCustomEventDetails(Rectangle panel, float y
     for (const Pin& pin : node.inputs) {
         if (pin.type == PinType::Exec) continue;
         if (pin.name == "Target" || pin.name == "Event Name") continue;
+        DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+        y += 16;
+    }
+}
+
+void StargraphEditorPanel::RenderCallFunctionDetails(Rectangle panel, float y, Node& node) {
+    const UIPalette& theme = UITheme::Get();
+    int nodeId = std::stoi(node.id);
+    if (lastFuncCallDetailNodeId != nodeId) {
+        funcCallNameBuf[0] = '\0';
+        for (const Pin& p : node.inputs) if (p.name == "Function Name") snprintf(funcCallNameBuf, sizeof(funcCallNameBuf), "%s", p.defaultValue.c_str());
+        lastFuncCallDetailNodeId = nodeId;
+        funcCallActiveField = 0;
+    }
+
+    DrawText("Function Name", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+    y += 14;
+
+    Pin* functionNamePin = nullptr;
+    for (Pin& p : node.inputs) if (p.name == "Function Name") functionNamePin = &p;
+
+    Rectangle nameRect = {panel.x + 8, y, panel.width - 16, 18};
+    if (functionNamePin) {
+        std::string val = functionNamePin->defaultValue;
+        if (PropertyField::StringBox(nameRect, funcCallNameBuf, sizeof(funcCallNameBuf), 1, funcCallActiveField, val)) {
+            functionNamePin->defaultValue = val;
+            isDirty = true;
+        }
+    }
+    y += 26;
+
+    if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 20}, "Refresh Pins")) {
+        std::string targetName = functionNamePin ? std::string(functionNamePin->defaultValue) : std::string();
+        FunctionDef* targetFn = graph.FindFunction(targetName);
+        if (targetFn) {
+            Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
+            Node* returnNode = targetFn->graph.FindNodeByType("Return");
+
+            std::vector<std::string> keepInputs = {"Function Name"};
+            if (entryNode) {
+                for (const Pin& srcPin : entryNode->outputs) {
+                    if (srcPin.type == PinType::Exec) continue;
+                    ActiveGraph().AddDynamicPin(node, false, srcPin.name, srcPin.type);
+                    keepInputs.push_back(srcPin.name);
+                }
+            }
+            std::vector<std::string> toRemoveIn;
+            for (const Pin& p : node.inputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keepInputs) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemoveIn.push_back(p.name);
+            }
+            for (const std::string& n : toRemoveIn) ActiveGraph().RemoveDynamicPin(node, false, n);
+
+            std::vector<std::string> keepOutputs;
+            if (returnNode) {
+                for (const Pin& srcPin : returnNode->inputs) {
+                    if (srcPin.type == PinType::Exec) continue;
+                    ActiveGraph().AddDynamicPin(node, true, srcPin.name, srcPin.type);
+                    keepOutputs.push_back(srcPin.name);
+                }
+            }
+            std::vector<std::string> toRemoveOut;
+            for (const Pin& p : node.outputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keepOutputs) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemoveOut.push_back(p.name);
+            }
+            for (const std::string& n : toRemoveOut) ActiveGraph().RemoveDynamicPin(node, true, n);
+            isDirty = true;
+        }
+    }
+    y += 28;
+
+    DrawText("Inputs", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
+    y += 18;
+    for (const Pin& pin : node.inputs) {
+        if (pin.type == PinType::Exec) continue;
+        if (pin.name == "Function Name") continue;
+        DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+        y += 16;
+    }
+
+    y += 8;
+    DrawText("Outputs", (int)panel.x + 8, (int)y, 12, theme.textSecondary);
+    y += 18;
+    for (const Pin& pin : node.outputs) {
+        if (pin.type == PinType::Exec) continue;
         DrawText((pin.name + " (" + ParamTypeShortName(pin.type) + ")").c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         y += 16;
     }

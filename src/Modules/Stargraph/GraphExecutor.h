@@ -16,6 +16,10 @@ public:
     static void RunCustomEvent(Stargraph& graph, const std::string& eventName, ExecutionContext ctx,
                                 const std::vector<std::pair<std::string, std::string>>& params = {});
 
+    static bool RunFunction(Stargraph& classGraph, const std::string& functionName, ExecutionContext ctx,
+                             const std::vector<std::pair<std::string, std::string>>& args,
+                             std::vector<std::pair<std::string, std::string>>& outResults);
+
     static void RunFromPin(Stargraph& graph, Node* node, ExecutionContext& ctx, const std::string& pinName);
 
     // Checks which pin fired.

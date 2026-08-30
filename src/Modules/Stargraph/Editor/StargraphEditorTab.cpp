@@ -78,7 +78,8 @@ void StargraphEditorTab::BuildDefaultLayout() {
     std::unique_ptr<DockNode> graphSide;
     if (logPanel) {
         auto graphLeaf = std::make_unique<DockNode>();
-        graphLeaf->panelNames = { "Graph", "Preview" };
+        graphLeaf->panelNames = { "Preview", "Graph" };
+        graphLeaf->activeTab  = 1;
 
         auto logsLeaf = std::make_unique<DockNode>();
         logsLeaf->panelNames = { "Logs" };
@@ -90,7 +91,8 @@ void StargraphEditorTab::BuildDefaultLayout() {
         graphSide->second      = std::move(logsLeaf);
     } else {
         graphSide = std::make_unique<DockNode>();
-        graphSide->panelNames = { "Graph", "Preview" };
+        graphSide->panelNames = { "Preview", "Graph" };
+        graphSide->activeTab  = 1;
     }
 
     auto detailsLeaf = std::make_unique<DockNode>();

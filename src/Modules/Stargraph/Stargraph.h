@@ -28,6 +28,14 @@ enum class ReplicationMode {
 std::string ReplicationModeToString(ReplicationMode mode);
 ReplicationMode ReplicationModeFromString(const std::string& text);
 
+namespace StargraphIO {
+    struct ParsedSection {
+        std::string name;
+        std::vector<std::pair<std::string, std::string>> entries;
+    };
+}
+
+
 class PinValue {
 public:
     struct Vec3Value { float x = 0.0f, y = 0.0f, z = 0.0f; };
@@ -242,6 +250,8 @@ struct ComponentDecl {
     std::unordered_map<std::string, std::string> savableFields;
 };
 
+struct FunctionDef;
+
 class Stargraph {
 public:
     const std::deque<Node>& GetNodes() const { return nodes; }
@@ -279,6 +289,14 @@ public:
     Variable* FindVariable(const std::string& name);
     const Variable* FindVariable(const std::string& name) const;
 
+    const std::vector<FunctionDef>& GetFunctions() const { return functions; }
+    std::vector<FunctionDef>& GetFunctions() { return functions; }
+    FunctionDef* AddFunction(const std::string& name);
+    void RemoveFunction(size_t index);
+    void RenameFunction(size_t index, const std::string& newName);
+    FunctionDef* FindFunction(const std::string& name);
+    const FunctionDef* FindFunction(const std::string& name) const;
+
     const std::vector<Link*>& GetLinksFromPin(int outputPinId);
     Link* GetLinkToPin(int inputPinId);
 
@@ -293,10 +311,14 @@ public:
     int customEventDepth = 0;
 
 private:
+    void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
+    bool LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& sections, const std::string& prefix);
+
     std::deque<Node> nodes;
     std::vector<Link> links;
     std::vector<Variable> variables;
     std::vector<ComponentDecl> components;
+    std::vector<FunctionDef> functions;
     int nextPinId = 1;
     int nextNodeId = 1;
 
@@ -312,3 +334,8 @@ private:
 
 std::string PinTypeToString(PinType type);
 PinType PinTypeFromString(const std::string& text);
+
+struct FunctionDef {
+    std::string name;
+    Stargraph graph;
+};

@@ -32,6 +32,8 @@ static std::string NodeMenuDisplayLabel(const std::string& rawType) {
     std::string display = rawType;
     if (display.rfind("Call_Custom_Event:", 0) == 0) {
         display = "Event " + display.substr(18);
+    } else if (display.rfind("Call_Function:", 0) == 0) {
+        display = "Function " + display.substr(14);
     } else if (display.rfind("Input_Mapping:", 0) == 0) {
         display = "Key " + display.substr(14);
     } else if (display.rfind("Get_External_Var:", 0) == 0) {
@@ -95,7 +97,7 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
         if (pin.name == "Component_Name") continue;
         if (pin.type != PinType::Exec && editingPinId != pin.id) {
             bool linked = false;
-            for (const Link& lk : graph.GetLinks()) {
+            for (const Link& lk : ActiveGraph().GetLinks()) {
                 if (lk.inputPinId == pin.id) { linked = true; break; }
             }
             if (!linked) rows++;
@@ -172,7 +174,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
         y += scaledPinHeight;
         if (p.type != PinType::Exec) {
             bool linked = false;
-            for (const Link& lk : graph.GetLinks()) {
+            for (const Link& lk : ActiveGraph().GetLinks()) {
                 if (lk.inputPinId == p.id) { linked = true; break; }
             }
             if (!linked) y += scaledPinHeight;
@@ -191,7 +193,7 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
     const Pin* in = nullptr;
     const Node* outNode = nullptr;
     const Node* inNode = nullptr;
-    for (const Node& node : graph.GetNodes()) {
+    for (const Node& node : ActiveGraph().GetNodes()) {
         for (const Pin& pin : node.outputs) if (pin.id == outputPinId) { out = &pin; outNode = &node; }
         for (const Pin& pin : node.inputs)  if (pin.id == inputPinId)  { in  = &pin; inNode = &node; }
     }
@@ -212,14 +214,14 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
 
     if (!PinsCompatible(outputPinId, inputPinId)) { CancelLink(); return; }
 
-    for (const Link& lk : graph.GetLinks()) {
+    for (const Link& lk : ActiveGraph().GetLinks()) {
         if (lk.inputPinId == inputPinId) { CancelLink(); return; }
     }
 
-    graph.AddLink({outputPinId, inputPinId});
+    ActiveGraph().AddLink({outputPinId, inputPinId});
     isDirty = true;
-    RefreshWildcardPins(graph.FindNodeByPinId(outputPinId));
-    RefreshWildcardPins(graph.FindNodeByPinId(inputPinId));
+    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(outputPinId));
+    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(inputPinId));
 
     for (int extraPinId : rerouteExtraPins) {
         int extraOutputPinId = linkFromIsOutput ? extraPinId : pinId;
@@ -227,14 +229,14 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
         if (!PinsCompatible(extraOutputPinId, extraInputPinId)) continue;
 
         bool inputTaken = false;
-        for (const Link& lk : graph.GetLinks()) {
+        for (const Link& lk : ActiveGraph().GetLinks()) {
             if (lk.inputPinId == extraInputPinId) { inputTaken = true; break; }
         }
         if (inputTaken) continue;
 
-        graph.AddLink({extraOutputPinId, extraInputPinId});
-        RefreshWildcardPins(graph.FindNodeByPinId(extraOutputPinId));
-        RefreshWildcardPins(graph.FindNodeByPinId(extraInputPinId));
+        ActiveGraph().AddLink({extraOutputPinId, extraInputPinId});
+        RefreshWildcardPins(ActiveGraph().FindNodeByPinId(extraOutputPinId));
+        RefreshWildcardPins(ActiveGraph().FindNodeByPinId(extraInputPinId));
     }
 
     CancelLink();
@@ -248,26 +250,26 @@ void StargraphEditorPanel::CancelLink() {
 
 void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
     int otherPinId = -1;
-    for (const Link& lk : graph.GetLinks()) {
+    for (const Link& lk : ActiveGraph().GetLinks()) {
         if (lk.inputPinId == pinId)  { otherPinId = lk.outputPinId; break; }
         if (lk.outputPinId == pinId) { otherPinId = lk.inputPinId;  break; }
     }
-    graph.RemoveLink(pinId);
+    ActiveGraph().RemoveLink(pinId);
     isDirty = true;
-    RefreshWildcardPins(graph.FindNodeByPinId(pinId));
-    if (otherPinId != -1) RefreshWildcardPins(graph.FindNodeByPinId(otherPinId));
+    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(pinId));
+    if (otherPinId != -1) RefreshWildcardPins(ActiveGraph().FindNodeByPinId(otherPinId));
 }
 
 void StargraphEditorPanel::RemoveSpecificLink(int outputPinId, int inputPinId) {
-    graph.RemoveSpecificLink(outputPinId, inputPinId);
+    ActiveGraph().RemoveSpecificLink(outputPinId, inputPinId);
     isDirty = true;
-    RefreshWildcardPins(graph.FindNodeByPinId(outputPinId));
-    RefreshWildcardPins(graph.FindNodeByPinId(inputPinId));
+    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(outputPinId));
+    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(inputPinId));
 }
 
 void StargraphEditorPanel::BeginReroute(int pinId) {
     std::vector<int> otherPinIds;
-    for (const Link& lk : graph.GetLinks()) {
+    for (const Link& lk : ActiveGraph().GetLinks()) {
         if (lk.outputPinId == pinId) otherPinIds.push_back(lk.inputPinId);
         else if (lk.inputPinId == pinId) otherPinIds.push_back(lk.outputPinId);
     }
@@ -277,7 +279,7 @@ void StargraphEditorPanel::BeginReroute(int pinId) {
 
     linkFromPin = otherPinIds[0];
     linkFromIsOutput = false;
-    for (const Node& n : graph.GetNodes()) {
+    for (const Node& n : ActiveGraph().GetNodes()) {
         for (const Pin& p : n.outputs) if (p.id == linkFromPin) { linkFromIsOutput = true; break; }
         for (const Pin& p : n.inputs)  if (p.id == linkFromPin) { linkFromIsOutput = false; break; }
     }
@@ -310,9 +312,9 @@ void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
     PinType resolved = PinType::None;
     for (const Pin& pin : node->inputs) {
         if (pin.type != PinType::Wildcard) continue;
-        for (const Link& lk : graph.GetLinks()) {
+        for (const Link& lk : ActiveGraph().GetLinks()) {
             if (lk.inputPinId != pin.id) continue;
-            if (const Node* fromNode = graph.FindNodeByPinId(lk.outputPinId)) {
+            if (const Node* fromNode = ActiveGraph().FindNodeByPinId(lk.outputPinId)) {
                 for (const Pin& p : fromNode->outputs) {
                     if (p.id == lk.outputPinId && p.type != PinType::Wildcard) resolved = p.type;
                 }
@@ -322,9 +324,9 @@ void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
     if (resolved == PinType::None) {
         for (const Pin& pin : node->outputs) {
             if (pin.type != PinType::Wildcard) continue;
-            for (const Link& lk : graph.GetLinks()) {
+            for (const Link& lk : ActiveGraph().GetLinks()) {
                 if (lk.outputPinId != pin.id) continue;
-                if (const Node* toNode = graph.FindNodeByPinId(lk.inputPinId)) {
+                if (const Node* toNode = ActiveGraph().FindNodeByPinId(lk.inputPinId)) {
                     for (const Pin& p : toNode->inputs) {
                         if (p.id == lk.inputPinId && p.type != PinType::Wildcard) resolved = p.type;
                     }
@@ -354,7 +356,7 @@ void StargraphEditorPanel::CopySelectedNodes() {
 
     float minX = FLT_MAX, minY = FLT_MAX;
     for (int nodeId : nodesToCopy) {
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             if (std::stoi(node.id) == nodeId) {
                 if (node.posX < minX) minX = node.posX;
                 if (node.posY < minY) minY = node.posY;
@@ -366,7 +368,7 @@ void StargraphEditorPanel::CopySelectedNodes() {
     std::string clipText = "[StargraphCopy]\n";
 
     for (int nodeId : nodesToCopy) {
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             if (std::stoi(node.id) != nodeId) continue;
 
             clipText += "[Node]\n";
@@ -387,10 +389,10 @@ void StargraphEditorPanel::CopySelectedNodes() {
         }
     }
 
-    for (const Link& link : graph.GetLinks()) {
+    for (const Link& link : ActiveGraph().GetLinks()) {
         int fromNodeId = -1, toNodeId = -1;
         std::string fromPinName, toPinName;
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             for (const Pin& pin : node.outputs) {
                 if (pin.id == link.outputPinId) { fromNodeId = std::stoi(node.id); fromPinName = pin.name; }
             }
@@ -487,7 +489,7 @@ void StargraphEditorPanel::PasteNodes() {
 
     std::vector<Node*> createdNodes;
     for (const ClipNode& cn : parsedNodes) {
-        Node* node = graph.CreateNode(cn.type);
+        Node* node = ActiveGraph().CreateNode(cn.type);
         if (!node) continue;
         node->title = cn.title;
         node->posX = roundf((rawX + cn.posX) / gridSnap) * gridSnap;
@@ -498,14 +500,14 @@ void StargraphEditorPanel::PasteNodes() {
             for (Pin& p : node->inputs) {
                 if (p.name == pt.first) { p.type = PinTypeFromString(pt.second); found = true; break; }
             }
-            if (!found) graph.AddDynamicPin(*node, false, pt.first, PinTypeFromString(pt.second));
+            if (!found) ActiveGraph().AddDynamicPin(*node, false, pt.first, PinTypeFromString(pt.second));
         }
         for (const auto& op : cn.outputPinTypes) {
             bool found = false;
             for (Pin& p : node->outputs) {
                 if (p.name == op.first) { p.type = PinTypeFromString(op.second); found = true; break; }
             }
-            if (!found) graph.AddDynamicPin(*node, true, op.first, PinTypeFromString(op.second));
+            if (!found) ActiveGraph().AddDynamicPin(*node, true, op.first, PinTypeFromString(op.second));
         }
         for (const auto& pin : cn.inputPins) {
             for (Pin& p : node->inputs) {
@@ -523,7 +525,7 @@ void StargraphEditorPanel::PasteNodes() {
         int outPinId = -1, inPinId = -1;
         for (const Pin& p : fromNode->outputs) if (p.name == l.fromPin) { outPinId = p.id; break; }
         for (const Pin& p : toNode->inputs) if (p.name == l.toPin) { inPinId = p.id; break; }
-        if (outPinId != -1 && inPinId != -1) graph.AddLink({outPinId, inPinId});
+        if (outPinId != -1 && inPinId != -1) ActiveGraph().AddLink({outPinId, inPinId});
     }
 
     for (Node* node : createdNodes) {
@@ -547,10 +549,10 @@ void StargraphEditorPanel::DuplicateSelected() {
 
     for (int nodeId : nodesToDup) {
         const Node* src = nullptr;
-        for (const Node& n : graph.GetNodes()) if (std::stoi(n.id) == nodeId) { src = &n; break; }
+        for (const Node& n : ActiveGraph().GetNodes()) if (std::stoi(n.id) == nodeId) { src = &n; break; }
         if (!src) continue;
 
-        Node* node = graph.CreateNode(src->type);
+        Node* node = ActiveGraph().CreateNode(src->type);
         if (!node) continue;
         node->title = src->title;
         node->posX = src->posX + offset;
@@ -565,7 +567,7 @@ void StargraphEditorPanel::DuplicateSelected() {
                 found = true;
             }
             if (!found) {
-                Pin* np = graph.AddDynamicPin(*node, false, sp.name, sp.type);
+                Pin* np = ActiveGraph().AddDynamicPin(*node, false, sp.name, sp.type);
                 if (np) np->defaultValue = sp.defaultValue;
             }
         }
@@ -574,17 +576,17 @@ void StargraphEditorPanel::DuplicateSelected() {
             for (Pin& p : node->outputs) {
                 if (p.name == sp.name) { p.type = sp.type; found = true; break; }
             }
-            if (!found) graph.AddDynamicPin(*node, true, sp.name, sp.type);
+            if (!found) ActiveGraph().AddDynamicPin(*node, true, sp.name, sp.type);
         }
 
         oldIds.push_back(nodeId);
         newNodes.push_back(node);
     }
 
-    for (const Link& link : graph.GetLinks()) {
+    for (const Link& link : ActiveGraph().GetLinks()) {
         int fromNodeId = -1, toNodeId = -1;
         std::string fromPinName, toPinName;
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             for (const Pin& pin : node.outputs) if (pin.id == link.outputPinId) { fromNodeId = std::stoi(node.id); fromPinName = pin.name; }
             for (const Pin& pin : node.inputs) if (pin.id == link.inputPinId) { toNodeId = std::stoi(node.id); toPinName = pin.name; }
         }
@@ -598,7 +600,7 @@ void StargraphEditorPanel::DuplicateSelected() {
         int outPinId = -1, inPinId = -1;
         for (const Pin& p : fromDup->outputs) if (p.name == fromPinName) { outPinId = p.id; break; }
         for (const Pin& p : toDup->inputs) if (p.name == toPinName) { inPinId = p.id; break; }
-        if (outPinId != -1 && inPinId != -1) graph.AddLink({outPinId, inPinId});
+        if (outPinId != -1 && inPinId != -1) ActiveGraph().AddLink({outPinId, inPinId});
     }
 
     selectedNodeIds.clear();
@@ -612,18 +614,18 @@ void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1 && selectedNodeIds.empty()) return;
 
     if (!selectedNodeIds.empty()) {
-        for (int id : selectedNodeIds) graph.RemoveNode(id);
+        for (int id : selectedNodeIds) ActiveGraph().RemoveNode(id);
         selectedNodeIds.clear();
         selectedNodeId = -1;
     } else {
-        graph.RemoveNode(selectedNodeId);
+        ActiveGraph().RemoveNode(selectedNodeId);
         selectedNodeId = -1;
     }
     isDirty = true;
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
-    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+    for (Node& node : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
         float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
         float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
         if (CheckCollisionPointRec(pos, {nx, ny, GetNodeWidth(node) * canvasState.zoom, GetNodeHeight(node) * canvasState.zoom})) return &node;
@@ -643,7 +645,7 @@ void StargraphEditorPanel::RenderWireInProgress() {
         Vector2 fromPos = {0, 0};
         Color wireColor = {180, 180, 180, 200};
 
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             for (const Pin& pin : node.outputs) {
                 if (pin.id == dragPinId) { fromPos = GetPinPos(node, pin); wireColor = GetPinColor(pin.type); }
             }
@@ -659,6 +661,26 @@ void StargraphEditorPanel::RenderWireInProgress() {
 }
 
 void StargraphEditorPanel::RenderGraph(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+    previewGizmoState.hoverAxis = -1;
+
+    if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
+        Rectangle bar = {area.x, area.y, area.width, 22};
+        DrawRectangleRec(bar, theme.tabBar);
+        DrawLine((int)bar.x, (int)(bar.y + bar.height), (int)(bar.x + bar.width), (int)(bar.y + bar.height), theme.panelBorder);
+
+        Rectangle backBtn = {bar.x + 4, bar.y + 2, 90, 18};
+        if (UIWidget::Button(backBtn, "< Class Graph")) {
+            CloseFunctionGraph();
+        }
+
+        std::string label = "  /  " + graph.GetFunctions()[openFunctionIndex].name;
+        DrawText(label.c_str(), (int)(backBtn.x + backBtn.width), (int)bar.y + 4, 12, theme.textPrimary);
+
+        area.y += bar.height;
+        area.height -= bar.height;
+    }
+
     graphArea = area;
     Vector2 mousePos = GetMousePosition();
 
@@ -675,7 +697,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             if (keyCode != 0) {
                 std::string keyName = InputKeyCodeToName(keyCode);
                 if (!keyName.empty()) {
-                    for (Node& n : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                    for (Node& n : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
                         for (Pin& p : n.inputs) {
                             if (p.id == listeningForKeyPinId) { p.defaultValue = keyName; isDirty = true; }
                         }
@@ -694,10 +716,10 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
     BeginScissorMode((int)graphArea.x, (int)graphArea.y, (int)graphArea.width, (int)graphArea.height);
 
-    for (const Link& link : graph.GetLinks()) {
+    for (const Link& link : ActiveGraph().GetLinks()) {
         const Pin* outPin = nullptr; const Node* outNode = nullptr;
         const Pin* inPin  = nullptr; const Node* inNode  = nullptr;
-        for (const Node& node : graph.GetNodes()) {
+        for (const Node& node : ActiveGraph().GetNodes()) {
             for (const Pin& pin : node.outputs) if (pin.id == link.outputPinId) { outPin = &pin; outNode = &node; }
             for (const Pin& pin : node.inputs)  if (pin.id == link.inputPinId)  { inPin  = &pin; inNode  = &node; }
         }
@@ -722,7 +744,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
     RenderWireInProgress();
 
-    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+    for (Node& node : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
         int nodeIdInt = std::stoi(node.id);
         float nx = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
         float ny = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
@@ -753,7 +775,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             }
             bool targetLinked = false;
             if (targetPin) {
-                for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == targetPin->id) { targetLinked = true; break; }
+                for (const Link& lk : ActiveGraph().GetLinks()) if (lk.inputPinId == targetPin->id) { targetLinked = true; break; }
             }
             bool showTargetPin = targetPin && (targetLinked || linkFromPin != -1 || CheckCollisionPointRec(mousePos, nodeBounds));
 
@@ -772,7 +794,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
             if (outputPin && CheckCollisionPointCircle(mousePos, {nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 bool linked = false;
-                for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
+                for (const Link& lk : ActiveGraph().GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
                 DrawCircleV({nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
@@ -806,7 +828,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 Vector2 pinPos = {nx + scaledNodeWidth - scaledRadius - 6, ny + scaledHeight * 0.5f};
                 Color pinColor = GetPinColor(outputPin->type);
                 bool linked = false;
-                for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
+                for (const Link& lk : ActiveGraph().GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
                 if (linked) {
                     DrawCircleV(pinPos, scaledRadius, pinColor);
                 } else {
@@ -844,8 +866,13 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         selectedNodeId = nodeIdInt;
                     }
                     selectedVariableIndex = -1;
+                    lastValidVariableIndex = -1;
+                    selectedFunctionIndex = -1;
+                    lastValidFunctionIndex = -1;
                     selectedComponentIndex = -1;
                     lastValidComponentIndex = -1;
+                    selectedLocalVariableIndex = -1;
+                    lastValidLocalVariableIndex = -1;
                     draggingNode = true;
                     nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
                     break;
@@ -864,7 +891,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 node.posY = snappedY;
                 
                 if (!selectedNodeIds.empty()) {
-                    for (Node& other : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                    for (Node& other : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
                         int oid = std::stoi(other.id);
                         if (oid == nodeIdInt) continue;
                         for (int sid : selectedNodeIds) {
@@ -900,7 +927,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
-            for (const Link& lk : graph.GetLinks()) if (lk.inputPinId == pin.id) { linked = true; break; }
+            for (const Link& lk : ActiveGraph().GetLinks()) if (lk.inputPinId == pin.id) { linked = true; break; }
 
             float scaledRadius = pinRadius * canvasState.zoom;
 
@@ -1120,7 +1147,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             Color pinColor = GetPinColor(pin.type);
 
             bool linked = false;
-            for (const Link& lk : graph.GetLinks()) if (lk.outputPinId == pin.id) { linked = true; break; }
+            for (const Link& lk : ActiveGraph().GetLinks()) if (lk.outputPinId == pin.id) { linked = true; break; }
 
             float scaledRadius = pinRadius * canvasState.zoom;
 
@@ -1174,8 +1201,13 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     selectedNodeId = nodeIdInt;
                 }
                 selectedVariableIndex = -1;
+                lastValidVariableIndex = -1;
+                selectedFunctionIndex = -1;
+                lastValidFunctionIndex = -1;
                 selectedComponentIndex = -1;
                 lastValidComponentIndex = -1;
+                selectedLocalVariableIndex = -1;
+                lastValidLocalVariableIndex = -1;
                 draggingNode = true;
                 nodeDragOffset = {mousePos.x - nx, mousePos.y - ny};
                 break;
@@ -1194,7 +1226,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             node.posY = snappedY;
 
             if (!selectedNodeIds.empty()) {
-                for (Node& other : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+                for (Node& other : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
                     int oid = std::stoi(other.id);
                     if (oid == nodeIdInt) continue;
                     for (int sid : selectedNodeIds) {
@@ -1221,7 +1253,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         draggingNode = false;
         if (linkFromPin != -1) {
             bool hitPin = false;
-            for (const Node& node : graph.GetNodes()) {
+            for (const Node& node : ActiveGraph().GetNodes()) {
                 for (const Pin& pin : node.inputs) {
                     if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * canvasState.zoom + 4)) { hitPin = true; break; }
                 }
@@ -1248,9 +1280,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 
     EndScissorMode();
 
-    if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)graph.GetVariables().size()) {
+    if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)(variableDragIsLocal ? ActiveGraph() : graph).GetVariables().size()) {
         Vector2 mp = GetMousePosition();
-        const Variable& var = graph.GetVariables()[variableDragIndex];
+        const Variable& var = (variableDragIsLocal ? ActiveGraph() : graph).GetVariables()[variableDragIndex];
         bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
         bool alt  = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
         bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
@@ -1270,10 +1302,10 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = nullptr;
-                const Variable& var = graph.GetVariables()[variableDragIndex];
+                const Variable& var = (variableDragIsLocal ? ActiveGraph() : graph).GetVariables()[variableDragIndex];
 
                 if (ctrl && alt) {
-                    node = graph.CreateNode("Load_Saved_Variable");
+                    node = ActiveGraph().CreateNode("Load_Saved_Variable");
                     node->title = "Load Saved: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
@@ -1282,13 +1314,13 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                         if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else if (ctrl) {
-                    node = graph.CreateNode("Save_Variable");
+                    node = ActiveGraph().CreateNode("Save_Variable");
                     node->title = "Save: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
                     }
                 } else if (shift) {
-                    node = graph.CreateNode("Get_Saved_Variable");
+                    node = ActiveGraph().CreateNode("Get_Saved_Variable");
                     node->title = "Get Saved: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
@@ -1297,14 +1329,14 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                         if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else if (IsKeyDown(KEY_LEFT_ALT)) {
-                    node = graph.CreateNode("Set_Variable");
+                    node = ActiveGraph().CreateNode("Set_Variable");
                     node->title = "Set: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
                         if (p.name == "Value")         { p.type = var.type; p.objectKind = var.objectKind; }
                     }
                 } else {
-                    node = graph.CreateNode("Get_Variable");
+                    node = ActiveGraph().CreateNode("Get_Variable");
                     node->title = "Get: " + var.name;
                     for (Pin& p : node->inputs) {
                         if (p.name == "Variable_Name") p.defaultValue = var.name;
@@ -1338,7 +1370,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mp, graphArea)) {
-                Node* node = graph.CreateNode("Get_Component");
+                Node* node = ActiveGraph().CreateNode("Get_Component");
                 node->title = "Get: " + comp.name;
                 node->componentClass = comp.componentType;
                 for (Pin& p : node->inputs) {
@@ -1376,7 +1408,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             Rectangle sel = GraphCanvas::NormalizeBox(boxSelectStart, boxSelectEnd);
             if (sel.width > 4 || sel.height > 4) {
                 if (!IsKeyDown(KEY_LEFT_CONTROL)) selectedNodeIds.clear();
-                for (const Node& node : graph.GetNodes()) {
+                for (const Node& node : ActiveGraph().GetNodes()) {
                     float nx2 = graphArea.x + node.posX * canvasState.zoom + canvasState.scroll.x;
                     float ny2 = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
                     float nw2 = GetNodeWidth(node) * canvasState.zoom;
@@ -1434,7 +1466,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     Node* dragSourceNode = nullptr;
     std::string sourceKind;
     if (filterCompatibleWithPin != -1) {
-        for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+        for (Node& node : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
             for (Pin& pin : node.outputs) if (pin.id == filterCompatibleWithPin) { dragFromPin = &pin; dragFromIsOutput = true; dragSourceNode = &node; break; }
             for (Pin& pin : node.inputs)  if (pin.id == filterCompatibleWithPin) { dragFromPin = &pin; dragFromIsOutput = false; dragSourceNode = &node; break; }
         }
@@ -1444,7 +1476,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     for (const auto& t : templates) {
         if (t.type == "Get_Variable" || t.type == "Set_Variable") continue;
         if (t.type == "Call_Custom_Event") continue;
+        if (t.type == "Call_Function") continue;
         if (t.type == "Input_Mapping") continue;
+        if ((t.type == "Function_Entry" || t.type == "Return") && openFunctionIndex < 0) continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = NodeMenuDisplayLabel(t.type);
@@ -1495,6 +1529,29 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
 
         entries.push_back({"Events", "Call_Custom_Event:" + eventName});
+    }
+
+    for (const FunctionDef& fn : graph.GetFunctions()) {
+        if (fn.name.empty()) continue;
+
+        std::string typeLower = NodeMenuDisplayLabel("Call_Function:" + fn.name);
+        for (char& c : typeLower) c = (char)tolower(c);
+        if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
+
+        entries.push_back({"Functions", "Call_Function:" + fn.name});
+    }
+
+    if (openFunctionIndex >= 0) {
+        for (const char* specialType : {"Function_Entry", "Return"}) {
+            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(specialType);
+            if (!tmpl) continue;
+
+            std::string typeLower = NodeMenuDisplayLabel(tmpl->type);
+            for (char& c : typeLower) c = (char)tolower(c);
+            if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
+
+            entries.push_back({"Functions", tmpl->type});
+        }
     }
 
     for (const ComponentDecl& comp : graph.GetComponents()) {
@@ -1636,6 +1693,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 std::string nodeType = entry.second;
                 std::string eventName;
+                std::string functionName;
                 std::string mappingName;
                 std::string externalVarName;
                 std::string externalCompName;
@@ -1643,6 +1701,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
                     eventName = nodeType.substr(18);
                     nodeType = "Call_Custom_Event";
+                } else if (nodeType.rfind("Call_Function:", 0) == 0) {
+                    functionName = nodeType.substr(14);
+                    nodeType = "Call_Function";
                 } else if (nodeType.rfind("Input_Mapping:", 0) == 0) {
                     mappingName = nodeType.substr(14);
                     nodeType = "Input_Mapping";
@@ -1657,7 +1718,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                     externalCompName = nodeType.substr(23);
                     nodeType = "Get_Component";
                 }
-                Node* node = graph.CreateNode(nodeType);
+                Node* node = ActiveGraph().CreateNode(nodeType);
                 if (!mappingName.empty()) {
                     for (Pin& p : node->inputs) {
                         if (p.name == "Mapping") { p.defaultValue = mappingName; break; }
@@ -1680,7 +1741,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                         std::vector<std::string> keep = {"Target", "Event Name"};
                         for (const Pin& srcPin : targetEvent->outputs) {
                             if (srcPin.type == PinType::Exec) continue;
-                            graph.AddDynamicPin(*node, false, srcPin.name, srcPin.type);
+                            ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
                             keep.push_back(srcPin.name);
                         }
                         std::vector<std::string> toRemove;
@@ -1690,7 +1751,53 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                             for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
                             if (!keepIt) toRemove.push_back(p.name);
                         }
-                        for (const std::string& n : toRemove) graph.RemoveDynamicPin(*node, false, n);
+                        for (const std::string& n : toRemove) ActiveGraph().RemoveDynamicPin(*node, false, n);
+                    }
+                }
+                if (!functionName.empty()) {
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Function Name") {
+                            p.defaultValue = functionName;
+                            break;
+                        }
+                    }
+                    if (FunctionDef* targetFn = graph.FindFunction(functionName)) {
+                        Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
+                        Node* returnNode = targetFn->graph.FindNodeByType("Return");
+
+                        std::vector<std::string> keepInputs = {"Function Name"};
+                        if (entryNode) {
+                            for (const Pin& srcPin : entryNode->outputs) {
+                                if (srcPin.type == PinType::Exec) continue;
+                                ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
+                                keepInputs.push_back(srcPin.name);
+                            }
+                        }
+                        std::vector<std::string> toRemoveIn;
+                        for (Pin& p : node->inputs) {
+                            if (p.type == PinType::Exec) continue;
+                            bool keepIt = false;
+                            for (const std::string& k : keepInputs) if (k == p.name) { keepIt = true; break; }
+                            if (!keepIt) toRemoveIn.push_back(p.name);
+                        }
+                        for (const std::string& n : toRemoveIn) ActiveGraph().RemoveDynamicPin(*node, false, n);
+
+                        std::vector<std::string> keepOutputs;
+                        if (returnNode) {
+                            for (const Pin& srcPin : returnNode->inputs) {
+                                if (srcPin.type == PinType::Exec) continue;
+                                ActiveGraph().AddDynamicPin(*node, true, srcPin.name, srcPin.type);
+                                keepOutputs.push_back(srcPin.name);
+                            }
+                        }
+                        std::vector<std::string> toRemoveOut;
+                        for (Pin& p : node->outputs) {
+                            if (p.type == PinType::Exec) continue;
+                            bool keepIt = false;
+                            for (const std::string& k : keepOutputs) if (k == p.name) { keepIt = true; break; }
+                            if (!keepIt) toRemoveOut.push_back(p.name);
+                        }
+                        for (const std::string& n : toRemoveOut) ActiveGraph().RemoveDynamicPin(*node, true, n);
                     }
                 }
                 if (!externalVarName.empty()) {
@@ -1731,7 +1838,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                     const Pin* fromPin = nullptr;
                     bool fromIsOutput = false;
                     const Node* fromNode = nullptr;
-                    for (const Node& n : graph.GetNodes()) {
+                    for (const Node& n : ActiveGraph().GetNodes()) {
                         for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; fromNode = &n; }
                         for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; fromNode = &n; }
                     }
@@ -1739,27 +1846,27 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                         std::string sourceKind = EffectivePinObjectKind(fromNode, *fromPin);
                         if (fromIsOutput) {
                             for (const Pin& p : node->inputs) {
-                                if (p.type == PinType::Wildcard) { graph.AddLink({filterCompatibleWithPin, p.id}); break; }
+                                if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({filterCompatibleWithPin, p.id}); break; }
                                 if (p.type != fromPin->type) continue;
                                 if (p.type == PinType::Object) {
                                     if (!ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) continue;
                                 }
-                                graph.AddLink({filterCompatibleWithPin, p.id});
+                                ActiveGraph().AddLink({filterCompatibleWithPin, p.id});
                                 break;
                             }
                         } else {
                             for (const Pin& p : node->outputs) {
-                                if (p.type == PinType::Wildcard) { graph.AddLink({p.id, filterCompatibleWithPin}); break; }
+                                if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({p.id, filterCompatibleWithPin}); break; }
                                 if (p.type != fromPin->type) continue;
                                 if (p.type == PinType::Object) {
                                     if (!ObjectKindRegistry::Get().IsCompatible(p.objectKind, sourceKind)) continue;
                                 }
-                                graph.AddLink({p.id, filterCompatibleWithPin});
+                                ActiveGraph().AddLink({p.id, filterCompatibleWithPin});
                                 break;
                             }
                         }
                         RefreshWildcardPins(node);
-                        RefreshWildcardPins(graph.FindNodeByPinId(filterCompatibleWithPin));
+                        RefreshWildcardPins(ActiveGraph().FindNodeByPinId(filterCompatibleWithPin));
                     }
                 }
 

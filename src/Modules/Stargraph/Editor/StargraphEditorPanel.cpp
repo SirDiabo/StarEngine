@@ -14,11 +14,39 @@ const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
 void StargraphEditorPanel::Initialize() {
 }
 
+void StargraphEditorPanel::OpenFunctionGraph(int index) {
+    if (index < 0 || index >= (int)graph.GetFunctions().size()) return;
+    openFunctionIndex = index;
+    selectedNodeId = -1;
+    selectedNodeIds.clear();
+    boxSelecting = false;
+    linkFromPin = -1;
+    canvasState = GraphCanvas::PanZoomState{};
+    selectedLocalVariableIndex = -1;
+    lastValidLocalVariableIndex = -1;
+    selectedVariableIndex = -1;
+    lastValidVariableIndex = -1;
+    selectedComponentIndex = -1;
+    lastValidComponentIndex = -1;
+}
+
+void StargraphEditorPanel::CloseFunctionGraph() {
+    openFunctionIndex = -1;
+    selectedNodeId = -1;
+    selectedNodeIds.clear();
+    boxSelecting = false;
+    linkFromPin = -1;
+    canvasState = GraphCanvas::PanZoomState{};
+    selectedLocalVariableIndex = -1;
+    lastValidLocalVariableIndex = -1;
+}
+
 bool StargraphEditorPanel::Open(const std::string& path) {
     if (!graph.LoadFromFile(path)) return false;
     filePath = path;
     isOpen = true;
     isDirty = false;
+    openFunctionIndex = -1;
     selectedNodeId = -1;
     selectedNodeIds.clear();
     boxSelecting = false;
