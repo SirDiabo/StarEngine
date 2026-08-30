@@ -305,6 +305,7 @@ void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
         addingVariable = true;
         variableNameActiveField = 1;
     }
+    y += 24;
 
     if (varContextMenuOpen) {
         Rectangle popup = {panel.x + panel.width, varContextMenuAnchorY - 4, 110, 50};

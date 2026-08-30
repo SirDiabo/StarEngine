@@ -614,11 +614,18 @@ void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1 && selectedNodeIds.empty()) return;
 
     if (!selectedNodeIds.empty()) {
-        for (int id : selectedNodeIds) ActiveGraph().RemoveNode(id);
+        for (int id : selectedNodeIds) {
+            Node* n = ActiveGraph().FindNodeById(id);
+            if (n && n->type == "Function_Entry") continue;
+            ActiveGraph().RemoveNode(id);
+        }
         selectedNodeIds.clear();
         selectedNodeId = -1;
     } else {
-        ActiveGraph().RemoveNode(selectedNodeId);
+        Node* n = ActiveGraph().FindNodeById(selectedNodeId);
+        if (!(n && n->type == "Function_Entry")) {
+            ActiveGraph().RemoveNode(selectedNodeId);
+        }
         selectedNodeId = -1;
     }
     isDirty = true;
@@ -669,13 +676,30 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
         DrawRectangleRec(bar, theme.tabBar);
         DrawLine((int)bar.x, (int)(bar.y + bar.height), (int)(bar.x + bar.width), (int)(bar.y + bar.height), theme.panelBorder);
 
-        Rectangle backBtn = {bar.x + 4, bar.y + 2, 90, 18};
-        if (UIWidget::Button(backBtn, "< Class Graph")) {
-            CloseFunctionGraph();
+        std::string functionName = graph.GetFunctions()[openFunctionIndex].name;
+
+        const int crumbFontSize = 12;
+        float cursorX = bar.x + 6;
+
+        {
+            int labelW = MeasureText(graph.assetName.c_str(), crumbFontSize);
+            Rectangle crumbRect = {cursorX, bar.y + 2, (float)labelW, 18};
+            Color crumbColor = theme.textPrimary;
+            UIWidget::Interaction crumbIntr = UIWidget::Interact(crumbRect, true);
+            if (crumbIntr.hovered) crumbColor = theme.accent;
+            if (crumbIntr.clicked) CloseFunctionGraph();
+            DrawText(graph.assetName.c_str(), (int)cursorX, (int)bar.y + 4, crumbFontSize, crumbColor);
+            cursorX += (float)labelW;
         }
 
-        std::string label = "  /  " + graph.GetFunctions()[openFunctionIndex].name;
-        DrawText(label.c_str(), (int)(backBtn.x + backBtn.width), (int)bar.y + 4, 12, theme.textPrimary);
+        {
+            const char* separator = " | ";
+            int sepW = MeasureText(separator, crumbFontSize);
+            DrawText(separator, (int)cursorX, (int)bar.y + 4, crumbFontSize, theme.textSecondary);
+            cursorX += (float)sepW;
+        }
+
+        DrawText(functionName.c_str(), (int)cursorX, (int)bar.y + 4, crumbFontSize, theme.textPrimary);
 
         area.y += bar.height;
         area.height -= bar.height;
@@ -1478,7 +1502,8 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (t.type == "Call_Custom_Event") continue;
         if (t.type == "Call_Function") continue;
         if (t.type == "Input_Mapping") continue;
-        if ((t.type == "Function_Entry" || t.type == "Return") && openFunctionIndex < 0) continue;
+        if (t.type == "Function_Entry") continue;
+        if (t.type == "Return" && openFunctionIndex < 0) continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = NodeMenuDisplayLabel(t.type);
@@ -1542,15 +1567,13 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     }
 
     if (openFunctionIndex >= 0) {
-        for (const char* specialType : {"Function_Entry", "Return"}) {
-            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(specialType);
-            if (!tmpl) continue;
-
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate("Return");
+        if (tmpl) {
             std::string typeLower = NodeMenuDisplayLabel(tmpl->type);
             for (char& c : typeLower) c = (char)tolower(c);
-            if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
-
-            entries.push_back({"Functions", tmpl->type});
+            if (searchLower.empty() || typeLower.find(searchLower) != std::string::npos) {
+                entries.push_back({"Functions", tmpl->type});
+            }
         }
     }
 
