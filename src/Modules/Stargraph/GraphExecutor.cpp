@@ -7,6 +7,12 @@
 #include <cstdlib>
 #include <vector>
 
+static bool NodeHasExecPin(const Node& node) {
+    for (const Pin& pin : node.inputs)  if (pin.type == PinType::Exec) return true;
+    for (const Pin& pin : node.outputs) if (pin.type == PinType::Exec) return true;
+    return false;
+}
+
 static void ResolveWildcardPins(Stargraph& graph, Node* node) {
     if (node->wildcardResolved) return;
 
@@ -71,8 +77,18 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, Exec
         if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx, visiting);
     }
 
-    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
-    if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
+    bool fromNodeIsImpure = NodeHasExecPin(*fromNode);
+    bool alreadyExecuted = false;
+    if (fromNodeIsImpure) {
+        int fromId = std::stoi(fromNode->id);
+        for (int id : ctx.executedNodeIds) if (id == fromId) { alreadyExecuted = true; break; }
+    }
+
+    if (!alreadyExecuted) {
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
+        if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
+        if (fromNodeIsImpure) ctx.executedNodeIds.push_back(std::stoi(fromNode->id));
+    }
 
     for (const Pin& outPin : fromNode->outputs) {
         if (outPin.id == link->outputPinId) {
@@ -103,6 +119,7 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
         GraphExecutor::PropagateDataPins(graph, current, ctx);
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(current->type);
         if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
+        if (NodeHasExecPin(*current)) ctx.executedNodeIds.push_back(std::stoi(current->id));
         Node* next = nullptr;
         int nextPinId = 0;
         for (const Pin& pin : current->outputs) {
@@ -222,6 +239,7 @@ void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, Execution
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(next->type);
 
         if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
+        if (NodeHasExecPin(*next)) ctx.executedNodeIds.push_back(std::stoi(next->id));
         current = next;
     }
 }

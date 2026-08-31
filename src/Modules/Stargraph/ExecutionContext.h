@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 class Actor;
 class Stargraph;
 
@@ -12,4 +14,6 @@ struct ExecutionContext {
     Stargraph* rootGraph = nullptr;
 
     int callDepth = 0;
+
+    std::vector<int> executedNodeIds;
 };
