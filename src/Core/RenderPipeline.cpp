@@ -4,6 +4,7 @@
 #include "ShadingTechniqueRegistry.h"
 #include "RenderSettings.h"
 #include "ShadingModel.h"
+#include "Widgets/WidgetRenderer.h"
 
 namespace RenderPipeline {
 
@@ -25,6 +26,8 @@ void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
 
     if (activeTechnique && activeTechnique->renderOverlay) activeTechnique->renderOverlay(target);
     if (PostProcessPass::Enabled()) PostProcessPass::Run(target);
+
+    WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)target.texture.width, (float)target.texture.height}, false);
 
     EndTextureMode();
 }

@@ -10,17 +10,17 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/StarMap.h"
-#include "Runtime/WorldSpawner.h"
 #include "Runtime/AssetCache.h"
 #include "Runtime/AudioCore.h"
-#include "Runtime/Components/CameraComponent.h"
+#include "Runtime/Components/WidgetComponent.h"
+#include "Core/Widgets/WidgetRenderer.h"
+#include "Core/Widgets/WidgetDebug.h"
 #include "Core/RenderPipeline.h"
+#include "Core/GameSession.h"
 #include "Core/RenderSettings.h"
 #include "Core/ShadingTechniqueRegistry.h"
 #include "Modules.modules.generated.h"
 #include "raylib.h"
-#include "raymath.h"
-#include "rlgl.h"
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -114,8 +114,7 @@ int main(int argc, char* argv[]) {
     } else {
         TraceLog(LOG_WARNING, "GameMain: no default map set, starting with an empty world");
     }
-    WorldSpawner::SpawnMapActors(map);
-    World::Get().BeginPlay();
+    GameSession::BeginSession(map);
     TraceLog(LOG_INFO, "GameMain: spawned %d actors", (int)World::Get().GetActors().size());
 
     Camera3D camera{};
@@ -124,23 +123,7 @@ int main(int argc, char* argv[]) {
     camera.up = {0, 1, 0};
     camera.fovy = 50.0f;
     camera.projection = CAMERA_PERSPECTIVE;
-
-    for (const auto& actor : World::Get().GetActors()) {
-        if (actor->GetCameraComponent()) {
-            CameraComponent* cc = actor->GetCameraComponent();
-            Vector3 compPos = actor->GetComponentWorldPosition(cc);
-            Vector3 compRot = actor->GetComponentWorldRotation(cc);
-            float yr = compRot.y * DEG2RAD;
-            float pr = compRot.x * DEG2RAD;
-            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
-            camera.position = compPos;
-            camera.target = Vector3Add(compPos, forward);
-            camera.fovy = cc->fov;
-            camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
-            rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
-            break;
-        }
-    }
+    GameSession::UpdateActiveCamera(camera);
 
     double perfTickAccum = 0.0, perfRenderAccum = 0.0, perfPresentAccum = 0.0;
     int perfSampleCount = 0;
@@ -153,21 +136,7 @@ int main(int argc, char* argv[]) {
         World::Get().Tick(deltaTime);
         perfTickAccum += GetTime() - perfTickStart;
 
-        for (const auto& actor : World::Get().GetActors()) {
-            if (actor->GetCameraComponent()) {
-                CameraComponent* cc = actor->GetCameraComponent();
-                Vector3 compPos = actor->GetComponentWorldPosition(cc);
-                Vector3 compRot = actor->GetComponentWorldRotation(cc);
-                float yr = compRot.y * DEG2RAD;
-                float pr = compRot.x * DEG2RAD;
-                Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
-                camera.position = compPos;
-                camera.target = Vector3Add(compPos, forward);
-                camera.fovy = cc->fov;
-                rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
-                break;
-            }
-        }
+        GameSession::UpdateActiveCamera(camera);
 
         if ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER)) {
             ToggleBorderlessWindowed();
@@ -188,6 +157,8 @@ int main(int argc, char* argv[]) {
             renderTargetHeight = scaledHeight;
         }
 
+        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight});
+
         double perfRenderStart = GetTime();
         RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255});
         perfRenderAccum += GetTime() - perfRenderStart;
@@ -198,6 +169,7 @@ int main(int argc, char* argv[]) {
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
         Rectangle dest = {0, 0, (float)screenWidth, (float)screenHeight};
         DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
+        WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)screenWidth, (float)screenHeight}, true);
         EndDrawing();
         perfPresentAccum += GetTime() - perfPresentStart;
 
@@ -213,7 +185,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
-    World::Get().EndPlay();
+    GameSession::EndSession();
     AssetCache::Get().Clear();
     AudioCore::Get().CloseDevice();
     ModuleManager::Get().ShutdownAll();

@@ -1,12 +1,11 @@
 #include "ViewportPanel.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
-#include "Runtime/Components/CameraComponent.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
 #include "Runtime/AssetCache.h"
-#include "Runtime/WorldSpawner.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Core/RenderPipeline.h"
+#include "Core/GameSession.h"
 #include "Core/RenderSettings.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
@@ -387,35 +386,10 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     }
 
     if (playing) {
-        const auto& actors = World::Get().GetActors();
-        if (!actors.empty()) {
-            Actor* camActor = World::Get().GetViewTarget();
-            if (!camActor) {
-                for (const auto& actor : actors) {
-                    if (actor->GetCameraComponent()) {
-                        camActor = actor.get();
-                        World::Get().SetViewTarget(camActor);
-                        break;
-                    }
-                }
-            }
-            if (camActor) {
-                CameraComponent* cc = camActor->GetCameraComponent();
-                Vector3 compPos = camActor->GetComponentWorldPosition(cc);
-                Vector3 compRot = camActor->GetComponentWorldRotation(cc);
-                float yr = compRot.y * DEG2RAD;
-                float pr = compRot.x * DEG2RAD;
-                Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
-                camera.position = compPos;
-                camera.target = Vector3Add(compPos, forward);
-                camera.up = {0, 1, 0};
-                camera.fovy = cc->fov;
-                camera.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
-                rlSetClipPlanes((double)cc->nearClip, (double)cc->farClip);
-            } else {
-                Actor* first = actors.front().get();
-                cameraTarget = first->position;
-            }
+        GameSession::UpdateActiveCamera(camera);
+        if (!World::Get().GetViewTarget()) {
+            const auto& actors = World::Get().GetActors();
+            if (!actors.empty()) cameraTarget = actors.front()->position;
         }
     }
 
@@ -663,8 +637,7 @@ void ViewportPanel::RenderToolbar() {
             savedOrbitRadius = orbitRadius;
             savedCameraTarget = cameraTarget;
             if (flying) { flying = false; ShowCursor(); }
-            WorldSpawner::SpawnMapActors(starMap);
-            World::Get().BeginPlay();
+            GameSession::BeginSession(starMap);
             }
         btnRight -= 26;
         }
@@ -675,7 +648,7 @@ void ViewportPanel::RenderToolbar() {
             DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
-            World::Get().EndPlay();
+            GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;
             orbitRadius = savedOrbitRadius;
@@ -686,7 +659,7 @@ void ViewportPanel::RenderToolbar() {
             }
 
         if (IsKeyPressed(KEY_ESCAPE)) {
-            World::Get().EndPlay();
+            GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;
             orbitRadius = savedOrbitRadius;
