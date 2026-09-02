@@ -709,7 +709,7 @@ void ViewportPanel::Render() {
 
             Vector2 panelMouse = {GetMousePosition().x - client.x, GetMousePosition().y - client.y};
             Vector2 lowResMouse = {panelMouse.x * ((float)pieWidth / (float)clientWidth), panelMouse.y * ((float)pieHeight / (float)clientHeight)};
-            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)pieRenderTarget.texture.width, (float)pieRenderTarget.texture.height}, lowResMouse, false);
+            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)pieRenderTarget.texture.width, (float)pieRenderTarget.texture.height}, lowResMouse, false, scale);
             WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)clientWidth, (float)clientHeight}, panelMouse, true);
 
             RenderPipeline::Render(camera, pieRenderTarget, clearColor);

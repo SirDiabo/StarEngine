@@ -7,7 +7,7 @@
 
 namespace WidgetRenderer {
 
-void DrawScreenSpaceWidgets(Rectangle targetRect, bool nativeResolutionOnly) {
+void DrawScreenSpaceWidgets(Rectangle targetRect, bool nativeResolutionOnly, float bufferScale) {
     for (const auto& actor : World::Get().GetActors()) {
         for (Component* component : actor->GetComponents()) {
             WidgetComponent* widgetComponent = dynamic_cast<WidgetComponent*>(component);
@@ -15,12 +15,12 @@ void DrawScreenSpaceWidgets(Rectangle targetRect, bool nativeResolutionOnly) {
             if (widgetComponent->renderSpace != WidgetRenderSpace::Screen) continue;
             if (widgetComponent->forceNativeResolution != nativeResolutionOnly) continue;
             Widget* widget = widgetComponent->GetWidget();
-            if (widget) widget->Draw(targetRect);
+            if (widget) widget->Draw(targetRect, bufferScale);
         }
     }
 }
 
-void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 localMousePos, bool nativeResolutionOnly) {
+void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 localMousePos, bool nativeResolutionOnly, float bufferScale) {
     for (const auto& actor : World::Get().GetActors()) {
         for (Component* component : actor->GetComponents()) {
             WidgetComponent* widgetComponent = dynamic_cast<WidgetComponent*>(component);
@@ -29,7 +29,7 @@ void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 local
             if (widgetComponent->forceNativeResolution != nativeResolutionOnly) continue;
             Widget* widget = widgetComponent->GetWidget();
             if (!widget) continue;
-            widget->Tick(deltaTime, targetRect);
+            widget->Tick(deltaTime, targetRect, bufferScale);
             WidgetInput::ProcessInput(widget, widgetComponent->inputDevice, deltaTime, localMousePos);
         }
     }

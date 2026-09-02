@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
         Vector2 rawMouse = GetMousePosition();
         float renderScale = RenderSettings::Get().GetRenderScale();
         Vector2 lowResMouse = {rawMouse.x * renderScale, rawMouse.y * renderScale};
-        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight}, lowResMouse, false);
+        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight}, lowResMouse, false, renderScale);
         WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)screenWidth, (float)screenHeight}, rawMouse, true);
 
         double perfRenderStart = GetTime();

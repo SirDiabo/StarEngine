@@ -18,12 +18,12 @@ void Widget::SetSelection(WidgetElement* element) {
     }
 }
 
-void Widget::Draw(Rectangle screenRect) {
+void Widget::Draw(Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
-    rootElement->Draw(screenRect, uiScale);
+    rootElement->Draw(screenRect, uiScale * bufferScale);
 }
 
-void Widget::Tick(float deltaTime, Rectangle screenRect) {
+void Widget::Tick(float deltaTime, Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
-    rootElement->Tick(deltaTime, screenRect, uiScale);
+    rootElement->Tick(deltaTime, screenRect, uiScale * bufferScale);
 }

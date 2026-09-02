@@ -33,6 +33,6 @@ public:
     bool cancelWasHeld = false;
 
     void SetSelection(WidgetElement* element);
-    void Draw(Rectangle screenRect);
-    void Tick(float deltaTime, Rectangle screenRect);
+    void Draw(Rectangle screenRect, float bufferScale = 1.0f);
+    void Tick(float deltaTime, Rectangle screenRect, float bufferScale = 1.0f);
 };
