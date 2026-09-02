@@ -998,4 +998,113 @@ void RegisterMathNodes() {
     RegisterWildcardCompare("Less_Than",       '<');
     RegisterWildcardCompare("Greater_Or_Equal", 'g');
     RegisterWildcardCompare("Less_Or_Equal",    'l');
+
+    // Matrix Calculation Nodes
+    auto RegisterMakeRot = [](const std::string& nodeType, char primary, char secondary) {
+        NodeTemplate t;
+        t.type = nodeType;
+        t.category = "Math";
+        t.moduleName = "Stargraph";
+        t.createPins = [primary, secondary](Node* node) {
+            std::string pName(1, primary);
+            node->inputs.push_back({pName, PinType::Vec3, true, false, 0, "0,0,0"});
+            if (secondary != '\0') {
+                std::string sName(1, secondary);
+                node->inputs.push_back({sName, PinType::Vec3, true, false, 0, "0,0,0"});
+            }
+            node->outputs.push_back({"Rotator", PinType::Vec3, false, true});
+        };
+        t.execute = [primary, secondary](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            Vector3 pVec = {0,0,0}, sVec = {0,0,0};
+            std::string pName(1, primary);
+            
+            for (const Pin& p : node.inputs) {
+                if (p.name == pName) ReadVec3(p, pVec.x, pVec.y, pVec.z);
+            }
+            
+            if (secondary != '\0') {
+                std::string sName(1, secondary);
+                for (const Pin& p : node.inputs) {
+                    if (p.name == sName) ReadVec3(p, sVec.x, sVec.y, sVec.z);
+                }
+            }
+        
+            char sec = secondary;
+            if (sec == '\0') {
+                if (primary == 'X') { sVec = {0, 1, 0}; sec = 'Y'; }
+                else if (primary == 'Y') { sVec = {0, 0, 1}; sec = 'Z'; }
+                else if (primary == 'Z') { sVec = {1, 0, 0}; sec = 'X'; }
+                
+                Vector3 pNorm = Vector3Normalize(pVec);
+                if (fabsf(Vector3DotProduct(pNorm, sVec)) > 0.999f) {
+                    if (primary == 'X') { sVec = {0, 0, 1}; sec = 'Z'; }
+                    else if (primary == 'Y') { sVec = {1, 0, 0}; sec = 'X'; }
+                    else if (primary == 'Z') { sVec = {0, 1, 0}; sec = 'Y'; }
+                }
+            }
+        
+            Vector3 x = {0}, y = {0}, z = {0};
+            Vector3 P = Vector3Normalize(pVec);
+            Vector3 S = Vector3Normalize(sVec);
+            
+            if (Vector3Length(P) < 0.001f) {
+                P = (primary == 'X') ? Vector3{1,0,0} : (primary == 'Y') ? Vector3{0,1,0} : Vector3{0,0,1};
+            }
+        
+            if (primary == 'X' && sec == 'Y') {
+                x = P;
+                z = Vector3Normalize(Vector3CrossProduct(x, S));
+                y = Vector3Normalize(Vector3CrossProduct(z, x));
+            } else if (primary == 'X' && sec == 'Z') {
+                x = P;
+                y = Vector3Normalize(Vector3CrossProduct(S, x));
+                z = Vector3Normalize(Vector3CrossProduct(x, y));
+            } else if (primary == 'Y' && sec == 'X') {
+                y = P;
+                z = Vector3Normalize(Vector3CrossProduct(S, y));
+                x = Vector3Normalize(Vector3CrossProduct(y, z));
+            } else if (primary == 'Y' && sec == 'Z') {
+                y = P;
+                x = Vector3Normalize(Vector3CrossProduct(y, S));
+                z = Vector3Normalize(Vector3CrossProduct(x, y));
+            } else if (primary == 'Z' && sec == 'X') {
+                z = P;
+                y = Vector3Normalize(Vector3CrossProduct(z, S));
+                x = Vector3Normalize(Vector3CrossProduct(y, z));
+            } else if (primary == 'Z' && sec == 'Y') {
+                z = P;
+                x = Vector3Normalize(Vector3CrossProduct(S, z));
+                y = Vector3Normalize(Vector3CrossProduct(z, x));
+            }
+        
+            if (Vector3Length(x) < 0.001f) x = {1,0,0};
+            if (Vector3Length(y) < 0.001f) y = {0,1,0};
+            if (Vector3Length(z) < 0.001f) z = {0,0,1};
+        
+            Matrix mat = {0};
+            mat.m0 = x.x; mat.m1 = x.y; mat.m2 = x.z; mat.m3 = 0.0f;
+            mat.m4 = y.x; mat.m5 = y.y; mat.m6 = y.z; mat.m7 = 0.0f;
+            mat.m8 = z.x; mat.m9 = z.y; mat.m10 = z.z; mat.m11 = 0.0f;
+            mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
+        
+            Vector3 euler = Vector3Scale(QuaternionToEuler(QuaternionFromMatrix(mat)), RAD2DEG);
+        
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", euler.x, euler.y, euler.z);
+            for (Pin& p : node.outputs) {
+                if (p.name == "Rotator") p.defaultValue = buf;
+            }
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    };
+    
+    RegisterMakeRot("Make_Rot_From_X", 'X', '\0');
+    RegisterMakeRot("Make_Rot_From_XY", 'X', 'Y');
+    RegisterMakeRot("Make_Rot_From_XZ", 'X', 'Z');
+    RegisterMakeRot("Make_Rot_From_Y", 'Y', '\0');
+    RegisterMakeRot("Make_Rot_From_YX", 'Y', 'X');
+    RegisterMakeRot("Make_Rot_From_YZ", 'Y', 'Z');
+    RegisterMakeRot("Make_Rot_From_Z", 'Z', '\0');
+    RegisterMakeRot("Make_Rot_From_ZX", 'Z', 'X');
+    RegisterMakeRot("Make_Rot_From_ZY", 'Z', 'Y');
 }
