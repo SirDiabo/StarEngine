@@ -1,7 +1,7 @@
 #include "WidgetDebug.h"
 #include "Widget.h"
 #include "VerticalBoxElement.h"
-#include "RectangleElement.h"
+#include "ButtonElement.h"
 #include "TextElement.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -18,14 +18,9 @@ void SpawnTestWidget() {
     root->anchor = {0.0f, 0.0f};
     root->pivot = {0.0f, 0.0f};
     root->offset = {40.0f, 40.0f};
-    root->size = {300.0f, 220.0f};
+    root->size = {260.0f, 220.0f};
     root->childSpacing = 10.0f;
     root->backgroundColor = {30, 30, 30, 200};
-
-    RectangleElement* box = new RectangleElement();
-    box->size = {260.0f, 80.0f};
-    box->color = {80, 140, 220, 255};
-    root->AddChild(box);
 
     TextElement* label = new TextElement();
     label->size = {260.0f, 30.0f};
@@ -33,6 +28,19 @@ void SpawnTestWidget() {
     label->fontSize = 18.0f;
     label->color = WHITE;
     root->AddChild(label);
+
+    ButtonElement* buttonOne = new ButtonElement();
+    buttonOne->size = {260.0f, 40.0f};
+    root->AddChild(buttonOne);
+
+    ButtonElement* buttonTwo = new ButtonElement();
+    buttonTwo->size = {260.0f, 40.0f};
+    buttonTwo->disabled = true;
+    root->AddChild(buttonTwo);
+
+    ButtonElement* buttonThree = new ButtonElement();
+    buttonThree->size = {260.0f, 40.0f};
+    root->AddChild(buttonThree);
 
     Widget* widget = new Widget();
     widget->rootElement = root;

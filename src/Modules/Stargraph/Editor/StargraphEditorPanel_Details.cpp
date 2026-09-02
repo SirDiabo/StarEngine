@@ -1,6 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Editor/PropertyFields.h"
-#include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/StarAsset.h"
 #include "Core/SaveFileRegistry.h"

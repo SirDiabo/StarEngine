@@ -4,6 +4,14 @@
 #include <string>
 #include <vector>
 
+enum class WidgetInteractionState {
+    Default,
+    Hovered,
+    Selected,
+    Pressed,
+    Disabled
+};
+
 class WidgetElement : public Object {
 public:
     ~WidgetElement() override;
@@ -17,7 +25,12 @@ public:
     Vector2 size{ 100.0f, 30.0f };
     bool visible = true;
 
+    bool selectable = false;
+    bool disabled = false;
+    WidgetInteractionState interactionState = WidgetInteractionState::Default;
+
     WidgetElement* parent = nullptr;
+    Rectangle lastResolvedRect{ 0.0f, 0.0f, 0.0f, 0.0f };
 
     void AddChild(WidgetElement* child);
     void RemoveChild(WidgetElement* child);
@@ -29,6 +42,12 @@ public:
 
     virtual void Draw(Rectangle rect, float uiScale);
     virtual void Tick(float deltaTime, Rectangle rect, float uiScale);
+
+    void CollectSelectables(std::vector<WidgetElement*>& out);
+
+    virtual void OnSelected() { }
+    virtual void OnDeselected() { }
+    virtual void OnConfirmed() { }
 
 protected:
     virtual void OnDrawSelf(Rectangle rect, float uiScale) { }

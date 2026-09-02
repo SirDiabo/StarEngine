@@ -67,6 +67,15 @@ void WidgetElement::Draw(Rectangle rect, float uiScale) {
 }
 
 void WidgetElement::Tick(float deltaTime, Rectangle rect, float uiScale) {
+    lastResolvedRect = rect;
     OnTickSelf(deltaTime, rect, uiScale);
     TickChildren(deltaTime, rect, uiScale);
+}
+
+void WidgetElement::CollectSelectables(std::vector<WidgetElement*>& out) {
+    if (selectable && !disabled) out.push_back(this);
+    for (WidgetElement* child : children) {
+        if (!child->visible) continue;
+        child->CollectSelectables(out);
+    }
 }

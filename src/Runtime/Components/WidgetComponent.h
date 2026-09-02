@@ -15,6 +15,7 @@ public:
     WidgetBillboardMode billboardMode = WidgetBillboardMode::YawOnly;
     bool forceNativeResolution = false;
     float uiScale = 1.0f;
+    std::string inputDevice = "Unclaimed";
 
     Widget* GetWidget() const { return widget; }
     void SetWidget(Widget* newWidget);

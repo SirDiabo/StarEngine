@@ -157,7 +157,11 @@ int main(int argc, char* argv[]) {
             renderTargetHeight = scaledHeight;
         }
 
-        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight});
+        Vector2 rawMouse = GetMousePosition();
+        float renderScale = RenderSettings::Get().GetRenderScale();
+        Vector2 lowResMouse = {rawMouse.x * renderScale, rawMouse.y * renderScale};
+        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight}, lowResMouse, false);
+        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)screenWidth, (float)screenHeight}, rawMouse, true);
 
         double perfRenderStart = GetTime();
         RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255});
@@ -191,4 +195,4 @@ int main(int argc, char* argv[]) {
     ModuleManager::Get().ShutdownAll();
     CloseWindow();
     return 0;
-}
+}

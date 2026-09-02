@@ -8,6 +8,7 @@ void WidgetComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddBool("Force Native Resolution", &forceNativeResolution);
     outProperties.AddFloat("UI Scale", &uiScale);
+    outProperties.AddString("Input Device", &inputDevice);
 }
 
 void WidgetComponent::Update(float deltaTime) {

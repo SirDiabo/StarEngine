@@ -1,7 +1,7 @@
 #include "InputComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/GraphExecutor.h"
-#include "Modules/Stargraph/InputKeyNames.h"
+#include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"

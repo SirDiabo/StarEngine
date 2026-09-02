@@ -6,6 +6,7 @@
 #include "Runtime/PrintMessageLog.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
+#include "Core/Widgets/WidgetRenderer.h"
 #include "Core/RenderSettings.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
@@ -706,12 +707,18 @@ void ViewportPanel::Render() {
             if (pieHeight < 1) pieHeight = 1;
             EnsurePieRenderTarget(pieWidth, pieHeight);
 
+            Vector2 panelMouse = {GetMousePosition().x - client.x, GetMousePosition().y - client.y};
+            Vector2 lowResMouse = {panelMouse.x * ((float)pieWidth / (float)clientWidth), panelMouse.y * ((float)pieHeight / (float)clientHeight)};
+            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)pieRenderTarget.texture.width, (float)pieRenderTarget.texture.height}, lowResMouse, false);
+            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)clientWidth, (float)clientHeight}, panelMouse, true);
+
             RenderPipeline::Render(camera, pieRenderTarget, clearColor);
 
             BeginTextureMode(renderTarget);
             Rectangle pieSource = {0, 0, (float)pieRenderTarget.texture.width, -(float)pieRenderTarget.texture.height};
             Rectangle pieDest = {0, 0, (float)clientWidth, (float)clientHeight};
             DrawTexturePro(pieRenderTarget.texture, pieSource, pieDest, {0, 0}, 0.0f, WHITE);
+            WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)clientWidth, (float)clientHeight}, true);
             BeginMode3D(camera);
             DrawAndClearCollisionDebug();
             EndMode3D();
