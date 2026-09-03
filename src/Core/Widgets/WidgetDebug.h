@@ -3,5 +3,6 @@
 namespace WidgetDebug {
 
 void SpawnTestWidget();
+void SpawnContainerTestWidget();
 
 }

@@ -45,6 +45,8 @@ public:
 
     void CollectSelectables(std::vector<WidgetElement*>& out);
 
+    virtual WidgetElement* GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const { return nullptr; }
+
     virtual void OnSelected() { }
     virtual void OnDeselected() { }
     virtual void OnConfirmed() { }

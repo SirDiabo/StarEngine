@@ -20,10 +20,14 @@ void Widget::SetSelection(WidgetElement* element) {
 
 void Widget::Draw(Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
-    rootElement->Draw(screenRect, uiScale * bufferScale);
+    float scale = uiScale * bufferScale;
+    Rectangle resolvedRootRect = rootElement->ResolveRect(screenRect, scale);
+    rootElement->Draw(resolvedRootRect, scale);
 }
 
 void Widget::Tick(float deltaTime, Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
-    rootElement->Tick(deltaTime, screenRect, uiScale * bufferScale);
+    float scale = uiScale * bufferScale;
+    Rectangle resolvedRootRect = rootElement->ResolveRect(screenRect, scale);
+    rootElement->Tick(deltaTime, resolvedRootRect, scale);
 }

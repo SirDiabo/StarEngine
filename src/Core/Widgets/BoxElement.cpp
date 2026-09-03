@@ -41,3 +41,33 @@ void BoxElement::Draw(Rectangle rect, float uiScale) {
 
     DrawChildren(rect, uiScale);
 }
+
+WidgetElement* BoxElement::GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const {
+    int step = (axis == BoxAxis::Vertical) ? dy : dx;
+    if (step == 0) return nullptr;
+
+    int idx = -1;
+    for (int i = 0; i < (int)children.size(); i++) {
+        if (children[i] == current) { idx = i; break; }
+    }
+    if (idx < 0) return nullptr;
+
+    int newIndex = idx + (step > 0 ? 1 : -1);
+    while (newIndex >= 0 && newIndex < (int)children.size()) {
+        WidgetElement* candidate = children[newIndex];
+        if (candidate->selectable && !candidate->disabled && candidate->visible) return candidate;
+        newIndex += (step > 0 ? 1 : -1);
+    }
+
+    if (wrapNavigation) {
+        int wrapStart = (step > 0) ? 0 : (int)children.size() - 1;
+        int wrapIndex = wrapStart;
+        while (wrapIndex >= 0 && wrapIndex < (int)children.size() && wrapIndex != idx) {
+            WidgetElement* candidate = children[wrapIndex];
+            if (candidate->selectable && !candidate->disabled && candidate->visible) return candidate;
+            wrapIndex += (step > 0 ? 1 : -1);
+        }
+    }
+
+    return nullptr;
+}

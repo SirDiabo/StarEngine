@@ -5,8 +5,11 @@
 #include "Core/InputKeyNames.h"
 #include <vector>
 #include <cmath>
+#include <unordered_map>
 
 namespace {
+
+std::unordered_map<std::string, Widget*> focusedWidgetByDevice;
 
 const char* kNavigateMapping = "UI_Navigate";
 const char* kConfirmMapping = "UI_Confirm";
@@ -112,9 +115,21 @@ void SyncStates(WidgetElement* element, WidgetElement* current, WidgetElement* p
 
 namespace WidgetInput {
 
+void ClaimFocus(Widget* widget, const std::string& device) {
+    focusedWidgetByDevice[device] = widget;
+}
+
+bool IsFocused(const Widget* widget, const std::string& device) {
+    auto it = focusedWidgetByDevice.find(device);
+    if (it == focusedWidgetByDevice.end()) return true;
+    return it->second == widget;
+}
+
 void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Vector2 localMousePos) {
     if (!widget || !widget->rootElement) return;
     EnsureDefaultMappings();
+
+    bool focused = IsFocused(widget, device);
 
     std::vector<WidgetElement*> selectables;
     widget->rootElement->CollectSelectables(selectables);
@@ -123,14 +138,14 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
         widget->SetSelection(selectables.front());
     }
 
-    WidgetElement* hovered = HitTestSelectable(widget->rootElement, localMousePos);
+    WidgetElement* hovered = focused ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
     if (hovered) widget->SetSelection(hovered);
 
-    bool confirmHeld = PollBool(kConfirmMapping, device);
-    bool cancelHeld = PollBool(kCancelMapping, device);
+    bool confirmHeld = focused && PollBool(kConfirmMapping, device);
+    bool cancelHeld = focused && PollBool(kCancelMapping, device);
     bool mouseHeld = hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
-    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (focused && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         hovered->OnConfirmed();
     }
 
@@ -145,17 +160,26 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     if (widget->navigateCooldown > 0.0f) widget->navigateCooldown -= deltaTime;
 
-    if (currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
+    if (focused && currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
         Vector2 nav = PollAxis2D(kNavigateMapping, device);
-        int step = 0;
-        if (fabsf(nav.y) > fabsf(nav.x)) step = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
-        else step = nav.x > 0.4f ? 1 : (nav.x < -0.4f ? -1 : 0);
+        int dx = 0, dy = 0;
+        if (fabsf(nav.y) > fabsf(nav.x)) dy = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
+        else dx = nav.x > 0.4f ? 1 : (nav.x < -0.4f ? -1 : 0);
 
-        if (step != 0) {
-            int nextIndex = currentIndex + step;
-            if (nextIndex >= 0 && nextIndex < (int)selectables.size()) {
-                widget->SetSelection(selectables[nextIndex]);
+        if (dx != 0 || dy != 0) {
+            WidgetElement* current = widget->currentSelection;
+            WidgetElement* next = nullptr;
+            if (current && current->parent) {
+                next = current->parent->GetNextSelectableInDirection(current, dx, dy);
             }
+            if (!next) {
+                int step = (dy != 0) ? dy : dx;
+                int nextIndex = currentIndex + step;
+                if (nextIndex >= 0 && nextIndex < (int)selectables.size()) {
+                    next = selectables[nextIndex];
+                }
+            }
+            if (next) widget->SetSelection(next);
             widget->navigateCooldown = 0.25f;
         }
     }
@@ -169,7 +193,7 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     WidgetElement* pressedElement = nullptr;
     if (mouseHeld) pressedElement = hovered;
     else if (confirmHeld) pressedElement = widget->currentSelection;
-    SyncStates(widget->rootElement, widget->currentSelection, pressedElement);
+    SyncStates(widget->rootElement, focused ? widget->currentSelection : nullptr, pressedElement);
 }
 
 }

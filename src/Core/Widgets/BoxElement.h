@@ -15,10 +15,12 @@ public:
     bool scrollEnabled = false;
     float scrollOffset = 0.0f;
     float childSpacing = 0.0f;
+    bool wrapNavigation = false;
     Color backgroundColor{ 0, 0, 0, 0 };
 
     void Draw(Rectangle rect, float uiScale) override;
     float GetContentExtent(float uiScale) const;
+    WidgetElement* GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const override;
 
 protected:
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override;

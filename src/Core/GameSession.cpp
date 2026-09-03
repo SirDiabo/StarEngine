@@ -14,6 +14,7 @@ void BeginSession(StarMap& map) {
     WorldSpawner::SpawnMapActors(map);
     World::Get().BeginPlay();
     WidgetDebug::SpawnTestWidget();
+    WidgetDebug::SpawnContainerTestWidget();
 }
 
 void EndSession() {
