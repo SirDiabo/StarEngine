@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+class Widget;
+
 enum class WidgetInteractionState {
     Default,
     Hovered,
@@ -30,6 +32,7 @@ public:
     WidgetInteractionState interactionState = WidgetInteractionState::Default;
 
     WidgetElement* parent = nullptr;
+    Widget* owningWidget = nullptr;
     Rectangle lastResolvedRect{ 0.0f, 0.0f, 0.0f, 0.0f };
 
     void AddChild(WidgetElement* child);
@@ -37,6 +40,7 @@ public:
     void RemoveChildAt(int index);
     void ClearChildren();
     const std::vector<WidgetElement*>& GetChildren() const { return children; }
+    void SetOwningWidgetRecursive(Widget* widget);
 
     Rectangle ResolveRect(Rectangle parentRect, float uiScale) const;
 
@@ -47,9 +51,9 @@ public:
 
     virtual WidgetElement* GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const { return nullptr; }
 
-    virtual void OnSelected() { }
-    virtual void OnDeselected() { }
-    virtual void OnConfirmed() { }
+    virtual void OnSelected();
+    virtual void OnDeselected();
+    virtual void OnConfirmed();
 
 protected:
     virtual void OnDrawSelf(Rectangle rect, float uiScale) { }

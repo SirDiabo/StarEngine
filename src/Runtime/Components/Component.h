@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 class PropertyList;
+class Actor;
 
 class Component : public Object {
 public:
@@ -14,6 +15,8 @@ public:
     Vector3 scale = {1, 1, 1};
 
     Component* parent = nullptr;
+    Actor* owningActor = nullptr;
+    Actor* GetOwningActor() const { return owningActor; }
 
     std::unordered_map<std::string, std::string> savableFields;
 
@@ -27,4 +30,4 @@ public:
         outProperties.AddVector3("Scale", &scale.x);
         GetEditorProperties(outProperties);
     }
-};
+};

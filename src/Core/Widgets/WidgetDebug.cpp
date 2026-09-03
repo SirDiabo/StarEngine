@@ -65,7 +65,7 @@ void SpawnTestWidget() {
     root->AddChild(image);
 
     Widget* widget = new Widget();
-    widget->rootElement = root;
+    widget->SetRoot(root);
     widgetComponent->SetWidget(widget);
 }
 
@@ -104,7 +104,7 @@ void SpawnContainerTestWidget() {
     tabs->AddTab("Split", split);
 
     Widget* widget = new Widget();
-    widget->rootElement = tabs;
+    widget->SetRoot(tabs);
     widgetComponent->SetWidget(widget);
     WidgetInput::ClaimFocus(widget, widgetComponent->inputDevice);
 }

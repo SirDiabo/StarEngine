@@ -165,6 +165,7 @@ Vector3 Actor::GetComponentWorldRotation(Component* comp) const {
 void Actor::AddComponent(Component* component) {
     components.push_back(component);
     component->parent = GetRootComponent();
+    component->owningActor = this;
 }
 
 void Actor::RemoveComponent(Component* component) {
@@ -210,4 +211,4 @@ void Actor::AddMovementInput(Vector3 worldDirection, float scaleValue) {
     float len = Vector3Length(worldDirection);
     if (len > 0.0001f) worldDirection = Vector3Scale(worldDirection, 1.0f / len);
     pendingMovementInput = Vector3Add(pendingMovementInput, Vector3Scale(worldDirection, scaleValue));
-}
+}

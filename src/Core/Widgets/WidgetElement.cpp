@@ -1,4 +1,5 @@
 #include "WidgetElement.h"
+#include "Widget.h"
 #include <algorithm>
 
 WidgetElement::~WidgetElement() {
@@ -8,7 +9,13 @@ WidgetElement::~WidgetElement() {
 void WidgetElement::AddChild(WidgetElement* child) {
     if (!child) return;
     child->parent = this;
+    child->SetOwningWidgetRecursive(owningWidget);
     children.push_back(child);
+}
+
+void WidgetElement::SetOwningWidgetRecursive(Widget* widget) {
+    owningWidget = widget;
+    for (WidgetElement* child : children) child->SetOwningWidgetRecursive(widget);
 }
 
 void WidgetElement::RemoveChild(WidgetElement* child) {
@@ -78,4 +85,16 @@ void WidgetElement::CollectSelectables(std::vector<WidgetElement*>& out) {
         if (!child->visible) continue;
         child->CollectSelectables(out);
     }
+}
+
+void WidgetElement::OnSelected() {
+    if (owningWidget) owningWidget->FireElementEvent(this, "Selected");
+}
+
+void WidgetElement::OnDeselected() {
+    if (owningWidget) owningWidget->FireElementEvent(this, "Deselected");
+}
+
+void WidgetElement::OnConfirmed() {
+    if (owningWidget) owningWidget->FireElementEvent(this, "Clicked");
 }

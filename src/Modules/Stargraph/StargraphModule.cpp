@@ -22,6 +22,7 @@
 #include "Nodes_Audio.h"
 #include "Nodes_Timers.h"
 #include "Nodes_Collision.h"
+#include "Nodes_Widgets.h"
 #include "Core/ObjectKindRegistry.h"
 
 #ifndef STARENGINE_GAME_BUILD
@@ -52,6 +53,7 @@ bool StargraphModule::Initialize() {
     RegisterCollisionNodes();
     RegisterAudioComponentNodes();
     RegisterInputComponentNodes();
+    RegisterWidgetNodes();
 
     RegisterObjectKinds();
     RegisterAssetType();
@@ -102,6 +104,22 @@ void StargraphModule::RegisterObjectKinds() {
     kinds.RegisterKind("InputComponent", "SceneComponent");
     kinds.RegisterKind("LightComponent", "SceneComponent");
     kinds.RegisterKind("BillboardComponent", "SceneComponent");
+    kinds.RegisterKind("WidgetComponent", "SceneComponent");
+    kinds.RegisterKind("Widget", "");
+    kinds.RegisterKind("WidgetElement", "");
+    kinds.RegisterKind("BoxElement", "WidgetElement");
+    kinds.RegisterKind("VerticalBoxElement", "BoxElement");
+    kinds.RegisterKind("HorizontalBoxElement", "BoxElement");
+    kinds.RegisterKind("GridElement", "WidgetElement");
+    kinds.RegisterKind("RectangleElement", "WidgetElement");
+    kinds.RegisterKind("ButtonElement", "RectangleElement");
+    kinds.RegisterKind("TabHeaderButtonElement", "ButtonElement");
+    kinds.RegisterKind("TextElement", "WidgetElement");
+    kinds.RegisterKind("ImageElement", "WidgetElement");
+    kinds.RegisterKind("ProgressBarElement", "WidgetElement");
+    kinds.RegisterKind("SpacerElement", "WidgetElement");
+    kinds.RegisterKind("SplitBoxElement", "WidgetElement");
+    kinds.RegisterKind("TabContainer", "WidgetElement");
     kinds.RegisterKind("Sound", "");
     kinds.RegisterKind("Music", "");
     kinds.RegisterKind("Texture", "");

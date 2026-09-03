@@ -2,6 +2,7 @@
 
 void TabHeaderButtonElement::OnConfirmed() {
     if (owningTabContainer) owningTabContainer->SetActiveIndex(tabIndex);
+    WidgetElement::OnConfirmed();
 }
 
 void TabHeaderButtonElement::OnDrawSelf(Rectangle rect, float uiScale) {

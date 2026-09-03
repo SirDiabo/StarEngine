@@ -4,6 +4,8 @@
 #include <string>
 
 class WidgetElement;
+class WidgetBehavior;
+class WidgetComponent;
 
 enum class WidgetRenderSpace {
     Screen,
@@ -32,7 +34,17 @@ public:
     bool confirmWasHeld = false;
     bool cancelWasHeld = false;
 
+    WidgetComponent* owningComponent = nullptr;
+
     void SetSelection(WidgetElement* element);
+    void SetRoot(WidgetElement* root);
     void Draw(Rectangle screenRect, float bufferScale = 1.0f);
     void Tick(float deltaTime, Rectangle screenRect, float bufferScale = 1.0f);
+
+    WidgetBehavior* GetBehavior() const { return behavior; }
+    void SetBehavior(WidgetBehavior* newBehavior);
+    void FireElementEvent(WidgetElement* target, const std::string& eventName);
+
+private:
+    WidgetBehavior* behavior = nullptr;
 };

@@ -26,5 +26,6 @@ void WidgetComponent::SetWidget(Widget* newWidget) {
     if (widget) {
         widget->uiScale = uiScale;
         widget->forceNativeResolution = forceNativeResolution;
+        widget->owningComponent = this;
     }
 }
