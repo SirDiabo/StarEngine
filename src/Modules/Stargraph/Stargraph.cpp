@@ -345,19 +345,19 @@ bool Stargraph::SaveToFile(const std::string& path) const {
     out << "\n";
     for (size_t i = 0; i < components.size(); i++) {
         const ComponentDecl& comp = components[i];
-        out << "[Component" << i << "]\n";
+        out << "[Component" << comp.name << "]\n";
         out << "Type=" << comp.componentType << "\n";
         out << "Name=" << comp.name << "\n";
         out << "Parent=" << comp.parentName << "\n";
-        out << "PosX=" << comp.posX << "\n";
-        out << "PosY=" << comp.posY << "\n";
-        out << "PosZ=" << comp.posZ << "\n";
-        out << "RotX=" << comp.rotX << "\n";
-        out << "RotY=" << comp.rotY << "\n";
-        out << "RotZ=" << comp.rotZ << "\n";
-        out << "ScaleX=" << comp.scaleX << "\n";
-        out << "ScaleY=" << comp.scaleY << "\n";
-        out << "ScaleZ=" << comp.scaleZ << "\n";
+        if (comp.posX != 0.0f) out << "PosX=" << comp.posX << "\n";
+        if (comp.posY != 0.0f) out << "PosY=" << comp.posY << "\n";
+        if (comp.posZ != 0.0f) out << "PosZ=" << comp.posZ << "\n";
+        if (comp.rotX != 0.0f) out << "RotX=" << comp.rotX << "\n";
+        if (comp.rotY != 0.0f) out << "RotY=" << comp.rotY << "\n";
+        if (comp.rotZ != 0.0f) out << "RotZ=" << comp.rotZ << "\n";
+        if (comp.scaleX != 1.0f) out << "ScaleX=" << comp.scaleX << "\n";
+        if (comp.scaleY != 1.0f) out << "ScaleY=" << comp.scaleY << "\n";
+        if (comp.scaleZ != 1.0f) out << "ScaleZ=" << comp.scaleZ << "\n";
         for (const ComponentFieldDesc& f : GetComponentFields()) {
             if (f.componentType != comp.componentType) continue;
             switch (f.type) {
@@ -442,11 +442,12 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         const Node& node = *nodePtr;
         out << "[" << prefix << "Node" << node.id << "]\n";
         out << "Type=" << node.type << "\n";
-        out << "Title=" << node.title << "\n";
+        if (node.title != node.type) out << "Title=" << node.title << "\n";
         out << "Pos=" << node.posX << "," << node.posY << "\n";
         if (node.type == "Custom_Event") {
-            out << "Replication=" << ReplicationModeToString(node.eventReplication) << "\n";
-            out << "Reliable=" << (node.eventReliable ? "true" : "false") << "\n";
+            if (node.eventReplication != ReplicationMode::Local)
+                out << "Replication=" << ReplicationModeToString(node.eventReplication) << "\n";
+            if (node.eventReliable) out << "Reliable=true\n";
         }
 
         Node templateNode;
@@ -456,9 +457,10 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
 
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
-            if (!pin.defaultValue.empty()) out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
             const Pin* templatePin = nullptr;
             for (const Pin& tp : templateNode.inputs) if (tp.name == pin.name) { templatePin = &tp; break; }
+            if (!pin.defaultValue.empty() && (!templatePin || templatePin->defaultValue != pin.defaultValue))
+                out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
             if (!templatePin || templatePin->type != pin.type)
                 out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
             if (pin.type == PinType::Object && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
