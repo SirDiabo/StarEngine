@@ -1,14 +1,12 @@
 # StarEngine
 
-StarEngine is a game engine for games in the style of the fifth console generation (Nintendo 64 / PlayStation 1).
+StarEngine is a indie-first game engine for games in the style of the fifth console generation.
 
 ## Overview
 
 Built on [raylib](https://github.com/raysan5/raylib) for windowing, input, audio, and rendering.
 
 Uses [raygui](https://github.com/raysan5/raygui) for editor UI controls.
-
-Features a visual scripting system called Stargraph, inspired by Unreal Engine's Blueprints.
 
 ## Projects
 
@@ -19,28 +17,13 @@ Each project contains:
 - `Config/` - Project configuration files
 - `Saved/` - User settings, logs, and temporary data
 
-### Asset System
-
-The content browser imports external assets (PNG, WAV, FBX) without copying them. Instead, it creates cooked `.starasset` files that reference the original source paths. This enables:
-- Fast reimports when source files change
-- No duplication of original assets in the project
-- Easy asset management within the engine
-
-Supported asset types:
-- `.stargraph` - Visual script graphs for actors
-- `.starasset` - Cooked assets (textures, audio, models)
-- `.starmap` - Scene/level files
-
 ## Modules
 
 Core functionality is separated into loadable modules. Each module extends the engine:
 
-- Core - Application framework, module system
-- Audio - Sound and music handling
-- Particles - Particle system
-- Renderer - Rendering utilities
-- Input - Input mapping and handling
-- Stargraph - Visual scripting system
+- Stargraph - Visual Scripting System
+- BlobShadows - Simple Lighting System.
+- ShadowMap - Realtime ShadowMap Lighting System. 
 
 ## Project Structure
 
@@ -87,6 +70,6 @@ If you find StarEngine useful, consider [supporting me on Ko-fi](https://ko-fi.c
 
 ## License
 
-StarEngine is released under the [MIT License](./LICENSE).
+StarEngine is released under the [MIT License](LICENSE).
 
-See [THIRD_PARTY_LICENSES](./THIRD_PARTY_LICENSES) for licenses of included third-party components (raylib, raygui).
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for licenses of included third-party components (raylib, raygui).
