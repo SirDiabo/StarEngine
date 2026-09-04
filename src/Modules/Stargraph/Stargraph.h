@@ -170,6 +170,7 @@ struct Node {
 struct Link {
     int outputPinId = 0;
     int inputPinId = 0;
+    std::string id;
 };
 
 struct Variable {
@@ -321,6 +322,7 @@ private:
     std::vector<FunctionDef> functions;
     int nextPinId = 1;
     int nextNodeId = 1;
+    int nextLinkId = 1;
 
     std::unordered_map<std::string, std::vector<Node*>> nodesByTypeCache;
     std::unordered_map<int, Node*> pinToNodeCache;

@@ -32,7 +32,9 @@ Node* Stargraph::CreateNode(const std::string& type) {
 }
 
 void Stargraph::AddLink(const Link& link) {
-    links.push_back(link);
+    Link newLink = link;
+    if (newLink.id.empty()) newLink.id = std::to_string(nextLinkId++);
+    links.push_back(newLink);
     InvalidateCaches();
 }
 
@@ -480,11 +482,12 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
 
     out << "[" << prefix << "Links]\n";
     struct ResolvedLink {
-        std::string fromNode, fromPin, toNode, toPin;
+        std::string id, fromNode, fromPin, toNode, toPin;
     };
     std::vector<ResolvedLink> resolvedLinks;
     for (size_t i = 0; i < links.size(); i++) {
         ResolvedLink resolved;
+        resolved.id = links[i].id;
         if (!FindPinLocation(nodes, links[i].outputPinId, resolved.fromNode, resolved.fromPin)) continue;
         if (!FindPinLocation(nodes, links[i].inputPinId, resolved.toNode, resolved.toPin)) continue;
         resolvedLinks.push_back(resolved);
@@ -492,14 +495,10 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
     out << "Count=" << resolvedLinks.size() << "\n";
     out << "\n";
     std::sort(resolvedLinks.begin(), resolvedLinks.end(), [](const ResolvedLink& a, const ResolvedLink& b) {
-        if (SafeParse::ToInt(a.fromNode) != SafeParse::ToInt(b.fromNode)) return SafeParse::ToInt(a.fromNode) < SafeParse::ToInt(b.fromNode);
-        if (a.fromPin != b.fromPin) return a.fromPin < b.fromPin;
-        if (SafeParse::ToInt(a.toNode) != SafeParse::ToInt(b.toNode)) return SafeParse::ToInt(a.toNode) < SafeParse::ToInt(b.toNode);
-        return a.toPin < b.toPin;
+        return SafeParse::ToInt(a.id) < SafeParse::ToInt(b.id);
     });
-    for (size_t i = 0; i < resolvedLinks.size(); i++) {
-        const ResolvedLink& resolved = resolvedLinks[i];
-        out << "[" << prefix << "Link" << i << "]\n";
+    for (const ResolvedLink& resolved : resolvedLinks) {
+        out << "[" << prefix << "Link" << resolved.id << "]\n";
         out << "FromNode=" << resolved.fromNode << "\n";
         out << "FromPin=" << resolved.fromPin << "\n";
         out << "ToNode=" << resolved.toNode << "\n";
@@ -760,6 +759,8 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
         const std::string* toPinStr = FindEntry(section, "ToPin");
         if (!fromNodeStr || !fromPinStr || !toNodeStr || !toPinStr) continue;
 
+        std::string linkId = section.name.substr(linkPrefix.size());
+
         Node* fromNode = nullptr;
         Node* toNode = nullptr;
         for (Node* candidate : createdNodes) {
@@ -778,9 +779,16 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
         }
 
         if (outputPinId != 0 && inputPinId != 0) {
-            AddLink(Link{ outputPinId, inputPinId });
+            AddLink(Link{ outputPinId, inputPinId, linkId });
         }
     }
+
+    int maxLoadedLinkId = 0;
+    for (const Link& link : links) {
+        int idValue = SafeParse::ToInt(link.id);
+        if (idValue > maxLoadedLinkId) maxLoadedLinkId = idValue;
+    }
+    nextLinkId = maxLoadedLinkId + 1;
 
     return true;
 }
