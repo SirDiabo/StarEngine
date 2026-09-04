@@ -6,6 +6,7 @@
 #include "Core/ObjectKindRegistry.h"
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 Node* Stargraph::CreateNode(const std::string& type) {
     InvalidateCaches();
@@ -317,13 +318,13 @@ ReplicationMode ReplicationModeFromString(const std::string& text) {
     return ReplicationMode::Local;
 }
 
-static bool FindPinLocation(const std::deque<Node>& nodes, int pinId, int& outNodeIndex, std::string& outPinName) {
-    for (size_t i = 0; i < nodes.size(); i++) {
-        for (const Pin& pin : nodes[i].inputs) {
-            if (pin.id == pinId) { outNodeIndex = (int)i; outPinName = pin.name; return true; }
+static bool FindPinLocation(const std::deque<Node>& nodes, int pinId, std::string& outNodeId, std::string& outPinName) {
+    for (const Node& node : nodes) {
+        for (const Pin& pin : node.inputs) {
+            if (pin.id == pinId) { outNodeId = node.id; outPinName = pin.name; return true; }
         }
-        for (const Pin& pin : nodes[i].outputs) {
-            if (pin.id == pinId) { outNodeIndex = (int)i; outPinName = pin.name; return true; }
+        for (const Pin& pin : node.outputs) {
+            if (pin.id == pinId) { outNodeId = node.id; outPinName = pin.name; return true; }
         }
     }
     return false;
@@ -432,9 +433,14 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
     out << "[" << prefix << "Nodes]\n";
     out << "Count=" << nodes.size() << "\n";
     out << "\n";
-    for (size_t i = 0; i < nodes.size(); i++) {
-        const Node& node = nodes[i];
-        out << "[" << prefix << "Node" << i << "]\n";
+    std::vector<const Node*> sortedNodes;
+    for (const Node& node : nodes) sortedNodes.push_back(&node);
+    std::sort(sortedNodes.begin(), sortedNodes.end(), [](const Node* a, const Node* b) {
+        return SafeParse::ToInt(a->id) < SafeParse::ToInt(b->id);
+    });
+    for (const Node* nodePtr : sortedNodes) {
+        const Node& node = *nodePtr;
+        out << "[" << prefix << "Node" << node.id << "]\n";
         out << "Type=" << node.type << "\n";
         out << "Title=" << node.title << "\n";
         out << "PosX=" << node.posX << "\n";
@@ -480,17 +486,29 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
     out << "[" << prefix << "Links]\n";
     out << "Count=" << links.size() << "\n";
     out << "\n";
+    struct ResolvedLink {
+        std::string fromNode, fromPin, toNode, toPin;
+    };
+    std::vector<ResolvedLink> resolvedLinks;
     for (size_t i = 0; i < links.size(); i++) {
-        int fromIndex = 0, toIndex = 0;
-        std::string fromPin, toPin;
-        if (!FindPinLocation(nodes, links[i].outputPinId, fromIndex, fromPin)) continue;
-        if (!FindPinLocation(nodes, links[i].inputPinId, toIndex, toPin)) continue;
-
+        ResolvedLink resolved;
+        if (!FindPinLocation(nodes, links[i].outputPinId, resolved.fromNode, resolved.fromPin)) continue;
+        if (!FindPinLocation(nodes, links[i].inputPinId, resolved.toNode, resolved.toPin)) continue;
+        resolvedLinks.push_back(resolved);
+    }
+    std::sort(resolvedLinks.begin(), resolvedLinks.end(), [](const ResolvedLink& a, const ResolvedLink& b) {
+        if (SafeParse::ToInt(a.fromNode) != SafeParse::ToInt(b.fromNode)) return SafeParse::ToInt(a.fromNode) < SafeParse::ToInt(b.fromNode);
+        if (a.fromPin != b.fromPin) return a.fromPin < b.fromPin;
+        if (SafeParse::ToInt(a.toNode) != SafeParse::ToInt(b.toNode)) return SafeParse::ToInt(a.toNode) < SafeParse::ToInt(b.toNode);
+        return a.toPin < b.toPin;
+    });
+    for (size_t i = 0; i < resolvedLinks.size(); i++) {
+        const ResolvedLink& resolved = resolvedLinks[i];
         out << "[" << prefix << "Link" << i << "]\n";
-        out << "FromNode=" << fromIndex << "\n";
-        out << "FromPin=" << fromPin << "\n";
-        out << "ToNode=" << toIndex << "\n";
-        out << "ToPin=" << toPin << "\n";
+        out << "FromNode=" << resolved.fromNode << "\n";
+        out << "FromPin=" << resolved.fromPin << "\n";
+        out << "ToNode=" << resolved.toNode << "\n";
+        out << "ToPin=" << resolved.toPin << "\n";
         out << "\n";
     }
 }
@@ -635,6 +653,7 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
             if (!typeValue) continue;
 
             Node* node = CreateNode(*typeValue);
+            node->id = section.name.substr(nodePrefix.size());
             if (const std::string* v = FindEntry(section, "Title")) node->title = *v;
             if (const std::string* v = FindEntry(section, "PosX")) node->posX = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "PosY")) node->posY = SafeParse::ToFloat(*v);
@@ -722,6 +741,13 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
         }
     }
 
+    int maxLoadedId = 0;
+    for (const Node* node : createdNodes) {
+        int idValue = SafeParse::ToInt(node->id);
+        if (idValue > maxLoadedId) maxLoadedId = idValue;
+    }
+    nextNodeId = maxLoadedId + 1;
+
     for (const ParsedSection& section : sections) {
         if (section.name == linksHeader || section.name.rfind(linkPrefix, 0) != 0) continue;
 
@@ -731,17 +757,20 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
         const std::string* toPinStr = FindEntry(section, "ToPin");
         if (!fromNodeStr || !fromPinStr || !toNodeStr || !toPinStr) continue;
 
-        int fromIndex = SafeParse::ToInt(*fromNodeStr);
-        int toIndex = SafeParse::ToInt(*toNodeStr);
-        if (fromIndex < 0 || fromIndex >= (int)createdNodes.size()) continue;
-        if (toIndex < 0 || toIndex >= (int)createdNodes.size()) continue;
+        Node* fromNode = nullptr;
+        Node* toNode = nullptr;
+        for (Node* candidate : createdNodes) {
+            if (candidate->id == *fromNodeStr) fromNode = candidate;
+            if (candidate->id == *toNodeStr) toNode = candidate;
+        }
+        if (!fromNode || !toNode) continue;
 
         int outputPinId = 0;
-        for (const Pin& pin : createdNodes[fromIndex]->outputs) {
+        for (const Pin& pin : fromNode->outputs) {
             if (pin.name == *fromPinStr) { outputPinId = pin.id; break; }
         }
         int inputPinId = 0;
-        for (const Pin& pin : createdNodes[toIndex]->inputs) {
+        for (const Pin& pin : toNode->inputs) {
             if (pin.name == *toPinStr) { inputPinId = pin.id; break; }
         }
 
