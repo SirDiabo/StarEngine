@@ -443,49 +443,40 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         out << "[" << prefix << "Node" << node.id << "]\n";
         out << "Type=" << node.type << "\n";
         out << "Title=" << node.title << "\n";
-        out << "PosX=" << node.posX << "\n";
-        out << "PosY=" << node.posY << "\n";
+        out << "Pos=" << node.posX << "," << node.posY << "\n";
         if (node.type == "Custom_Event") {
             out << "Replication=" << ReplicationModeToString(node.eventReplication) << "\n";
             out << "Reliable=" << (node.eventReliable ? "true" : "false") << "\n";
         }
-        {
-            std::string names;
-            for (const Pin& pin : node.inputs) {
-                if (pin.type == PinType::Exec) continue;
-                if (!names.empty()) names += ",";
-                names += pin.name;
-            }
-            out << "InputPinNames=" << names << "\n";
-        }
-        {
-            std::string names;
-            for (const Pin& pin : node.outputs) {
-                if (pin.type == PinType::Exec) continue;
-                if (!names.empty()) names += ",";
-                names += pin.name;
-            }
-            out << "OutputPinNames=" << names << "\n";
-        }
+
+        Node templateNode;
+        templateNode.type = node.type;
+        const NodeTemplate* nodeTmpl = NodeRegistry::Get().GetTemplate(node.type);
+        if (nodeTmpl && nodeTmpl->createPins) nodeTmpl->createPins(&templateNode);
+
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
-            out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
-            out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
-            if (pin.type == PinType::Object && !pin.objectKind.empty())
+            if (!pin.defaultValue.empty()) out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
+            const Pin* templatePin = nullptr;
+            for (const Pin& tp : templateNode.inputs) if (tp.name == pin.name) { templatePin = &tp; break; }
+            if (!templatePin || templatePin->type != pin.type)
+                out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
+            if (pin.type == PinType::Object && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
                 out << "PinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         for (const Pin& pin : node.outputs) {
             if (pin.type == PinType::Exec) continue;
-            out << "OutPinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
-            if (pin.type == PinType::Object && !pin.objectKind.empty())
+            const Pin* templatePin = nullptr;
+            for (const Pin& tp : templateNode.outputs) if (tp.name == pin.name) { templatePin = &tp; break; }
+            if (!templatePin || templatePin->type != pin.type)
+                out << "OutPinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
+            if (pin.type == PinType::Object && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
                 out << "OutPinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         out << "\n";
     }
 
     out << "[" << prefix << "Links]\n";
-    out << "Count=" << links.size() << "\n";
-    out << "\n";
     struct ResolvedLink {
         std::string fromNode, fromPin, toNode, toPin;
     };
@@ -496,6 +487,8 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         if (!FindPinLocation(nodes, links[i].inputPinId, resolved.toNode, resolved.toPin)) continue;
         resolvedLinks.push_back(resolved);
     }
+    out << "Count=" << resolvedLinks.size() << "\n";
+    out << "\n";
     std::sort(resolvedLinks.begin(), resolvedLinks.end(), [](const ResolvedLink& a, const ResolvedLink& b) {
         if (SafeParse::ToInt(a.fromNode) != SafeParse::ToInt(b.fromNode)) return SafeParse::ToInt(a.fromNode) < SafeParse::ToInt(b.fromNode);
         if (a.fromPin != b.fromPin) return a.fromPin < b.fromPin;
@@ -655,8 +648,16 @@ bool Stargraph::LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& 
             Node* node = CreateNode(*typeValue);
             node->id = section.name.substr(nodePrefix.size());
             if (const std::string* v = FindEntry(section, "Title")) node->title = *v;
-            if (const std::string* v = FindEntry(section, "PosX")) node->posX = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "PosY")) node->posY = SafeParse::ToFloat(*v);
+            if (const std::string* v = FindEntry(section, "Pos")) {
+                size_t comma = v->find(',');
+                if (comma != std::string::npos) {
+                    node->posX = SafeParse::ToFloat(v->substr(0, comma));
+                    node->posY = SafeParse::ToFloat(v->substr(comma + 1));
+                }
+            } else {
+                if (const std::string* px = FindEntry(section, "PosX")) node->posX = SafeParse::ToFloat(*px);
+                if (const std::string* py = FindEntry(section, "PosY")) node->posY = SafeParse::ToFloat(*py);
+            }
             if (const std::string* v = FindEntry(section, "Replication")) node->eventReplication = ReplicationModeFromString(*v);
             if (const std::string* v = FindEntry(section, "Reliable")) node->eventReliable = (*v == "true");
 
