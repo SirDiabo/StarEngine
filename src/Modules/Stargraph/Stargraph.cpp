@@ -362,20 +362,26 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         if (comp.scaleZ != 1.0f) out << "ScaleZ=" << comp.scaleZ << "\n";
         for (const ComponentFieldDesc& f : GetComponentFields()) {
             if (f.componentType != comp.componentType) continue;
+            static const ComponentDecl defaultDecl;
             switch (f.type) {
                 case ComponentFieldType::String:
-                    out << f.key << "=" << (comp.*f.stringField) << "\n";
+                    if ((comp.*f.stringField) != (defaultDecl.*f.stringField))
+                        out << f.key << "=" << (comp.*f.stringField) << "\n";
                     break;
                 case ComponentFieldType::Float:
-                    out << f.key << "=" << (comp.*f.floatField) << "\n";
+                    if ((comp.*f.floatField) != (defaultDecl.*f.floatField))
+                        out << f.key << "=" << (comp.*f.floatField) << "\n";
                     break;
                 case ComponentFieldType::Bool:
-                    out << f.key << "=" << ((comp.*f.boolField) ? "true" : "false") << "\n";
+                    if ((comp.*f.boolField) != (defaultDecl.*f.boolField))
+                        out << f.key << "=" << ((comp.*f.boolField) ? "true" : "false") << "\n";
                     break;
                 case ComponentFieldType::StringArray: {
                     const auto& arr = comp.*f.stringArrayField;
-                    out << f.key << "Count=" << arr.size() << "\n";
-                    for (size_t m = 0; m < arr.size(); m++) out << f.key << m << "=" << arr[m] << "\n";
+                    if (!arr.empty()) {
+                        out << f.key << "Count=" << arr.size() << "\n";
+                        for (size_t m = 0; m < arr.size(); m++) out << f.key << m << "=" << arr[m] << "\n";
+                    }
                     break;
                 }
             }
