@@ -60,7 +60,7 @@ void ShadowMapSettings::ApplyKeyValues(const std::unordered_map<std::string, std
 }
 
 void ShadowMapSettings::Load(const std::string& projectRoot) {
-    filePath = (fs::path(projectRoot) / "Saved" / "ShadowMapSettings.cfg").string();
+    filePath = (fs::path(projectRoot) / "Config" / "ShadowMapSettings.cfg").string();
 
     std::unordered_map<std::string, std::string> raw;
     if (!LayoutSerializer::Load(filePath, raw)) {

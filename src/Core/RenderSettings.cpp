@@ -22,7 +22,7 @@ void RenderSettings::Load(const std::string& projectRoot) {
     shadingType = "Unlit";
     lightingQuality = LightingQuality::PerVertex;
     renderScale = 1.0f;
-    filePath = (fs::path(projectRoot) / "Saved" / "RenderSettings.cfg").string();
+    filePath = (fs::path(projectRoot) / "Config" / "RenderSettings.cfg").string();
 
     std::unordered_map<std::string, std::string> raw;
     if (!LayoutSerializer::Load(filePath, raw)) return;

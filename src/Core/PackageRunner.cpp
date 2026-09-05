@@ -232,7 +232,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
     std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();
 
-    fs::path inputMappingsSource = fs::path(options.projectRoot) / "Saved" / "InputMappings.cfg";
+    fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
     std::vector<uint8_t> inputMappingsBytes;
     if (fs::exists(inputMappingsSource)) {
         std::ifstream mappingsIn(inputMappingsSource, std::ios::binary);
@@ -290,7 +290,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n");
 
         if (!inputMappingsBytes.empty()) {
-            fs::path outputMappingsPath = fs::path(options.outputDir) / "Saved" / "InputMappings.cfg";
+            fs::path outputMappingsPath = fs::path(options.outputDir) / "Config" / "InputMappings.cfg";
             std::ofstream mappingsOut(outputMappingsPath, std::ios::binary);
             mappingsOut.write(reinterpret_cast<const char*>(inputMappingsBytes.data()), (std::streamsize)inputMappingsBytes.size());
         }
