@@ -631,7 +631,7 @@ void ViewportPanel::RenderToolbar() {
         DrawRectangleRec(playBtn, theme.success);
         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn) || IsKeyDown(KEY_LEFT_ALT) && (IsKeyDown(KEY_P)) && !playing) {
             playing = true;
             savedYaw = yaw;
             savedPitch = pitch;
