@@ -16,10 +16,13 @@ enum class WidgetInteractionState {
 
 class WidgetElement : public Object {
 public:
+    WidgetElement();
     ~WidgetElement() override;
 
     const char* GetClassName() const override { return "WidgetElement"; }
     std::string GetObjectKind() const override { return "WidgetElement"; }
+
+    std::string elementId;
 
     Vector2 anchor{ 0.0f, 0.0f };
     Vector2 pivot{ 0.0f, 0.0f };
@@ -41,6 +44,7 @@ public:
     void ClearChildren();
     const std::vector<WidgetElement*>& GetChildren() const { return children; }
     void SetOwningWidgetRecursive(Widget* widget);
+    static void EnsureNextElementIdAtLeast(int id);
 
     Rectangle ResolveRect(Rectangle parentRect, float uiScale) const;
 

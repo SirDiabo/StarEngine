@@ -2,6 +2,18 @@
 #include "Widget.h"
 #include <algorithm>
 
+namespace {
+int nextWidgetElementId = 1;
+}
+
+WidgetElement::WidgetElement() {
+    elementId = std::to_string(nextWidgetElementId++);
+}
+
+void WidgetElement::EnsureNextElementIdAtLeast(int id) {
+    if (id >= nextWidgetElementId) nextWidgetElementId = id + 1;
+}
+
 WidgetElement::~WidgetElement() {
     for (WidgetElement* child : children) delete child;
 }

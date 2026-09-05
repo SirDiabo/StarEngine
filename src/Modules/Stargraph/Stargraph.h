@@ -305,6 +305,8 @@ public:
 
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
+    void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
+    bool LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& sections, const std::string& prefix);
 
     std::string assetName;
     std::string parentClass = "Actor";
@@ -312,9 +314,6 @@ public:
     int customEventDepth = 0;
 
 private:
-    void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
-    bool LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& sections, const std::string& prefix);
-
     std::deque<Node> nodes;
     std::vector<Link> links;
     std::vector<Variable> variables;
