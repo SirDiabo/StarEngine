@@ -463,6 +463,37 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         const NodeTemplate* nodeTmpl = NodeRegistry::Get().GetTemplate(node.type);
         if (nodeTmpl && nodeTmpl->createPins) nodeTmpl->createPins(&templateNode);
 
+        auto hasTemplateMatch = [](const std::vector<Pin>& templatePins, const Pin& pin) {
+            for (const Pin& tp : templatePins) if (tp.name == pin.name) return true;
+            return false;
+        };
+        bool hasDynamicPins = false;
+        for (const Pin& pin : node.inputs) {
+            if (pin.type == PinType::Exec) continue;
+            if (!hasTemplateMatch(templateNode.inputs, pin)) { hasDynamicPins = true; break; }
+        }
+        if (!hasDynamicPins) {
+            for (const Pin& pin : node.outputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (!hasTemplateMatch(templateNode.outputs, pin)) { hasDynamicPins = true; break; }
+            }
+        }
+        if (hasDynamicPins) {
+            std::string inNames, outNames;
+            for (const Pin& pin : node.inputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (!inNames.empty()) inNames += ",";
+                inNames += pin.name;
+            }
+            for (const Pin& pin : node.outputs) {
+                if (pin.type == PinType::Exec) continue;
+                if (!outNames.empty()) outNames += ",";
+                outNames += pin.name;
+            }
+            out << "InputPinNames=" << inNames << "\n";
+            out << "OutputPinNames=" << outNames << "\n";
+        }
+
         for (const Pin& pin : node.inputs) {
             if (pin.type == PinType::Exec) continue;
             const Pin* templatePin = nullptr;

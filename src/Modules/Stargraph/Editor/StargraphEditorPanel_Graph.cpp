@@ -1503,7 +1503,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (t.type == "Call_Function") continue;
         if (t.type == "Input_Mapping") continue;
         if (t.type == "Function_Entry") continue;
-        if (t.type == "Return" && openFunctionIndex < 0) continue;
+        if (t.type == "Return") continue;
 
         if (!searchLower.empty()) {
             std::string typeLower = NodeMenuDisplayLabel(t.type);
