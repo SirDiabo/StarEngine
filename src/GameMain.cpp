@@ -90,6 +90,7 @@ int main(int argc, char* argv[]) {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, config.name.c_str());
+    SetExitKey(0);
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
 
@@ -195,4 +196,4 @@ int main(int argc, char* argv[]) {
     ModuleManager::Get().ShutdownAll();
     CloseWindow();
     return 0;
-}
+}
