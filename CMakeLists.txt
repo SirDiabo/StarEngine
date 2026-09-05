@@ -26,6 +26,7 @@ add_custom_target(generate_modules ALL
         -P "${CMAKE_SOURCE_DIR}/cmake/GenerateModules.cmake"
     BYPRODUCTS ${MODULES_GENERATED_FILE}
     COMMENT "Generating module registration"
+    VERBATIM
 )
 
 if(STARENGINE_BUILD_GAME)

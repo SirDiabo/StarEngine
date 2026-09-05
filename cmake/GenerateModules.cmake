@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+cmake_policy(SET CMP0007 NEW)
+
 if(NOT DEFINED MODULES_SOURCE_DIR)
     message(FATAL_ERROR "MODULES_SOURCE_DIR not set")
 endif()
@@ -5,6 +8,20 @@ endif()
 if(NOT DEFINED MODULES_OUTPUT_FILE)
     message(FATAL_ERROR "MODULES_OUTPUT_FILE not set")
 endif()
+
+function(_starengine_unquote var)
+    set(_value "${${var}}")
+    string(LENGTH "${_value}" _len)
+    if(_len GREATER 1 AND "${_value}" MATCHES "^\"(.*)\"$")
+        set(_value "${CMAKE_MATCH_1}")
+    endif()
+    set(${var} "${_value}" PARENT_SCOPE)
+endfunction()
+
+_starengine_unquote(MODULES_SOURCE_DIR)
+_starengine_unquote(MODULES_OUTPUT_FILE)
+_starengine_unquote(MODULES_PROJECT_DIR)
+_starengine_unquote(MODULES_ENGINE_DIR)
 
 if(NOT DEFINED STARENGINE_BUILD_GAME)
     set(STARENGINE_BUILD_GAME OFF)
