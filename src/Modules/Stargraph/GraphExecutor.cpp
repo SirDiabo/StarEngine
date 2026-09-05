@@ -278,8 +278,7 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
     if (!fn) return false;
 
     Node* entry = fn->graph.FindNodeByType("Function_Entry");
-    Node* ret   = fn->graph.FindNodeByType("Return");
-    if (!entry || !ret) return false;
+    if (!entry) return false;
 
     for (const auto& arg : args) {
         for (Pin& p : entry->outputs) {
@@ -290,14 +289,16 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
     ctx.callDepth++;
     ExecuteFromNode(fn->graph, entry, ctx);
 
-    GraphExecutor::PropagateDataPins(fn->graph, ret, ctx);
-    ctx.callDepth--;
-
+    Node* ret = fn->graph.FindNodeByType("Return");
     outResults.clear();
-    for (const Pin& p : ret->inputs) {
-        if (p.type == PinType::Exec) continue;
-        outResults.emplace_back(p.name, (const std::string&)p.defaultValue);
+    if (ret) {
+        GraphExecutor::PropagateDataPins(fn->graph, ret, ctx);
+        for (const Pin& p : ret->inputs) {
+            if (p.type == PinType::Exec) continue;
+            outResults.emplace_back(p.name, (const std::string&)p.defaultValue);
+        }
     }
+    ctx.callDepth--;
 
     return true;
 }
@@ -319,4 +320,4 @@ bool GraphExecutor::EnteredViaPin(const Node& node, const ExecutionContext& ctx,
         if (pin.name == pinName) return ctx.enteredExecPin == pin.id;
     }
     return false;
-}
+}
