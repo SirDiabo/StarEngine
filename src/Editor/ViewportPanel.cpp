@@ -648,7 +648,7 @@ void ViewportPanel::RenderToolbar() {
             DrawRectangleRec(stopBtn, theme.dangerBg);
             DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing) {
             GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;
@@ -658,17 +658,6 @@ void ViewportPanel::RenderToolbar() {
             if (flying) { flying = false; ShowCursor(); }
             playing = false;
             }
-
-        if (IsKeyPressed(KEY_ESCAPE)) {
-            GameSession::EndSession();
-            yaw = savedYaw;
-            pitch = savedPitch;
-            orbitRadius = savedOrbitRadius;
-            cameraTarget = savedCameraTarget;
-            UpdateOrbitPosition(camera, yaw, pitch, orbitRadius, cameraTarget);
-            if (flying) { flying = false; ShowCursor(); }
-            playing = false;
-        }
         btnRight -= 26;
     }
 
