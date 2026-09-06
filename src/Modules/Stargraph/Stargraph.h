@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <ostream>
+#include <fstream>
 #include "Runtime/ReplicationMode.h"
 
 enum class PinType {
@@ -26,6 +27,9 @@ namespace StargraphIO {
         std::string name;
         std::vector<std::pair<std::string, std::string>> entries;
     };
+
+    std::vector<ParsedSection> ParseSections(std::ifstream& in);
+    const std::string* FindEntry(const ParsedSection& section, const std::string& key);
 }
 
 

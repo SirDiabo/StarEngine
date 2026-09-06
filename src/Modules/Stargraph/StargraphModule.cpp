@@ -24,6 +24,7 @@
 #include "Nodes_Timers.h"
 #include "Nodes_Collision.h"
 #include "Nodes_Widgets.h"
+#include "WidgetAsset.h"
 #include "Core/ObjectKindRegistry.h"
 
 #ifndef STARENGINE_GAME_BUILD
@@ -92,6 +93,30 @@ void StargraphModule::RegisterAssetType() {
     sound.category = "Audio";
     sound.moduleName = "Stargraph";
     AssetTypeRegistry::Get().RegisterType(sound);
+
+    AssetTypeInfo widget;
+    widget.typeName = "Widget";
+    widget.extension = ".starwidget";
+    widget.category = "UI";
+    widget.moduleName = "Stargraph";
+    widget.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+        WidgetAssetData data;
+        data.assetName = assetName;
+        data.parentClass = "Widget";
+        data.graph.assetName = assetName;
+        data.graph.parentClass = "Widget";
+        return WidgetAsset::SaveWidgetAsset(fullPath, data);
+    };
+    widget.renameAsset = [](const std::string& fullPath, const std::string& newAssetName) {
+        WidgetAssetData data;
+        if (!WidgetAsset::LoadWidgetAsset(fullPath, data)) return false;
+        data.assetName = newAssetName;
+        data.graph.assetName = newAssetName;
+        bool saved = WidgetAsset::SaveWidgetAsset(fullPath, data);
+        delete data.rootElement;
+        return saved;
+    };
+    AssetTypeRegistry::Get().RegisterType(widget);
 }
 
 void StargraphModule::RegisterObjectKinds() {

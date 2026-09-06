@@ -542,9 +542,7 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
     }
 }
 
-namespace {
-    using StargraphIO::ParsedSection;
-
+namespace StargraphIO {
     std::vector<ParsedSection> ParseSections(std::ifstream& in) {
         std::vector<ParsedSection> sections;
         std::string line;
@@ -578,6 +576,10 @@ namespace {
         return nullptr;
     }
 }
+
+using StargraphIO::ParsedSection;
+using StargraphIO::ParseSections;
+using StargraphIO::FindEntry;
 
 bool Stargraph::LoadFromFile(const std::string& path) {
     std::ifstream in(CookedFile::Open(path));

@@ -82,6 +82,16 @@ WidgetElementFieldDesc ColF(const char* type, const char* key, Color T::* field)
     return d;
 }
 
+WidgetElementFieldDesc SplitAxisF(const char* type, const char* key, BoxAxis SplitBoxElement::* field) {
+    WidgetElementFieldDesc d;
+    d.elementType = type;
+    d.key = key;
+    d.kind = WidgetFieldKind::Int;
+    d.getValue = [field](const WidgetElement& e) { return std::to_string((int)(static_cast<const SplitBoxElement&>(e).*field)); };
+    d.setValue = [field](WidgetElement& e, const std::string& v) { static_cast<SplitBoxElement&>(e).*field = (BoxAxis)SafeParse::ToInt(v); };
+    return d;
+}
+
 }
 
 const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
@@ -125,6 +135,7 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         FltF<SplitBoxElement>("SplitBoxElement", "SplitRatio", &SplitBoxElement::splitRatio),
         FltF<SplitBoxElement>("SplitBoxElement", "DividerThickness", &SplitBoxElement::dividerThickness),
         ColF<SplitBoxElement>("SplitBoxElement", "DividerColor", &SplitBoxElement::dividerColor),
+        SplitAxisF("SplitBoxElement", "Axis", &SplitBoxElement::axis),
     };
     return fields;
 }
