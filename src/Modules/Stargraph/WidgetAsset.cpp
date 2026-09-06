@@ -1,6 +1,7 @@
 #include "WidgetAsset.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/WidgetElementFields.h"
+#include "Core/Widgets/TabContainer.h"
 #include "Core/SafeParse.h"
 #include <fstream>
 #include <unordered_map>
@@ -55,6 +56,26 @@ void WriteElement(std::ostream& out, WidgetElement* element, const std::string& 
 
     for (WidgetElement* child : element->GetChildren()) {
         WriteElement(out, child, element->elementId);
+    }
+}
+
+void RelinkTabHeaderButtons(WidgetElement* element) {
+    if (!element) return;
+    if (TabContainer* tabContainer = dynamic_cast<TabContainer*>(element)) {
+        const auto& kids = tabContainer->GetChildren();
+        if (!kids.empty()) {
+            WidgetElement* headerBox = kids[0];
+            const auto& buttons = headerBox->GetChildren();
+            for (size_t i = 0; i < buttons.size(); i++) {
+                if (TabHeaderButtonElement* button = dynamic_cast<TabHeaderButtonElement*>(buttons[i])) {
+                    button->owningTabContainer = tabContainer;
+                    button->tabIndex = (int)i;
+                }
+            }
+        }
+    }
+    for (WidgetElement* child : element->GetChildren()) {
+        RelinkTabHeaderButtons(child);
     }
 }
 
@@ -187,6 +208,8 @@ bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
             outData.rootElement = pending.element;
         }
     }
+
+    RelinkTabHeaderButtons(outData.rootElement);
 
     outData.graph.LoadGraphContent(sections, "Widget.");
 

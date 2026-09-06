@@ -153,6 +153,7 @@ const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
         { "SpacerElement", []() -> WidgetElement* { return new SpacerElement(); } },
         { "SplitBoxElement", []() -> WidgetElement* { return new SplitBoxElement(); } },
         { "TabContainer", []() -> WidgetElement* { return new TabContainer(); } },
+        { "TabHeaderButtonElement", []() -> WidgetElement* { return new TabHeaderButtonElement(); } },
     };
     return types;
 }
