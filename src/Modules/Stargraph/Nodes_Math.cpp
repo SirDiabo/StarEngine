@@ -1045,119 +1045,54 @@ void RegisterMathNodes() {
     RegisterWildcardCompare("Greater_Or_Equal", 'g');
     RegisterWildcardCompare("Less_Or_Equal",    'l');
 
-    // Matrix Calculation Nodes
-    auto RegisterMakeRot = [](const std::string& nodeType, char primary, char secondary) {
-        NodeTemplate t;
-        t.type = nodeType;
-        t.category = "Math";
-        t.moduleName = "Stargraph";
-        t.createPins = [primary, secondary](Node* node) {
-            std::string pName(1, primary);
-            node->inputs.push_back({pName, PinType::Vec3, true, false, 0, "0,0,0"});
-            if (secondary != '\0') {
-                std::string sName(1, secondary);
-                node->inputs.push_back({sName, PinType::Vec3, true, false, 0, "0,0,0"});
-            }
-            node->outputs.push_back({"Rotator", PinType::Rotator, false, true});
-        };
-        t.execute = [primary, secondary](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-            Vector3 pVec = {0,0,0}, sVec = {0,0,0};
-            std::string pName(1, primary);
-            
-            for (const Pin& p : node.inputs) {
-                if (p.name == pName) ReadVec3(p, pVec.x, pVec.y, pVec.z);
-            }
-            
-            if (secondary != '\0') {
-                std::string sName(1, secondary);
-                for (const Pin& p : node.inputs) {
-                    if (p.name == sName) ReadVec3(p, sVec.x, sVec.y, sVec.z);
-                }
-            }
-        
-            char sec = secondary;
-            if (sec == '\0') {
-                if (primary == 'X') { sVec = {0, 1, 0}; sec = 'Y'; }
-                else if (primary == 'Y') { sVec = {0, 0, 1}; sec = 'Z'; }
-                else if (primary == 'Z') { sVec = {1, 0, 0}; sec = 'X'; }
-                
-                Vector3 pNorm = Vector3Normalize(pVec);
-                if (fabsf(Vector3DotProduct(pNorm, sVec)) > 0.999f) {
-                    if (primary == 'X') { sVec = {0, 0, 1}; sec = 'Z'; }
-                    else if (primary == 'Y') { sVec = {1, 0, 0}; sec = 'X'; }
-                    else if (primary == 'Z') { sVec = {0, 1, 0}; sec = 'Y'; }
-                }
-            }
-        
-            Vector3 x = {0}, y = {0}, z = {0};
-            Vector3 P = Vector3Normalize(pVec);
-            Vector3 S = Vector3Normalize(sVec);
-            
-            if (Vector3Length(P) < 0.001f) {
-                P = (primary == 'X') ? Vector3{1,0,0} : (primary == 'Y') ? Vector3{0,1,0} : Vector3{0,0,1};
-            }
-        
-            if (primary == 'X' && sec == 'Y') {
-                x = P;
-                z = Vector3Normalize(Vector3CrossProduct(x, S));
-                y = Vector3Normalize(Vector3CrossProduct(z, x));
-            } else if (primary == 'X' && sec == 'Z') {
-                x = P;
-                y = Vector3Normalize(Vector3CrossProduct(S, x));
-                z = Vector3Normalize(Vector3CrossProduct(x, y));
-            } else if (primary == 'Y' && sec == 'X') {
-                y = P;
-                z = Vector3Normalize(Vector3CrossProduct(S, y));
-                x = Vector3Normalize(Vector3CrossProduct(y, z));
-            } else if (primary == 'Y' && sec == 'Z') {
-                y = P;
-                x = Vector3Normalize(Vector3CrossProduct(y, S));
-                z = Vector3Normalize(Vector3CrossProduct(x, y));
-            } else if (primary == 'Z' && sec == 'X') {
-                z = P;
-                y = Vector3Normalize(Vector3CrossProduct(z, S));
-                x = Vector3Normalize(Vector3CrossProduct(y, z));
-            } else if (primary == 'Z' && sec == 'Y') {
-                z = P;
-                x = Vector3Normalize(Vector3CrossProduct(S, z));
-                y = Vector3Normalize(Vector3CrossProduct(z, x));
-            }
-        
-            if (Vector3Length(x) < 0.001f) x = {1,0,0};
-            if (Vector3Length(y) < 0.001f) y = {0,1,0};
-            if (Vector3Length(z) < 0.001f) z = {0,0,1};
-        
-            Matrix mat = {0};
-            mat.m0 = x.x; mat.m1 = x.y; mat.m2 = x.z; mat.m3 = 0.0f;
-            mat.m4 = y.x; mat.m5 = y.y; mat.m6 = y.z; mat.m7 = 0.0f;
-            mat.m8 = z.x; mat.m9 = z.y; mat.m10 = z.z; mat.m11 = 0.0f;
-            mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
-        
-            Vector3 euler;
-            float m2 = mat.m2;
-            if (m2 > 1.0f) m2 = 1.0f;
-            if (m2 < -1.0f) m2 = -1.0f;
-            euler.y = asinf(m2);
-            euler.x = atan2f(-mat.m6, mat.m10);
-            euler.z = atan2f(-mat.m1, mat.m0);
-            euler = Vector3Scale(euler, RAD2DEG);
-        
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", euler.x, euler.y, euler.z);
-            for (Pin& p : node.outputs) {
-                if (p.name == "Rotator") p.defaultValue = buf;
-            }
-        };
-        NodeRegistry::Get().RegisterNode(t);
+    NodeTemplate alignToGround;
+    alignToGround.type = "Align_To_Ground";
+    alignToGround.category = "Math";
+    alignToGround.moduleName = "Stargraph";
+    alignToGround.createPins = [](Node* node) {
+        node->inputs.push_back({"Forward", PinType::Vec3, true, false, 0, "0,0,1"});
+        node->inputs.push_back({"Right", PinType::Vec3, true, false, 0, "1,0,0"});
+        node->inputs.push_back({"Ground Normal", PinType::Vec3, true, false, 0, "0,1,0"});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
     };
-    
-    RegisterMakeRot("Make_Rot_From_X", 'X', '\0');
-    RegisterMakeRot("Make_Rot_From_XY", 'X', 'Y');
-    RegisterMakeRot("Make_Rot_From_XZ", 'X', 'Z');
-    RegisterMakeRot("Make_Rot_From_Y", 'Y', '\0');
-    RegisterMakeRot("Make_Rot_From_YX", 'Y', 'X');
-    RegisterMakeRot("Make_Rot_From_YZ", 'Y', 'Z');
-    RegisterMakeRot("Make_Rot_From_Z", 'Z', '\0');
-    RegisterMakeRot("Make_Rot_From_ZX", 'Z', 'X');
-    RegisterMakeRot("Make_Rot_From_ZY", 'Z', 'Y');
+    alignToGround.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 forward = {0, 0, 1};
+        Vector3 right = {1, 0, 0};
+        Vector3 normal = {0, 1, 0};
+
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Forward") ReadVec3(p, forward.x, forward.y, forward.z);
+            if (p.name == "Right") ReadVec3(p, right.x, right.y, right.z);
+            if (p.name == "Ground Normal") ReadVec3(p, normal.x, normal.y, normal.z);
+        }
+
+        forward = Vector3Normalize(forward);
+        right = Vector3Normalize(right);
+        normal = Vector3Normalize(normal);
+
+        Vector3 forwardComponent = Vector3Scale(forward, Vector3DotProduct(right, forward));
+        right = Vector3Normalize(Vector3Subtract(right, forwardComponent));
+
+        Vector3 up = Vector3Normalize(Vector3CrossProduct(right, forward));
+
+        float yaw = atan2f(forward.x, forward.z);
+
+        float localRight = Vector3DotProduct(normal, right);
+        float localUp = Vector3DotProduct(normal, up);
+        float localForward = Vector3DotProduct(normal, forward);
+
+        float pitch = asinf(-localForward);
+        float roll = atan2f(localRight, localUp);
+
+        float pitchDeg = pitch * RAD2DEG;
+        float yawDeg = yaw * RAD2DEG;
+        float rollDeg = roll * RAD2DEG;
+
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", pitchDeg, yawDeg, rollDeg);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Rotation") p.defaultValue = buf;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(alignToGround);
 }
