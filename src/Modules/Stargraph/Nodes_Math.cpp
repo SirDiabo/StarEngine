@@ -1133,7 +1133,14 @@ void RegisterMathNodes() {
             mat.m8 = z.x; mat.m9 = z.y; mat.m10 = z.z; mat.m11 = 0.0f;
             mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
         
-            Vector3 euler = Vector3Scale(QuaternionToEuler(QuaternionFromMatrix(mat)), RAD2DEG);
+            Vector3 euler;
+            float m2 = mat.m2;
+            if (m2 > 1.0f) m2 = 1.0f;
+            if (m2 < -1.0f) m2 = -1.0f;
+            euler.y = asinf(m2);
+            euler.x = atan2f(-mat.m6, mat.m10);
+            euler.z = atan2f(-mat.m1, mat.m0);
+            euler = Vector3Scale(euler, RAD2DEG);
         
             char buf[64];
             snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", euler.x, euler.y, euler.z);
