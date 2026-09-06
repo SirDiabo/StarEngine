@@ -461,6 +461,18 @@ void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, 
                 }
                 break;
             }
+            case PinType::Rotator: {
+                float vx = 0, vy = 0, vz = 0;
+                sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                if (PropertyField::Vec3Row(valueRect, varArrayBufs[i].text[0], varArrayBufs[i].text[1],
+                                            varArrayBufs[i].text[2], fieldId, activeField, vx, vy, vz)) {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+                    elem = buf;
+                    changed = true;
+                }
+                break;
+            }
             default: {
                 std::string strVal = elem;
                 if (PropertyField::StringBox(valueRect, varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]),
@@ -486,7 +498,7 @@ void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, 
         var.arrayValues.push_back(def);
 
         ArrayElemBuf buf;
-        if (var.type == PinType::Vec3) {
+        if (var.type == PinType::Vec3 || var.type == PinType::Rotator) {
             float vx = 0, vy = 0, vz = 0;
             sscanf(def.c_str(), "%f,%f,%f", &vx, &vy, &vz);
             snprintf(buf.text[0], sizeof(buf.text[0]), "%.2f", vx);
@@ -549,6 +561,14 @@ void StargraphEditorPanel::RenderVariableDetailsBody(Rectangle panel, float y, V
                 snprintf(varVecBuf[2], 32, "%.2f", vz);
                 break;
             }
+            case PinType::Rotator: {
+                float vx = 0, vy = 0, vz = 0;
+                sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                snprintf(varVecBuf[0], 32, "%.2f", vx);
+                snprintf(varVecBuf[1], 32, "%.2f", vy);
+                snprintf(varVecBuf[2], 32, "%.2f", vz);
+                break;
+            }
             default:
                 snprintf(varValBuffer, sizeof(varValBuffer), "%s", var.value.c_str());
                 break;
@@ -559,6 +579,14 @@ void StargraphEditorPanel::RenderVariableDetailsBody(Rectangle panel, float y, V
             const std::string& elem = var.arrayValues[i];
             switch (var.type) {
                 case PinType::Vec3: {
+                    float vx = 0, vy = 0, vz = 0;
+                    sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+                    snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", vx);
+                    snprintf(varArrayBufs[i].text[1], sizeof(varArrayBufs[i].text[1]), "%.2f", vy);
+                    snprintf(varArrayBufs[i].text[2], sizeof(varArrayBufs[i].text[2]), "%.2f", vz);
+                    break;
+                }
+                case PinType::Rotator: {
                     float vx = 0, vy = 0, vz = 0;
                     sscanf(elem.c_str(), "%f,%f,%f", &vx, &vy, &vz);
                     snprintf(varArrayBufs[i].text[0], sizeof(varArrayBufs[i].text[0]), "%.2f", vx);
@@ -599,9 +627,9 @@ void StargraphEditorPanel::RenderVariableDetailsBody(Rectangle panel, float y, V
     DrawText("Type", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
     y += 14;
 
-    static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Object","Wildcard"};
+    static const char* typeNames[] = {"None","Exec","Boolean","Integer","Float","String","Vec3","Rotator","Object","Wildcard"};
     int typeIndex = (int)var.type;
-    if (typeIndex < 0 || typeIndex > 8) typeIndex = 2;
+    if (typeIndex < 0 || typeIndex > 9) typeIndex = 2;
 
     Rectangle typeRect = {panel.x + 8, y, panel.width - 16, 18};
     PropertyField::Style typeStyle;
@@ -611,13 +639,14 @@ void StargraphEditorPanel::RenderVariableDetailsBody(Rectangle panel, float y, V
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), typeRect) && !savePicker.IsOpen()) {
         int next = typeIndex + 1;
-        if (next < 2 || next > 7) next = 2;
+        if (next < 2 || next > 8) next = 2;
         var.type = (PinType)next;
         switch (var.type) {
             case PinType::Boolean: var.value = "false"; break;
             case PinType::Integer: var.value = "0"; break;
             case PinType::Float:   var.value = "0.00"; break;
             case PinType::Vec3:    var.value = "0.00,0.00,0.00"; break;
+            case PinType::Rotator: var.value = "0.00,0.00,0.00"; break;
             default:               var.value = ""; break;
         }
         var.arrayValues.clear();
@@ -725,6 +754,17 @@ void StargraphEditorPanel::RenderVariableDetailsBody(Rectangle panel, float y, V
             isDirty = true;
         }
     } else if (var.type == PinType::Vec3) {
+        Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
+        float vx = 0, vy = 0, vz = 0;
+        sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);
+        if (PropertyField::Vec3Row(row, varVecBuf[0], varVecBuf[1], varVecBuf[2], 2, activeField,
+                                    vx, vy, vz)) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", vx, vy, vz);
+            var.value = buf;
+            isDirty = true;
+        }
+    } else if (var.type == PinType::Rotator) {
         Rectangle row = {panel.x + 8, y, panel.width - 16, 18};
         float vx = 0, vy = 0, vz = 0;
         sscanf(var.value.c_str(), "%f,%f,%f", &vx, &vy, &vz);

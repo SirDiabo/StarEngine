@@ -54,6 +54,29 @@ uint32_t World::AllocateNetId() {
     return nextNetId++;
 }
 
+void World::RequestLoadLevel(const std::string& path) {
+    pendingLevelPath = path;
+    hasPendingLevelLoad = true;
+}
+
+bool World::ConsumePendingLevelLoad(std::string& outPath) {
+    if (!hasPendingLevelLoad) return false;
+    outPath = pendingLevelPath;
+    hasPendingLevelLoad = false;
+    pendingLevelPath.clear();
+    return true;
+}
+
+void World::RequestQuit() {
+    quitRequested = true;
+}
+
+bool World::ConsumeQuitRequest() {
+    if (!quitRequested) return false;
+    quitRequested = false;
+    return true;
+}
+
 void World::BeginPlay() {
     playing = true;
     ReplicationManager::Reset();

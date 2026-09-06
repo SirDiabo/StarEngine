@@ -19,6 +19,7 @@
 #include "Nodes_Variables.h"
 #include "Nodes_Save.h"
 #include "Nodes_Utility.h"
+#include "Nodes_OS.h"
 #include "Nodes_Audio.h"
 #include "Nodes_Timers.h"
 #include "Nodes_Collision.h"
@@ -44,6 +45,7 @@ bool StargraphModule::Initialize() {
     RegisterVariableNodes();
     RegisterSaveNodes();
     RegisterUtilityNodes();
+    RegisterOSNodes();
     RegisterAudioNodes();
     RegisterTimerNodes();
 

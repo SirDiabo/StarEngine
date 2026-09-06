@@ -65,6 +65,7 @@ std::string Variable::DefaultElementText() const {
         case PinType::Integer: return "0";
         case PinType::Float:   return "0.00";
         case PinType::Vec3:    return "0.00,0.00,0.00";
+        case PinType::Rotator: return "0.00,0.00,0.00";
         default:                return "";
     }
 }
@@ -245,6 +246,15 @@ const Variable* Stargraph::FindVariable(const std::string& name) const {
     return nullptr;
 }
 
+void Stargraph::CaptureVariableDefaults() {
+    for (Variable& v : variables) {
+        v.defaultValue = v.value;
+    }
+    for (FunctionDef& fn : functions) {
+        fn.graph.CaptureVariableDefaults();
+    }
+}
+
 const std::vector<Link*>& Stargraph::GetLinksFromPin(int outputPinId) {
     if (!cachesBuilt) BuildCaches();
     static const std::vector<Link*> empty;
@@ -290,6 +300,7 @@ std::string PinTypeToString(PinType type) {
         case PinType::Float: return "Float";
         case PinType::String: return "String";
         case PinType::Vec3: return "Vec3";
+        case PinType::Rotator: return "Rotator";
         case PinType::Object: return "Object";
         default: return "None";
     }
@@ -302,22 +313,9 @@ PinType PinTypeFromString(const std::string& text) {
     if (text == "Float") return PinType::Float;
     if (text == "String") return PinType::String;
     if (text == "Vec3") return PinType::Vec3;
+    if (text == "Rotator") return PinType::Rotator;
     if (text == "Object") return PinType::Object;
     return PinType::None;
-}
-
-std::string ReplicationModeToString(ReplicationMode mode) {
-    switch (mode) {
-        case ReplicationMode::Replicated: return "Replicated";
-        case ReplicationMode::ServerOnly: return "ServerOnly";
-        default: return "Local";
-    }
-}
-
-ReplicationMode ReplicationModeFromString(const std::string& text) {
-    if (text == "Replicated") return ReplicationMode::Replicated;
-    if (text == "ServerOnly") return ReplicationMode::ServerOnly;
-    return ReplicationMode::Local;
 }
 
 static bool FindPinLocation(const std::deque<Node>& nodes, int pinId, std::string& outNodeId, std::string& outPinName) {

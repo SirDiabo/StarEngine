@@ -648,7 +648,17 @@ void ViewportPanel::RenderToolbar() {
             DrawRectangleRec(stopBtn, theme.dangerBg);
             DrawText("S", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing) {
+        std::string requestedLevelPath;
+        if (World::Get().ConsumePendingLevelLoad(requestedLevelPath)) {
+            StarMap newMap;
+            if (newMap.LoadFromFile(requestedLevelPath)) {
+                GameSession::EndSession();
+                starMap = newMap;
+                GameSession::BeginSession(starMap);
+            }
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing || World::Get().ConsumeQuitRequest()) {
             GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;

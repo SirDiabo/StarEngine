@@ -72,7 +72,7 @@ void RegisterActorNodes() {
     getActorRotation.moduleName = "Stargraph";
     getActorRotation.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
-        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
     };
     getActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
@@ -98,7 +98,7 @@ void RegisterActorNodes() {
     setActorRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
-        node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->inputs.push_back({"Rotation", PinType::Rotator, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
     setActorRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -609,7 +609,7 @@ void RegisterActorNodes() {
     getControlRotation.moduleName = "Stargraph";
     getControlRotation.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
-        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
     };
     getControlRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
@@ -634,7 +634,7 @@ void RegisterActorNodes() {
     setControlRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
-        node->inputs.push_back({"Rotation", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->inputs.push_back({"Rotation", PinType::Rotator, true,  false, 0, "0,0,0"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
     };
     setControlRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {

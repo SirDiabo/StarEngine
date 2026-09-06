@@ -30,6 +30,12 @@ public:
     uint32_t AllocateNetId();
     void ResetNetIds() { nextNetId = 1; }
 
+    void RequestLoadLevel(const std::string& path);
+    bool ConsumePendingLevelLoad(std::string& outPath);
+
+    void RequestQuit();
+    bool ConsumeQuitRequest();
+
 private:
     std::vector<std::unique_ptr<Actor>> actors;
     std::vector<Actor*> pendingDestroy;
@@ -37,6 +43,9 @@ private:
     Actor* viewTarget = nullptr;
     Actor* inputFocus = nullptr;
     uint32_t nextNetId = 1;
+    std::string pendingLevelPath;
+    bool hasPendingLevelLoad = false;
+    bool quitRequested = false;
 
     void FlushDestroyQueue();
 };

@@ -137,6 +137,20 @@ int main(int argc, char* argv[]) {
         World::Get().Tick(deltaTime);
         perfTickAccum += GetTime() - perfTickStart;
 
+        std::string requestedLevelPath;
+        if (World::Get().ConsumePendingLevelLoad(requestedLevelPath)) {
+            StarMap newMap;
+            if (newMap.LoadFromFile(requestedLevelPath)) {
+                World::Get().EndPlay();
+                map = newMap;
+                GameSession::BeginSession(map);
+            } else {
+                TraceLog(LOG_ERROR, "GameMain: failed to load level '%s'", requestedLevelPath.c_str());
+            }
+        }
+
+        if (World::Get().ConsumeQuitRequest()) break;
+
         GameSession::UpdateActiveCamera(camera);
 
         if ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER)) {
@@ -196,4 +210,4 @@ int main(int argc, char* argv[]) {
     ModuleManager::Get().ShutdownAll();
     CloseWindow();
     return 0;
-}
+}

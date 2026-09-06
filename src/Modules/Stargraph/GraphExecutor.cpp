@@ -280,6 +280,10 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
     Node* entry = fn->graph.FindNodeByType("Function_Entry");
     if (!entry) return false;
 
+    for (Variable& localVar : fn->graph.GetVariables()) {
+        localVar.value = localVar.defaultValue;
+    }
+
     for (const auto& arg : args) {
         for (Pin& p : entry->outputs) {
             if (p.name == arg.first) { p.defaultValue = arg.second; break; }

@@ -71,6 +71,7 @@ Color StargraphEditorPanel::GetPinColor(PinType type) const {
         case PinType::Float:   return { 90, 195,  90, 255};
         case PinType::String:  return {200,   0, 200, 255};
         case PinType::Vec3:    return {231, 191,  18, 255};
+        case PinType::Rotator: return {172,  89, 227, 255};
         case PinType::Object:  return {  0, 140, 255, 255};
         case PinType::Wildcard: return {180, 180, 180, 255};
         default:               return {120, 120, 120, 255};

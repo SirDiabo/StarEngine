@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <ostream>
+#include "Runtime/ReplicationMode.h"
 
 enum class PinType {
     None,
@@ -15,18 +16,10 @@ enum class PinType {
     Float,
     String,
     Vec3,
+    Rotator,
     Object,
     Wildcard
 };
-
-enum class ReplicationMode {
-    Local,          // Never leaves the machine.
-    Replicated,     // Client Authoritative. Writes sync up to host, then from host to everyone.
-    ServerOnly      // Write-Gated to Host, syncs out to clients. Clients can't write and only read this.
-};
-
-std::string ReplicationModeToString(ReplicationMode mode);
-ReplicationMode ReplicationModeFromString(const std::string& text);
 
 namespace StargraphIO {
     struct ParsedSection {
@@ -177,6 +170,7 @@ struct Variable {
     std::string name;
     PinType type = PinType::None;
     std::string value;
+    std::string defaultValue;
     std::string objectKind;
     bool isArray = false;
     std::vector<std::string> arrayValues;
@@ -289,6 +283,7 @@ public:
 
     Variable* FindVariable(const std::string& name);
     const Variable* FindVariable(const std::string& name) const;
+    void CaptureVariableDefaults();
 
     const std::vector<FunctionDef>& GetFunctions() const { return functions; }
     std::vector<FunctionDef>& GetFunctions() { return functions; }

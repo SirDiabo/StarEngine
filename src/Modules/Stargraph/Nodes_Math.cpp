@@ -198,6 +198,52 @@ void RegisterMathNodes() {
     };
     NodeRegistry::Get().RegisterNode(vec3Break);
 
+    NodeTemplate rotatorMake;
+    rotatorMake.type = "Rotator_Make";
+    rotatorMake.category = "Math";
+    rotatorMake.moduleName = "Stargraph";
+    rotatorMake.createPins = [](Node* node) {
+        node->inputs.push_back({"X", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Y", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Z", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Rotator", PinType::Rotator, false, true});
+    };
+    rotatorMake.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "X" && !p.defaultValue.empty()) x = p.defaultValue.AsFloat();
+            if (p.name == "Y" && !p.defaultValue.empty()) y = p.defaultValue.AsFloat();
+            if (p.name == "Z" && !p.defaultValue.empty()) z = p.defaultValue.AsFloat();
+        }
+        char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Rotator") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(rotatorMake);
+
+    NodeTemplate rotatorBreak;
+    rotatorBreak.type = "Rotator_Break";
+    rotatorBreak.category = "Math";
+    rotatorBreak.moduleName = "Stargraph";
+    rotatorBreak.createPins = [](Node* node) {
+        node->inputs.push_back({"Rotator", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"X", PinType::Float, false, true});
+        node->outputs.push_back({"Y", PinType::Float, false, true});
+        node->outputs.push_back({"Z", PinType::Float, false, true});
+    };
+    rotatorBreak.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Rotator") ReadVec3(p, x, y, z);
+        }
+        char buf[32];
+        for (Pin& p : node.outputs) {
+            if (p.name == "X") { snprintf(buf, sizeof(buf), "%g", x); p.defaultValue = buf; }
+            if (p.name == "Y") { snprintf(buf, sizeof(buf), "%g", y); p.defaultValue = buf; }
+            if (p.name == "Z") { snprintf(buf, sizeof(buf), "%g", z); p.defaultValue = buf; }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(rotatorBreak);
+
     NodeTemplate vec3Length;
     vec3Length.type = "Vec3_Length";
     vec3Length.category = "Math";
@@ -1012,7 +1058,7 @@ void RegisterMathNodes() {
                 std::string sName(1, secondary);
                 node->inputs.push_back({sName, PinType::Vec3, true, false, 0, "0,0,0"});
             }
-            node->outputs.push_back({"Rotator", PinType::Vec3, false, true});
+            node->outputs.push_back({"Rotator", PinType::Rotator, false, true});
         };
         t.execute = [primary, secondary](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             Vector3 pVec = {0,0,0}, sVec = {0,0,0};

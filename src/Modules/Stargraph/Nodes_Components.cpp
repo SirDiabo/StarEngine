@@ -68,7 +68,7 @@ void RegisterComponentNodes() {
     setCompRotation.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
-        node->inputs.push_back({"Rotation", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Rotation", PinType::Rotator, true, false, 0, "0,0,0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setCompRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -142,7 +142,7 @@ void RegisterComponentNodes() {
     getCompRotation.hideFromContextMenu = true;
     getCompRotation.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
-        node->outputs.push_back({"Rotation", PinType::Vec3, false, true});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
     };
     getCompRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;

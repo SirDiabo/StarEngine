@@ -678,6 +678,7 @@ static const char* ParamTypeShortName(PinType type) {
         case PinType::Float:   return "Float";
         case PinType::String:  return "String";
         case PinType::Vec3:    return "Vec3";
+        case PinType::Rotator: return "Rotator";
         case PinType::Object:  return "Object";
         default:                return "Float";
     }
@@ -689,7 +690,8 @@ static PinType NextParamType(PinType type) {
         case PinType::Integer: return PinType::Float;
         case PinType::Float:   return PinType::String;
         case PinType::String:  return PinType::Vec3;
-        case PinType::Vec3:    return PinType::Object;
+        case PinType::Vec3:    return PinType::Rotator;
+        case PinType::Rotator: return PinType::Object;
         default:                return PinType::Boolean;
     }
 }
