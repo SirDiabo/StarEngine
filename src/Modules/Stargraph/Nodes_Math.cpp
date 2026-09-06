@@ -1070,26 +1070,32 @@ void RegisterMathNodes() {
         right = Vector3Normalize(right);
         normal = Vector3Normalize(normal);
 
-        Vector3 forwardComponent = Vector3Scale(forward, Vector3DotProduct(right, forward));
-        right = Vector3Normalize(Vector3Subtract(right, forwardComponent));
+        Vector3 newForward = Vector3Subtract(forward, Vector3Scale(normal, Vector3DotProduct(forward, normal)));
+        if (Vector3Length(newForward) < 0.001f) {
+            newForward = Vector3Subtract(right, Vector3Scale(normal, Vector3DotProduct(right, normal)));
+        }
+        if (Vector3Length(newForward) < 0.001f) newForward = {0, 0, 1};
+        newForward = Vector3Normalize(newForward);
 
-        Vector3 up = Vector3Normalize(Vector3CrossProduct(right, forward));
+        Vector3 newX = Vector3CrossProduct(normal, newForward);
+        if (Vector3Length(newX) < 0.001f) newX = {1, 0, 0};
+        newX = Vector3Normalize(newX);
 
-        float yaw = atan2f(forward.x, forward.z);
+        Matrix mat = {0};
+        mat.m0 = newX.x;      mat.m1 = newX.y;      mat.m2 = newX.z;      mat.m3 = 0.0f;
+        mat.m4 = normal.x;    mat.m5 = normal.y;    mat.m6 = normal.z;    mat.m7 = 0.0f;
+        mat.m8 = newForward.x; mat.m9 = newForward.y; mat.m10 = newForward.z; mat.m11 = 0.0f;
+        mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
 
-        float localRight = Vector3DotProduct(normal, right);
-        float localUp = Vector3DotProduct(normal, up);
-        float localForward = Vector3DotProduct(normal, forward);
-
-        float pitch = asinf(-localForward);
-        float roll = atan2f(localRight, localUp);
-
-        float pitchDeg = pitch * RAD2DEG;
-        float yawDeg = yaw * RAD2DEG;
-        float rollDeg = roll * RAD2DEG;
+        float m8v = mat.m8;
+        if (m8v > 1.0f) m8v = 1.0f;
+        if (m8v < -1.0f) m8v = -1.0f;
+        float yawRad = asinf(m8v);
+        float pitchRad = atan2f(-mat.m9, mat.m10);
+        float rollRad = atan2f(-mat.m4, mat.m0);
 
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", pitchDeg, yawDeg, rollDeg);
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", pitchRad * RAD2DEG, yawRad * RAD2DEG, rollRad * RAD2DEG);
         for (Pin& p : node.outputs) {
             if (p.name == "Rotation") p.defaultValue = buf;
         }
