@@ -149,6 +149,26 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(getDeltaTime);
 
+    NodeTemplate getDeltaScale;
+    getDeltaScale.type = "Get_Delta_Scale";
+    getDeltaScale.category = "Utility";
+    getDeltaScale.moduleName= "Stargraph";
+    getDeltaScale.createPins = [](Node* node) {
+        node->inputs.push_back({"Base", PinType::Float, true, false, 60, "60.0"});
+        node->outputs.push_back({"Multiplier", PinType::Float, false, true});
+    };
+    getDeltaScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float base = 60.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Base") base = p.defaultValue.AsFloat();
+        }
+        float result = base * ctx.deltaTime;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%g", result);
+        for (Pin& p : node.outputs) if (p.name == "Multiplier") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getDeltaScale);
+
     NodeTemplate strConcat;
     strConcat.type = "String_Concat";
     strConcat.category = "String";
@@ -1475,4 +1495,5 @@ void RegisterUtilityNodes() {
         for (Pin& p : node.outputs) if (p.name == "Duration") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getGestureHoldDuration);
+
 }
