@@ -8,6 +8,7 @@
 #include <ostream>
 #include <fstream>
 #include "Runtime/ReplicationMode.h"
+#include "Core/SectionFileIO.h"
 
 enum class PinType {
     None,
@@ -21,16 +22,6 @@ enum class PinType {
     Object,
     Wildcard
 };
-
-namespace StargraphIO {
-    struct ParsedSection {
-        std::string name;
-        std::vector<std::pair<std::string, std::string>> entries;
-    };
-
-    std::vector<ParsedSection> ParseSections(std::ifstream& in);
-    const std::string* FindEntry(const ParsedSection& section, const std::string& key);
-}
 
 
 class PinValue {
@@ -305,7 +296,7 @@ public:
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
     void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
-    bool LoadGraphContent(const std::vector<StargraphIO::ParsedSection>& sections, const std::string& prefix);
+    bool LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix);
 
     std::string assetName;
     std::string parentClass = "Actor";
