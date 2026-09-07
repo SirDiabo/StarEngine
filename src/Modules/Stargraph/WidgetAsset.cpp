@@ -1,4 +1,7 @@
 #include "WidgetAsset.h"
+#include "WidgetAssetCache.h"
+#include "StargraphBehavior.h"
+#include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetElementIO.h"
 #include "Core/SafeParse.h"
 #include <fstream>
@@ -42,6 +45,18 @@ bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
     outData.graph.LoadGraphContent(sections, "Widget.");
 
     return true;
+}
+
+Widget* InstantiateWidget(const std::string& path) {
+    const WidgetAssetData* cached = WidgetAssetCache::Get().GetOrLoad(path);
+    if (!cached) return nullptr;
+
+    Widget* widget = new Widget();
+    widget->SetRoot(WidgetElementIO::CloneElementTree(cached->rootElement));
+    widget->uiScale = cached->uiScale;
+    widget->forceNativeResolution = cached->forceNativeResolution;
+    widget->SetBehavior(new StargraphBehavior(cached->graph));
+    return widget;
 }
 
 }

@@ -16,10 +16,13 @@ public:
     bool forceNativeResolution = false;
     float uiScale = 1.0f;
     std::string inputDevice = "Unclaimed";
+    std::string widgetAssetPath;
 
     Widget* GetWidget() const { return widget; }
     void SetWidget(Widget* newWidget);
 
 private:
     Widget* widget = nullptr;
+    std::string loadedWidgetAssetPath;
+    void RebuildWidgetFromAsset();
 };

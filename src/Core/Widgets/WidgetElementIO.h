@@ -9,4 +9,5 @@ class WidgetElement;
 namespace WidgetElementIO {
     void WriteElementTree(std::ostream& out, WidgetElement* root);
     WidgetElement* ReadElementTree(const std::vector<SectionFileIO::ParsedSection>& sections);
+    WidgetElement* CloneElementTree(WidgetElement* root);
 }

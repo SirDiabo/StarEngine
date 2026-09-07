@@ -3,6 +3,7 @@
 #include <string>
 
 class WidgetElement;
+class Widget;
 
 struct WidgetAssetData {
     std::string assetName;
@@ -16,4 +17,5 @@ struct WidgetAssetData {
 namespace WidgetAsset {
     bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data);
     bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData);
+    Widget* InstantiateWidget(const std::string& path);
 }

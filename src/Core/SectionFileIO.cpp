@@ -2,7 +2,7 @@
 
 namespace SectionFileIO {
 
-std::vector<ParsedSection> ParseSections(std::ifstream& in) {
+std::vector<ParsedSection> ParseSections(std::istream& in) {
     std::vector<ParsedSection> sections;
     std::string line;
     while (std::getline(in, line)) {

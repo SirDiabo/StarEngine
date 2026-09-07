@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <fstream>
+#include <istream>
 
 namespace SectionFileIO {
     struct ParsedSection {
@@ -10,6 +10,6 @@ namespace SectionFileIO {
         std::vector<std::pair<std::string, std::string>> entries;
     };
 
-    std::vector<ParsedSection> ParseSections(std::ifstream& in);
+    std::vector<ParsedSection> ParseSections(std::istream& in);
     const std::string* FindEntry(const ParsedSection& section, const std::string& key);
 }

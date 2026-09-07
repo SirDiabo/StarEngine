@@ -4,6 +4,7 @@
 #include "TabContainer.h"
 #include "Core/SafeParse.h"
 #include <unordered_map>
+#include <sstream>
 
 namespace {
 
@@ -185,6 +186,15 @@ WidgetElement* ReadElementTree(const std::vector<ParsedSection>& sections) {
     RelinkTabHeaderButtons(rootElement);
 
     return rootElement;
+}
+
+WidgetElement* CloneElementTree(WidgetElement* root) {
+    if (!root) return nullptr;
+    std::ostringstream out;
+    WriteElementTree(out, root);
+    std::istringstream in(out.str());
+    std::vector<ParsedSection> sections = SectionFileIO::ParseSections(in);
+    return ReadElementTree(sections);
 }
 
 }
