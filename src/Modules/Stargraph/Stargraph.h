@@ -236,6 +236,12 @@ struct ComponentDecl {
     float billboardHeight = 50.0f;
     bool billboardHiddenInGame = true;
 
+    std::string widgetAssetPath;
+    bool widgetForceNativeResolution = false;
+    float widgetUiScale = 1.0f;
+    std::string widgetRenderSpace = "Screen";
+    std::string widgetBillboardMode = "YawOnly";
+
     // SaveFileRegistry
     std::unordered_map<std::string, std::string> savableFields;
 };

@@ -1,4 +1,5 @@
 #include "StargraphEditorPanel.h"
+#include "Modules/Stargraph/ComponentFields.h"
 #include "Editor/PropertyFields.h"
 #include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
@@ -87,9 +88,11 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     }
 
     if (addComponentMenu.IsOpen()) {
-        static const char* componentTypes[] = { "SceneComponent", "MeshComponent", "CollisionComponent", "AudioComponent", "CameraComponent", "LightComponent", "InputComponent" };
         std::vector<SearchableListPopup::Entry> entries;
-        for (const char* typeName : componentTypes) entries.push_back({"Components", typeName, typeName});
+        entries.push_back({"Components", "SceneComponent", "SceneComponent"});
+        for (const ComponentTypeDesc& typeDesc : GetComponentTypes()) {
+            entries.push_back({"Components", typeDesc.componentType, typeDesc.componentType});
+        }
 
         std::string picked = addComponentMenu.Render(entries, screenBounds);
         if (!picked.empty()) {
@@ -181,11 +184,13 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", comp.lightOuterConeAngle);
         snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", comp.lightWidth);
         snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", comp.lightHeight);
+        snprintf(compWidgetUiScaleBuf, sizeof(compWidgetUiScaleBuf), "%.2f", comp.widgetUiScale);
         lastComponentDetailIndex = lastValidComponentIndex;
         componentActiveField = 0;
         componentMeshPicker.Close();
         componentMaterialPicker.Close();
         audioPathPicker.Close();
+        componentWidgetPicker.Close();
         savePicker.Close();
         materialSlotPickerIndex = -1;
         inputMappingPicker.Close();
@@ -576,10 +581,47 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             comp.inputMappingNames.erase(comp.inputMappingNames.begin() + removeMappingIndex);
             isDirty = true;
         }
+    } else if (comp.componentType == "WidgetComponent") {
+        assetField("Widget Asset", comp.widgetAssetPath, componentWidgetPicker, ".starwidget", comp.widgetAssetPath, "Widget Asset");
+
+        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Force Native Resolution", &comp.widgetForceNativeResolution)) isDirty = true;
+        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Force Native Resolution");
+        y += 24;
+
+        floatField("UI Scale", compWidgetUiScaleBuf, sizeof(compWidgetUiScaleBuf), 30, comp.widgetUiScale, "UI Scale");
+
+        DrawText("Render Space", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+        y += 14;
+        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.widgetRenderSpace.c_str())) {
+            if (comp.widgetRenderSpace == "Screen") comp.widgetRenderSpace = "World";
+            else if (comp.widgetRenderSpace == "World") comp.widgetRenderSpace = "Billboard";
+            else comp.widgetRenderSpace = "Screen";
+            isDirty = true;
+        }
+        y += 24;
+
+        if (comp.widgetRenderSpace == "Billboard") {
+            DrawText("Billboard Mode", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+            y += 14;
+            if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.widgetBillboardMode.c_str())) {
+                comp.widgetBillboardMode = (comp.widgetBillboardMode == "YawOnly") ? "FullSpherical" : "YawOnly";
+                isDirty = true;
+            }
+            y += 24;
+        }
+
+        DrawText("Device", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+        Rectangle widgetDeviceBtn = {panel.x + 60, y - 2, panel.width - 68, 16};
+        DrawRectangleRec(widgetDeviceBtn, theme.buttonBg);
+        DrawText(comp.inputDevice.c_str(), (int)widgetDeviceBtn.x + 6, (int)widgetDeviceBtn.y + 3, 11, theme.textPrimary);
+        if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, widgetDeviceBtn)) {
+            inputDevicePicker.Open({widgetDeviceBtn.x, widgetDeviceBtn.y + widgetDeviceBtn.height}, widgetDeviceBtn.width);
+        }
+        y += 22;
     }
 
     // Device picker
-    if (comp.componentType == "InputComponent" && inputDevicePicker.IsOpen()) {
+    if ((comp.componentType == "InputComponent" || comp.componentType == "WidgetComponent") && inputDevicePicker.IsOpen()) {
         std::vector<SearchableListPopup::Entry> deviceEntries;
         deviceEntries.push_back({"Devices", "Unclaimed", "Unclaimed"});
         deviceEntries.push_back({"Devices", "Keyboard+Mouse", "Keyboard+Mouse"});

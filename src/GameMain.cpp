@@ -14,7 +14,6 @@
 #include "Runtime/AudioCore.h"
 #include "Runtime/Components/WidgetComponent.h"
 #include "Core/Widgets/WidgetRenderer.h"
-#include "Core/Widgets/WidgetDebug.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
 #include "Core/RenderSettings.h"
@@ -210,4 +209,4 @@ int main(int argc, char* argv[]) {
     ModuleManager::Get().ShutdownAll();
     CloseWindow();
     return 0;
-}
+}

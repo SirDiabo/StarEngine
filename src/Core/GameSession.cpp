@@ -4,7 +4,6 @@
 #include "Runtime/StarMap.h"
 #include "Runtime/WorldSpawner.h"
 #include "Runtime/Components/CameraComponent.h"
-#include "Widgets/WidgetDebug.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -13,8 +12,6 @@ namespace GameSession {
 void BeginSession(StarMap& map) {
     WorldSpawner::SpawnMapActors(map);
     World::Get().BeginPlay();
-    WidgetDebug::SpawnTestWidget();
-    WidgetDebug::SpawnContainerTestWidget();
 }
 
 void EndSession() {

@@ -6,6 +6,7 @@
 #include "Runtime/Components/LightComponent.h"
 #include "Runtime/Components/InputComponent.h"
 #include "Runtime/Components/BillboardComponent.h"
+#include "Runtime/Components/WidgetComponent.h"
 
 namespace {
 
@@ -150,6 +151,27 @@ const std::vector<ComponentFieldDesc>& GetComponentFields() {
             [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).height = d.billboardHeight; }),
         Bln("BillboardComponent", "BillboardHiddenInGame", &ComponentDecl::billboardHiddenInGame,
             [](Component& c, const ComponentDecl& d) { static_cast<BillboardComponent&>(c).hiddenInGame = d.billboardHiddenInGame; }),
+
+        Str("WidgetComponent", "WidgetAsset", &ComponentDecl::widgetAssetPath,
+            [](Component& c, const ComponentDecl& d) { static_cast<WidgetComponent&>(c).widgetAssetPath = d.widgetAssetPath; }),
+        Bln("WidgetComponent", "WidgetForceNativeResolution", &ComponentDecl::widgetForceNativeResolution,
+            [](Component& c, const ComponentDecl& d) { static_cast<WidgetComponent&>(c).forceNativeResolution = d.widgetForceNativeResolution; }),
+        Flt("WidgetComponent", "WidgetUIScale", &ComponentDecl::widgetUiScale,
+            [](Component& c, const ComponentDecl& d) { static_cast<WidgetComponent&>(c).uiScale = d.widgetUiScale; }),
+        Str("WidgetComponent", "InputDevice", &ComponentDecl::inputDevice,
+            [](Component& c, const ComponentDecl& d) { static_cast<WidgetComponent&>(c).inputDevice = d.inputDevice; }),
+        Str("WidgetComponent", "WidgetRenderSpace", &ComponentDecl::widgetRenderSpace,
+            [](Component& c, const ComponentDecl& d) {
+                auto& wc = static_cast<WidgetComponent&>(c);
+                wc.renderSpace = d.widgetRenderSpace == "World" ? WidgetRenderSpace::World
+                                : d.widgetRenderSpace == "Billboard" ? WidgetRenderSpace::Billboard
+                                                                     : WidgetRenderSpace::Screen;
+            }),
+        Str("WidgetComponent", "WidgetBillboardMode", &ComponentDecl::widgetBillboardMode,
+            [](Component& c, const ComponentDecl& d) {
+                static_cast<WidgetComponent&>(c).billboardMode = d.widgetBillboardMode == "FullSpherical"
+                    ? WidgetBillboardMode::FullSpherical : WidgetBillboardMode::YawOnly;
+            }),
     };
     return table;
 }
@@ -163,6 +185,7 @@ const std::vector<ComponentTypeDesc>& GetComponentTypes() {
         { "LightComponent",     []() -> Component* { return new LightComponent(); } },
         { "InputComponent",     []() -> Component* { return new InputComponent(); } },
         { "BillboardComponent", []() -> Component* { return new BillboardComponent(); } },
+        { "WidgetComponent",    []() -> Component* { return new WidgetComponent(); } },
     };
     return table;
 }

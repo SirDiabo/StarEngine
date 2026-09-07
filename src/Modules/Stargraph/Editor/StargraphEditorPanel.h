@@ -221,6 +221,8 @@ private:
     char compLightOuterConeBuf[32] = "";
     char compLightWidthBuf[32] = "";
     char compLightHeightBuf[32] = "";
+    AssetPickerPopup componentWidgetPicker;
+    char compWidgetUiScaleBuf[32] = "";
 
     RegistryPickerPopup inputMappingPicker;
     SearchableListPopup inputKeyPicker;
