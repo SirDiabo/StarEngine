@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <array>
 #include <functional>
 
 class ViewportPanel;
@@ -191,11 +192,9 @@ private:
     int lastValidComponentIndex = -1;
     SearchableListPopup addComponentMenu;
 
-    AssetPickerPopup componentMeshPicker;
     AssetPickerPopup componentMaterialPicker;
-    AssetPickerPopup componentAnimPicker;
-    int materialSlotPickerIndex = -1;
     AssetPickerPopup audioPathPicker;
+    int materialSlotPickerIndex = -1;
     AssetPickerPopup actorClassPicker;
     int actorClassPickerPinId = 0;
     int actorClassPickerVarIndex = -1;
@@ -206,23 +205,9 @@ private:
     char compPosBuf[3][32] = {"", "", ""};
     char compRotBuf[3][32] = {"", "", ""};
     char compScaleBuf[3][32] = {"", "", ""};
-    char compRadiusBuf[32] = "";
-    char compHeightBuf[32] = "";
-    char compSoundBuf[256] = "";
-    char compVolumeBuf[32] = "";
-    char compPitchBuf[32] = "";
-    char compFovBuf[32] = "";
-    char compNearClipBuf[32] = "";
-    char compFarClipBuf[32] = "";
-    char compLightColorBuf[3][32] = {"", "", ""};
-    char compLightIntensityBuf[32] = "";
-    char compLightRadiusBuf[32] = "";
-    char compLightInnerConeBuf[32] = "";
-    char compLightOuterConeBuf[32] = "";
-    char compLightWidthBuf[32] = "";
-    char compLightHeightBuf[32] = "";
-    AssetPickerPopup componentWidgetPicker;
-    char compWidgetUiScaleBuf[32] = "";
+    std::unordered_map<std::string, std::array<char, 32>> genericFieldBufs;
+    std::unordered_map<std::string, AssetPickerPopup> genericAssetPickers;
+    std::string activeDeviceFieldKey;
 
     RegistryPickerPopup inputMappingPicker;
     SearchableListPopup inputKeyPicker;

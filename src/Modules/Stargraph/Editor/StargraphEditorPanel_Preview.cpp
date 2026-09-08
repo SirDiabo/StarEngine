@@ -6,6 +6,7 @@
 #include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
 #include "Core/EmbeddedAssets.h"
+#include "Core/SafeParse.h"
 #include "raymath.h"
 #include "rlgl.h"
 #include <cmath>
@@ -56,10 +57,11 @@ static void PreviewComputeDeclWorldTransform(const std::vector<ComponentDecl>& c
 
 static std::string PreviewIconForComponent(const ComponentDecl& comp) {
     if (comp.componentType == "LightComponent") {
-        if (comp.lightType == "Sun") return "icon_actor_light_sun.png";
-        if (comp.lightType == "Spot") return "icon_actor_light_spot.png";
-        if (comp.lightType == "Rectangle") return "icon_actor_light_rect.png";
-        if (comp.lightType == "Global") return "icon_actor_light_global.png";
+        std::string lightType = comp.Get("LightType", "Point");
+        if (lightType == "Sun") return "icon_actor_light_sun.png";
+        if (lightType == "Spot") return "icon_actor_light_spot.png";
+        if (lightType == "Rectangle") return "icon_actor_light_rect.png";
+        if (lightType == "Global") return "icon_actor_light_global.png";
         return "icon_actor_light_point.png";
     }
     if (comp.componentType == "CameraComponent") return "icon_actor_camera.png";
@@ -196,10 +198,11 @@ void StargraphEditorPanel::RenderPreviewScene() {
         PreviewComputeDeclWorldTransform(comps, comp, pos, rot, scl);
 
         if (comp.componentType == "MeshComponent") {
+            std::string meshAssetPath = comp.Get("Mesh");
             Model* model = nullptr;
-            if (!comp.meshAssetPath.empty()) {
+            if (!meshAssetPath.empty()) {
                 StarAsset asset;
-                if (StarAsset::LoadFromFile(comp.meshAssetPath, asset) && asset.assetType == "StaticMesh") {
+                if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
                     model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
                 }
             }
@@ -207,7 +210,9 @@ void StargraphEditorPanel::RenderPreviewScene() {
                 Matrix scaleMatrix = MatrixScale(scl.x, scl.y, scl.z);
                 Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
                 model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
-                AssetCache::ApplyMaterialSlots(model, comp.materialAssetPaths);
+                auto materialIt = comp.arrayFields.find("Material");
+                static const std::vector<std::string> emptyMaterials;
+                AssetCache::ApplyMaterialSlots(model, materialIt != comp.arrayFields.end() ? materialIt->second : emptyMaterials);
                 DrawModel(*model, pos, 1.0f, WHITE);
                 if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
             } else {
@@ -222,21 +227,27 @@ void StargraphEditorPanel::RenderPreviewScene() {
                 rlRotatef(rot.x, 1, 0, 0);
                 rlRotatef(rot.z, 0, 0, 1);
                 Color c = {90, 200, 255, 200};
-                if (comp.collisionShape == "Sphere") {
-                    DrawSphereWires({0, 0, 0}, comp.collisionRadius, 8, 12, c);
-                } else if (comp.collisionShape == "Capsule") {
-                    float half = comp.collisionHeight * 0.5f;
-                    DrawCylinderWires({0, -half, 0}, comp.collisionRadius, comp.collisionRadius, comp.collisionHeight, 12, c);
-                    DrawSphereWires({0, half, 0}, comp.collisionRadius, 8, 12, c);
-                    DrawSphereWires({0, -half, 0}, comp.collisionRadius, 8, 12, c);
+                std::string collisionShape = comp.Get("CollisionShape", "Box");
+                float collisionRadius = SafeParse::ToFloat(comp.Get("CollisionRadius", "50"));
+                float collisionHeight = SafeParse::ToFloat(comp.Get("CollisionHeight", "100"));
+                if (collisionShape == "Sphere") {
+                    DrawSphereWires({0, 0, 0}, collisionRadius, 8, 12, c);
+                } else if (collisionShape == "Capsule") {
+                    float half = collisionHeight * 0.5f;
+                    DrawCylinderWires({0, -half, 0}, collisionRadius, collisionRadius, collisionHeight, 12, c);
+                    DrawSphereWires({0, half, 0}, collisionRadius, 8, 12, c);
+                    DrawSphereWires({0, -half, 0}, collisionRadius, 8, 12, c);
                 } else {
                     DrawCubeWiresV({0, 0, 0}, {comp.scaleX, comp.scaleY, comp.scaleZ}, c);
                 }
                 rlPopMatrix();
             }
         } else if (comp.componentType == "BillboardComponent") {
-            Texture2D* tex = comp.billboardTexturePath.empty() ? nullptr : AssetCache::Get().GetOrLoadTexture(comp.billboardTexturePath);
-            if (tex) DrawBillboardRec(previewCamera, *tex, {0, 0, (float)tex->width, (float)tex->height}, pos, {comp.billboardWidth, comp.billboardHeight}, WHITE);
+            std::string billboardTexturePath = comp.Get("BillboardTexture");
+            Texture2D* tex = billboardTexturePath.empty() ? nullptr : AssetCache::Get().GetOrLoadTexture(billboardTexturePath);
+            float billboardWidth = SafeParse::ToFloat(comp.Get("BillboardWidth", "50"));
+            float billboardHeight = SafeParse::ToFloat(comp.Get("BillboardHeight", "50"));
+            if (tex) DrawBillboardRec(previewCamera, *tex, {0, 0, (float)tex->width, (float)tex->height}, pos, {billboardWidth, billboardHeight}, WHITE);
         } else {
             std::string iconFile = PreviewIconForComponent(comp);
             Texture2D tex = GetOrLoadPreviewIcon(iconFile);

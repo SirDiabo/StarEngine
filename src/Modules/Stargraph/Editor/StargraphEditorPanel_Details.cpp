@@ -1,10 +1,11 @@
 #include "StargraphEditorPanel.h"
-#include "Modules/Stargraph/ComponentFields.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
 #include "Editor/PropertyFields.h"
 #include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/StarAsset.h"
 #include "Core/SaveFileRegistry.h"
+#include "Core/SafeParse.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
 #include "raygui.h"
@@ -90,8 +91,8 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     if (addComponentMenu.IsOpen()) {
         std::vector<SearchableListPopup::Entry> entries;
         entries.push_back({"Components", "SceneComponent", "SceneComponent"});
-        for (const ComponentTypeDesc& typeDesc : GetComponentTypes()) {
-            entries.push_back({"Components", typeDesc.componentType, typeDesc.componentType});
+        for (const ComponentTypeInfo& typeInfo : ComponentRegistry::Get().GetAll()) {
+            entries.push_back({"Components", typeInfo.componentType, typeInfo.componentType});
         }
 
         std::string picked = addComponentMenu.Render(entries, screenBounds);
@@ -150,10 +151,12 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     const UIPalette& theme = UITheme::Get();
     ComponentDecl& comp = graph.GetComponents()[lastValidComponentIndex];
     Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = componentMeshPicker.ContainsPoint(mp) || componentMaterialPicker.ContainsPoint(mp)
-                            || audioPathPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp)
+    bool pickerBlocksInput = componentMaterialPicker.ContainsPoint(mp) || savePicker.ContainsPoint(mp)
                             || inputMappingPicker.ContainsPoint(mp) || inputKeyPicker.ContainsPoint(mp)
                             || inputDevicePicker.ContainsPoint(mp);
+    for (auto& kv : genericAssetPickers) {
+        if (kv.second.ContainsPoint(mp)) { pickerBlocksInput = true; break; }
+    }
     const float kSaveColWidth = 24.0f;
 
     if (lastComponentDetailIndex != lastValidComponentIndex) {
@@ -167,30 +170,12 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         snprintf(compScaleBuf[0], 32, "%.2f", comp.scaleX);
         snprintf(compScaleBuf[1], 32, "%.2f", comp.scaleY);
         snprintf(compScaleBuf[2], 32, "%.2f", comp.scaleZ);
-        snprintf(compRadiusBuf, sizeof(compRadiusBuf), "%.2f", comp.collisionRadius);
-        snprintf(compHeightBuf, sizeof(compHeightBuf), "%.2f", comp.collisionHeight);
-        snprintf(compSoundBuf, sizeof(compSoundBuf), "%s", comp.soundAssetPath.c_str());
-        snprintf(compVolumeBuf, sizeof(compVolumeBuf), "%.2f", comp.volume);
-        snprintf(compPitchBuf, sizeof(compPitchBuf), "%.2f", comp.pitch);
-        snprintf(compFovBuf, sizeof(compFovBuf), "%.2f", comp.cameraFov);
-        snprintf(compNearClipBuf, sizeof(compNearClipBuf), "%.2f", comp.cameraNearClip);
-        snprintf(compFarClipBuf, sizeof(compFarClipBuf), "%.2f", comp.cameraFarClip);
-        snprintf(compLightColorBuf[0], 32, "%.2f", comp.lightColorR);
-        snprintf(compLightColorBuf[1], 32, "%.2f", comp.lightColorG);
-        snprintf(compLightColorBuf[2], 32, "%.2f", comp.lightColorB);
-        snprintf(compLightIntensityBuf, sizeof(compLightIntensityBuf), "%.2f", comp.lightIntensity);
-        snprintf(compLightRadiusBuf, sizeof(compLightRadiusBuf), "%.2f", comp.lightRadius);
-        snprintf(compLightInnerConeBuf, sizeof(compLightInnerConeBuf), "%.2f", comp.lightInnerConeAngle);
-        snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", comp.lightOuterConeAngle);
-        snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", comp.lightWidth);
-        snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", comp.lightHeight);
-        snprintf(compWidgetUiScaleBuf, sizeof(compWidgetUiScaleBuf), "%.2f", comp.widgetUiScale);
         lastComponentDetailIndex = lastValidComponentIndex;
         componentActiveField = 0;
-        componentMeshPicker.Close();
+        genericFieldBufs.clear();
+        genericAssetPickers.clear();
+        activeDeviceFieldKey.clear();
         componentMaterialPicker.Close();
-        audioPathPicker.Close();
-        componentWidgetPicker.Close();
         savePicker.Close();
         materialSlotPickerIndex = -1;
         inputMappingPicker.Close();
@@ -265,31 +250,6 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         y += 22;
     };
 
-    auto assetField = [&](const char* label, const std::string& current, AssetPickerPopup& picker,
-                           const char* extension, std::string& outVal, const char* saveKey = nullptr) {
-        DrawText(label, (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        y += 14;
-        float w = panel.width - 16 - (saveKey ? kSaveColWidth : 0.0f);
-        Rectangle r = {panel.x + 8, y, w, 18};
-        DrawRectangleRec(r, theme.fieldBg);
-        DrawRectangleLinesEx(r, 1, theme.fieldBorder);
-        std::string label2 = current.empty() ? "None" : std::filesystem::path(current).stem().string();
-        DrawText(label2.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
-            componentMeshPicker.Close();
-            componentMaterialPicker.Close();
-            componentAnimPicker.Close();
-            picker.Open({r.x, r.y + r.height}, extension);
-        }
-        if (saveKey) saveButton(r, saveKey);
-        y += 22;
-        std::string picked;
-        if (picker.Render(picked)) {
-            outVal = picked;
-            isDirty = true;
-        }
-    };
-
     DrawText(comp.componentType.c_str(), (int)panel.x + 8, (int)y, 13, theme.textPrimary);
     y += 20;
 
@@ -318,15 +278,115 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     vec3Row("Scale", compScaleBuf, 8, comp.scaleX, comp.scaleY, comp.scaleZ, "Scale");
     y += 6;
 
-    if (comp.componentType == "MeshComponent") {
-        assetField("Static Mesh", comp.meshAssetPath, componentMeshPicker, ".starasset", comp.meshAssetPath, "Static Mesh");
-
-        std::vector<MaterialSlot> meshSlots;
-        if (!comp.meshAssetPath.empty()) {
-            StarAsset meshAsset;
-            if (StarAsset::LoadFromFile(comp.meshAssetPath, meshAsset)) meshSlots = meshAsset.materialSlots;
+    const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(comp.componentType);
+    if (typeInfo) {
+        int fieldId = 50;
+        for (const ComponentFieldDesc& f : typeInfo->fields) {
+            fieldId++;
+            if (f.visibleIf && !f.visibleIf(comp)) continue;
+            switch (f.kind) {
+                case ComponentFieldKind::String: {
+                    std::string value = comp.Get(f.key, f.defaultValue);
+                    auto& buf = genericFieldBufs[f.key];
+                    if (componentActiveField != fieldId) snprintf(buf.data(), buf.size(), "%s", value.c_str());
+                    DrawText(f.label.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+                    y += 14;
+                    Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+                    if (PropertyField::StringBox(r, buf.data(), buf.size(), fieldId, componentActiveField, value, !pickerBlocksInput)) {
+                        comp.fields[f.key] = value;
+                        isDirty = true;
+                    }
+                    y += 22;
+                    break;
+                }
+                case ComponentFieldKind::Float: {
+                    float value = SafeParse::ToFloat(comp.Get(f.key, f.defaultValue));
+                    auto& buf = genericFieldBufs[f.key];
+                    if (componentActiveField != fieldId) snprintf(buf.data(), buf.size(), "%.2f", value);
+                    DrawText(f.label.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+                    y += 14;
+                    Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+                    if (PropertyField::FloatBox(r, buf.data(), buf.size(), fieldId, componentActiveField, value, !pickerBlocksInput)) {
+                        char vbuf[32];
+                        snprintf(vbuf, sizeof(vbuf), "%g", value);
+                        comp.fields[f.key] = vbuf;
+                        isDirty = true;
+                    }
+                    y += 22;
+                    break;
+                }
+                case ComponentFieldKind::Bool: {
+                    bool value = comp.Get(f.key, f.defaultValue) == "true";
+                    bool before = value;
+                    GuiCheckBox({panel.x + 8, y, 18, 18}, f.label.c_str(), &value);
+                    if (value != before) {
+                        comp.fields[f.key] = value ? "true" : "false";
+                        isDirty = true;
+                    }
+                    y += 24;
+                    break;
+                }
+                case ComponentFieldKind::Enum: {
+                    std::string value = comp.Get(f.key, f.defaultValue);
+                    DrawText(f.label.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+                    y += 14;
+                    if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, value.c_str()) && !f.enumOptions.empty()) {
+                        auto optIt = std::find(f.enumOptions.begin(), f.enumOptions.end(), value);
+                        size_t idx = (optIt != f.enumOptions.end()) ? (size_t)(optIt - f.enumOptions.begin()) : 0;
+                        idx = (idx + 1) % f.enumOptions.size();
+                        comp.fields[f.key] = f.enumOptions[idx];
+                        isDirty = true;
+                    }
+                    y += 24;
+                    break;
+                }
+                case ComponentFieldKind::AssetPath: {
+                    std::string value = comp.Get(f.key, f.defaultValue);
+                    AssetPickerPopup& picker = genericAssetPickers[f.key];
+                    DrawText(f.label.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+                    y += 14;
+                    Rectangle r = {panel.x + 8, y, panel.width - 16, 18};
+                    DrawRectangleRec(r, theme.fieldBg);
+                    DrawRectangleLinesEx(r, 1, theme.fieldBorder);
+                    std::string shortLabel = value.empty() ? "None" : std::filesystem::path(value).stem().string();
+                    DrawText(shortLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
+                        picker.Open({r.x, r.y + r.height}, f.assetExtension);
+                    }
+                    y += 22;
+                    std::string picked;
+                    if (picker.Render(picked)) {
+                        comp.fields[f.key] = picked;
+                        isDirty = true;
+                    }
+                    break;
+                }
+                case ComponentFieldKind::Device: {
+                    std::string value = comp.Get(f.key, f.defaultValue);
+                    DrawText(f.label.c_str(), (int)panel.x + 8, (int)y, 11, theme.textSecondary);
+                    Rectangle r = {panel.x + 60, y - 2, panel.width - 68, 16};
+                    DrawRectangleRec(r, theme.buttonBg);
+                    DrawText(value.c_str(), (int)r.x + 6, (int)r.y + 3, 11, theme.textPrimary);
+                    if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r)) {
+                        activeDeviceFieldKey = f.key;
+                        inputDevicePicker.Open({r.x, r.y + r.height}, r.width);
+                    }
+                    y += 22;
+                    break;
+                }
+            }
         }
-        if (comp.materialAssetPaths.size() != meshSlots.size()) comp.materialAssetPaths.resize(meshSlots.size());
+    }
+
+    if (comp.componentType == "MeshComponent") {
+        std::vector<MaterialSlot> meshSlots;
+        std::string meshPath = comp.Get("Mesh");
+        if (!meshPath.empty()) {
+            StarAsset meshAsset;
+            if (StarAsset::LoadFromFile(meshPath, meshAsset)) meshSlots = meshAsset.materialSlots;
+        }
+        std::vector<std::string>& materialAssetPaths = comp.arrayFields["Material"];
+        if (materialAssetPaths.size() != meshSlots.size()) materialAssetPaths.resize(meshSlots.size());
 
         if (meshSlots.empty()) {
             DrawText("No material slots", (int)panel.x + 8, (int)y, 10, theme.textSecondary);
@@ -340,12 +400,10 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
                 DrawRectangleLinesEx(rowRect, 1, theme.fieldBorder);
                 std::string slotName = meshSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : meshSlots[i].usemtlName;
                 DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 2, 10, theme.textSecondary);
-                std::string matLabel = comp.materialAssetPaths[i].empty() ? "None" :
-                    std::filesystem::path(comp.materialAssetPaths[i]).stem().string();
+                std::string matLabel = materialAssetPaths[i].empty() ? "None" :
+                    std::filesystem::path(materialAssetPaths[i]).stem().string();
                 DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 2, 10, theme.textPrimary);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
-                    componentMeshPicker.Close();
-                    componentAnimPicker.Close();
                     componentMaterialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
                     materialSlotPickerIndex = (int)i;
                 }
@@ -353,111 +411,14 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             }
             std::string pickedMat;
             if (componentMaterialPicker.Render(pickedMat)) {
-                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)comp.materialAssetPaths.size())
-                    comp.materialAssetPaths[materialSlotPickerIndex] = pickedMat;
+                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialAssetPaths.size())
+                    materialAssetPaths[materialSlotPickerIndex] = pickedMat;
                 isDirty = true;
             }
         }
-
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Casts Shadow", &comp.meshCastsShadow)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Casts Shadow");
-        y += 24;
-
-        assetField("Default Anim", comp.defaultAnimPath, componentAnimPicker, ".staranim", comp.defaultAnimPath, "Default Anim");
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Default Anim Looping", &comp.defaultAnimLooping)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Default Anim Looping");
-        y += 24;
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Default Anim Auto Play", &comp.defaultAnimAutoPlay)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Default Anim Auto Play");
-        y += 24;
-    } else if (comp.componentType == "CollisionComponent") {
-        DrawText("Shape", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        y += 14;
-        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.collisionShape.c_str())) {
-            if (comp.collisionShape == "Box") comp.collisionShape = "Sphere";
-            else if (comp.collisionShape == "Sphere") comp.collisionShape = "Capsule";
-            else comp.collisionShape = "Box";
-            isDirty = true;
-        }
-        y += 24;
-        if (comp.collisionShape != "Box") {
-            floatField("Radius", compRadiusBuf, sizeof(compRadiusBuf), 11, comp.collisionRadius, "Radius");
-        }
-        if (comp.collisionShape == "Capsule") {
-            floatField("Height", compHeightBuf, sizeof(compHeightBuf), 12, comp.collisionHeight, "Height");
-        }
-    } else if (comp.componentType == "AudioComponent") {
-        DrawText("Sound Path", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        y += 14;
-        Rectangle r = {panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18};
-        DrawRectangleRec(r, theme.fieldBg);
-        DrawRectangleLinesEx(r, 1, theme.fieldBorder);
-        std::string soundLabel = comp.soundAssetPath.empty() ? "None" : std::filesystem::path(comp.soundAssetPath).stem().string();
-        DrawText(soundLabel.c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !pickerBlocksInput) {
-            audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
-        }
-        saveButton(r, "Sound Path");
-        y += 22;
-        std::string pickedSound;
-        if (audioPathPicker.Render(pickedSound)) {
-            comp.soundAssetPath = pickedSound;
-            isDirty = true;
-        }
-        floatField("Volume", compVolumeBuf, sizeof(compVolumeBuf), 14, comp.volume, "Volume");
-        floatField("Pitch", compPitchBuf, sizeof(compPitchBuf), 27, comp.pitch, "Pitch");
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Auto Play", &comp.autoPlay)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Auto Play");
-        y += 24;
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Looping", &comp.looping)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Looping");
-        y += 24;
-    } else if (comp.componentType == "CameraComponent") {
-        floatField("FOV", compFovBuf, sizeof(compFovBuf), 15, comp.cameraFov, "FOV");
-        floatField("Near Clip", compNearClipBuf, sizeof(compNearClipBuf), 25, comp.cameraNearClip, "Near Clip");
-        floatField("Far Clip", compFarClipBuf, sizeof(compFarClipBuf), 26, comp.cameraFarClip, "Far Clip");
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Orthographic", &comp.cameraOrthographic)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Orthographic");
-        y += 24;
-    } else if (comp.componentType == "LightComponent") {
-        DrawText("Light Type", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        y += 14;
-        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.lightType.c_str())) {
-            if (comp.lightType == "Point") comp.lightType = "Rectangle";
-            else if (comp.lightType == "Rectangle") comp.lightType = "Spot";
-            else if (comp.lightType == "Spot") comp.lightType = "Global";
-            else if (comp.lightType == "Global") comp.lightType = "Sun";
-            else comp.lightType = "Point";
-            isDirty = true;
-        }
-        y += 24;
-
-        vec3Row("Light Color", compLightColorBuf, 16, comp.lightColorR, comp.lightColorG, comp.lightColorB, "Light Color");
-        y += 2;
-        floatField("Intensity", compLightIntensityBuf, sizeof(compLightIntensityBuf), 19, comp.lightIntensity, "Intensity");
-
-        if (comp.lightType != "Global" && comp.lightType != "Sun") {
-            floatField("Radius", compLightRadiusBuf, sizeof(compLightRadiusBuf), 20, comp.lightRadius, "Radius");
-        }
-        if (comp.lightType == "Spot") {
-            floatField("Inner Cone Angle", compLightInnerConeBuf, sizeof(compLightInnerConeBuf), 21, comp.lightInnerConeAngle, "Inner Cone Angle");
-            floatField("Outer Cone Angle", compLightOuterConeBuf, sizeof(compLightOuterConeBuf), 22, comp.lightOuterConeAngle, "Outer Cone Angle");
-        }
-        if (comp.lightType == "Rectangle") {
-            floatField("Width", compLightWidthBuf, sizeof(compLightWidthBuf), 23, comp.lightWidth, "Width");
-            floatField("Height", compLightHeightBuf, sizeof(compLightHeightBuf), 24, comp.lightHeight, "Height");
-        }
     } else if (comp.componentType == "InputComponent") {
         static const char* mappingTypeNames[] = {"Bool", "Axis", "Axis2D"};
-
-        DrawText("Device", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        Rectangle deviceBtn = {panel.x + 60, y - 2, panel.width - 68, 16};
-        DrawRectangleRec(deviceBtn, theme.buttonBg);
-        DrawText(comp.inputDevice.c_str(), (int)deviceBtn.x + 6, (int)deviceBtn.y + 3, 11, theme.textPrimary);
-        if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, deviceBtn)) {
-            inputDevicePicker.Open({deviceBtn.x, deviceBtn.y + deviceBtn.height}, deviceBtn.width);
-        }
-        y += 22;
+        std::vector<std::string>& inputMappingNames = comp.arrayFields["InputMapping"];
 
         DrawText("Mappings", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
         Rectangle addMappingBtn = {panel.x + panel.width - 60, y - 2, 52, 16};
@@ -468,8 +429,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
 
         int scaleSlot = 0;
         int removeMappingIndex = -1;
-        for (size_t mi = 0; mi < comp.inputMappingNames.size(); mi++) {
-            const std::string& mappingName = comp.inputMappingNames[mi];
+        for (size_t mi = 0; mi < inputMappingNames.size(); mi++) {
+            const std::string& mappingName = inputMappingNames[mi];
             InputMapping mapping;
             if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
 
@@ -578,50 +539,13 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
 
         if (removeMappingIndex != -1) {
-            comp.inputMappingNames.erase(comp.inputMappingNames.begin() + removeMappingIndex);
+            inputMappingNames.erase(inputMappingNames.begin() + removeMappingIndex);
             isDirty = true;
         }
-    } else if (comp.componentType == "WidgetComponent") {
-        assetField("Widget Asset", comp.widgetAssetPath, componentWidgetPicker, ".starwidget", comp.widgetAssetPath, "Widget Asset");
-
-        if (GuiCheckBox({panel.x + 8, y, 18, 18}, "Force Native Resolution", &comp.widgetForceNativeResolution)) isDirty = true;
-        saveButton({panel.x + 8, y, panel.width - 16 - kSaveColWidth, 18}, "Force Native Resolution");
-        y += 24;
-
-        floatField("UI Scale", compWidgetUiScaleBuf, sizeof(compWidgetUiScaleBuf), 30, comp.widgetUiScale, "UI Scale");
-
-        DrawText("Render Space", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        y += 14;
-        if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.widgetRenderSpace.c_str())) {
-            if (comp.widgetRenderSpace == "Screen") comp.widgetRenderSpace = "World";
-            else if (comp.widgetRenderSpace == "World") comp.widgetRenderSpace = "Billboard";
-            else comp.widgetRenderSpace = "Screen";
-            isDirty = true;
-        }
-        y += 24;
-
-        if (comp.widgetRenderSpace == "Billboard") {
-            DrawText("Billboard Mode", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-            y += 14;
-            if (UIWidget::Button({panel.x + 8, y, panel.width - 16, 18}, comp.widgetBillboardMode.c_str())) {
-                comp.widgetBillboardMode = (comp.widgetBillboardMode == "YawOnly") ? "FullSpherical" : "YawOnly";
-                isDirty = true;
-            }
-            y += 24;
-        }
-
-        DrawText("Device", (int)panel.x + 8, (int)y, 11, theme.textSecondary);
-        Rectangle widgetDeviceBtn = {panel.x + 60, y - 2, panel.width - 68, 16};
-        DrawRectangleRec(widgetDeviceBtn, theme.buttonBg);
-        DrawText(comp.inputDevice.c_str(), (int)widgetDeviceBtn.x + 6, (int)widgetDeviceBtn.y + 3, 11, theme.textPrimary);
-        if (!pickerBlocksInput && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, widgetDeviceBtn)) {
-            inputDevicePicker.Open({widgetDeviceBtn.x, widgetDeviceBtn.y + widgetDeviceBtn.height}, widgetDeviceBtn.width);
-        }
-        y += 22;
     }
 
     // Device picker
-    if ((comp.componentType == "InputComponent" || comp.componentType == "WidgetComponent") && inputDevicePicker.IsOpen()) {
+    if (!activeDeviceFieldKey.empty() && inputDevicePicker.IsOpen()) {
         std::vector<SearchableListPopup::Entry> deviceEntries;
         deviceEntries.push_back({"Devices", "Unclaimed", "Unclaimed"});
         deviceEntries.push_back({"Devices", "Keyboard+Mouse", "Keyboard+Mouse"});
@@ -632,8 +556,8 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
 
         std::string pickedDevice = inputDevicePicker.Render(deviceEntries, panel);
-        if (!pickedDevice.empty() && pickedDevice != comp.inputDevice) {
-            comp.inputDevice = pickedDevice;
+        if (!pickedDevice.empty()) {
+            comp.fields[activeDeviceFieldKey] = pickedDevice;
             isDirty = true;
         }
     }
@@ -641,10 +565,11 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
     // Mapping name picker
     std::string pickedMappingName;
     if (comp.componentType == "InputComponent" && inputMappingPicker.Render(pickedMappingName) && !pickedMappingName.empty()) {
-        bool alreadyOwned = std::find(comp.inputMappingNames.begin(), comp.inputMappingNames.end(), pickedMappingName) != comp.inputMappingNames.end();
+        std::vector<std::string>& inputMappingNames = comp.arrayFields["InputMapping"];
+        bool alreadyOwned = std::find(inputMappingNames.begin(), inputMappingNames.end(), pickedMappingName) != inputMappingNames.end();
         if (!alreadyOwned) {
             if (!InputMappingRegistry::Get().Find(pickedMappingName)) InputMappingRegistry::Get().SetMapping(pickedMappingName, InputMapping{});
-            comp.inputMappingNames.push_back(pickedMappingName);
+            inputMappingNames.push_back(pickedMappingName);
             isDirty = true;
         }
     }
@@ -663,8 +588,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
         }
 
         std::string pickedKey = inputKeyPicker.Render(keyEntries, panel);
-        if (!pickedKey.empty() && inputKeyPickerMappingIndex >= 0 && inputKeyPickerMappingIndex < (int)comp.inputMappingNames.size()) {
-            const std::string& mappingName = comp.inputMappingNames[inputKeyPickerMappingIndex];
+        const std::vector<std::string>& inputMappingNames = comp.arrayFields["InputMapping"];
+        if (!pickedKey.empty() && inputKeyPickerMappingIndex >= 0 && inputKeyPickerMappingIndex < (int)inputMappingNames.size()) {
+            const std::string& mappingName = inputMappingNames[inputKeyPickerMappingIndex];
             InputMapping mapping;
             if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
             if (inputKeyPickerBindingIndex >= 0 && inputKeyPickerBindingIndex < (int)mapping.bindings.size()) {
@@ -687,8 +613,9 @@ void StargraphEditorPanel::RenderComponentDetails(Rectangle panel, float& y) {
             int keyCode = GetKeyPressed();
             if (keyCode != 0) {
                 std::string keyName = InputKeyCodeToName(keyCode);
-                if (!keyName.empty() && listeningForInputBindingMappingIndex < (int)comp.inputMappingNames.size()) {
-                    const std::string& mappingName = comp.inputMappingNames[listeningForInputBindingMappingIndex];
+                const std::vector<std::string>& inputMappingNames = comp.arrayFields["InputMapping"];
+                if (!keyName.empty() && listeningForInputBindingMappingIndex < (int)inputMappingNames.size()) {
+                    const std::string& mappingName = inputMappingNames[listeningForInputBindingMappingIndex];
                     InputMapping mapping;
                     if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
                     if (listeningForInputBindingIndex >= 0 && listeningForInputBindingIndex < (int)mapping.bindings.size()) {

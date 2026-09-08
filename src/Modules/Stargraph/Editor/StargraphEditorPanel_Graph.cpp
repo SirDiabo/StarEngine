@@ -1580,7 +1580,9 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     for (const ComponentDecl& comp : graph.GetComponents()) {
         if (comp.componentType != "InputComponent") continue;
-        for (const std::string& mappingName : comp.inputMappingNames) {
+        auto mappingIt = comp.arrayFields.find("InputMapping");
+        if (mappingIt == comp.arrayFields.end()) continue;
+        for (const std::string& mappingName : mappingIt->second) {
             if (mappingName.empty()) continue;
 
             std::string typeLower = NodeMenuDisplayLabel("Input_Mapping:" + mappingName);

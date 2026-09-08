@@ -57,6 +57,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     keyPickerOpen = false;
     keyPickerPinId = 0;
     keyPickerSearch[0] = '\0';
+    for (auto& kv : genericAssetPickers) kv.second.Close();
     audioPathPicker.Close();
     canvasState.scroll = {0, 0};
     canvasState.didPan = false;
@@ -78,6 +79,7 @@ void StargraphEditorPanel::Close() {
     keyPickerOpen = false;
     keyPickerPinId = 0;
     listeningForKeyPinId = 0;
+    for (auto& kv : genericAssetPickers) kv.second.Close();
     audioPathPicker.Close();
 }
 

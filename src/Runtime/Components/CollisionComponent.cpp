@@ -2,6 +2,8 @@
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/ObjectPinRef.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Core/SafeParse.h"
 
 void RegisterCollisionComponentNodes() {
     NodeTemplate setCollisionRadius;
@@ -67,4 +69,24 @@ void CollisionComponent::GetEditorProperties(PropertyList& outProperties) {
 
 void CollisionComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
+}
+
+namespace {
+ComponentRegistrar registrar_CollisionComponent({
+    "CollisionComponent",
+    []() -> Component* { return new CollisionComponent(); },
+    {
+        ComponentField::Enm("CollisionShape", "Shape", {"Box", "Sphere", "Capsule"}, "Box",
+            [](Component& c, const ComponentDecl& d) {
+                std::string shape = d.Get("CollisionShape", "Box");
+                static_cast<CollisionComponent&>(c).shapeType = shape == "Sphere" ? CollisionComponent::Sphere
+                                                                : shape == "Capsule" ? CollisionComponent::Capsule
+                                                                                     : CollisionComponent::Box;
+            }),
+        ComponentField::Flt("CollisionRadius", "Radius", 50.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).radius = SafeParse::ToFloat(d.Get("CollisionRadius", "50")); }),
+        ComponentField::Flt("CollisionHeight", "Height", 100.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).height = SafeParse::ToFloat(d.Get("CollisionHeight", "100")); }),
+    }
+});
 }

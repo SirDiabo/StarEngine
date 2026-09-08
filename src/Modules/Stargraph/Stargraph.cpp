@@ -1,12 +1,13 @@
 #include "Stargraph.h"
 #include "NodeRegistry.h"
-#include "ComponentFields.h"
+#include "ComponentRegistry.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
 #include "Core/ObjectKindRegistry.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <unordered_set>
 
 Node* Stargraph::CreateNode(const std::string& type) {
     InvalidateCaches();
@@ -358,30 +359,19 @@ bool Stargraph::SaveToFile(const std::string& path) const {
         if (comp.scaleX != 1.0f) out << "ScaleX=" << comp.scaleX << "\n";
         if (comp.scaleY != 1.0f) out << "ScaleY=" << comp.scaleY << "\n";
         if (comp.scaleZ != 1.0f) out << "ScaleZ=" << comp.scaleZ << "\n";
-        for (const ComponentFieldDesc& f : GetComponentFields()) {
-            if (f.componentType != comp.componentType) continue;
-            static const ComponentDecl defaultDecl;
-            switch (f.type) {
-                case ComponentFieldType::String:
-                    if ((comp.*f.stringField) != (defaultDecl.*f.stringField))
-                        out << f.key << "=" << (comp.*f.stringField) << "\n";
-                    break;
-                case ComponentFieldType::Float:
-                    if ((comp.*f.floatField) != (defaultDecl.*f.floatField))
-                        out << f.key << "=" << (comp.*f.floatField) << "\n";
-                    break;
-                case ComponentFieldType::Bool:
-                    if ((comp.*f.boolField) != (defaultDecl.*f.boolField))
-                        out << f.key << "=" << ((comp.*f.boolField) ? "true" : "false") << "\n";
-                    break;
-                case ComponentFieldType::StringArray: {
-                    const auto& arr = comp.*f.stringArrayField;
-                    if (!arr.empty()) {
-                        out << f.key << "Count=" << arr.size() << "\n";
-                        for (size_t m = 0; m < arr.size(); m++) out << f.key << m << "=" << arr[m] << "\n";
-                    }
-                    break;
-                }
+        const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(comp.componentType);
+        if (typeInfo) {
+            for (const ComponentFieldDesc& f : typeInfo->fields) {
+                auto it = comp.fields.find(f.key);
+                if (it == comp.fields.end() || it->second == f.defaultValue) continue;
+                out << f.key << "=" << it->second << "\n";
+            }
+        }
+        for (const auto& kv : comp.arrayFields) {
+            const auto& arr = kv.second;
+            if (!arr.empty()) {
+                out << kv.first << "Count=" << arr.size() << "\n";
+                for (size_t m = 0; m < arr.size(); m++) out << kv.first << m << "=" << arr[m] << "\n";
             }
         }
         {
@@ -574,31 +564,31 @@ bool Stargraph::LoadFromFile(const std::string& path) {
             if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = SafeParse::ToFloat(*v);
             if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = SafeParse::ToFloat(*v);
-            for (const ComponentFieldDesc& f : GetComponentFields()) {
-                if (f.componentType != comp.componentType) continue;
-                switch (f.type) {
-                    case ComponentFieldType::String:
-                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.stringField = *v;
-                        break;
-                    case ComponentFieldType::Float:
-                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.floatField = SafeParse::ToFloat(*v);
-                        break;
-                    case ComponentFieldType::Bool:
-                        if (const std::string* v = FindEntry(section, f.key)) comp.*f.boolField = (*v == "true");
-                        break;
-                    case ComponentFieldType::StringArray: {
-                        if (const std::string* v = FindEntry(section, std::string(f.key) + "Count")) {
-                            int count = SafeParse::ToInt(*v);
-                            auto& arr = comp.*f.stringArrayField;
-                            if (count > 0) arr.resize((size_t)count);
-                            for (int m = 0; m < count; m++) {
-                                if (const std::string* mv = FindEntry(section, f.key + std::to_string(m)))
-                                    arr[(size_t)m] = *mv;
-                            }
+            std::unordered_set<std::string> consumed = {
+                "Type", "Name", "Parent", "PosX", "PosY", "PosZ", "RotX", "RotY", "RotZ",
+                "ScaleX", "ScaleY", "ScaleZ", "SavableFields"
+            };
+            for (const auto& entry : section.entries) {
+                const std::string& key = entry.first;
+                if (key.size() > 5 && key.compare(key.size() - 5, 5, "Count") == 0) {
+                    std::string baseKey = key.substr(0, key.size() - 5);
+                    int count = SafeParse::ToInt(entry.second);
+                    consumed.insert(key);
+                    if (count > 0) {
+                        std::vector<std::string> arr;
+                        arr.resize((size_t)count);
+                        for (int m = 0; m < count; m++) {
+                            std::string elemKey = baseKey + std::to_string(m);
+                            consumed.insert(elemKey);
+                            if (const std::string* mv = FindEntry(section, elemKey)) arr[(size_t)m] = *mv;
                         }
-                        break;
+                        comp.arrayFields[baseKey] = std::move(arr);
                     }
                 }
+            }
+            for (const auto& entry : section.entries) {
+                if (consumed.count(entry.first)) continue;
+                comp.fields[entry.first] = entry.second;
             }
             if (const std::string* v = FindEntry(section, "SavableFields")) {
                 std::stringstream ss(*v);

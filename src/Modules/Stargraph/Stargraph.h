@@ -189,58 +189,13 @@ struct ComponentDecl {
     float rotX = 0, rotY = 0, rotZ = 0;
     float scaleX = 1, scaleY = 1, scaleZ = 1;
 
-    // MeshComponent
-    std::string meshAssetPath;
-    std::vector<std::string> materialAssetPaths;
-    bool meshCastsShadow = true;
+    std::unordered_map<std::string, std::string> fields;
+    std::unordered_map<std::string, std::vector<std::string>> arrayFields;
 
-    std::string defaultAnimPath;
-    bool defaultAnimLooping = false;
-    bool defaultAnimAutoPlay = false;
-
-    // CollisionComponent
-    std::string collisionShape = "Box";
-    float collisionRadius = 50.0f;
-    float collisionHeight = 100.0f;
-
-    // AudioComponent
-    std::string soundAssetPath;
-    bool autoPlay = false;
-    bool looping = false;
-    float volume = 1.0f;
-    float pitch = 1.0f;
-
-    // CameraComponent
-    float cameraFov = 50.0f;
-    bool cameraOrthographic = false;
-    float cameraNearClip = 0.1f;
-    float cameraFarClip = 4000.0f;
-
-    // LightComponent
-    std::string lightType = "Point";
-    float lightColorR = 1.0f, lightColorG = 1.0f, lightColorB = 1.0f;
-    float lightIntensity = 1.0f;
-    float lightRadius = 500.0f;
-    float lightInnerConeAngle = 25.0f;
-    float lightOuterConeAngle = 35.0f;
-    float lightWidth = 100.0f;
-    float lightHeight = 100.0f;
-
-    // InputComponent
-    std::vector<std::string> inputMappingNames;
-    std::string inputDevice = "Unclaimed";
-
-    // BillboardComponent
-    std::string billboardTexturePath;
-    float billboardWidth = 50.0f;
-    float billboardHeight = 50.0f;
-    bool billboardHiddenInGame = true;
-
-    std::string widgetAssetPath;
-    bool widgetForceNativeResolution = false;
-    float widgetUiScale = 1.0f;
-    std::string widgetRenderSpace = "Screen";
-    std::string widgetBillboardMode = "YawOnly";
+    std::string Get(const std::string& key, const std::string& def = "") const {
+        auto it = fields.find(key);
+        return it != fields.end() ? it->second : def;
+    }
 
     // SaveFileRegistry
     std::unordered_map<std::string, std::string> savableFields;

@@ -20,7 +20,7 @@ const std::vector<BasicActorDef>& GetBasicActorDefs() {
             def.kindName = kindName;
             def.componentType = "LightComponent";
             def.defaultComponent.componentType = "LightComponent";
-            def.defaultComponent.lightType = lightType;
+            def.defaultComponent.fields["LightType"] = lightType;
             return def;
         };
 

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include "Modules/Stargraph/ObjectPinRef.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
 
 void RegisterMeshComponentNodes() {
     NodeTemplate setStaticMesh;
@@ -282,4 +283,33 @@ void MeshComponent::InvalidateCachedModel() {
     cachedModel = nullptr;
     cachedModelPath.clear();
     ReleaseAnimModelInstance();
+}
+
+namespace {
+ComponentRegistrar registrar_MeshComponent({
+    "MeshComponent",
+    []() -> Component* { return new MeshComponent(); },
+    {
+        ComponentField::Asset("Mesh", "Static Mesh", ".starasset",
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).SetMeshPath(d.Get("Mesh")); }),
+        ComponentField::Bln("MeshCastsShadow", "Casts Shadow", true,
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.Get("MeshCastsShadow", "true") == "true"; }),
+        ComponentField::Asset("DefaultAnim", "Default Anim", ".staranim",
+            [](Component& c, const ComponentDecl& d) {
+                auto& mc = static_cast<MeshComponent&>(c);
+                std::string animPath = d.Get("DefaultAnim");
+                bool autoPlay = d.Get("DefaultAnimAutoPlay", "false") == "true";
+                bool looping = d.Get("DefaultAnimLooping", "false") == "true";
+                if (autoPlay && !animPath.empty()) mc.PlayAnimation(animPath, looping);
+                else mc.currentAnimPath = animPath;
+            }),
+        ComponentField::Bln("DefaultAnimLooping", "Default Anim Looping", false,
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).animLooping = d.Get("DefaultAnimLooping", "false") == "true"; }),
+        ComponentField::Bln("DefaultAnimAutoPlay", "Default Anim Auto Play", false, nullptr),
+    },
+    [](Component& c, const ComponentDecl& d) {
+        auto it = d.arrayFields.find("Material");
+        if (it != d.arrayFields.end()) static_cast<MeshComponent&>(c).SetMaterialPaths(it->second);
+    }
+});
 }

@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
+#include "Core/SafeParse.h"
 
 namespace fs = std::filesystem;
 
@@ -99,13 +100,16 @@ void ViewportPanel::DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, V
     rlRotatef(rot.x, 1, 0, 0);
     rlRotatef(rot.z, 0, 0, 1);
 
-    if (comp.collisionShape == "Sphere") {
-        DrawSphereWires({0, 0, 0}, comp.collisionRadius, 8, 12, color);
-    } else if (comp.collisionShape == "Capsule") {
-        float half = comp.collisionHeight * 0.5f;
-        DrawCylinderWires({0, -half, 0}, comp.collisionRadius, comp.collisionRadius, comp.collisionHeight, 12, color);
-        DrawSphereWires({0, half, 0}, comp.collisionRadius, 8, 12, color);
-        DrawSphereWires({0, -half, 0}, comp.collisionRadius, 8, 12, color);
+    std::string collisionShape = comp.Get("CollisionShape", "Box");
+    float collisionRadius = SafeParse::ToFloat(comp.Get("CollisionRadius", "50"));
+    float collisionHeight = SafeParse::ToFloat(comp.Get("CollisionHeight", "100"));
+    if (collisionShape == "Sphere") {
+        DrawSphereWires({0, 0, 0}, collisionRadius, 8, 12, color);
+    } else if (collisionShape == "Capsule") {
+        float half = collisionHeight * 0.5f;
+        DrawCylinderWires({0, -half, 0}, collisionRadius, collisionRadius, collisionHeight, 12, color);
+        DrawSphereWires({0, half, 0}, collisionRadius, 8, 12, color);
+        DrawSphereWires({0, -half, 0}, collisionRadius, 8, 12, color);
     } else {
         DrawCubeWiresV({0, 0, 0}, {comp.scaleX, comp.scaleY, comp.scaleZ}, color);
     }
@@ -474,17 +478,22 @@ void ViewportPanel::RenderScene() {
                                                compPos, compRot, compScale);
 
                     if (comp.componentType == "MeshComponent") {
-                        DrawInstanceOrMesh(comp.meshAssetPath, comp.materialAssetPaths, compPos, compRot,
-                                            compScale, selected, fallbackColor);
+                        auto materialIt = comp.arrayFields.find("Material");
+                        static const std::vector<std::string> emptyMaterials;
+                        DrawInstanceOrMesh(comp.Get("Mesh"), materialIt != comp.arrayFields.end() ? materialIt->second : emptyMaterials,
+                                            compPos, compRot, compScale, selected, fallbackColor);
                         drewAnyMesh = true;
                     } else if (comp.componentType == "CollisionComponent" && selected) {
                         DrawCollisionShape(comp, compPos, compRot, {90, 200, 255, 200});
                     } else if (comp.componentType == "BillboardComponent") {
-                        Texture2D* tex = comp.billboardTexturePath.empty() ? nullptr
-                                        : AssetCache::Get().GetOrLoadTexture(comp.billboardTexturePath);
+                        std::string billboardTexturePath = comp.Get("BillboardTexture");
+                        Texture2D* tex = billboardTexturePath.empty() ? nullptr
+                                        : AssetCache::Get().GetOrLoadTexture(billboardTexturePath);
                         if (tex) {
+                            float billboardWidth = SafeParse::ToFloat(comp.Get("BillboardWidth", "50"));
+                            float billboardHeight = SafeParse::ToFloat(comp.Get("BillboardHeight", "50"));
                             DrawBillboardRec(camera, *tex, {0, 0, (float)tex->width, (float)tex->height},
-                                              compPos, {comp.billboardWidth, comp.billboardHeight}, WHITE);
+                                              compPos, {billboardWidth, billboardHeight}, WHITE);
                             drewBillboard = true;
                         }
                     }

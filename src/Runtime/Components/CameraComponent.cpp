@@ -1,6 +1,8 @@
 #include "CameraComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Core/SafeParse.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "raylib.h"
@@ -306,4 +308,21 @@ void CameraComponent::GetEditorProperties(PropertyList& outProperties) {
 
 void CameraComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
+}
+
+namespace {
+ComponentRegistrar registrar_CameraComponent({
+    "CameraComponent",
+    []() -> Component* { return new CameraComponent(); },
+    {
+        ComponentField::Flt("CameraFOV", "FOV", 50.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).fov = SafeParse::ToFloat(d.Get("CameraFOV", "50")); }),
+        ComponentField::Flt("CameraNearClip", "Near Clip", 0.1f,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).nearClip = SafeParse::ToFloat(d.Get("CameraNearClip", "0.1")); }),
+        ComponentField::Flt("CameraFarClip", "Far Clip", 4000.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).farClip = SafeParse::ToFloat(d.Get("CameraFarClip", "4000")); }),
+        ComponentField::Bln("CameraOrthographic", "Orthographic", false,
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).orthographic = d.Get("CameraOrthographic", "false") == "true"; }),
+    }
+});
 }

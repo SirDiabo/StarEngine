@@ -1,10 +1,11 @@
 #include "StarMap.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
-#include "Modules/Stargraph/ComponentFields.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <unordered_set>
 
 bool StarMap::SaveToFile(const std::string& path) const {
     std::ofstream out(path);
@@ -35,27 +36,20 @@ bool StarMap::SaveToFile(const std::string& path) const {
         out << "ActorKind=" << inst.actorKind << "\n";
         if (inst.hasComponent) {
             out << "ComponentType=" << inst.component.componentType << "\n";
-            for (const ComponentFieldDesc& fd : GetComponentFields()) {
-                if (fd.componentType != inst.component.componentType) continue;
-                std::string key = std::string("Comp.") + fd.key;
-                switch (fd.type) {
-                    case ComponentFieldType::String:
-                        out << key << "=" << inst.component.*(fd.stringField) << "\n";
-                        break;
-                    case ComponentFieldType::Float:
-                        out << key << "=" << inst.component.*(fd.floatField) << "\n";
-                        break;
-                    case ComponentFieldType::Bool:
-                        out << key << "=" << ((inst.component.*(fd.boolField)) ? "true" : "false") << "\n";
-                        break;
-                    case ComponentFieldType::StringArray: {
-                        const std::vector<std::string>& arr = inst.component.*(fd.stringArrayField);
-                        out << key << ".Count=" << arr.size() << "\n";
-                        for (size_t a = 0; a < arr.size(); a++)
-                            out << key << "." << a << "=" << arr[a] << "\n";
-                        break;
-                    }
+            const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(inst.component.componentType);
+            if (typeInfo) {
+                for (const ComponentFieldDesc& fd : typeInfo->fields) {
+                    auto it = inst.component.fields.find(fd.key);
+                    if (it == inst.component.fields.end() || it->second == fd.defaultValue) continue;
+                    out << "Comp." << fd.key << "=" << it->second << "\n";
                 }
+            }
+            for (const auto& kv : inst.component.arrayFields) {
+                const auto& arr = kv.second;
+                if (arr.empty()) continue;
+                std::string key = std::string("Comp.") + kv.first;
+                out << key << ".Count=" << arr.size() << "\n";
+                for (size_t a = 0; a < arr.size(); a++) out << key << "." << a << "=" << arr[a] << "\n";
             }
         }
         out << "PosX=" << inst.posX << "\n";
@@ -133,26 +127,36 @@ bool StarMap::LoadFromFile(const std::string& path) {
             if (const std::string* v = Find(section, "ActorKind")) inst.actorKind = *v;
             if (const std::string* v = Find(section, "ComponentType")) inst.component.componentType = *v;
             if (inst.hasComponent) {
-                for (const ComponentFieldDesc& fd : GetComponentFields()) {
-                    if (fd.componentType != inst.component.componentType) continue;
-                    std::string key = std::string("Comp.") + fd.key;
-                    if (fd.type == ComponentFieldType::StringArray) {
-                        if (const std::string* cv = Find(section, key + ".Count")) {
-                            int count = SafeParse::ToInt(*cv);
-                            std::vector<std::string>& arr = inst.component.*(fd.stringArrayField);
-                            if (count > 0) arr.resize((size_t)count);
+                std::unordered_set<std::string> consumedArrayKeys;
+                for (const auto& entry : section.entries) {
+                    const std::string& key = entry.first;
+                    if (key.rfind("Comp.", 0) != 0) continue;
+                    std::string compKey = key.substr(5);
+                    if (compKey.size() > 6 && compKey.compare(compKey.size() - 6, 6, ".Count") == 0) {
+                        std::string baseKey = compKey.substr(0, compKey.size() - 6);
+                        int count = SafeParse::ToInt(entry.second);
+                        consumedArrayKeys.insert(baseKey);
+                        if (count > 0) {
+                            std::vector<std::string> arr;
+                            arr.resize((size_t)count);
                             for (int a = 0; a < count; a++) {
-                                if (const std::string* av = Find(section, key + "." + std::to_string(a)))
+                                if (const std::string* av = Find(section, key.substr(0, key.size() - 6) + "." + std::to_string(a)))
                                     arr[(size_t)a] = *av;
                             }
+                            inst.component.arrayFields[baseKey] = std::move(arr);
                         }
-                        continue;
                     }
-                    const std::string* v = Find(section, key);
-                    if (!v) continue;
-                    if (fd.type == ComponentFieldType::String) inst.component.*(fd.stringField) = *v;
-                    else if (fd.type == ComponentFieldType::Float) inst.component.*(fd.floatField) = SafeParse::ToFloat(*v);
-                    else if (fd.type == ComponentFieldType::Bool) inst.component.*(fd.boolField) = (*v == "true");
+                }
+                for (const auto& entry : section.entries) {
+                    const std::string& key = entry.first;
+                    if (key.rfind("Comp.", 0) != 0) continue;
+                    std::string compKey = key.substr(5);
+                    bool isArrayPart = false;
+                    for (const std::string& baseKey : consumedArrayKeys) {
+                        if (compKey == baseKey + ".Count" || compKey.rfind(baseKey + ".", 0) == 0) { isArrayPart = true; break; }
+                    }
+                    if (isArrayPart) continue;
+                    inst.component.fields[compKey] = entry.second;
                 }
             }
             if (const std::string* v = Find(section, "PosX"))   inst.posX   = SafeParse::ToFloat(*v);
@@ -177,4 +181,4 @@ void StarMap::AddInstance(const ActorInstance& instance) {
 
 void StarMap::RemoveInstance(size_t index) {
     if (index < instances.size()) instances.erase(instances.begin() + index);
-}
+}

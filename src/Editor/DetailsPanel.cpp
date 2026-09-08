@@ -4,6 +4,7 @@
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
+#include "Core/SafeParse.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
@@ -32,20 +33,20 @@ void DetailsPanel::RefreshFromSelection(const ActorInstance& inst) {
     snprintf(scaleYBuf, sizeof(scaleYBuf), "%.2f", inst.scaleY);
     snprintf(scaleZBuf, sizeof(scaleZBuf), "%.2f", inst.scaleZ);
 
-    snprintf(compLightColorBuf[0], 32, "%.2f", inst.component.lightColorR);
-    snprintf(compLightColorBuf[1], 32, "%.2f", inst.component.lightColorG);
-    snprintf(compLightColorBuf[2], 32, "%.2f", inst.component.lightColorB);
-    snprintf(compLightIntensityBuf, sizeof(compLightIntensityBuf), "%.2f", inst.component.lightIntensity);
-    snprintf(compLightRadiusBuf, sizeof(compLightRadiusBuf), "%.2f", inst.component.lightRadius);
-    snprintf(compLightInnerConeBuf, sizeof(compLightInnerConeBuf), "%.2f", inst.component.lightInnerConeAngle);
-    snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", inst.component.lightOuterConeAngle);
-    snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", inst.component.lightWidth);
-    snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", inst.component.lightHeight);
-    snprintf(compCameraFovBuf, sizeof(compCameraFovBuf), "%.2f", inst.component.cameraFov);
-    snprintf(compCameraNearBuf, sizeof(compCameraNearBuf), "%.2f", inst.component.cameraNearClip);
-    snprintf(compCameraFarBuf, sizeof(compCameraFarBuf), "%.2f", inst.component.cameraFarClip);
-    snprintf(compAudioVolumeBuf, sizeof(compAudioVolumeBuf), "%.2f", inst.component.volume);
-    snprintf(compAudioPitchBuf, sizeof(compAudioPitchBuf), "%.2f", inst.component.pitch);
+    snprintf(compLightColorBuf[0], 32, "%.2f", SafeParse::ToFloat(inst.component.Get("LightColorR", "1")));
+    snprintf(compLightColorBuf[1], 32, "%.2f", SafeParse::ToFloat(inst.component.Get("LightColorG", "1")));
+    snprintf(compLightColorBuf[2], 32, "%.2f", SafeParse::ToFloat(inst.component.Get("LightColorB", "1")));
+    snprintf(compLightIntensityBuf, sizeof(compLightIntensityBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightIntensity", "1")));
+    snprintf(compLightRadiusBuf, sizeof(compLightRadiusBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightRadius", "500")));
+    snprintf(compLightInnerConeBuf, sizeof(compLightInnerConeBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightInnerConeAngle", "25")));
+    snprintf(compLightOuterConeBuf, sizeof(compLightOuterConeBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightOuterConeAngle", "35")));
+    snprintf(compLightWidthBuf, sizeof(compLightWidthBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightWidth", "100")));
+    snprintf(compLightHeightBuf, sizeof(compLightHeightBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("LightHeight", "100")));
+    snprintf(compCameraFovBuf, sizeof(compCameraFovBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("CameraFOV", "50")));
+    snprintf(compCameraNearBuf, sizeof(compCameraNearBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("CameraNearClip", "0.1")));
+    snprintf(compCameraFarBuf, sizeof(compCameraFarBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("CameraFarClip", "4000")));
+    snprintf(compAudioVolumeBuf, sizeof(compAudioVolumeBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("Volume", "1")));
+    snprintf(compAudioPitchBuf, sizeof(compAudioPitchBuf), "%.2f", SafeParse::ToFloat(inst.component.Get("Pitch", "1")));
 
     activeField = 0;
     meshPicker.Close();
@@ -215,11 +216,16 @@ void DetailsPanel::RenderInlineComponentSection(ActorInstance& inst, float x, fl
     DrawText((comp.componentType + " Component").c_str(), (int)x + 8, (int)y, 12, theme.sectionHeader);
     y += 18;
 
-    auto floatField = [&](const char* label, char* buf, size_t bufSize, int fieldId, float& outVal) {
+    auto floatFieldGeneric = [&](const char* label, char* buf, size_t bufSize, int fieldId,
+                                  ComponentDecl& c, const char* key, const char* defaultValue) {
+        float outVal = SafeParse::ToFloat(c.Get(key, defaultValue));
         DrawText(label, (int)x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
         Rectangle r = {x + 8, y, w - 16, 18};
         if (PropertyField::FloatBox(r, buf, bufSize, fieldId, activeField, outVal)) {
+            char vbuf[32];
+            snprintf(vbuf, sizeof(vbuf), "%g", outVal);
+            c.fields[key] = vbuf;
             if (onEdited) onEdited();
         }
         y += 22;
@@ -228,12 +234,14 @@ void DetailsPanel::RenderInlineComponentSection(ActorInstance& inst, float x, fl
     if (comp.componentType == "LightComponent") {
         DrawText("Light Type", (int)x + 8, (int)y, 11, theme.textSecondary);
         y += 14;
-        if (UIWidget::Button({x + 8, y, w - 16, 18}, comp.lightType.c_str())) {
-            if (comp.lightType == "Point") comp.lightType = "Rectangle";
-            else if (comp.lightType == "Rectangle") comp.lightType = "Spot";
-            else if (comp.lightType == "Spot") comp.lightType = "Global";
-            else if (comp.lightType == "Global") comp.lightType = "Sun";
-            else comp.lightType = "Point";
+        std::string lightType = comp.Get("LightType", "Point");
+        if (UIWidget::Button({x + 8, y, w - 16, 18}, lightType.c_str())) {
+            if (lightType == "Point") lightType = "Rectangle";
+            else if (lightType == "Rectangle") lightType = "Spot";
+            else if (lightType == "Spot") lightType = "Global";
+            else if (lightType == "Global") lightType = "Sun";
+            else lightType = "Point";
+            comp.fields["LightType"] = lightType;
             if (onEdited) onEdited();
         }
         y += 24;
@@ -241,32 +249,39 @@ void DetailsPanel::RenderInlineComponentSection(ActorInstance& inst, float x, fl
         DrawText("Light Color", (int)x + 8, (int)y, 11, theme.sectionHeader);
         y += 14;
         Rectangle colorRow = {x + 8, y, w - 16, 18};
+        float lightColorR = SafeParse::ToFloat(comp.Get("LightColorR", "1"));
+        float lightColorG = SafeParse::ToFloat(comp.Get("LightColorG", "1"));
+        float lightColorB = SafeParse::ToFloat(comp.Get("LightColorB", "1"));
         if (PropertyField::Vec3Row(colorRow, compLightColorBuf[0], compLightColorBuf[1], compLightColorBuf[2],
-                                    16, activeField, comp.lightColorR, comp.lightColorG, comp.lightColorB)) {
+                                    16, activeField, lightColorR, lightColorG, lightColorB)) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%g", lightColorR); comp.fields["LightColorR"] = buf;
+            snprintf(buf, sizeof(buf), "%g", lightColorG); comp.fields["LightColorG"] = buf;
+            snprintf(buf, sizeof(buf), "%g", lightColorB); comp.fields["LightColorB"] = buf;
             if (onEdited) onEdited();
         }
         y += 22;
 
-        floatField("Intensity", compLightIntensityBuf, sizeof(compLightIntensityBuf), 19, comp.lightIntensity);
+        floatFieldGeneric("Intensity", compLightIntensityBuf, sizeof(compLightIntensityBuf), 19, comp, "LightIntensity", "1");
 
-        if (comp.lightType != "Global" && comp.lightType != "Sun") {
-            floatField("Radius", compLightRadiusBuf, sizeof(compLightRadiusBuf), 20, comp.lightRadius);
+        if (lightType != "Global" && lightType != "Sun") {
+            floatFieldGeneric("Radius", compLightRadiusBuf, sizeof(compLightRadiusBuf), 20, comp, "LightRadius", "500");
         }
-        if (comp.lightType == "Spot") {
-            floatField("Inner Cone Angle", compLightInnerConeBuf, sizeof(compLightInnerConeBuf), 21, comp.lightInnerConeAngle);
-            floatField("Outer Cone Angle", compLightOuterConeBuf, sizeof(compLightOuterConeBuf), 22, comp.lightOuterConeAngle);
+        if (lightType == "Spot") {
+            floatFieldGeneric("Inner Cone Angle", compLightInnerConeBuf, sizeof(compLightInnerConeBuf), 21, comp, "LightInnerConeAngle", "25");
+            floatFieldGeneric("Outer Cone Angle", compLightOuterConeBuf, sizeof(compLightOuterConeBuf), 22, comp, "LightOuterConeAngle", "35");
         }
-        if (comp.lightType == "Rectangle") {
-            floatField("Width", compLightWidthBuf, sizeof(compLightWidthBuf), 23, comp.lightWidth);
-            floatField("Height", compLightHeightBuf, sizeof(compLightHeightBuf), 24, comp.lightHeight);
+        if (lightType == "Rectangle") {
+            floatFieldGeneric("Width", compLightWidthBuf, sizeof(compLightWidthBuf), 23, comp, "LightWidth", "100");
+            floatFieldGeneric("Height", compLightHeightBuf, sizeof(compLightHeightBuf), 24, comp, "LightHeight", "100");
         }
     } else if (comp.componentType == "CameraComponent") {
-        floatField("FOV", compCameraFovBuf, sizeof(compCameraFovBuf), 25, comp.cameraFov);
-        floatField("Near Clip", compCameraNearBuf, sizeof(compCameraNearBuf), 26, comp.cameraNearClip);
-        floatField("Far Clip", compCameraFarBuf, sizeof(compCameraFarBuf), 27, comp.cameraFarClip);
-        bool ortho = comp.cameraOrthographic;
+        floatFieldGeneric("FOV", compCameraFovBuf, sizeof(compCameraFovBuf), 25, comp, "CameraFOV", "50");
+        floatFieldGeneric("Near Clip", compCameraNearBuf, sizeof(compCameraNearBuf), 26, comp, "CameraNearClip", "0.1");
+        floatFieldGeneric("Far Clip", compCameraFarBuf, sizeof(compCameraFarBuf), 27, comp, "CameraFarClip", "4000");
+        bool ortho = comp.Get("CameraOrthographic", "false") == "true";
         if (GuiCheckBox({x + 8, y, 18, 18}, "Orthographic", &ortho)) {
-            comp.cameraOrthographic = ortho;
+            comp.fields["CameraOrthographic"] = ortho ? "true" : "false";
             if (onEdited) onEdited();
         }
         y += 24;
@@ -276,29 +291,30 @@ void DetailsPanel::RenderInlineComponentSection(ActorInstance& inst, float x, fl
         Rectangle r = {x + 8, y, w - 16, 18};
         DrawRectangleRec(r, theme.fieldBg);
         DrawRectangleLinesEx(r, 1, theme.fieldBorder);
-        DrawText(AssetDisplayName(comp.soundAssetPath).c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
+        std::string soundAssetPath = comp.Get("Sound");
+        DrawText(AssetDisplayName(soundAssetPath).c_str(), (int)r.x + 4, (int)r.y + 3, 11, theme.textPrimary);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, r) && !audioPathPicker.IsOpen()) {
             audioPathPicker.Open({r.x, r.y + r.height}, ".starsound");
         }
         y += 22;
         std::string pickedSound;
         if (audioPathPicker.Render(pickedSound)) {
-            comp.soundAssetPath = pickedSound;
+            comp.fields["Sound"] = pickedSound;
             if (onEdited) onEdited();
         }
 
-        floatField("Volume", compAudioVolumeBuf, sizeof(compAudioVolumeBuf), 28, comp.volume);
-        floatField("Pitch", compAudioPitchBuf, sizeof(compAudioPitchBuf), 29, comp.pitch);
+        floatFieldGeneric("Volume", compAudioVolumeBuf, sizeof(compAudioVolumeBuf), 28, comp, "Volume", "1");
+        floatFieldGeneric("Pitch", compAudioPitchBuf, sizeof(compAudioPitchBuf), 29, comp, "Pitch", "1");
 
-        bool autoPlay = comp.autoPlay;
+        bool autoPlay = comp.Get("AutoPlay", "false") == "true";
         if (GuiCheckBox({x + 8, y, 18, 18}, "Auto Play", &autoPlay)) {
-            comp.autoPlay = autoPlay;
+            comp.fields["AutoPlay"] = autoPlay ? "true" : "false";
             if (onEdited) onEdited();
         }
         y += 24;
-        bool looping = comp.looping;
+        bool looping = comp.Get("Looping", "false") == "true";
         if (GuiCheckBox({x + 8, y, 18, 18}, "Looping", &looping)) {
-            comp.looping = looping;
+            comp.fields["Looping"] = looping ? "true" : "false";
             if (onEdited) onEdited();
         }
         y += 24;
@@ -347,4 +363,4 @@ void DetailsPanel::RenderClassComponentsSection(const ActorInstance& inst, float
 
     DrawText("Edit components in the class blueprint.", (int)x + 8, (int)y, 10, {110, 110, 118, 255});
     y += 16;
-}
+}

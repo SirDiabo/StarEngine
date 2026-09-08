@@ -1,6 +1,8 @@
 #include "AudioComponent.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Core/SafeParse.h"
 #include "Runtime/AudioCore.h"
 #include "raylib.h"
 #include <cstdlib>
@@ -264,4 +266,28 @@ void AudioComponent::Resume() {
     Sound* snd = AudioCore::Get().GetOrLoadCookedSound(soundPath);
     if (!snd) return;
     ResumeSound(*snd);
+}
+
+namespace {
+ComponentRegistrar registrar_AudioComponent({
+    "AudioComponent",
+    []() -> Component* { return new AudioComponent(); },
+    {
+        ComponentField::Asset("Sound", "Sound Path", ".starsound",
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).soundPath = d.Get("Sound"); }),
+        ComponentField::Flt("Volume", "Volume", 1.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).volume = SafeParse::ToFloat(d.Get("Volume", "1")); }),
+        ComponentField::Flt("Pitch", "Pitch", 1.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = SafeParse::ToFloat(d.Get("Pitch", "1")); }),
+        ComponentField::Bln("AutoPlay", "Auto Play", false,
+            [](Component& c, const ComponentDecl& d) {
+                auto& ac = static_cast<AudioComponent&>(c);
+                bool autoPlay = d.Get("AutoPlay", "false") == "true";
+                if (autoPlay && !d.Get("Sound").empty()) ac.Play();
+                else ac.autoPlay = autoPlay;
+            }),
+        ComponentField::Bln("Looping", "Looping", false,
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }),
+    }
+});
 }

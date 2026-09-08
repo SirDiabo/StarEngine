@@ -5,11 +5,25 @@
 #include "Modules/Stargraph/StargraphBehavior.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
-#include "Modules/Stargraph/ComponentFields.h"
+#include "Modules/Stargraph/ComponentRegistry.h"
 #include "Components/MeshComponent.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+static Component* BuildComponentFromDecl(const ComponentDecl& decl) {
+    const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(decl.componentType);
+    Component* comp = typeInfo ? typeInfo->factory() : nullptr;
+    if (!comp) comp = new SceneComponent();
+
+    if (typeInfo) {
+        for (const ComponentFieldDesc& f : typeInfo->fields) {
+            if (f.apply) f.apply(*comp, decl);
+        }
+        if (typeInfo->applyArrays) typeInfo->applyArrays(*comp, decl);
+    }
+    return comp;
+}
 
 Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
@@ -27,15 +41,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
             std::vector<std::pair<Component*, std::string>> pendingParents;
 
             for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
-                Component* comp = nullptr;
-                for (const ComponentTypeDesc& td : GetComponentTypes()) {
-                    if (decl.componentType == td.componentType) { comp = td.factory(); break; }
-                }
-                if (!comp) comp = new SceneComponent();
-
-                for (const ComponentFieldDesc& fd : GetComponentFields()) {
-                    if (decl.componentType == fd.componentType && fd.applyToComponent) fd.applyToComponent(*comp, decl);
-                }
+                Component* comp = BuildComponentFromDecl(decl);
 
                 comp->position = {decl.posX, decl.posY, decl.posZ};
                 comp->rotation = {decl.rotX, decl.rotY, decl.rotZ};
@@ -66,18 +72,9 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     }
 
     if (inst.hasComponent && !inst.component.componentType.empty()) {
-        Component* comp = nullptr;
-        for (const ComponentTypeDesc& td : GetComponentTypes()) {
-            if (inst.component.componentType == td.componentType) { comp = td.factory(); break; }
-        }
-        if (comp) {
-            for (const ComponentFieldDesc& fd : GetComponentFields()) {
-                if (fd.componentType == inst.component.componentType && fd.applyToComponent)
-                    fd.applyToComponent(*comp, inst.component);
-            }
-            comp->SetName(inst.component.componentType);
-            actor->AddComponent(comp);
-        }
+        Component* comp = BuildComponentFromDecl(inst.component);
+        comp->SetName(inst.component.componentType);
+        actor->AddComponent(comp);
     }
 
     return actor;
@@ -88,4 +85,4 @@ void WorldSpawner::SpawnMapActors(const StarMap& map) {
         Actor* actor = SpawnActorFromInstance(inst);
         actor->SetNetId(World::Get().AllocateNetId());
     }
-}
+}
