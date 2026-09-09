@@ -1,5 +1,6 @@
 #include "WidgetElementFields.h"
 #include "TextElement.h"
+#include "TextInputElement.h"
 #include "RectangleElement.h"
 #include "ButtonElement.h"
 #include "VerticalBoxElement.h"
@@ -99,6 +100,13 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         StrF<TextElement>("TextElement", "Text", &TextElement::text),
         FltF<TextElement>("TextElement", "FontSize", &TextElement::fontSize),
         ColF<TextElement>("TextElement", "Color", &TextElement::color),
+        StrF<TextInputElement>("TextInputElement", "Text", &TextInputElement::text),
+        FltF<TextInputElement>("TextInputElement", "FontSize", &TextInputElement::fontSize),
+        ColF<TextInputElement>("TextInputElement", "Color", &TextInputElement::color),
+        ColF<TextInputElement>("TextInputElement", "BackgroundColor", &TextInputElement::backgroundColor),
+        ColF<TextInputElement>("TextInputElement", "BorderColor", &TextInputElement::borderColor),
+        StrF<TextInputElement>("TextInputElement", "Placeholder", &TextInputElement::placeholder),
+        IntF<TextInputElement>("TextInputElement", "MaxLength", &TextInputElement::maxLength),
 
         ColF<RectangleElement>("RectangleElement", "Color", &RectangleElement::color),
 
@@ -143,6 +151,7 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
 const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
     static const std::vector<WidgetElementTypeDesc> types = {
         { "TextElement", []() -> WidgetElement* { return new TextElement(); } },
+        { "TextInputElement", []() -> WidgetElement* { return new TextInputElement(); } },
         { "RectangleElement", []() -> WidgetElement* { return new RectangleElement(); } },
         { "ButtonElement", []() -> WidgetElement* { return new ButtonElement(); } },
         { "VerticalBoxElement", []() -> WidgetElement* { return new VerticalBoxElement(); } },

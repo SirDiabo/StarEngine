@@ -1,10 +1,12 @@
 #include "WidgetInput.h"
 #include "Widget.h"
 #include "WidgetElement.h"
+#include "BoxElement.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/InputKeyNames.h"
 #include <vector>
 #include <cmath>
+#include <algorithm>
 #include <unordered_map>
 
 namespace {
@@ -111,6 +113,19 @@ void SyncStates(WidgetElement* element, WidgetElement* current, WidgetElement* p
     for (WidgetElement* child : element->GetChildren()) SyncStates(child, current, pressed);
 }
 
+BoxElement* HitTestScrollable(WidgetElement* element, Vector2 point) {
+    if (!element->visible) return nullptr;
+    for (int i = (int)element->GetChildren().size() - 1; i >= 0; i--) {
+        BoxElement* childHit = HitTestScrollable(element->GetChildren()[i], point);
+        if (childHit) return childHit;
+    }
+    BoxElement* box = dynamic_cast<BoxElement*>(element);
+    if (box && box->scrollEnabled && CheckCollisionPointRec(point, element->lastResolvedRect)) {
+        return box;
+    }
+    return nullptr;
+}
+
 }
 
 namespace WidgetInput {
@@ -125,11 +140,27 @@ bool IsFocused(const Widget* widget, const std::string& device) {
     return it->second == widget;
 }
 
-void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Vector2 localMousePos) {
+void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Vector2 localMousePos, float uiScale) {
     if (!widget || !widget->rootElement) return;
     EnsureDefaultMappings();
 
     bool focused = IsFocused(widget, device);
+
+    float wheel = GetMouseWheelMove();
+    if (focused && wheel != 0.0f) {
+        BoxElement* scrollTarget = HitTestScrollable(widget->rootElement, localMousePos);
+        if (scrollTarget) {
+            float scale = (uiScale > 0.0f) ? uiScale : 1.0f;
+            float contentExtent = scrollTarget->GetContentExtent(1.0f);
+            float containerExtent = (scrollTarget->axis == BoxAxis::Vertical
+                                          ? scrollTarget->lastResolvedRect.height
+                                          : scrollTarget->lastResolvedRect.width) / scale;
+            float maxScroll = std::max(0.0f, contentExtent - containerExtent);
+            scrollTarget->scrollOffset -= wheel * 40.0f;
+            if (scrollTarget->scrollOffset < 0.0f) scrollTarget->scrollOffset = 0.0f;
+            if (scrollTarget->scrollOffset > maxScroll) scrollTarget->scrollOffset = maxScroll;
+        }
+    }
 
     std::vector<WidgetElement*> selectables;
     widget->rootElement->CollectSelectables(selectables);

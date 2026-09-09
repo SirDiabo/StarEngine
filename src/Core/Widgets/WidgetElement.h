@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include <string>
 #include <vector>
+#include <functional>
 
 class Widget;
 
@@ -33,6 +34,7 @@ public:
     bool selectable = false;
     bool disabled = false;
     WidgetInteractionState interactionState = WidgetInteractionState::Default;
+    std::function<void()> onActivated;
 
     WidgetElement* parent = nullptr;
     Widget* owningWidget = nullptr;

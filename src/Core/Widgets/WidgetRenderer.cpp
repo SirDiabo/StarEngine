@@ -30,7 +30,7 @@ void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 local
             Widget* widget = widgetComponent->GetWidget();
             if (!widget) continue;
             widget->Tick(deltaTime, targetRect, bufferScale);
-            WidgetInput::ProcessInput(widget, widgetComponent->inputDevice, deltaTime, localMousePos);
+            WidgetInput::ProcessInput(widget, widgetComponent->inputDevice, deltaTime, localMousePos, bufferScale);
         }
     }
 }
