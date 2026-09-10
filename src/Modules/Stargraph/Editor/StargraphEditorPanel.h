@@ -21,9 +21,11 @@ public:
     ~StargraphEditorPanel();
 
     bool Open(const std::string& filePath);
+    bool OpenEmbedded(const Stargraph& initialGraph, const std::string& logicalName);
     void Close();
     bool IsOpen() const { return isOpen; }
     const std::string& GetFilePath() const { return filePath; }
+    Stargraph& GetGraph() { return graph; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
 
     void SetScreenBounds(Rectangle b) { screenBounds = b; }
@@ -44,6 +46,8 @@ public:
     void SetOnTogglePreviewFullscreen(std::function<void()> cb) { onTogglePreviewFullscreen = cb; }
 
 private:
+    void ResetTransientEditState();
+
     void RenderComponentDetails(Rectangle panel, float& y);
     void RenderCustomEventDetails(Rectangle panel, float y, Node& node);
     void RenderCallCustomEventDetails(Rectangle panel, float y, Node& node);
@@ -80,6 +84,7 @@ private:
     std::string filePath;
     bool isOpen = false;
     bool isDirty = false;
+    bool embedded = false;
 
     int openFunctionIndex = -1;
     Rectangle leftPanelBounds{};

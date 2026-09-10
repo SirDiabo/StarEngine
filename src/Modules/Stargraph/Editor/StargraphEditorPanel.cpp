@@ -46,6 +46,22 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     filePath = path;
     isOpen = true;
     isDirty = false;
+    embedded = false;
+    ResetTransientEditState();
+    return true;
+}
+
+bool StargraphEditorPanel::OpenEmbedded(const Stargraph& initialGraph, const std::string& logicalName) {
+    graph = initialGraph;
+    filePath = logicalName;
+    isOpen = true;
+    isDirty = false;
+    embedded = true;
+    ResetTransientEditState();
+    return true;
+}
+
+void StargraphEditorPanel::ResetTransientEditState() {
     openFunctionIndex = -1;
     selectedNodeId = -1;
     selectedNodeIds.clear();
@@ -65,7 +81,6 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     variableDragIndex = -1;
     componentDragActive = false;
     componentDragIndex = -1;
-    return true;
 }
 
 void StargraphEditorPanel::Close() {
@@ -84,6 +99,10 @@ void StargraphEditorPanel::Close() {
 }
 
 void StargraphEditorPanel::SaveGraph() {
+    if (embedded) {
+        isDirty = false;
+        return;
+    }
     if (!graph.SaveToFile(filePath)) return;
     isDirty = false;
     if (viewportPanel) viewportPanel->InvalidateClassGraph(filePath);

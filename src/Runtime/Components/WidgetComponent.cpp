@@ -1,5 +1,5 @@
 #include "WidgetComponent.h"
-#include "Modules/Stargraph/WidgetAsset.h"
+#include "Core/Widgets/WidgetAsset.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 

@@ -10,6 +10,10 @@
 #include "Core/EmbeddedAssets.h"
 #include "Core/ExecutablePath.h"
 #include "Core/SafeProcess.h"
+#include "Core/Widgets/WidgetAsset.h"
+#include "Core/EditorAssetHandlerRegistry.h"
+#include "Core/ProgrammingInterfaceRegistry.h"
+#include "Editor/WidgetEditorTab.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
@@ -116,6 +120,45 @@ bool Application::Initialize(int argc, char* argv[]) {
     animationType.extension = ".staranim";
     animationType.category = "Mesh";
     AssetTypeRegistry::Get().RegisterType(animationType);
+
+    AssetTypeInfo widgetType;
+    widgetType.typeName = "Widget";
+    widgetType.extension = ".starwidget";
+    widgetType.category = "UI";
+    widgetType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+        WidgetAssetData data;
+        data.assetName = assetName;
+        data.parentClass = "Widget";
+        const std::vector<ProgrammingInterfaceInfo>& providers = ProgrammingInterfaceRegistry::Get().GetAll();
+        if (providers.size() == 1) {
+            data.programmingInterface = providers[0].name;
+            if (providers[0].createDefaultContent) data.behaviorContent = providers[0].createDefaultContent();
+        }
+        bool saved = WidgetAsset::SaveWidgetAsset(fullPath, data);
+        delete data.rootElement;
+        delete data.behaviorContent;
+        return saved;
+    };
+    widgetType.renameAsset = [](const std::string& fullPath, const std::string& newAssetName) {
+        WidgetAssetData data;
+        if (!WidgetAsset::LoadWidgetAsset(fullPath, data)) return false;
+        data.assetName = newAssetName;
+        bool saved = WidgetAsset::SaveWidgetAsset(fullPath, data);
+        delete data.rootElement;
+        delete data.behaviorContent;
+        return saved;
+    };
+    AssetTypeRegistry::Get().RegisterType(widgetType);
+
+    EditorAssetHandlerInfo widgetHandler;
+    widgetHandler.extension = ".starwidget";
+    widgetHandler.createTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
+        auto* tab = new WidgetEditorTab(fullPath);
+        tab->SetSharedLogPanel(services.sharedLogPanel);
+        tab->SetViewportPanel(services.sharedViewportPanel);
+        return tab;
+    };
+    EditorAssetHandlerRegistry::Get().RegisterHandler(widgetHandler);
 
     activeLogPanel = editor->GetLogPanel();
     SetTraceLogCallback(ForwardTraceLogToPanel);
