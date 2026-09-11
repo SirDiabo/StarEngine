@@ -16,7 +16,8 @@ namespace {
 bool IsTextProjectFile(const fs::path& p) {
     std::string ext = p.extension().string();
     return ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
-           ext == ".staractor" || ext == ".stargraph" || ext == ".startex";
+           ext == ".staractor" || ext == ".stargraph" || ext == ".startex" ||
+           ext == ".starwidget";
 }
 
 std::vector<uint8_t> ReadBytes(const fs::path& p) {
