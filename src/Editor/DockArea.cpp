@@ -27,6 +27,10 @@ void DockArea::SetDefaultLayout(std::unique_ptr<DockNode> r) {
     floating.clear();
 }
 
+std::unique_ptr<DockNode> DockArea::TakeLayout() {
+    return std::move(root);
+}
+
 // Layout pass
 
 void DockArea::LayoutNode(DockNode* node, Rectangle area) {

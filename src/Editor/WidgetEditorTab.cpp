@@ -80,7 +80,16 @@ void WidgetEditorTab::Initialize() {
 }
 
 void WidgetEditorTab::ApplyDesignerLayout() {
+    if (inGraphMode) {
+        std::unique_ptr<DockNode> live = dockArea.TakeLayout();
+        if (live) graphLayoutSnapshot = std::move(live);
+    }
     inGraphMode = false;
+
+    if (designerLayoutSnapshot) {
+        dockArea.SetDefaultLayout(CloneDockNode(*designerLayoutSnapshot));
+        return;
+    }
 
     auto paletteLeaf = std::make_unique<DockNode>();
     paletteLeaf->panelNames = { "Palette" };
@@ -126,6 +135,8 @@ void WidgetEditorTab::ApplyDesignerLayout() {
     root->first = std::move(leftCol);
     root->second = std::move(centerAndRight);
 
+    designerDefaultLayout = CloneDockNode(*root);
+    designerLayoutSnapshot = CloneDockNode(*root);
     dockArea.SetDefaultLayout(std::move(root));
 }
 
@@ -147,7 +158,6 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         graphPanels = panelSet.panels;
         graphTeardown = panelSet.teardown;
         graphModeLabel = provider->displayLabel;
-        if (panelSet.layout) savedGraphLayout = CloneDockNode(*panelSet.layout);
         graphPanelsBuilt = true;
 
         session->beforeSave = panelSet.syncBeforeSave;
@@ -156,20 +166,27 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         for (Panel* p : graphPanels) allPanels.push_back(p);
         if (logPanel) allPanels.push_back(logPanel);
         dockArea.SetPanels(allPanels);
+
+        auto hierarchyLeaf = std::make_unique<DockNode>();
+        hierarchyLeaf->panelNames = { "Hierarchy" };
+
+        auto root = std::make_unique<DockNode>();
+        root->type = DockNode::Type::SplitH;
+        root->splitRatio = 0.16f;
+        root->first = std::move(hierarchyLeaf);
+        root->second = panelSet.layout ? std::move(panelSet.layout) : std::make_unique<DockNode>();
+
+        graphDefaultLayout = CloneDockNode(*root);
+        graphLayoutSnapshot = std::move(root);
     }
 
-    if (!savedGraphLayout) return false;
+    if (!inGraphMode) {
+        std::unique_ptr<DockNode> live = dockArea.TakeLayout();
+        if (live) designerLayoutSnapshot = std::move(live);
+    }
 
-    auto hierarchyLeaf = std::make_unique<DockNode>();
-    hierarchyLeaf->panelNames = { "Hierarchy" };
-
-    auto root = std::make_unique<DockNode>();
-    root->type = DockNode::Type::SplitH;
-    root->splitRatio = 0.16f;
-    root->first = std::move(hierarchyLeaf);
-    root->second = CloneDockNode(*savedGraphLayout);
-
-    dockArea.SetDefaultLayout(std::move(root));
+    if (!graphLayoutSnapshot) return false;
+    dockArea.SetDefaultLayout(CloneDockNode(*graphLayoutSnapshot));
     inGraphMode = true;
     return true;
 }
@@ -287,8 +304,14 @@ bool WidgetEditorTab::IsOpen() const {
 void WidgetEditorTab::ResetLayout() {
     for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Details", "Logs" })
         dockArea.SetPanelVisible(n, true);
-    if (inGraphMode) ApplyGraphLayout();
-    else ApplyDesignerLayout();
+
+    if (inGraphMode) {
+        graphLayoutSnapshot = graphDefaultLayout ? CloneDockNode(*graphDefaultLayout) : nullptr;
+        ApplyGraphLayout();
+    } else {
+        designerLayoutSnapshot = designerDefaultLayout ? CloneDockNode(*designerDefaultLayout) : nullptr;
+        ApplyDesignerLayout();
+    }
 }
 
 void WidgetEditorTab::TogglePanelVisible(const std::string& name) {
@@ -300,13 +323,20 @@ void WidgetEditorTab::SaveLayout(const std::string& filePath) const {
     std::unordered_map<std::string, std::string> data;
     LayoutSerializer::Load(filePath, data);
     dockArea.SaveLayout(data, "widget");
+    data["WidgetTab.Mode"] = inGraphMode ? "Graph" : "Designer";
     LayoutSerializer::Save(filePath, data);
 }
 
 void WidgetEditorTab::LoadLayout(const std::string& filePath) {
     std::unordered_map<std::string, std::string> data;
-    if (LayoutSerializer::Load(filePath, data))
-        dockArea.LoadLayout(data, "widget");
+    if (!LayoutSerializer::Load(filePath, data)) return;
+
+    auto modeIt = data.find("WidgetTab.Mode");
+    if (modeIt != data.end() && modeIt->second == "Graph") {
+        ApplyGraphLayout();
+    }
+
+    dockArea.LoadLayout(data, "widget");
 }
 
 void WidgetEditorTab::Save() {

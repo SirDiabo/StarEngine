@@ -27,6 +27,7 @@ public:
     Panel* GetPanel(const std::string& name) const;
 
     void SetDefaultLayout(std::unique_ptr<DockNode> root);
+    std::unique_ptr<DockNode> TakeLayout();
 
     // Main render call - draws everything including overlays.
     void Render(Rectangle area);

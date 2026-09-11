@@ -1,6 +1,7 @@
 #include "WidgetEditorSession.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/WidgetElementFields.h"
+#include "Core/Widgets/WidgetAssetCache.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 
 bool WidgetEditorSession::Open(const std::string& path) {
@@ -26,6 +27,7 @@ bool WidgetEditorSession::Save() {
     if (!isOpen) return false;
     if (beforeSave) beforeSave();
     if (!WidgetAsset::SaveWidgetAsset(assetPath, data)) return false;
+    WidgetAssetCache::Get().Invalidate(assetPath);
     dirty = false;
     return true;
 }

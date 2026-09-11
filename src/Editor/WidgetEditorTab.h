@@ -57,7 +57,10 @@ private:
 
     std::vector<Panel*> graphPanels;
     std::function<void()> graphTeardown;
-    std::unique_ptr<DockNode> savedGraphLayout;
+    std::unique_ptr<DockNode> designerLayoutSnapshot;
+    std::unique_ptr<DockNode> designerDefaultLayout;
+    std::unique_ptr<DockNode> graphLayoutSnapshot;
+    std::unique_ptr<DockNode> graphDefaultLayout;
     std::string graphModeLabel = "Graph";
     bool graphPanelsBuilt = false;
     bool inGraphMode = false;
