@@ -6,6 +6,12 @@ ProgrammingInterfaceRegistry& ProgrammingInterfaceRegistry::Get() {
 }
 
 void ProgrammingInterfaceRegistry::RegisterInterface(const ProgrammingInterfaceInfo& info) {
+    for (ProgrammingInterfaceInfo& existing : interfaces) {
+        if (existing.name == info.name) {
+            existing = info;
+            return;
+        }
+    }
     interfaces.push_back(info);
 }
 
