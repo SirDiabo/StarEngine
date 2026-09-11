@@ -40,14 +40,12 @@ void Widget::SetSelection(WidgetElement* element) {
 void Widget::Draw(Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
     float scale = uiScale * bufferScale;
-    Rectangle resolvedRootRect = rootElement->ResolveRect(screenRect, scale);
-    rootElement->Draw(resolvedRootRect, scale);
+    rootElement->Draw(screenRect, scale);
 }
 
 void Widget::Tick(float deltaTime, Rectangle screenRect, float bufferScale) {
     if (behavior) behavior->OnTick(this, deltaTime);
     if (!rootElement || !rootElement->visible) return;
     float scale = uiScale * bufferScale;
-    Rectangle resolvedRootRect = rootElement->ResolveRect(screenRect, scale);
-    rootElement->Tick(deltaTime, resolvedRootRect, scale);
+    rootElement->Tick(deltaTime, screenRect, scale);
 }

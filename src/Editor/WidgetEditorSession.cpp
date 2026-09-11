@@ -9,6 +9,16 @@ bool WidgetEditorSession::Open(const std::string& path) {
     isOpen = true;
     dirty = false;
     selectedElement = nullptr;
+
+    if (data.programmingInterface.empty()) {
+        const std::vector<ProgrammingInterfaceInfo>& providers = ProgrammingInterfaceRegistry::Get().GetAll();
+        if (providers.size() == 1) {
+            data.programmingInterface = providers[0].name;
+            if (providers[0].createDefaultContent) data.behaviorContent = providers[0].createDefaultContent();
+            dirty = true;
+        }
+    }
+
     return true;
 }
 

@@ -3,15 +3,21 @@
 #include "Widget.h"
 #include "WidgetElementIO.h"
 #include "Core/SafeParse.h"
+#include "Core/ContentPathResolver.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "Runtime/WidgetBehavior.h"
+#include "raylib.h"
 #include <fstream>
 
 namespace WidgetAsset {
 
 bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data) {
-    std::ofstream out(path);
-    if (!out.is_open()) return false;
+    std::string resolvedPath = ContentPathResolver::Resolve(path);
+    std::ofstream out(resolvedPath);
+    if (!out.is_open()) {
+        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for writing", resolvedPath.c_str());
+        return false;
+    }
 
     out << "[Widget]\n";
     out << "Version=1\n";
@@ -33,8 +39,12 @@ bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data) {
 }
 
 bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
-    std::ifstream in(path);
-    if (!in.is_open()) return false;
+    std::string resolvedPath = ContentPathResolver::Resolve(path);
+    std::ifstream in(resolvedPath);
+    if (!in.is_open()) {
+        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", resolvedPath.c_str());
+        return false;
+    }
 
     std::vector<SectionFileIO::ParsedSection> sections = SectionFileIO::ParseSections(in);
 
