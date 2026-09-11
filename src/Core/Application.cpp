@@ -60,7 +60,7 @@ static bool CreateProject(const std::string& name) {
 }
 
 bool Application::Initialize(int argc, char* argv[]) {
-    SetTraceLogLevel(LOG_NONE);
+    SetTraceLogLevel(LOG_ALL);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, "StarEngine " STARENGINE_VERSION);
     SetExitKey(0);

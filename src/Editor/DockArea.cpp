@@ -580,3 +580,15 @@ void DockArea::LoadLayout(const std::unordered_map<std::string, std::string>& in
     auto loaded = LoadNode(in, prefix);
     if (loaded) root = std::move(loaded);
 }
+
+void DockArea::SaveLayoutTree(const DockNode* node,
+                               std::unordered_map<std::string, std::string>& out,
+                               const std::string& prefix) {
+    SaveNode(node, out, prefix);
+}
+
+std::unique_ptr<DockNode> DockArea::LoadLayoutTree(
+    const std::unordered_map<std::string, std::string>& in,
+    const std::string& prefix) {
+    return LoadNode(in, prefix);
+}

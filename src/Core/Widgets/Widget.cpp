@@ -1,6 +1,7 @@
 #include "Widget.h"
 #include "WidgetElement.h"
 #include "Runtime/WidgetBehavior.h"
+#include "raylib.h"
 
 Widget::~Widget() {
     if (behavior) behavior->OnDestruct(this);
@@ -40,6 +41,11 @@ void Widget::SetSelection(WidgetElement* element) {
 void Widget::Draw(Rectangle screenRect, float bufferScale) {
     if (!rootElement || !rootElement->visible) return;
     float scale = uiScale * bufferScale;
+    static float lastLoggedScale = -1.0f;
+    if (scale != lastLoggedScale) {
+        TraceLog(LOG_INFO, "Widget::Draw uiScale=%.3f bufferScale=%.3f scale=%.3f", uiScale, bufferScale, scale);
+        lastLoggedScale = scale;
+    }
     rootElement->Draw(screenRect, scale);
 }
 

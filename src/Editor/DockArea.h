@@ -20,7 +20,6 @@ struct FloatingPanel {
     Vector2 dragOffset = { 0, 0 };
 };
 
-// Manages a panel dock tree and floating panels within one editor tab's area.
 class DockArea {
 public:
     void SetPanels(const std::vector<Panel*>& panels);
@@ -28,12 +27,13 @@ public:
 
     void SetDefaultLayout(std::unique_ptr<DockNode> root);
     std::unique_ptr<DockNode> TakeLayout();
+    const DockNode* GetLayoutRoot() const { return root.get(); }
 
-    // Main render call - draws everything including overlays.
+    static void SaveLayoutTree(const DockNode* node, std::unordered_map<std::string, std::string>& out, const std::string& prefix);
+    static std::unique_ptr<DockNode> LoadLayoutTree(const std::unordered_map<std::string, std::string>& in, const std::string& prefix);
+
     void Render(Rectangle area);
 
-    // Draw only the overlays that must appear on top of all other UI (floating panels, drag ghost, drop highlights).
-    // Called by the editor after the menu bar body but before the menu popup.
     void RenderOverlays();
 
     void SaveLayout(std::unordered_map<std::string, std::string>& out, const std::string& prefix) const;
@@ -51,7 +51,6 @@ public:
 
 private:
     void LayoutNode(DockNode* node, Rectangle area);
-    // Renders panel content only (no overlays).
     void RenderNode(DockNode* node);
     void RenderSplitter(DockNode* node);
     void RenderTabBar(DockNode* node);
@@ -67,18 +66,15 @@ private:
     void DrawDropHighlight(DockNode* target, DropZone zone) const;
     void PruneEmptyNodes(std::unique_ptr<DockNode>& node);
 
-    // Splitter resize state.
     DockNode* activeSplitter       = nullptr;
     Vector2   splitterDragStart    = { 0, 0 };
     float     splitterRatioAtStart = 0.0f;
 
-    // Pending drag: mouse pressed on a tab, waiting for threshold before committing to drag.
     bool      pendingDrag       = false;
     std::string pendingDragPanel;
     DockNode* pendingDragNode   = nullptr;
     Vector2   pendingDragOrigin = { 0, 0 };
 
-    // Active drag state.
     bool      dragging           = false;
     std::string dragPanelName;
     Vector2   dragPos            = { 0, 0 };

@@ -170,11 +170,46 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         auto hierarchyLeaf = std::make_unique<DockNode>();
         hierarchyLeaf->panelNames = { "Hierarchy" };
 
+        auto stargraphLeaf = std::make_unique<DockNode>();
+        stargraphLeaf->panelNames = { "My Stargraph" };
+
+        auto leftCol = std::make_unique<DockNode>();
+        leftCol->type = DockNode::Type::SplitV;
+        leftCol->splitRatio = 0.3144f;
+        leftCol->first = std::move(hierarchyLeaf);
+        leftCol->second = std::move(stargraphLeaf);
+
+        auto graphLeaf = std::make_unique<DockNode>();
+        graphLeaf->panelNames = { "Graph" };
+
+        std::unique_ptr<DockNode> graphCol;
+        if (logPanel) {
+            auto logsLeaf = std::make_unique<DockNode>();
+            logsLeaf->panelNames = { "Logs" };
+
+            graphCol = std::make_unique<DockNode>();
+            graphCol->type = DockNode::Type::SplitV;
+            graphCol->splitRatio = 0.7301f;
+            graphCol->first = std::move(graphLeaf);
+            graphCol->second = std::move(logsLeaf);
+        } else {
+            graphCol = std::move(graphLeaf);
+        }
+
+        auto detailsLeaf = std::make_unique<DockNode>();
+        detailsLeaf->panelNames = { "Details" };
+
+        auto rightCol = std::make_unique<DockNode>();
+        rightCol->type = DockNode::Type::SplitH;
+        rightCol->splitRatio = 0.8000f;
+        rightCol->first = std::move(graphCol);
+        rightCol->second = std::move(detailsLeaf);
+
         auto root = std::make_unique<DockNode>();
         root->type = DockNode::Type::SplitH;
         root->splitRatio = 0.16f;
-        root->first = std::move(hierarchyLeaf);
-        root->second = panelSet.layout ? std::move(panelSet.layout) : std::make_unique<DockNode>();
+        root->first = std::move(leftCol);
+        root->second = std::move(rightCol);
 
         graphDefaultLayout = CloneDockNode(*root);
         graphLayoutSnapshot = std::move(root);
@@ -322,8 +357,14 @@ void WidgetEditorTab::TogglePanelVisible(const std::string& name) {
 void WidgetEditorTab::SaveLayout(const std::string& filePath) const {
     std::unordered_map<std::string, std::string> data;
     LayoutSerializer::Load(filePath, data);
-    dockArea.SaveLayout(data, "widget");
+
+    const DockNode* designerTree = inGraphMode ? designerLayoutSnapshot.get() : dockArea.GetLayoutRoot();
+    const DockNode* graphTree = inGraphMode ? dockArea.GetLayoutRoot() : graphLayoutSnapshot.get();
+
+    if (designerTree) DockArea::SaveLayoutTree(designerTree, data, "widget.designer");
+    if (graphTree) DockArea::SaveLayoutTree(graphTree, data, "widget.graph");
     data["WidgetTab.Mode"] = inGraphMode ? "Graph" : "Designer";
+
     LayoutSerializer::Save(filePath, data);
 }
 
@@ -331,12 +372,24 @@ void WidgetEditorTab::LoadLayout(const std::string& filePath) {
     std::unordered_map<std::string, std::string> data;
     if (!LayoutSerializer::Load(filePath, data)) return;
 
+    std::unique_ptr<DockNode> loadedDesigner = DockArea::LoadLayoutTree(data, "widget.designer");
+    std::unique_ptr<DockNode> loadedGraph = DockArea::LoadLayoutTree(data, "widget.graph");
+
+    if (loadedDesigner) designerLayoutSnapshot = std::move(loadedDesigner);
+
     auto modeIt = data.find("WidgetTab.Mode");
-    if (modeIt != data.end() && modeIt->second == "Graph") {
-        ApplyGraphLayout();
+    bool wantGraph = modeIt != data.end() && modeIt->second == "Graph";
+
+    if (wantGraph && ApplyGraphLayout()) {
+        if (loadedGraph) {
+            graphLayoutSnapshot = std::move(loadedGraph);
+            dockArea.SetDefaultLayout(CloneDockNode(*graphLayoutSnapshot));
+        }
+        return;
     }
 
-    dockArea.LoadLayout(data, "widget");
+    if (loadedGraph) graphLayoutSnapshot = std::move(loadedGraph);
+    if (designerLayoutSnapshot) dockArea.SetDefaultLayout(CloneDockNode(*designerLayoutSnapshot));
 }
 
 void WidgetEditorTab::Save() {
