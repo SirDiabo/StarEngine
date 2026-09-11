@@ -434,10 +434,15 @@ void RegisterUtilityNodes() {
     toggleFullscreen.moduleName = "Stargraph";
     toggleFullscreen.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Borderless", PinType::Boolean, true,  false, 0, "false"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     toggleFullscreen.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        ToggleFullscreen();
+        bool borderless = false;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Borderless") borderless = (p.defaultValue == "true" || p.defaultValue == "1");
+        }
+        (borderless ? ToggleBorderlessWindowed : ToggleFullscreen)();
     };
     NodeRegistry::Get().RegisterNode(toggleFullscreen);
 
@@ -466,6 +471,42 @@ void RegisterUtilityNodes() {
         MinimizeWindow();
     };
     NodeRegistry::Get().RegisterNode(minimizeWindow);
+
+    NodeTemplate isWindowMinimized;
+    isWindowMinimized.type = "Is_Window_Minimized";
+    isWindowMinimized.category = "Window";
+    isWindowMinimized.moduleName = "Stargraph";
+    isWindowMinimized.createPins = [](Node* node) {
+        node->outputs.push_back({"Minimized", PinType::Boolean, false, true});
+    };
+    isWindowMinimized.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (Pin& p : node.outputs) if (p.name == "Minimized") p.defaultValue = IsWindowMinimized() ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(isWindowMinimized);
+
+    NodeTemplate isWindowMaximized;
+    isWindowMaximized.type = "Is_Window_Maximized";
+    isWindowMaximized.category = "Window";
+    isWindowMaximized.moduleName = "Stargraph";
+    isWindowMaximized.createPins = [](Node* node) {
+        node->outputs.push_back({"Maximized", PinType::Boolean, false, true});
+    };
+    isWindowMaximized.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (Pin& p : node.outputs) if (p.name == "Maximized") p.defaultValue = IsWindowMaximized() ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(isWindowMaximized);
+
+    NodeTemplate isWindowFocused;
+    isWindowFocused.type = "Is_Window_Focused";
+    isWindowFocused.category = "Window";
+    isWindowFocused.moduleName = "Stargraph";
+    isWindowFocused.createPins = [](Node* node) {
+        node->outputs.push_back({"Focused", PinType::Boolean, false, true});
+    };
+    isWindowFocused.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (Pin& p : node.outputs) if (p.name == "Focused") p.defaultValue = IsWindowFocused() ? "true" : "false";
+    };
+    NodeRegistry::Get().RegisterNode(isWindowFocused);
 
     NodeTemplate colorFromHex;
     colorFromHex.type = "Color_From_Hex";
@@ -1226,6 +1267,27 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(setWindowOpacity);
 
+    NodeTemplate getWindowPosition;
+    getWindowPosition.type = "Get_Window_Position";
+    getWindowPosition.category = "Window";
+    getWindowPosition.moduleName = "Stargraph";
+    getWindowPosition.createPins = [](Node* node) {
+        node->outputs.push_back({"Position", PinType::Vec3, false, true});
+        node->outputs.push_back({"X", PinType::Integer, false, true});
+        node->outputs.push_back({"Y", PinType::Integer, false, true});
+    };
+    getWindowPosition.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector2 position = GetWindowPosition();
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%g,%g,0", position.x, position.y);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Position") p.defaultValue = buf;
+            if (p.name == "X") p.defaultValue = std::to_string((int)position.x);
+            if (p.name == "Y") p.defaultValue = std::to_string((int)position.y);
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getWindowPosition);
+
     NodeTemplate setWindowPosition;
     setWindowPosition.type = "Set_Window_Position";
     setWindowPosition.category = "Window";
@@ -1243,6 +1305,42 @@ void RegisterUtilityNodes() {
         SetWindowPosition((int)pos.x, (int)pos.y);
     };
     NodeRegistry::Get().RegisterNode(setWindowPosition);
+
+    NodeTemplate getWindowSize;
+    getWindowSize.type = "Get_Window_Size";
+    getWindowSize.category = "Window";
+    getWindowSize.moduleName = "Stargraph";
+    getWindowSize.createPins = [](Node* node) {
+        node->outputs.push_back({"Width", PinType::Integer, false, true});
+        node->outputs.push_back({"Height", PinType::Integer, false, true});
+    };
+    getWindowSize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        for (Pin& p : node.outputs) {
+            if (p.name == "Width") p.defaultValue = std::to_string(GetScreenWidth());
+            if (p.name == "Height") p.defaultValue = std::to_string(GetScreenHeight());
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getWindowSize);
+
+    NodeTemplate setWindowSize;
+    setWindowSize.type = "Set_Window_Size";
+    setWindowSize.category = "Window";
+    setWindowSize.moduleName = "Stargraph";
+    setWindowSize.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Width", PinType::Integer, true, false, 0, "1280"});
+        node->inputs.push_back({"Height", PinType::Integer, true, false, 0, "720"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setWindowSize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int width = 1280, height = 720;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Width") width = p.defaultValue.AsInt();
+            if (p.name == "Height") height = p.defaultValue.AsInt();
+        }
+        SetWindowSize(width, height);
+    };
+    NodeRegistry::Get().RegisterNode(setWindowSize);
 
     NodeTemplate getClipboardText;
     getClipboardText.type = "Get_Clipboard_Text";
