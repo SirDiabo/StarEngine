@@ -26,7 +26,7 @@ void TimerManager::CancelNodeTimers(StargraphBehavior* owner, Node* node) {
     }), timers.end());
 }
 
-void TimerManager::StartNodeTimer(StargraphBehavior* owner, Actor* actor, Node* node, const std::string& outPin, float duration) {
+void TimerManager::StartNodeTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration) {
     if (timers.size() >= kMaxTimers) {
         TraceLog(LOG_WARNING, "TimerManager: timer limit reached, ignoring new Delay");
         return;
@@ -35,13 +35,14 @@ void TimerManager::StartNodeTimer(StargraphBehavior* owner, Actor* actor, Node* 
     PendingTimer t;
     t.owner = owner;
     t.actor = actor;
+    t.widget = widget;
     t.node = node;
     t.outPin = outPin;
     t.remaining = duration;
     timers.push_back(t);
 }
 
-void TimerManager::StartNamedTimer(StargraphBehavior* owner, Actor* actor, const std::string& functionName,
+void TimerManager::StartNamedTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, const std::string& functionName,
                                     float rate, bool loop, bool limitToFrameRate) {
     ClearNamedTimer(owner, functionName);
 
@@ -53,6 +54,7 @@ void TimerManager::StartNamedTimer(StargraphBehavior* owner, Actor* actor, const
     PendingTimer t;
     t.owner = owner;
     t.actor = actor;
+    t.widget = widget;
     t.functionName = functionName;
     t.remaining = rate;
     t.interval = rate;
@@ -96,6 +98,7 @@ void TimerManager::Tick(float deltaTime) {
     struct FireEvent {
         StargraphBehavior* owner;
         Actor* actor;
+        Widget* widget;
         Node* node;
         std::string outPin;
         std::string functionName;
@@ -120,7 +123,7 @@ void TimerManager::Tick(float deltaTime) {
 
         int fires = 0;
         while (t.remaining <= 0.0f && fires < kMaxCatchUpFires) {
-            firing.push_back({t.owner, t.actor, t.node, t.outPin, t.functionName});
+            firing.push_back({t.owner, t.actor, t.widget, t.node, t.outPin, t.functionName});
             fires++;
             if (!t.loop) break;
             t.remaining += t.interval;
@@ -135,6 +138,7 @@ void TimerManager::Tick(float deltaTime) {
     for (FireEvent& f : firing) {
         ExecutionContext ctx;
         ctx.actor = f.actor;
+        ctx.widget = f.widget;
         ctx.deltaTime = deltaTime;
         if (f.node) {
             GraphExecutor::RunFromPin(f.owner->GetGraph(), f.node, ctx, f.outPin);

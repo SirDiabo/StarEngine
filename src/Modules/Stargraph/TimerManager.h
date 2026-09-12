@@ -3,6 +3,7 @@
 #include <vector>
 
 class Actor;
+class Widget;
 class StargraphBehavior;
 struct Node;
 
@@ -15,10 +16,10 @@ public:
     // Node-keyed timers
     bool IsNodeTimerActive(StargraphBehavior* owner, Node* node) const;
     void CancelNodeTimers(StargraphBehavior* owner, Node* node);
-    void StartNodeTimer(StargraphBehavior* owner, Actor* actor, Node* node, const std::string& outPin, float duration);
+    void StartNodeTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration);
 
     // Named timers
-    void StartNamedTimer(StargraphBehavior* owner, Actor* actor, const std::string& functionName,
+    void StartNamedTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, const std::string& functionName,
                           float rate, bool loop, bool limitToFrameRate);
     void PauseNamedTimer(StargraphBehavior* owner, const std::string& functionName);
     void ResumeNamedTimer(StargraphBehavior* owner, const std::string& functionName);
@@ -33,6 +34,7 @@ private:
     struct PendingTimer {
         StargraphBehavior* owner = nullptr;
         Actor* actor = nullptr;
+        Widget* widget = nullptr;
         Node* node = nullptr;
         std::string outPin;
         std::string functionName;

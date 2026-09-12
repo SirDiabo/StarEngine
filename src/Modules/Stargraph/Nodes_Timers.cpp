@@ -3,23 +3,39 @@
 #include "StargraphBehavior.h"
 #include "TimerManager.h"
 #include "Runtime/Actor.h"
+#include "Core/Widgets/Widget.h"
 #include <cstdlib>
 #include "ObjectPinRef.h"
 
 static StargraphBehavior* ResolveOwner(ExecutionContext& ctx) {
-    if (!ctx.actor) return nullptr;
-    return dynamic_cast<StargraphBehavior*>(ctx.actor->GetGraphBehavior());
+    if (ctx.actor) return dynamic_cast<StargraphBehavior*>(ctx.actor->GetGraphBehavior());
+    if (ctx.widget) return dynamic_cast<StargraphBehavior*>(ctx.widget->GetBehavior());
+    return nullptr;
 }
 
-static Actor* ResolveTarget(Node& node, ExecutionContext& ctx) {
-    Actor* target = ctx.actor;
+struct ResolvedTimerTarget {
+    Actor* actor = nullptr;
+    Widget* widget = nullptr;
+    StargraphBehavior* owner = nullptr;
+};
+
+static ResolvedTimerTarget ResolveTimerTarget(Node& node, ExecutionContext& ctx) {
+    ResolvedTimerTarget result;
+    bool hasExplicitTarget = false;
     for (const Pin& p : node.inputs) {
         if (p.name == "Target" && !p.defaultValue.empty()) {
-            target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
+            result.actor = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
+            hasExplicitTarget = true;
             break;
         }
     }
-    return target;
+    if (!hasExplicitTarget) {
+        result.actor = ctx.actor;
+        result.widget = ctx.widget;
+    }
+    if (result.actor) result.owner = dynamic_cast<StargraphBehavior*>(result.actor->GetGraphBehavior());
+    else if (result.widget) result.owner = dynamic_cast<StargraphBehavior*>(result.widget->GetBehavior());
+    return result;
 }
 
 static float ReadDuration(Node& node) {
@@ -44,7 +60,7 @@ void RegisterTimerNodes() {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
         if (TimerManager::Get().IsNodeTimerActive(owner, &node)) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(delay);
 
@@ -61,7 +77,7 @@ void RegisterTimerNodes() {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
         TimerManager::Get().CancelNodeTimers(owner, &node);
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(retriggerableDelay);
 
@@ -77,7 +93,7 @@ void RegisterTimerNodes() {
     stackableDelay.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(stackableDelay);
 
@@ -92,7 +108,7 @@ void RegisterTimerNodes() {
     delayNextFrame.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, &node, "Completed", ctx.deltaTime);
+        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ctx.deltaTime);
     };
     NodeRegistry::Get().RegisterNode(delayNextFrame);
 
@@ -110,10 +126,8 @@ void RegisterTimerNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     timerByName.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Actor* target = ResolveTarget(node, ctx);
-        if (!target) return;
-        StargraphBehavior* owner = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior());
-        if (!owner) return;
+        ResolvedTimerTarget target = ResolveTimerTarget(node, ctx);
+        if (!target.owner) return;
 
         std::string functionName;
         float rate = 1.0f;
@@ -127,7 +141,7 @@ void RegisterTimerNodes() {
         }
         if (functionName.empty()) return;
 
-        TimerManager::Get().StartNamedTimer(owner, target, functionName, rate, loop, limitToFrameRate);
+        TimerManager::Get().StartNamedTimer(target.owner, target.actor, target.widget, functionName, rate, loop, limitToFrameRate);
     };
     NodeRegistry::Get().RegisterNode(timerByName);
 
@@ -142,12 +156,10 @@ void RegisterTimerNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     pauseTimer.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Actor* target = ResolveTarget(node, ctx);
-        if (!target) return;
-        StargraphBehavior* owner = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior());
-        if (!owner) return;
+        ResolvedTimerTarget target = ResolveTimerTarget(node, ctx);
+        if (!target.owner) return;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Function Name") TimerManager::Get().PauseNamedTimer(owner, p.defaultValue);
+            if (p.name == "Function Name") TimerManager::Get().PauseNamedTimer(target.owner, p.defaultValue);
         }
     };
     NodeRegistry::Get().RegisterNode(pauseTimer);
@@ -163,12 +175,10 @@ void RegisterTimerNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     resumeTimer.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Actor* target = ResolveTarget(node, ctx);
-        if (!target) return;
-        StargraphBehavior* owner = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior());
-        if (!owner) return;
+        ResolvedTimerTarget target = ResolveTimerTarget(node, ctx);
+        if (!target.owner) return;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Function Name") TimerManager::Get().ResumeNamedTimer(owner, p.defaultValue);
+            if (p.name == "Function Name") TimerManager::Get().ResumeNamedTimer(target.owner, p.defaultValue);
         }
     };
     NodeRegistry::Get().RegisterNode(resumeTimer);
@@ -184,12 +194,10 @@ void RegisterTimerNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     clearTimer.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Actor* target = ResolveTarget(node, ctx);
-        if (!target) return;
-        StargraphBehavior* owner = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior());
-        if (!owner) return;
+        ResolvedTimerTarget target = ResolveTimerTarget(node, ctx);
+        if (!target.owner) return;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Function Name") TimerManager::Get().ClearNamedTimer(owner, p.defaultValue);
+            if (p.name == "Function Name") TimerManager::Get().ClearNamedTimer(target.owner, p.defaultValue);
         }
     };
     NodeRegistry::Get().RegisterNode(clearTimer);
