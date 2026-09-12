@@ -57,6 +57,7 @@ private:
 
     std::vector<Panel*> graphPanels;
     std::function<void()> graphTeardown;
+    std::function<void(const std::string&, const std::string&)> graphElementDragCallback;
     std::unique_ptr<DockNode> designerLayoutSnapshot;
     std::unique_ptr<DockNode> designerDefaultLayout;
     std::unique_ptr<DockNode> graphLayoutSnapshot;

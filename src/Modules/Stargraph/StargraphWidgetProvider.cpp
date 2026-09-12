@@ -86,6 +86,9 @@ void RegisterStargraphWidgetProvider() {
         result.teardown = [session]() {
             delete session;
         };
+        result.onElementDragStarted = [session](const std::string& elementName, const std::string& elementClass) {
+            session->BeginElementDrag(elementName, elementClass);
+        };
 
         return result;
     };

@@ -1414,6 +1414,34 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         componentDragIndex = -1;
     }
 
+    if (elementDragActive) {
+        Vector2 mp = GetMousePosition();
+        std::string label = "Get: " + elementDragName;
+        int w = (int)MeasureText(label.c_str(), 12) + 12;
+        DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
+        DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
+        DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
+
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            if (CheckCollisionPointRec(mp, graphArea)) {
+                Node* node = ActiveGraph().CreateNode("Get_Widget_Element");
+                node->title = "Get: " + elementDragName;
+                node->componentClass = elementDragClass;
+                for (Pin& p : node->inputs) {
+                    if (p.name == "Element_Name") p.defaultValue = elementDragName;
+                }
+                for (Pin& p : node->outputs) {
+                    if (p.name == "Element") p.objectKind = elementDragClass;
+                }
+                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
+                node->posX = snapped.x;
+                node->posY = snapped.y;
+                isDirty = true;
+            }
+            elementDragActive = false;
+        }
+    }
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
         if (!GetNodeAtPos(mousePos)) {
             if (!IsKeyDown(KEY_LEFT_CONTROL)) {

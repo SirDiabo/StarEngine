@@ -27,6 +27,12 @@ public:
     const std::string& GetFilePath() const { return filePath; }
     Stargraph& GetGraph() { return graph; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
+    void BeginElementDrag(const std::string& elementName, const std::string& elementClass) {
+        elementDragName = elementName;
+        elementDragClass = elementClass;
+        elementDragPos = GetMousePosition();
+        elementDragActive = true;
+    }
 
     void SetScreenBounds(Rectangle b) { screenBounds = b; }
 
@@ -192,6 +198,11 @@ private:
     int componentDragIndex = -1;
     Vector2 componentDragPos{0, 0};
     bool componentDragActive = false;
+
+    std::string elementDragName;
+    std::string elementDragClass;
+    Vector2 elementDragPos{0, 0};
+    bool elementDragActive = false;
 
     int selectedComponentIndex = -1;
     int lastValidComponentIndex = -1;

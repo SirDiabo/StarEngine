@@ -9,6 +9,15 @@
 #include "Runtime/Components/WidgetComponent.h"
 #include "Runtime/Actor.h"
 
+static WidgetElement* FindWidgetElementByName(WidgetElement* root, const std::string& name) {
+    if (!root) return nullptr;
+    if (root->elementId == name) return root;
+    for (WidgetElement* child : root->GetChildren()) {
+        if (WidgetElement* found = FindWidgetElementByName(child, name)) return found;
+    }
+    return nullptr;
+}
+
 void RegisterWidgetNodes() {
     NodeTemplate setText;
     setText.type = "Set_Text_Element_Text";
@@ -59,6 +68,27 @@ void RegisterWidgetNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(getText);
+
+    NodeTemplate getElement;
+    getElement.type = "Get_Widget_Element";
+    getElement.category = "Widgets";
+    getElement.moduleName = "Stargraph";
+    getElement.hideFromContextMenu = true;
+    getElement.createPins = [](Node* node) {
+        node->inputs.push_back({"Element_Name", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Element", PinType::Object, false, true, 0, "", false, "WidgetElement"});
+    };
+    getElement.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string elementName;
+        for (const Pin& p : node.inputs) if (p.name == "Element_Name") elementName = p.defaultValue;
+        if (elementName.empty() || !ctx.widget || !ctx.widget->rootElement) return;
+        WidgetElement* found = FindWidgetElementByName(ctx.widget->rootElement, elementName);
+        if (!found) return;
+        for (Pin& p : node.outputs) {
+            if (p.name == "Element") p.defaultValue = ObjectPinRef::Encode(found->GetObjectKind(), found->GetObjectId());
+        }
+    };
+    NodeRegistry::Get().RegisterNode(getElement);
 
     NodeTemplate getParentActor;
     getParentActor.type = "Get_Parent_Actor_From_Widget";

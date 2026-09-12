@@ -25,7 +25,7 @@ std::string FormatFloat(float v) {
 }
 
 void WidgetDetailsPanel::Initialize() {
-    name = "Details";
+    name = "Element Details";
 }
 
 WidgetDetailsPanel::~WidgetDetailsPanel() {

@@ -121,7 +121,7 @@ void WidgetEditorTab::ApplyDesignerLayout() {
     }
 
     auto detailsLeaf = std::make_unique<DockNode>();
-    detailsLeaf->panelNames = { "Details" };
+    detailsLeaf->panelNames = { "Element Details" };
 
     auto centerAndRight = std::make_unique<DockNode>();
     centerAndRight->type = DockNode::Type::SplitH;
@@ -157,10 +157,12 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         ProgrammingInterfacePanelSet panelSet = provider->buildWidgetEditorPanels(ctx);
         graphPanels = panelSet.panels;
         graphTeardown = panelSet.teardown;
+        graphElementDragCallback = panelSet.onElementDragStarted;
         graphModeLabel = provider->displayLabel;
         graphPanelsBuilt = true;
 
         session->beforeSave = panelSet.syncBeforeSave;
+        if (hierarchyPanel) hierarchyPanel->SetElementDragCallback(graphElementDragCallback);
 
         std::vector<Panel*> allPanels = { palettePanel, hierarchyPanel, canvasPanel, detailsPanel };
         for (Panel* p : graphPanels) allPanels.push_back(p);
@@ -319,6 +321,7 @@ void WidgetEditorTab::BuildMenus(MenuBar* menuBar) {
         dockArea.IsPanelVisible("Palette"),
         dockArea.IsPanelVisible("Hierarchy"),
         dockArea.IsPanelVisible("Canvas"),
+        dockArea.IsPanelVisible("Element Details"),
         dockArea.IsPanelVisible("Details"),
         dockArea.IsPanelVisible("Logs"),
         false, false,
@@ -327,7 +330,7 @@ void WidgetEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "Save" } },
         { "Asset",  { "Find in Content Browser" } },
-        { "Window", { "Palette", "Hierarchy", "Canvas", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
+        { "Window", { "Palette", "Hierarchy", "Canvas", "Element Details", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -337,7 +340,7 @@ bool WidgetEditorTab::IsOpen() const {
 }
 
 void WidgetEditorTab::ResetLayout() {
-    for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Details", "Logs" })
+    for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Element Details", "Details", "Logs" })
         dockArea.SetPanelVisible(n, true);
 
     if (inGraphMode) {

@@ -31,6 +31,7 @@ struct ProgrammingInterfacePanelSet {
     std::unique_ptr<DockNode> layout;
     std::function<void()> syncBeforeSave;
     std::function<void()> teardown;
+    std::function<void(const std::string& elementName, const std::string& elementClass)> onElementDragStarted;
 };
 
 struct ProgrammingInterfaceInfo {

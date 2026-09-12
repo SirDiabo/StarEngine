@@ -17,8 +17,14 @@ public:
     WidgetAssetData& GetData() { return data; }
     const WidgetAssetData& GetData() const { return data; }
 
-    WidgetElement* GetSelectedElement() const { return selectedElement; }
-    void SetSelectedElement(WidgetElement* element) { selectedElement = element; }
+    WidgetElement* GetSelectedElement() const { return lastValidElement; }
+    void SetSelectedElement(WidgetElement* element) {
+        highlightedElement = element;
+        lastValidElement = element;
+    }
+
+    bool IsHierarchyRowHighlighted(WidgetElement* element) const { return highlightedElement == element; }
+    void ClearHierarchyHighlight() { highlightedElement = nullptr; }
 
     WidgetElement* AddElement(const std::string& className, WidgetElement* parent);
     void DeleteElement(WidgetElement* element);
@@ -31,7 +37,8 @@ public:
 private:
     std::string assetPath;
     WidgetAssetData data;
-    WidgetElement* selectedElement = nullptr;
+    WidgetElement* highlightedElement = nullptr;
+    WidgetElement* lastValidElement = nullptr;
     bool dirty = false;
     bool isOpen = false;
 };

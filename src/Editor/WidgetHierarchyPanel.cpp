@@ -24,13 +24,13 @@ WidgetHierarchyPanel::~WidgetHierarchyPanel() {
 
 void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement* element, int depth) {
     const UIPalette& theme = UITheme::Get();
-    bool isSelected = session && session->GetSelectedElement() == element;
+    bool isHighlighted = session && session->IsHierarchyRowHighlighted(element);
 
     auto* row = new ButtonElement();
     row->size = { 0.0f, kRowHeight };
-    row->defaultColor = isSelected ? theme.surfaceSelected : theme.panelBg;
-    row->hoveredColor = isSelected ? theme.surfaceSelected : theme.surfaceHover;
-    row->selectedColor = isSelected ? theme.surfaceSelected : theme.surfaceHover;
+    row->defaultColor = isHighlighted ? theme.surfaceSelected : theme.panelBg;
+    row->hoveredColor = isHighlighted ? theme.surfaceSelected : theme.surfaceHover;
+    row->selectedColor = isHighlighted ? theme.surfaceSelected : theme.surfaceHover;
     row->pressedColor = theme.accent;
     row->onActivated = [this, element]() {
         if (session) session->SetSelectedElement(element);
@@ -72,6 +72,7 @@ void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement
     }
 
     list->AddChild(row);
+    rowEntries.push_back({ element, row });
 
     for (WidgetElement* child : element->GetChildren()) {
         AddElementRow(list, child, depth + 1);
@@ -81,6 +82,7 @@ void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement
 void WidgetHierarchyPanel::Render() {
     delete chrome;
     chrome = new Widget();
+    rowEntries.clear();
 
     const UIPalette& theme = UITheme::Get();
 
@@ -98,6 +100,40 @@ void WidgetHierarchyPanel::Render() {
 
     float dt = GetFrameTime();
     chrome->Tick(dt, bounds, 1.0f);
-    WidgetInput::ProcessInput(chrome, "Editor", dt, GetMousePosition(), 1.0f);
+
+    Vector2 mouse = GetMousePosition();
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        dragPending = false;
+        dragCandidate = nullptr;
+        bool clickedARow = false;
+        for (RowEntry& entry : rowEntries) {
+            if (CheckCollisionPointRec(mouse, entry.rowWidget->lastResolvedRect)) {
+                clickedARow = true;
+                dragPending = true;
+                dragCandidate = entry.element;
+                dragStartMouse = mouse;
+                break;
+            }
+        }
+        if (!clickedARow && session) session->ClearHierarchyHighlight();
+    }
+
+    if (dragPending && dragCandidate) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float dx = mouse.x - dragStartMouse.x;
+            float dy = mouse.y - dragStartMouse.y;
+            if (dx * dx + dy * dy > 36.0f) {
+                if (dragCallback) dragCallback(dragCandidate->elementId, dragCandidate->GetClassName());
+                dragPending = false;
+                dragCandidate = nullptr;
+            }
+        } else {
+            dragPending = false;
+            dragCandidate = nullptr;
+        }
+    }
+
+    WidgetInput::ProcessInput(chrome, "Editor", dt, mouse, 1.0f);
     chrome->Draw(bounds, 1.0f);
 }

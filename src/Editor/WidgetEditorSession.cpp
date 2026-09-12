@@ -9,7 +9,8 @@ bool WidgetEditorSession::Open(const std::string& path) {
     assetPath = path;
     isOpen = true;
     dirty = false;
-    selectedElement = nullptr;
+    highlightedElement = nullptr;
+    lastValidElement = nullptr;
 
     if (data.programmingInterface.empty()) {
         const std::vector<ProgrammingInterfaceInfo>& providers = ProgrammingInterfaceRegistry::Get().GetAll();
@@ -49,13 +50,15 @@ WidgetElement* WidgetEditorSession::AddElement(const std::string& className, Wid
     }
 
     dirty = true;
-    selectedElement = element;
+    highlightedElement = element;
+    lastValidElement = element;
     return element;
 }
 
 void WidgetEditorSession::DeleteElement(WidgetElement* element) {
     if (!element || element == data.rootElement) return;
-    if (selectedElement == element) selectedElement = nullptr;
+    if (highlightedElement == element) highlightedElement = nullptr;
+    if (lastValidElement == element) lastValidElement = nullptr;
     if (element->parent) element->parent->RemoveChild(element);
     dirty = true;
 }
