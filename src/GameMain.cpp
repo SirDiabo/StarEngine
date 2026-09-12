@@ -24,6 +24,13 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#define NOGDI
+#define NOUSER
+#include <windows.h>
+#include <cstdio>
+#endif
+
 namespace fs = std::filesystem;
 
 static std::string FindBootstrapFile(const fs::path& exeDir) {
@@ -63,6 +70,13 @@ int main(int argc, char* argv[]) {
         CookedFile::SetActivePak(std::move(pak), CookCipherFromName(config.cipher), config.cipherKey);
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
+#ifdef _WIN32
+        AllocConsole();
+        FILE* consoleOut = nullptr;
+        FILE* consoleErr = nullptr;
+        freopen_s(&consoleOut, "CONOUT$", "w", stdout);
+        freopen_s(&consoleErr, "CONOUT$", "w", stderr);
+#endif
         std::string bootstrapPath = FindBootstrapFile(exeDir);
         if (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
             TraceLog(LOG_ERROR, "GameMain: no embedded pak and no .starproject bootstrap found next to the exe");

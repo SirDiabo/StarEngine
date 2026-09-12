@@ -3,6 +3,8 @@
 #include "Modules.modules.generated.h"
 
 #ifdef STARENGINE_DEBUG_CONSOLE
+#define NOGDI
+#define NOUSER
 #include <windows.h>
 #include <cstdio>
 #endif

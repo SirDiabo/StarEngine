@@ -4,6 +4,7 @@
 #include "WidgetElementIO.h"
 #include "Core/SafeParse.h"
 #include "Core/ContentPathResolver.h"
+#include "Core/CookedFile.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "Runtime/WidgetBehavior.h"
 #include "raylib.h"
@@ -39,10 +40,10 @@ bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data) {
 }
 
 bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
-    std::string resolvedPath = ContentPathResolver::Resolve(path);
-    std::ifstream in(resolvedPath);
+    std::string openPath = CookedFile::Open(path);
+    std::ifstream in(openPath);
     if (!in.is_open()) {
-        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", resolvedPath.c_str());
+        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", openPath.c_str());
         return false;
     }
 

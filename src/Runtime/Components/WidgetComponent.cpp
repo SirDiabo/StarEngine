@@ -27,10 +27,6 @@ void WidgetComponent::Update(float deltaTime) {
 void WidgetComponent::RebuildWidgetFromAsset() {
     loadedWidgetAssetPath = widgetAssetPath;
     Widget* newWidget = widgetAssetPath.empty() ? nullptr : WidgetAsset::InstantiateWidget(widgetAssetPath);
-    if (newWidget) {
-        uiScale = newWidget->uiScale;
-        forceNativeResolution = newWidget->forceNativeResolution;
-    }
     SetWidget(newWidget);
 }
 

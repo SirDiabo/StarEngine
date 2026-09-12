@@ -91,4 +91,35 @@ void RegisterWidgetNodes() {
     };
     elementEvent.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) { };
     NodeRegistry::Get().RegisterNode(elementEvent);
+
+    NodeTemplate widgetConstruct;
+    widgetConstruct.type = "Widget_Event_Construct";
+    widgetConstruct.category = "Widget Events";
+    widgetConstruct.moduleName = "Stargraph";
+    widgetConstruct.isEvent = true;
+    widgetConstruct.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(widgetConstruct);
+
+    NodeTemplate widgetTick;
+    widgetTick.type = "Widget_Event_Tick";
+    widgetTick.category = "Widget Events";
+    widgetTick.moduleName = "Stargraph";
+    widgetTick.isEvent = true;
+    widgetTick.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Delta Seconds", PinType::Float, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(widgetTick);
+
+    NodeTemplate widgetDestruct;
+    widgetDestruct.type = "Widget_Event_Destruct";
+    widgetDestruct.category = "Widget Events";
+    widgetDestruct.moduleName = "Stargraph";
+    widgetDestruct.isEvent = true;
+    widgetDestruct.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(widgetDestruct);
 }
