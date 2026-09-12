@@ -279,21 +279,26 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(strContains);
 
-    NodeTemplate getScreenSize;
-    getScreenSize.type = "Get_Screen_Size";
-    getScreenSize.category = "Utility";
-    getScreenSize.moduleName = "Stargraph";
-    getScreenSize.createPins = [](Node* node) {
+    NodeTemplate getMonitorSize;
+    getMonitorSize.type = "Get_Monitor_Size";
+    getMonitorSize.category = "Utility";
+    getMonitorSize.moduleName = "Stargraph";
+    getMonitorSize.createPins = [](Node* node) {
+        node->inputs.push_back({"Monitor ID", PinType::Integer, false, true, 0, "0"});
         node->outputs.push_back({"Width", PinType::Integer, false, true});
         node->outputs.push_back({"Height", PinType::Integer, false, true});
     };
-    getScreenSize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+    getMonitorSize.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        int mID = 0;
+        for (Pin& p : node.inputs) {
+            if (p.name == "Monitor ID") mID = p.defaultValue.AsInt();
+        }
         for (Pin& p : node.outputs) {
-            if (p.name == "Width") p.defaultValue = std::to_string(GetScreenWidth());
-            if (p.name == "Height") p.defaultValue = std::to_string(GetScreenHeight());
+            if (p.name == "Width") p.defaultValue = std::to_string(GetMonitorWidth(mID));
+            if (p.name == "Height") p.defaultValue = std::to_string(GetMonitorHeight(mID));
         }
     };
-    NodeRegistry::Get().RegisterNode(getScreenSize);
+    NodeRegistry::Get().RegisterNode(getMonitorSize);
 
     NodeTemplate getMousePos;
     getMousePos.type = "Get_Mouse_Position";
