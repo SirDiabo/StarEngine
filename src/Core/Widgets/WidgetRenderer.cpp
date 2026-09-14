@@ -4,6 +4,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/WidgetComponent.h"
+#include "raymath.h"
 
 namespace WidgetRenderer {
 
@@ -31,6 +32,75 @@ void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 local
             if (!widget) continue;
             widget->Tick(deltaTime, targetRect, bufferScale);
             WidgetInput::ProcessInput(widget, widgetComponent->inputDevice, deltaTime, localMousePos, bufferScale);
+        }
+    }
+}
+
+static constexpr float kWorldPlaneBaseRotationDeg = 90.0f;
+
+static Model& GetWidgetPlaneModel() {
+    static Model planeModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 1, 1));
+    return planeModel;
+}
+
+static const int kWorldTextureSize = 512;
+
+void PrepareWorldSpaceWidgets() {
+    for (const auto& actor : World::Get().GetActors()) {
+        for (Component* component : actor->GetComponents()) {
+            WidgetComponent* widgetComponent = dynamic_cast<WidgetComponent*>(component);
+            if (!widgetComponent) continue;
+            if (widgetComponent->renderSpace != WidgetRenderSpace::World &&
+                widgetComponent->renderSpace != WidgetRenderSpace::Billboard) continue;
+
+            Widget* widget = widgetComponent->GetWidget();
+            if (!widget) continue;
+
+            RenderTexture2D& rt = widgetComponent->GetOrCreateWorldTexture(kWorldTextureSize, kWorldTextureSize);
+
+            BeginTextureMode(rt);
+            ClearBackground(BLANK);
+            widget->Tick(GetFrameTime(), {0, 0, (float)kWorldTextureSize, (float)kWorldTextureSize}, 1.0f);
+            widget->Draw({0, 0, (float)kWorldTextureSize, (float)kWorldTextureSize}, 1.0f);
+            EndTextureMode();
+        }
+    }
+}
+
+void DrawWorldSpaceWidgets(Camera3D camera) {
+    for (const auto& actor : World::Get().GetActors()) {
+        for (Component* component : actor->GetComponents()) {
+            WidgetComponent* widgetComponent = dynamic_cast<WidgetComponent*>(component);
+            if (!widgetComponent) continue;
+            if (widgetComponent->renderSpace != WidgetRenderSpace::World &&
+                widgetComponent->renderSpace != WidgetRenderSpace::Billboard) continue;
+
+            Widget* widget = widgetComponent->GetWidget();
+            if (!widget) continue;
+
+            RenderTexture2D& rt = widgetComponent->GetOrCreateWorldTexture(kWorldTextureSize, kWorldTextureSize);
+
+            Vector3 pos, rot, scl;
+            actor->GetComponentWorldTransform(component, pos, rot, scl);
+
+            Rectangle source = { 0, 0, (float)kWorldTextureSize, -(float)kWorldTextureSize };
+            Vector2 size = { scl.x, scl.y };
+
+            if (widgetComponent->renderSpace == WidgetRenderSpace::Billboard) {
+                DrawBillboardRec(camera, rt.texture, source, pos, size, WHITE);
+            } else {
+                Model& plane = GetWidgetPlaneModel();
+                plane.materials[0].maps[MATERIAL_MAP_ALBEDO].texture = rt.texture;
+
+                Matrix baseRotation = MatrixRotateX(DEG2RAD * kWorldPlaneBaseRotationDeg);
+                Matrix scaleMatrix = MatrixScale(scl.x, scl.y, 1.0f);
+                Matrix rotationMatrix = MatrixRotateXYZ({ DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z });
+
+                Matrix savedTransform = plane.transform;
+                plane.transform = MatrixMultiply(MatrixMultiply(scaleMatrix, baseRotation), rotationMatrix);
+                DrawModel(plane, pos, 1.0f, WHITE);
+                plane.transform = savedTransform;
+            }
         }
     }
 }

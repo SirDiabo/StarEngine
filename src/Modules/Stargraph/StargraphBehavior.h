@@ -13,6 +13,8 @@ public:
     void OnEndPlay(Actor* owner) override;
     void OnCustomEvent(Actor* owner, const std::string& eventName,
                         const std::vector<std::pair<std::string, std::string>>& params) override;
+    void OnCustomEvent(Widget* owner, const std::string& eventName,
+                        const std::vector<std::pair<std::string, std::string>>& params);
     void OnDestroyed(Actor* owner) override;
 
     void OnConstruct(Widget* owner) override;

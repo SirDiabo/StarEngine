@@ -42,6 +42,14 @@ void StargraphBehavior::OnCustomEvent(Actor* owner, const std::string& eventName
     GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
 }
 
+void StargraphBehavior::OnCustomEvent(Widget* owner, const std::string& eventName,
+                                       const std::vector<std::pair<std::string, std::string>>& params) {
+    ExecutionContext ctx;
+    ctx.widget = owner;
+    ctx.deltaTime = 0.0f;
+    GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
+}
+
 void StargraphBehavior::OnDestroyed(Actor* owner) {
     ExecutionContext ctx;
     ctx.actor = owner;

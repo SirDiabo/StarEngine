@@ -20,9 +20,14 @@ public:
 
     Widget* GetWidget() const { return widget; }
     void SetWidget(Widget* newWidget);
+    RenderTexture2D& GetOrCreateWorldTexture(int width, int height);
 
 private:
     Widget* widget = nullptr;
     std::string loadedWidgetAssetPath;
+    RenderTexture2D worldTexture{};
+    bool worldTextureValid = false;
+    int worldTextureWidth = 0;
+    int worldTextureHeight = 0;
     void RebuildWidgetFromAsset();
 };

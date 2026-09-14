@@ -11,6 +11,8 @@ namespace RenderPipeline {
 void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
 
+    WidgetRenderer::PrepareWorldSpaceWidgets();
+
     ShadingModel::ResetShadowSource();
     if (activeTechnique && activeTechnique->renderPrePass) {
         activeTechnique->renderPrePass(camera, {(float)target.texture.width, (float)target.texture.height});

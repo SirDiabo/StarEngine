@@ -5,6 +5,7 @@
 
 WidgetComponent::~WidgetComponent() {
     delete widget;
+    if (worldTextureValid) UnloadRenderTexture(worldTexture);
 }
 
 void WidgetComponent::GetEditorProperties(PropertyList& outProperties) {
@@ -39,6 +40,17 @@ void WidgetComponent::SetWidget(Widget* newWidget) {
         widget->forceNativeResolution = forceNativeResolution;
         widget->owningComponent = this;
     }
+}
+
+RenderTexture2D& WidgetComponent::GetOrCreateWorldTexture(int width, int height) {
+    if (!worldTextureValid || worldTextureWidth != width || worldTextureHeight != height) {
+        if (worldTextureValid) UnloadRenderTexture(worldTexture);
+        worldTexture = LoadRenderTexture(width, height);
+        worldTextureWidth = width;
+        worldTextureHeight = height;
+        worldTextureValid = true;
+    }
+    return worldTexture;
 }
 
 namespace {

@@ -2,11 +2,24 @@
 #include "StargraphBehavior.h"
 #include "GraphExecutor.h"
 #include "Runtime/World.h"
+#include "Runtime/Actor.h"
+#include "Runtime/Components/WidgetComponent.h"
 #include "raylib.h"
 #include <algorithm>
 
 static const size_t kMaxTimers = 4096;
 static const int kMaxCatchUpFires = 1000;
+
+static bool IsWidgetValid(Widget* widget) {
+    if (!widget) return false;
+    for (const auto& actor : World::Get().GetActors()) {
+        for (Component* c : actor->GetComponents()) {
+            WidgetComponent* wc = dynamic_cast<WidgetComponent*>(c);
+            if (wc && wc->GetWidget() == widget) return true;
+        }
+    }
+    return false;
+}
 
 TimerManager& TimerManager::Get() {
     static TimerManager instance;
@@ -107,7 +120,9 @@ void TimerManager::Tick(float deltaTime) {
 
     World& world = World::Get();
     timers.erase(std::remove_if(timers.begin(), timers.end(), [&world](const PendingTimer& t) {
-        return t.actor && !world.IsActorValid(t.actor);
+        if (t.actor) return !world.IsActorValid(t.actor);
+        if (t.widget) return !IsWidgetValid(t.widget);
+        return false;
     }), timers.end());
 
     // Decrement pass
@@ -142,8 +157,10 @@ void TimerManager::Tick(float deltaTime) {
         ctx.deltaTime = deltaTime;
         if (f.node) {
             GraphExecutor::RunFromPin(f.owner->GetGraph(), f.node, ctx, f.outPin);
-        } else {
+        } else if (f.actor) {
             f.owner->OnCustomEvent(f.actor, f.functionName, {});
+        } else if (f.widget) {
+            f.owner->OnCustomEvent(f.widget, f.functionName, {});
         }
     }
 }
