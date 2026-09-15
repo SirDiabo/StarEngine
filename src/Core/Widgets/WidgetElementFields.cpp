@@ -11,6 +11,8 @@
 #include "SplitBoxElement.h"
 #include "TabContainer.h"
 #include "SearchListElement.h"
+#include "CheckBoxElement.h"
+#include "SliderElement.h"
 #include "Core/SafeParse.h"
 #include <cstdio>
 
@@ -151,6 +153,23 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         ColF<SearchListElement>("SearchListElement", "CategoryHeaderColor", &SearchListElement::categoryHeaderColor),
         ColF<SearchListElement>("SearchListElement", "RowColor", &SearchListElement::rowColor),
         ColF<SearchListElement>("SearchListElement", "RowHoveredColor", &SearchListElement::rowHoveredColor),
+        BlnF<SearchListElement>("SearchListElement", "AllowCreate", &SearchListElement::allowCreate),
+        StrF<SearchListElement>("SearchListElement", "CreateLabel", &SearchListElement::createLabel),
+        ColF<SearchListElement>("SearchListElement", "CreateRowColor", &SearchListElement::createRowColor),
+
+        BlnF<CheckBoxElement>("CheckBoxElement", "Checked", &CheckBoxElement::checked),
+        ColF<CheckBoxElement>("CheckBoxElement", "BoxColor", &CheckBoxElement::boxColor),
+        ColF<CheckBoxElement>("CheckBoxElement", "HoveredBoxColor", &CheckBoxElement::hoveredBoxColor),
+        ColF<CheckBoxElement>("CheckBoxElement", "BorderColor", &CheckBoxElement::borderColor),
+        ColF<CheckBoxElement>("CheckBoxElement", "CheckColor", &CheckBoxElement::checkColor),
+
+        FltF<SliderElement>("SliderElement", "Value", &SliderElement::value),
+        FltF<SliderElement>("SliderElement", "MinValue", &SliderElement::minValue),
+        FltF<SliderElement>("SliderElement", "MaxValue", &SliderElement::maxValue),
+        ColF<SliderElement>("SliderElement", "TrackColor", &SliderElement::trackColor),
+        ColF<SliderElement>("SliderElement", "FillColor", &SliderElement::fillColor),
+        ColF<SliderElement>("SliderElement", "HandleColor", &SliderElement::handleColor),
+        ColF<SliderElement>("SliderElement", "BorderColor", &SliderElement::borderColor),
     };
     return fields;
 }
@@ -170,6 +189,8 @@ const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
         { "TabContainer", []() -> WidgetElement* { return new TabContainer(); } },
         { "TabHeaderButtonElement", []() -> WidgetElement* { return new TabHeaderButtonElement(); } },
         { "SearchListElement", []() -> WidgetElement* { return new SearchListElement(); } },
+        { "CheckBoxElement", []() -> WidgetElement* { return new CheckBoxElement(); } },
+        { "SliderElement", []() -> WidgetElement* { return new SliderElement(); } },
     };
     return types;
 }

@@ -1,14 +1,11 @@
 #include "AssetPickerPopup.h"
 #include "Core/Project.h"
-#include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/SearchListElement.h"
 #include <filesystem>
 #include <algorithm>
 
 namespace fs = std::filesystem;
-
-std::vector<std::function<void()>> AssetPickerPopup::deferredDraws;
 
 void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
     OpenWithExtras(anchorPos, ext, {});
@@ -17,7 +14,7 @@ void AssetPickerPopup::Open(Vector2 anchorPos, const std::string& ext) {
 void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
                                        const std::vector<std::pair<std::string, std::string>>& extras) {
     open = true;
-    justOpened = true;
+    hasPending = false;
     extension = ext;
     displayNames.clear();
     contentPaths.clear();
@@ -39,76 +36,63 @@ void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
         }
     }
 
-    float height = 22.0f + (float)(displayNames.size() + 1) * 18.0f + 4.0f;
-    area = {anchorPos.x, anchorPos.y, 200.0f, height};
+    float rowH = 20.0f;
+    float contentHeight = (float)(displayNames.size() + 1) * rowH;
+    float maxContentHeight = 260.0f;
+    float height = 26.0f + std::min(contentHeight, maxContentHeight) + 4.0f;
+    area = { anchorPos.x, anchorPos.y, 220.0f, height };
+
+    float screenW = (float)GetScreenWidth();
+    float screenH = (float)GetScreenHeight();
+    if (area.x + area.width > screenW) area.x = screenW - area.width;
+    if (area.x < 0) area.x = 0;
+    if (area.y + area.height > screenH) area.y = screenH - area.height;
+    if (area.y < 0) area.y = 0;
+
+    auto* list = new SearchListElement();
+    list->rowHeight = rowH;
+
+    std::vector<SearchListElement::Entry> listEntries;
+    listEntries.reserve(displayNames.size() + 1);
+
+    SearchListElement::Entry noneEntry;
+    noneEntry.id = "";
+    noneEntry.label = "(None)";
+    listEntries.push_back(noneEntry);
+
+    for (size_t i = 0; i < displayNames.size(); i++) {
+        SearchListElement::Entry entry;
+        entry.id = contentPaths[i];
+        entry.label = displayNames[i];
+        listEntries.push_back(entry);
+    }
+    list->SetEntries(listEntries);
+
+    list->onEntrySelected = [this](const std::string& id) {
+        pendingPath = id;
+        hasPending = true;
+    };
+
+    WidgetOverlay::Open(list, { area.x, area.y }, { area.width, area.height }, [this]() {
+        open = false;
+    });
 }
 
 void AssetPickerPopup::Close() {
     open = false;
+    WidgetOverlay::Close();
 }
 
 bool AssetPickerPopup::Render(std::string& outPath) {
     if (!open) return false;
-
-    Vector2 mousePos = GetMousePosition();
-
-    Rectangle areaCopy = area;
-    deferredDraws.push_back([areaCopy]() {
-        UIWidget::Panel(areaCopy);
-    });
-
-    float y = area.y + 2;
-
-    Rectangle noneItem = {area.x + 1, y, area.width - 2, 18};
-    bool noneHovered = CheckCollisionPointRec(mousePos, noneItem);
-    deferredDraws.push_back([noneItem, noneHovered]() {
-        const UIPalette& theme = UITheme::Get();
-        if (noneHovered) DrawRectangleRec(noneItem, theme.surfaceHover);
-        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, theme.textSecondary);
-    });
-    if (noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        outPath.clear();
+    if (hasPending) {
+        outPath = pendingPath;
+        hasPending = false;
         Close();
         return true;
     }
-    y += 18.0f;
-
-    for (size_t i = 0; i < displayNames.size(); i++) {
-        Rectangle item = {area.x + 1, y, area.width - 2, 18};
-        bool hovered = CheckCollisionPointRec(mousePos, item);
-        std::string name = displayNames[i];
-        deferredDraws.push_back([item, hovered, name]() {
-            const UIPalette& theme = UITheme::Get();
-            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
-            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, theme.textPrimary);
-        });
-
-        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            outPath = contentPaths[i];
-            Close();
-            return true;
-        }
-        y += 18.0f;
-    }
-
-    if (displayNames.empty()) {
-        float emptyY = y;
-        float emptyX = area.x;
-        deferredDraws.push_back([emptyX, emptyY]() {
-            DrawText("(no matching assets)", (int)emptyX + 6, (int)emptyY, 10, UITheme::Get().textSecondary);
-        });
-    }
-
-    if (justOpened) {
-        justOpened = false;
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, area)) {
-        Close();
-    }
-
     return false;
 }
 
 void AssetPickerPopup::FlushDeferredDraws() {
-    for (const auto& draw : deferredDraws) draw();
-    deferredDraws.clear();
 }

@@ -37,6 +37,12 @@ void TextElement::CommitEditing() {
 void TextElement::CancelEditing() {
     text = textAtEditStart;
     isEditing = false;
+    if (onEditCancelled) onEditCancelled();
+}
+
+void TextElement::StartEditing() {
+    if (!editable) return;
+    if (!isEditing) BeginEditing();
 }
 
 void TextElement::OnConfirmed() {

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+class SearchListElement;
+
 class SearchableListPopup {
 public:
     struct Entry {
@@ -23,13 +25,12 @@ public:
 
 private:
     bool open = false;
-    bool justOpened = false;
     Vector2 pos{0, 0};
     float width = 200.0f;
     float maxVisibleHeight = 300.0f;
-    float scrollOffset = 0.0f;
-    char search[64] = {};
     Rectangle lastRect{};
 
-    static std::vector<std::function<void()>> deferredDraws;
+    SearchListElement* content = nullptr;
+    bool hasPending = false;
+    std::string pendingId;
 };

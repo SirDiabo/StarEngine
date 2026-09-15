@@ -19,11 +19,11 @@ public:
 
 private:
     bool open = false;
-    bool justOpened = false;
     Rectangle area{};
     std::string extension;
     std::vector<std::string> displayNames;
     std::vector<std::string> contentPaths;
 
-    static std::vector<std::function<void()>> deferredDraws;
+    bool hasPending = false;
+    std::string pendingPath;
 };

@@ -36,6 +36,11 @@ public:
 
     std::function<void(const std::string&)> onEntrySelected;
 
+    bool allowCreate = false;
+    std::string createLabel = "+ New...";
+    Color createRowColor{ 120, 195, 120, 255 };
+    std::function<void(const std::string&)> onCreateRequested;
+
     void SetEntries(std::vector<Entry> newEntries);
     void SetShowSearchBar(bool show);
 
@@ -45,8 +50,12 @@ protected:
 
 private:
     void RebuildRows();
+    void EnterCreateMode();
+    void ExitCreateMode();
 
     std::vector<Entry> entries;
     TextElement* searchBox = nullptr;
     BoxElement* listBox = nullptr;
+    TextElement* createBox = nullptr;
+    bool creatingNew = false;
 };

@@ -1,21 +1,20 @@
 #include "RegistryPickerPopup.h"
 #include "Core/NamedListRegistry.h"
-#include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
-
-std::vector<std::function<void()>> RegistryPickerPopup::deferredDraws;
+#include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/SearchListElement.h"
+#include <algorithm>
 
 void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
     open = true;
-    justOpened = true;
-    creating = false;
+    hasPending = false;
     category = cat;
     entries = NamedListRegistry::Get().GetList(category);
-    newEntryBuf[0] = '\0';
 
-    float height = 22.0f + (float)(entries.size() + 2) * 18.0f + 4.0f;
-    area = {anchorPos.x, anchorPos.y, 200.0f, height};
+    float rowH = 20.0f;
+    float contentHeight = (float)(entries.size() + 2) * rowH;
+    float maxContentHeight = 260.0f;
+    float height = 26.0f + std::min(contentHeight, maxContentHeight) + 4.0f;
+    area = { anchorPos.x, anchorPos.y, 200.0f, height };
 
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
@@ -23,99 +22,58 @@ void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
     if (area.x < 0) area.x = 0;
     if (area.y + area.height > screenH) area.y = screenH - area.height;
     if (area.y < 0) area.y = 0;
+
+    auto* list = new SearchListElement();
+    list->rowHeight = rowH;
+    list->allowCreate = true;
+    list->createLabel = "+ New...";
+
+    std::vector<SearchListElement::Entry> listEntries;
+    listEntries.reserve(entries.size() + 1);
+
+    SearchListElement::Entry noneEntry;
+    noneEntry.id = "";
+    noneEntry.label = "(None)";
+    listEntries.push_back(noneEntry);
+
+    for (const std::string& name : entries) {
+        SearchListElement::Entry entry;
+        entry.id = name;
+        entry.label = name;
+        listEntries.push_back(entry);
+    }
+    list->SetEntries(listEntries);
+
+    list->onEntrySelected = [this](const std::string& id) {
+        pendingValue = id;
+        hasPending = true;
+    };
+    list->onCreateRequested = [this](const std::string& name) {
+        NamedListRegistry::Get().AddEntry(category, name);
+        pendingValue = name;
+        hasPending = true;
+    };
+
+    WidgetOverlay::Open(list, { area.x, area.y }, { area.width, area.height }, [this]() {
+        open = false;
+    });
 }
 
 void RegistryPickerPopup::Close() {
     open = false;
-    creating = false;
+    WidgetOverlay::Close();
 }
 
 bool RegistryPickerPopup::Render(std::string& outVal) {
     if (!open) return false;
-
-    Vector2 mousePos = GetMousePosition();
-    bool wasJustOpened = justOpened;
-
-    Rectangle areaCopy = area;
-    deferredDraws.push_back([areaCopy]() {
-        UIWidget::Panel(areaCopy);
-    });
-
-    float y = area.y + 2;
-
-    // None entry, clears the reference
-    Rectangle noneItem = {area.x + 1, y, area.width - 2, 18};
-    bool noneHovered = !creating && CheckCollisionPointRec(mousePos, noneItem);
-    deferredDraws.push_back([noneItem, noneHovered]() {
-        const UIPalette& theme = UITheme::Get();
-        if (noneHovered) DrawRectangleRec(noneItem, theme.surfaceHover);
-        DrawText("None", (int)noneItem.x + 6, (int)noneItem.y + 3, 11, theme.textSecondary);
-    });
-    if (!creating && !wasJustOpened && noneHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        outVal.clear();
+    if (hasPending) {
+        outVal = pendingValue;
+        hasPending = false;
         Close();
         return true;
     }
-    y += 18.0f;
-
-    // Registered entries
-    for (size_t i = 0; i < entries.size(); i++) {
-        Rectangle item = {area.x + 1, y, area.width - 2, 18};
-        bool hovered = !creating && CheckCollisionPointRec(mousePos, item);
-        std::string name = entries[i];
-        deferredDraws.push_back([item, hovered, name]() {
-            const UIPalette& theme = UITheme::Get();
-            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
-            DrawText(name.c_str(), (int)item.x + 6, (int)item.y + 3, 11, theme.textPrimary);
-        });
-
-        if (!creating && !wasJustOpened && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            outVal = entries[i];
-            Close();
-            return true;
-        }
-        y += 18.0f;
-    }
-
-    // Inline create-new row
-    Rectangle newItem = {area.x + 1, y, area.width - 2, 18};
-    if (creating) {
-        char* entryBuf = newEntryBuf;
-        size_t entryBufSize = sizeof(newEntryBuf);
-        deferredDraws.push_back([newItem, entryBuf, entryBufSize]() {
-            GuiTextBox(newItem, entryBuf, entryBufSize, true);
-        });
-        if (IsKeyPressed(KEY_ENTER) && newEntryBuf[0] != '\0') {
-            std::string name = newEntryBuf;
-            NamedListRegistry::Get().AddEntry(category, name);
-            outVal = name;
-            Close();
-            return true;
-        }
-        if (IsKeyPressed(KEY_ESCAPE)) creating = false;
-    } else {
-        bool newHovered = CheckCollisionPointRec(mousePos, newItem);
-        deferredDraws.push_back([newItem, newHovered]() {
-            const UIPalette& theme = UITheme::Get();
-            if (newHovered) DrawRectangleRec(newItem, theme.surfaceHover);
-            DrawText("+ New...", (int)newItem.x + 6, (int)newItem.y + 3, 11, theme.success);
-        });
-        if (!wasJustOpened && newHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            creating = true;
-            newEntryBuf[0] = '\0';
-        }
-    }
-
-    if (justOpened) {
-        justOpened = false;
-    } else if (!creating && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, area)) {
-        Close();
-    }
-
     return false;
 }
 
 void RegistryPickerPopup::FlushDeferredDraws() {
-    for (const auto& draw : deferredDraws) draw();
-    deferredDraws.clear();
 }

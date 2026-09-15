@@ -27,6 +27,18 @@ SearchListElement::SearchListElement() {
     listBox->scrollEnabled = true;
     listBox->backgroundColor = { 0, 0, 0, 0 };
     AddChild(listBox);
+
+    createBox = new TextElement();
+    createBox->editable = true;
+    createBox->placeholder = "Name...";
+    createBox->fontSize = 13.0f;
+    createBox->visible = false;
+    createBox->onTextCommitted = [this](const std::string& text) {
+        if (!text.empty() && onCreateRequested) onCreateRequested(text);
+        ExitCreateMode();
+    };
+    createBox->onEditCancelled = [this]() { ExitCreateMode(); };
+    AddChild(createBox);
 }
 
 void SearchListElement::SetEntries(std::vector<Entry> newEntries) {
@@ -41,11 +53,34 @@ void SearchListElement::SetShowSearchBar(bool show) {
 }
 
 Rectangle SearchListElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const {
+    if (creatingNew) {
+        if (childIndex == 2) return ownRect;
+        return { ownRect.x, ownRect.y, 0.0f, 0.0f };
+    }
     float barH = showSearchBar ? searchBarHeight * uiScale : 0.0f;
     if (childIndex == 0) {
         return { ownRect.x, ownRect.y, ownRect.width, barH };
     }
-    return { ownRect.x, ownRect.y + barH, ownRect.width, ownRect.height - barH };
+    if (childIndex == 1) {
+        return { ownRect.x, ownRect.y + barH, ownRect.width, ownRect.height - barH };
+    }
+    return { ownRect.x, ownRect.y, 0.0f, 0.0f };
+}
+
+void SearchListElement::EnterCreateMode() {
+    creatingNew = true;
+    searchBox->visible = false;
+    listBox->visible = false;
+    createBox->visible = true;
+    createBox->text.clear();
+    createBox->StartEditing();
+}
+
+void SearchListElement::ExitCreateMode() {
+    creatingNew = false;
+    createBox->visible = false;
+    searchBox->visible = showSearchBar;
+    listBox->visible = true;
 }
 
 void SearchListElement::OnDrawSelf(Rectangle rect, float uiScale) {
@@ -113,5 +148,26 @@ void SearchListElement::RebuildRows() {
         }
 
         listBox->AddChild(row);
+    }
+
+    if (allowCreate) {
+        auto* createRow = new ButtonElement();
+        createRow->size = { 0.0f, rowHeight };
+        createRow->defaultColor = { 0, 0, 0, 0 };
+        createRow->hoveredColor = rowHoveredColor;
+        createRow->pressedColor = rowHoveredColor;
+        createRow->onActivated = [this]() { EnterCreateMode(); };
+
+        auto* createRowLabel = new TextElement();
+        createRowLabel->text = createLabel;
+        createRowLabel->color = createRowColor;
+        createRowLabel->fontSize = 13.0f;
+        createRowLabel->anchor = { 0.0f, 0.5f };
+        createRowLabel->pivot = { 0.0f, 0.5f };
+        createRowLabel->offset = { 8.0f, 0.0f };
+        createRowLabel->size = { 0.0f, 18.0f };
+        createRow->AddChild(createRowLabel);
+
+        listBox->AddChild(createRow);
     }
 }

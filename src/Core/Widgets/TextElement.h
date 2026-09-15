@@ -24,7 +24,9 @@ public:
 
     std::function<void(const std::string&)> onTextChanged;
     std::function<void(const std::string&)> onTextCommitted;
+    std::function<void()> onEditCancelled;
 
+    void StartEditing();
     void OnConfirmed() override;
     void OnDeselected() override;
 
