@@ -1,8 +1,6 @@
 #pragma once
 #include "raylib.h"
-#include <functional>
 #include <string>
-#include <vector>
 
 class ConfirmPopup {
 public:
@@ -16,10 +14,8 @@ public:
 
 private:
     bool open = false;
-    bool justOpened = false;
-    std::string message;
-    std::string confirmLabel;
     Rectangle area{};
 
-    static std::vector<std::function<void()>> deferredDraws;
+    bool hasPending = false;
+    bool pendingConfirmed = false;
 };

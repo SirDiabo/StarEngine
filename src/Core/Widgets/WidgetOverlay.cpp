@@ -9,6 +9,7 @@ Widget* g_overlayWidget = nullptr;
 Rectangle g_overlayRect{};
 std::function<void()> g_onClosed;
 bool g_justOpened = false;
+bool g_dimBackground = false;
 
 const char* kOverlayDevice = "Editor";
 
@@ -16,13 +17,14 @@ const char* kOverlayDevice = "Editor";
 
 namespace WidgetOverlay {
 
-void Open(WidgetElement* content, Vector2 anchorPos, Vector2 desiredSize, std::function<void()> onClosed) {
+void Open(WidgetElement* content, Vector2 anchorPos, Vector2 desiredSize, std::function<void()> onClosed, bool dimBackground) {
     Close();
     g_overlayWidget = new Widget();
     g_overlayWidget->SetRoot(content);
     g_overlayRect = { anchorPos.x, anchorPos.y, desiredSize.x, desiredSize.y };
     g_onClosed = onClosed;
     g_justOpened = true;
+    g_dimBackground = dimBackground;
     WidgetInput::ClaimFocus(g_overlayWidget, kOverlayDevice);
 }
 
@@ -65,6 +67,10 @@ void TickAndDraw(float deltaTime, Rectangle screenBounds) {
     if (closeRequested) {
         Close();
         return;
+    }
+
+    if (g_dimBackground) {
+        DrawRectangle((int)screenBounds.x, (int)screenBounds.y, (int)screenBounds.width, (int)screenBounds.height, {0, 0, 0, 130});
     }
 
     Vector2 mouse = GetMousePosition();

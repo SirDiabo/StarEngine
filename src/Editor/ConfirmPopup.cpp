@@ -1,87 +1,101 @@
 #include "ConfirmPopup.h"
 #include "UITheme.h"
-
-std::vector<std::function<void()>> ConfirmPopup::deferredDraws;
+#include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/RectangleElement.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/ButtonElement.h"
 
 void ConfirmPopup::Open(const std::string& msg, const std::string& confirm) {
     open = true;
-    justOpened = true;
-    message = msg;
-    confirmLabel = confirm;
-}
+    hasPending = false;
 
-void ConfirmPopup::Close() {
-    open = false;
-}
-
-bool ConfirmPopup::Render(bool& outConfirmed) {
-    if (!open) return false;
-
-    Vector2 mousePos = GetMousePosition();
     float sw = (float)GetScreenWidth();
     float sh = (float)GetScreenHeight();
     float w = 340.0f;
     float h = 100.0f;
-    area = {(sw - w) * 0.5f, (sh - h) * 0.5f, w, h};
+    area = { (sw - w) * 0.5f, (sh - h) * 0.5f, w, h };
 
-    Rectangle cancelBtn  = {area.x + 16, area.y + area.height - 36, area.width * 0.5f - 24, 24};
-    Rectangle confirmBtn = {area.x + area.width * 0.5f + 8, area.y + area.height - 36, area.width * 0.5f - 24, 24};
+    const UIPalette& theme = UITheme::Get();
 
-    bool cancelHovered = CheckCollisionPointRec(mousePos, cancelBtn);
-    bool confirmHovered = CheckCollisionPointRec(mousePos, confirmBtn);
+    auto* panel = new RectangleElement();
+    panel->color = theme.panelBg;
 
-    Rectangle areaCopy = area;
-    std::string msgCopy = message;
-    std::string confirmLabelCopy = confirmLabel;
-    deferredDraws.push_back([sw, sh, areaCopy, msgCopy, cancelBtn, confirmBtn, cancelHovered, confirmHovered, confirmLabelCopy]() {
-        const UIPalette& theme = UITheme::Get();
+    auto* messageText = new TextElement();
+    messageText->text = msg;
+    messageText->color = theme.textPrimary;
+    messageText->fontSize = 13.0f;
+    messageText->anchor = {0.5f, 0.0f};
+    messageText->pivot = {0.5f, 0.0f};
+    messageText->offset = {0.0f, 18.0f};
+    messageText->size = {w - 32.0f, 18.0f};
+    panel->AddChild(messageText);
 
-        DrawRectangle(0, 0, (int)sw, (int)sh, {0, 0, 0, 130});
-        DrawRectangleRounded(areaCopy, 0.08f, 6, theme.panelBg);
-        DrawRectangleRoundedLinesEx(areaCopy, 0.08f, 6, 1.5f, theme.panelBorder);
+    float btnW = w * 0.5f - 24.0f;
 
-        int textW = MeasureText(msgCopy.c_str(), 13);
-        DrawText(msgCopy.c_str(), (int)(areaCopy.x + (areaCopy.width - textW) * 0.5f), (int)areaCopy.y + 18, 13, theme.textPrimary);
+    auto* cancelBtn = new ButtonElement();
+    cancelBtn->defaultColor = theme.buttonBg;
+    cancelBtn->hoveredColor = theme.buttonHover;
+    cancelBtn->selectedColor = theme.buttonHover;
+    cancelBtn->pressedColor = theme.buttonHover;
+    cancelBtn->anchor = {0.0f, 0.0f};
+    cancelBtn->pivot = {0.0f, 0.0f};
+    cancelBtn->offset = {16.0f, h - 36.0f};
+    cancelBtn->size = {btnW, 24.0f};
+    cancelBtn->onActivated = [this]() {
+        pendingConfirmed = false;
+        hasPending = true;
+    };
+    auto* cancelLabel = new TextElement();
+    cancelLabel->text = "Cancel";
+    cancelLabel->color = theme.buttonText;
+    cancelLabel->fontSize = 12.0f;
+    cancelLabel->anchor = {0.5f, 0.5f};
+    cancelLabel->pivot = {0.5f, 0.5f};
+    cancelBtn->AddChild(cancelLabel);
+    panel->AddChild(cancelBtn);
 
-        DrawRectangleRec(cancelBtn, cancelHovered ? theme.buttonHover : theme.buttonBg);
-        DrawRectangleLinesEx(cancelBtn, 1, theme.buttonBorder);
-        int cw = MeasureText("Cancel", 12);
-        DrawText("Cancel", (int)(cancelBtn.x + (cancelBtn.width - cw) * 0.5f), (int)cancelBtn.y + 6, 12, theme.buttonText);
+    auto* confirmBtn = new ButtonElement();
+    confirmBtn->defaultColor = theme.dangerBg;
+    confirmBtn->hoveredColor = theme.danger;
+    confirmBtn->selectedColor = theme.danger;
+    confirmBtn->pressedColor = theme.danger;
+    confirmBtn->anchor = {0.0f, 0.0f};
+    confirmBtn->pivot = {0.0f, 0.0f};
+    confirmBtn->offset = {w * 0.5f + 8.0f, h - 36.0f};
+    confirmBtn->size = {btnW, 24.0f};
+    confirmBtn->onActivated = [this]() {
+        pendingConfirmed = true;
+        hasPending = true;
+    };
+    auto* confirmLabel = new TextElement();
+    confirmLabel->text = confirm;
+    confirmLabel->color = WHITE;
+    confirmLabel->fontSize = 12.0f;
+    confirmLabel->anchor = {0.5f, 0.5f};
+    confirmLabel->pivot = {0.5f, 0.5f};
+    confirmBtn->AddChild(confirmLabel);
+    panel->AddChild(confirmBtn);
 
-        DrawRectangleRec(confirmBtn, confirmHovered ? theme.danger : theme.dangerBg);
-        DrawRectangleLinesEx(confirmBtn, 1, theme.danger);
-        int fw = MeasureText(confirmLabelCopy.c_str(), 12);
-        DrawText(confirmLabelCopy.c_str(), (int)(confirmBtn.x + (confirmBtn.width - fw) * 0.5f), (int)confirmBtn.y + 6, 12, WHITE);
-    });
+    WidgetOverlay::Open(panel, { area.x, area.y }, { area.width, area.height }, [this]() {
+        open = false;
+    }, true);
+}
 
-    if (justOpened) {
-        justOpened = false;
-        return false;
-    }
+void ConfirmPopup::Close() {
+    open = false;
+    WidgetOverlay::Close();
+}
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        if (confirmHovered) {
-            Close();
-            outConfirmed = true;
-            return true;
-        }
-        if (cancelHovered) {
-            Close();
-            outConfirmed = false;
-            return true;
-        }
-    }
-
-    if (IsKeyPressed(KEY_ESCAPE)) {
+bool ConfirmPopup::Render(bool& outConfirmed) {
+    if (!open) return false;
+    if (hasPending) {
+        outConfirmed = pendingConfirmed;
+        hasPending = false;
         Close();
-        outConfirmed = false;
         return true;
     }
-
     return false;
 }
 
 void ConfirmPopup::FlushDeferredDraws() {
-    for (const auto& draw : deferredDraws) draw();
-    deferredDraws.clear();
 }

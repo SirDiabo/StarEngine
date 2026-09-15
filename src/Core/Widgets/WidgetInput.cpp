@@ -103,14 +103,15 @@ WidgetElement* HitTestSelectable(WidgetElement* element, Vector2 point) {
     return nullptr;
 }
 
-void SyncStates(WidgetElement* element, WidgetElement* current, WidgetElement* pressed) {
+void SyncStates(WidgetElement* element, WidgetElement* current, WidgetElement* hoveredEl, WidgetElement* pressed) {
     if (element->selectable) {
         if (element->disabled) element->interactionState = WidgetInteractionState::Disabled;
         else if (element == pressed) element->interactionState = WidgetInteractionState::Pressed;
+        else if (element == hoveredEl) element->interactionState = WidgetInteractionState::Hovered;
         else if (element == current) element->interactionState = WidgetInteractionState::Selected;
         else element->interactionState = WidgetInteractionState::Default;
     }
-    for (WidgetElement* child : element->GetChildren()) SyncStates(child, current, pressed);
+    for (WidgetElement* child : element->GetChildren()) SyncStates(child, current, hoveredEl, pressed);
 }
 
 BoxElement* HitTestScrollable(WidgetElement* element, Vector2 point) {
@@ -175,13 +176,9 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     WidgetElement* hovered = focused ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
 
-    if (focused && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && widget->currentSelection && widget->currentSelection != hovered) {
-        widget->currentSelection->interactionState = WidgetInteractionState::Default;
-        widget->currentSelection->OnDeselected();
-        widget->currentSelection = nullptr;
+    if (focused && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        widget->SetSelection(hovered);
     }
-
-    if (hovered) widget->SetSelection(hovered);
 
     bool confirmHeld = focused && PollBool(kConfirmMapping, device);
     bool cancelHeld = focused && PollBool(kCancelMapping, device);
@@ -235,7 +232,7 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     WidgetElement* pressedElement = nullptr;
     if (mouseHeld) pressedElement = hovered;
     else if (confirmHeld) pressedElement = widget->currentSelection;
-    SyncStates(widget->rootElement, focused ? widget->currentSelection : nullptr, pressedElement);
+    SyncStates(widget->rootElement, focused ? widget->currentSelection : nullptr, focused ? hovered : nullptr, pressedElement);
 }
 
 }
