@@ -1,6 +1,7 @@
 #include "ChoicePopup.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
+#include "UITheme.h"
 #include <cstdlib>
 
 void ChoicePopup::Open(Vector2 anchorPos, float width, const std::vector<ChoiceOption>& choices) {
@@ -17,6 +18,12 @@ void ChoicePopup::Open(Vector2 anchorPos, float width, const std::vector<ChoiceO
     auto* list = new SearchListElement();
     list->SetShowSearchBar(false);
     list->rowHeight = 20.0f;
+    const UIPalette& theme = UITheme::Get();
+    list->backgroundColor = theme.panelBg;
+    list->rowColor = theme.textPrimary;
+    list->rowHoveredColor = theme.surfaceHover;
+    list->rowDisabledColor = theme.buttonDisabledText;
+    list->rowDisabledReasonColor = theme.textSecondary;
 
     std::vector<SearchListElement::Entry> entries;
     entries.reserve(options.size());

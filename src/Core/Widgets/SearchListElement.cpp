@@ -17,6 +17,7 @@ std::string ToLowerCopy(const std::string& s) {
 SearchListElement::SearchListElement() {
     searchBox = new TextElement();
     searchBox->editable = true;
+    searchBox->text = "";
     searchBox->placeholder = "Search...";
     searchBox->fontSize = 13.0f;
     searchBox->onTextChanged = [this](const std::string&) { RebuildRows(); };
@@ -30,6 +31,7 @@ SearchListElement::SearchListElement() {
 
     createBox = new TextElement();
     createBox->editable = true;
+    createBox->text = "";
     createBox->placeholder = "Name...";
     createBox->fontSize = 13.0f;
     createBox->visible = false;
@@ -50,6 +52,19 @@ void SearchListElement::SetShowSearchBar(bool show) {
     showSearchBar = show;
     searchBox->visible = show;
     RebuildRows();
+}
+
+void SearchListElement::SetFieldColors(Color fieldBg, Color fieldBorder, Color fieldEditingBorder, Color fieldText, Color fieldPlaceholder) {
+    searchBox->backgroundColor = fieldBg;
+    searchBox->borderColor = fieldBorder;
+    searchBox->editingBorderColor = fieldEditingBorder;
+    searchBox->color = fieldText;
+    searchBox->placeholderColor = fieldPlaceholder;
+    createBox->backgroundColor = fieldBg;
+    createBox->borderColor = fieldBorder;
+    createBox->editingBorderColor = fieldEditingBorder;
+    createBox->color = fieldText;
+    createBox->placeholderColor = fieldPlaceholder;
 }
 
 Rectangle SearchListElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const {

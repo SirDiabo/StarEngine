@@ -2,6 +2,7 @@
 #include "Core/Project.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
+#include "UITheme.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -51,6 +52,11 @@ void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
 
     auto* list = new SearchListElement();
     list->rowHeight = rowH;
+    const UIPalette& theme = UITheme::Get();
+    list->backgroundColor = theme.panelBg;
+    list->rowColor = theme.textPrimary;
+    list->rowHoveredColor = theme.surfaceHover;
+    list->SetFieldColors(theme.fieldBg, theme.fieldBorder, theme.accent, theme.textPrimary, theme.textSecondary);
 
     std::vector<SearchListElement::Entry> listEntries;
     listEntries.reserve(displayNames.size() + 1);

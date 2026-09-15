@@ -1,6 +1,7 @@
 #include "SearchableListPopup.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
+#include "UITheme.h"
 
 void SearchableListPopup::Open(Vector2 anchorPos, float w, float maxH) {
     open = true;
@@ -11,6 +12,12 @@ void SearchableListPopup::Open(Vector2 anchorPos, float w, float maxH) {
     lastRect = { pos.x, pos.y, width, maxVisibleHeight };
 
     auto* list = new SearchListElement();
+    const UIPalette& theme = UITheme::Get();
+    list->backgroundColor = theme.panelBg;
+    list->categoryHeaderColor = theme.textSecondary;
+    list->rowColor = theme.textPrimary;
+    list->rowHoveredColor = theme.surfaceHover;
+    list->SetFieldColors(theme.fieldBg, theme.fieldBorder, theme.accent, theme.textPrimary, theme.textSecondary);
     list->onEntrySelected = [this](const std::string& id) {
         pendingId = id;
         hasPending = true;

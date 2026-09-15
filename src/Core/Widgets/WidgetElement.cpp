@@ -4,6 +4,15 @@
 
 namespace {
 int nextWidgetElementId = 1;
+
+bool ContainsRecursive(WidgetElement* root, WidgetElement* target) {
+    if (!root || !target) return false;
+    if (root == target) return true;
+    for (WidgetElement* child : root->GetChildren()) {
+        if (ContainsRecursive(child, target)) return true;
+    }
+    return false;
+}
 }
 
 WidgetElement::WidgetElement() {
@@ -33,17 +42,31 @@ void WidgetElement::SetOwningWidgetRecursive(Widget* widget) {
 void WidgetElement::RemoveChild(WidgetElement* child) {
     auto it = std::find(children.begin(), children.end(), child);
     if (it == children.end()) return;
+    if (owningWidget && ContainsRecursive(*it, owningWidget->currentSelection)) {
+        owningWidget->currentSelection = nullptr;
+    }
     delete *it;
     children.erase(it);
 }
 
 void WidgetElement::RemoveChildAt(int index) {
     if (index < 0 || index >= (int)children.size()) return;
+    if (owningWidget && ContainsRecursive(children[index], owningWidget->currentSelection)) {
+        owningWidget->currentSelection = nullptr;
+    }
     delete children[index];
     children.erase(children.begin() + index);
 }
 
 void WidgetElement::ClearChildren() {
+    if (owningWidget && owningWidget->currentSelection) {
+        for (WidgetElement* child : children) {
+            if (ContainsRecursive(child, owningWidget->currentSelection)) {
+                owningWidget->currentSelection = nullptr;
+                break;
+            }
+        }
+    }
     for (WidgetElement* child : children) delete child;
     children.clear();
 }

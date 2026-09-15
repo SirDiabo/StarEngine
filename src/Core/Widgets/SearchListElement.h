@@ -43,6 +43,7 @@ public:
 
     void SetEntries(std::vector<Entry> newEntries);
     void SetShowSearchBar(bool show);
+    void SetFieldColors(Color fieldBg, Color fieldBorder, Color fieldEditingBorder, Color fieldText, Color fieldPlaceholder);
 
 protected:
     void OnDrawSelf(Rectangle rect, float uiScale) override;

@@ -30,7 +30,7 @@ void Close() {
     if (!g_overlayWidget) return;
     Widget* closing = g_overlayWidget;
     g_overlayWidget = nullptr;
-    WidgetInput::ClaimFocus(nullptr, kOverlayDevice);
+    WidgetInput::ReleaseFocus(kOverlayDevice);
     delete closing;
     if (g_onClosed) {
         std::function<void()> cb = g_onClosed;

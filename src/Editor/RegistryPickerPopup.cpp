@@ -2,6 +2,7 @@
 #include "Core/NamedListRegistry.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
+#include "UITheme.h"
 #include <algorithm>
 
 void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
@@ -27,6 +28,12 @@ void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
     list->rowHeight = rowH;
     list->allowCreate = true;
     list->createLabel = "+ New...";
+    const UIPalette& theme = UITheme::Get();
+    list->backgroundColor = theme.panelBg;
+    list->rowColor = theme.textPrimary;
+    list->rowHoveredColor = theme.surfaceHover;
+    list->createRowColor = theme.success;
+    list->SetFieldColors(theme.fieldBg, theme.fieldBorder, theme.accent, theme.textPrimary, theme.textSecondary);
 
     std::vector<SearchListElement::Entry> listEntries;
     listEntries.reserve(entries.size() + 1);

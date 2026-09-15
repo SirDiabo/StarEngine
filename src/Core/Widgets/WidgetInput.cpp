@@ -134,6 +134,10 @@ void ClaimFocus(Widget* widget, const std::string& device) {
     focusedWidgetByDevice[device] = widget;
 }
 
+void ReleaseFocus(const std::string& device) {
+    focusedWidgetByDevice.erase(device);
+}
+
 bool IsFocused(const Widget* widget, const std::string& device) {
     auto it = focusedWidgetByDevice.find(device);
     if (it == focusedWidgetByDevice.end()) return true;
