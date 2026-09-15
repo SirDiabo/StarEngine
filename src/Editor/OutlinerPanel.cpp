@@ -2,14 +2,9 @@
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
-#include "Core/Widgets/VerticalBoxElement.h"
-#include "Core/Widgets/ButtonElement.h"
-#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/SearchListElement.h"
 #include "raylib.h"
-
-namespace {
-constexpr float kRowHeight = 20.0f;
-}
+#include <cstdlib>
 
 void OutlinerPanel::Initialize() {
     name = "Outliner";
@@ -20,56 +15,37 @@ OutlinerPanel::~OutlinerPanel() {
 }
 
 void OutlinerPanel::Render() {
-    delete chrome;
-    chrome = new Widget();
+    if (!chrome) {
+        chrome = new Widget();
+        list = new SearchListElement();
+        chrome->SetRoot(list);
 
-    const UIPalette& theme = UITheme::Get();
+        const UIPalette& theme = UITheme::Get();
+        list->backgroundColor = theme.panelBg;
+        list->rowColor = theme.textSecondary;
+        list->rowHoveredColor = theme.surfaceHover;
+        list->rowCurrentColor = theme.surfaceSelected;
+        list->rowCurrentTextColor = theme.textPrimary;
+        list->SetFieldColors(theme.fieldBg, theme.fieldBorder, theme.accent, theme.textPrimary, theme.textSecondary);
 
-    auto* list = new VerticalBoxElement();
-    list->scrollEnabled = true;
-    list->backgroundColor = theme.panelBg;
-    list->size = { bounds.width, bounds.height };
-    chrome->SetRoot(list);
+        list->onEntrySelected = [this](const std::string& id) {
+            if (selectedActorIndex) *selectedActorIndex = atoi(id.c_str());
+        };
+    }
 
-    if (!starMap) {
-        auto* empty = new TextElement();
-        empty->text = "No map loaded";
-        empty->color = theme.textSecondary;
-        empty->fontSize = 11.0f;
-        empty->anchor = {0.0f, 0.0f};
-        empty->pivot = {0.0f, 0.0f};
-        empty->offset = {8.0f, 4.0f};
-        empty->size = {0.0f, 18.0f};
-        list->AddChild(empty);
-    } else {
+    std::vector<SearchListElement::Entry> entries;
+    if (starMap) {
         const auto& instances = starMap->GetInstances();
+        entries.reserve(instances.size());
         for (size_t i = 0; i < instances.size(); i++) {
-            bool isSelected = selectedActorIndex && *selectedActorIndex == (int)i;
-
-            auto* row = new ButtonElement();
-            row->size = { 0.0f, kRowHeight };
-            row->defaultColor = isSelected ? theme.surfaceSelected : theme.panelBg;
-            row->hoveredColor = isSelected ? theme.surfaceSelected : theme.surfaceHover;
-            row->selectedColor = isSelected ? theme.surfaceSelected : theme.surfaceHover;
-            row->pressedColor = theme.accent;
-            int idx = (int)i;
-            row->onActivated = [this, idx]() {
-                if (selectedActorIndex) *selectedActorIndex = idx;
-            };
-
-            auto* label = new TextElement();
-            label->text = instances[i].name;
-            label->color = isSelected ? theme.textPrimary : theme.textSecondary;
-            label->fontSize = 11.0f;
-            label->anchor = {0.0f, 0.5f};
-            label->pivot = {0.0f, 0.5f};
-            label->offset = {8.0f, 0.0f};
-            label->size = {0.0f, 16.0f};
-            row->AddChild(label);
-
-            list->AddChild(row);
+            SearchListElement::Entry entry;
+            entry.id = std::to_string(i);
+            entry.label = instances[i].name;
+            entry.isCurrent = selectedActorIndex && *selectedActorIndex == (int)i;
+            entries.push_back(entry);
         }
     }
+    list->SetEntries(entries);
 
     float dt = GetFrameTime();
     chrome->Tick(dt, bounds, 1.0f);

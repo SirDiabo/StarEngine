@@ -3,6 +3,7 @@
 #include "Runtime/StarMap.h"
 
 class Widget;
+class SearchListElement;
 
 class OutlinerPanel : public Panel {
 public:
@@ -15,4 +16,5 @@ public:
 
 private:
     Widget* chrome = nullptr;
+    SearchListElement* list = nullptr;
 };

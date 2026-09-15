@@ -20,7 +20,10 @@ SearchListElement::SearchListElement() {
     searchBox->text = "";
     searchBox->placeholder = "Search...";
     searchBox->fontSize = 13.0f;
-    searchBox->onTextChanged = [this](const std::string&) { RebuildRows(); };
+    searchBox->onTextChanged = [this](const std::string&) {
+        listBox->scrollOffset = 0.0f;
+        RebuildRows();
+    };
     AddChild(searchBox);
 
     listBox = new BoxElement();
@@ -104,7 +107,6 @@ void SearchListElement::OnDrawSelf(Rectangle rect, float uiScale) {
 
 void SearchListElement::RebuildRows() {
     listBox->ClearChildren();
-    listBox->scrollOffset = 0.0f;
 
     std::string query = ToLowerCopy(searchBox->text);
     std::string lastCategory = "\x01";
@@ -130,7 +132,7 @@ void SearchListElement::RebuildRows() {
 
         auto* row = new ButtonElement();
         row->size = { 0.0f, thisRowHeight };
-        row->defaultColor = { 0, 0, 0, 0 };
+        row->defaultColor = entry.isCurrent ? rowCurrentColor : Color{ 0, 0, 0, 0 };
         row->hoveredColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->selectedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->pressedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
@@ -143,7 +145,7 @@ void SearchListElement::RebuildRows() {
 
         auto* label = new TextElement();
         label->text = entry.label;
-        label->color = entry.enabled ? rowColor : rowDisabledColor;
+        label->color = !entry.enabled ? rowDisabledColor : (entry.isCurrent ? rowCurrentTextColor : rowColor);
         label->fontSize = 13.0f;
         label->anchor = { 0.0f, 0.0f };
         label->pivot = { 0.0f, 0.0f };

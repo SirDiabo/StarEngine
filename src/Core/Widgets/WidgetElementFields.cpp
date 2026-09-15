@@ -156,6 +156,8 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         BlnF<SearchListElement>("SearchListElement", "AllowCreate", &SearchListElement::allowCreate),
         StrF<SearchListElement>("SearchListElement", "CreateLabel", &SearchListElement::createLabel),
         ColF<SearchListElement>("SearchListElement", "CreateRowColor", &SearchListElement::createRowColor),
+        ColF<SearchListElement>("SearchListElement", "RowCurrentColor", &SearchListElement::rowCurrentColor),
+        ColF<SearchListElement>("SearchListElement", "RowCurrentTextColor", &SearchListElement::rowCurrentTextColor),
 
         BlnF<CheckBoxElement>("CheckBoxElement", "Checked", &CheckBoxElement::checked),
         ColF<CheckBoxElement>("CheckBoxElement", "BoxColor", &CheckBoxElement::boxColor),

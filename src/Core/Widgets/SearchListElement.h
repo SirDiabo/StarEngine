@@ -15,6 +15,7 @@ public:
         std::string category;
         bool enabled = true;
         std::string disabledReason;
+        bool isCurrent = false;
     };
 
     SearchListElement();
@@ -33,6 +34,8 @@ public:
     Color rowHoveredColor{ 55, 55, 60, 255 };
     Color rowDisabledColor{ 110, 110, 115, 255 };
     Color rowDisabledReasonColor{ 130, 130, 135, 255 };
+    Color rowCurrentColor{ 60, 80, 110, 255 };
+    Color rowCurrentTextColor{ 235, 235, 240, 255 };
 
     std::function<void(const std::string&)> onEntrySelected;
 
