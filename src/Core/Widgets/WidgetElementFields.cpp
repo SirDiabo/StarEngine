@@ -1,6 +1,5 @@
 #include "WidgetElementFields.h"
 #include "TextElement.h"
-#include "TextInputElement.h"
 #include "RectangleElement.h"
 #include "ButtonElement.h"
 #include "VerticalBoxElement.h"
@@ -11,6 +10,7 @@
 #include "SpacerElement.h"
 #include "SplitBoxElement.h"
 #include "TabContainer.h"
+#include "SearchListElement.h"
 #include "Core/SafeParse.h"
 #include <cstdio>
 
@@ -100,13 +100,12 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         StrF<TextElement>("TextElement", "Text", &TextElement::text),
         FltF<TextElement>("TextElement", "FontSize", &TextElement::fontSize),
         ColF<TextElement>("TextElement", "Color", &TextElement::color),
-        StrF<TextInputElement>("TextInputElement", "Text", &TextInputElement::text),
-        FltF<TextInputElement>("TextInputElement", "FontSize", &TextInputElement::fontSize),
-        ColF<TextInputElement>("TextInputElement", "Color", &TextInputElement::color),
-        ColF<TextInputElement>("TextInputElement", "BackgroundColor", &TextInputElement::backgroundColor),
-        ColF<TextInputElement>("TextInputElement", "BorderColor", &TextInputElement::borderColor),
-        StrF<TextInputElement>("TextInputElement", "Placeholder", &TextInputElement::placeholder),
-        IntF<TextInputElement>("TextInputElement", "MaxLength", &TextInputElement::maxLength),
+        BlnF<TextElement>("TextElement", "Editable", &TextElement::editable),
+        BlnF<TextElement>("TextElement", "NumericOnly", &TextElement::numericOnly),
+        ColF<TextElement>("TextElement", "BackgroundColor", &TextElement::backgroundColor),
+        ColF<TextElement>("TextElement", "BorderColor", &TextElement::borderColor),
+        StrF<TextElement>("TextElement", "Placeholder", &TextElement::placeholder),
+        IntF<TextElement>("TextElement", "MaxLength", &TextElement::maxLength),
 
         ColF<RectangleElement>("RectangleElement", "Color", &RectangleElement::color),
 
@@ -144,6 +143,14 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         FltF<SplitBoxElement>("SplitBoxElement", "DividerThickness", &SplitBoxElement::dividerThickness),
         ColF<SplitBoxElement>("SplitBoxElement", "DividerColor", &SplitBoxElement::dividerColor),
         SplitAxisF("SplitBoxElement", "Axis", &SplitBoxElement::axis),
+
+        FltF<SearchListElement>("SearchListElement", "SearchBarHeight", &SearchListElement::searchBarHeight),
+        FltF<SearchListElement>("SearchListElement", "RowHeight", &SearchListElement::rowHeight),
+        FltF<SearchListElement>("SearchListElement", "CategoryHeaderHeight", &SearchListElement::categoryHeaderHeight),
+        ColF<SearchListElement>("SearchListElement", "BackgroundColor", &SearchListElement::backgroundColor),
+        ColF<SearchListElement>("SearchListElement", "CategoryHeaderColor", &SearchListElement::categoryHeaderColor),
+        ColF<SearchListElement>("SearchListElement", "RowColor", &SearchListElement::rowColor),
+        ColF<SearchListElement>("SearchListElement", "RowHoveredColor", &SearchListElement::rowHoveredColor),
     };
     return fields;
 }
@@ -151,7 +158,6 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
 const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
     static const std::vector<WidgetElementTypeDesc> types = {
         { "TextElement", []() -> WidgetElement* { return new TextElement(); } },
-        { "TextInputElement", []() -> WidgetElement* { return new TextInputElement(); } },
         { "RectangleElement", []() -> WidgetElement* { return new RectangleElement(); } },
         { "ButtonElement", []() -> WidgetElement* { return new ButtonElement(); } },
         { "VerticalBoxElement", []() -> WidgetElement* { return new VerticalBoxElement(); } },
@@ -163,6 +169,7 @@ const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
         { "SplitBoxElement", []() -> WidgetElement* { return new SplitBoxElement(); } },
         { "TabContainer", []() -> WidgetElement* { return new TabContainer(); } },
         { "TabHeaderButtonElement", []() -> WidgetElement* { return new TabHeaderButtonElement(); } },
+        { "SearchListElement", []() -> WidgetElement* { return new SearchListElement(); } },
     };
     return types;
 }

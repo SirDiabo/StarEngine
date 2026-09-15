@@ -1,75 +1,60 @@
 #include "ChoicePopup.h"
-#include "UITheme.h"
-#include "UIWidgets.h"
-
-std::vector<std::function<void()>> ChoicePopup::deferredDraws;
-
-static float RowHeight(const ChoiceOption& option) {
-    return option.enabled || option.disabledReason.empty() ? 20.0f : 32.0f;
-}
+#include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/SearchListElement.h"
+#include <cstdlib>
 
 void ChoicePopup::Open(Vector2 anchorPos, float width, const std::vector<ChoiceOption>& choices) {
     open = true;
-    justOpened = true;
+    hasPending = false;
     options = choices;
 
     float height = 4.0f;
-    for (const auto& opt : options) height += RowHeight(opt);
-    area = {anchorPos.x, anchorPos.y, width, height};
+    for (const ChoiceOption& opt : options) {
+        height += (!opt.enabled && !opt.disabledReason.empty()) ? 34.0f : 20.0f;
+    }
+    area = { anchorPos.x, anchorPos.y, width, height };
+
+    auto* list = new SearchListElement();
+    list->SetShowSearchBar(false);
+    list->rowHeight = 20.0f;
+
+    std::vector<SearchListElement::Entry> entries;
+    entries.reserve(options.size());
+    for (size_t i = 0; i < options.size(); i++) {
+        SearchListElement::Entry entry;
+        entry.id = std::to_string(i);
+        entry.label = options[i].label;
+        entry.enabled = options[i].enabled;
+        entry.disabledReason = options[i].disabledReason;
+        entries.push_back(entry);
+    }
+    list->SetEntries(entries);
+
+    list->onEntrySelected = [this](const std::string& id) {
+        pendingIndex = atoi(id.c_str());
+        hasPending = true;
+    };
+
+    WidgetOverlay::Open(list, { area.x, area.y }, { area.width, area.height }, [this]() {
+        open = false;
+    });
 }
 
 void ChoicePopup::Close() {
     open = false;
+    WidgetOverlay::Close();
 }
 
 bool ChoicePopup::Render(int& outIndex) {
     if (!open) return false;
-
-    Vector2 mousePos = GetMousePosition();
-
-    Rectangle areaCopy = area;
-    deferredDraws.push_back([areaCopy]() {
-        UIWidget::Panel(areaCopy);
-    });
-
-    float y = area.y + 2;
-    for (size_t i = 0; i < options.size(); i++) {
-        const ChoiceOption& opt = options[i];
-        float rowHeight = RowHeight(opt);
-        Rectangle item = {area.x + 1, y, area.width - 2, rowHeight};
-        bool hovered = opt.enabled && CheckCollisionPointRec(mousePos, item);
-
-        std::string label = opt.label;
-        std::string reason = opt.disabledReason;
-        bool enabled = opt.enabled;
-        deferredDraws.push_back([item, hovered, label, reason, enabled]() {
-            const UIPalette& theme = UITheme::Get();
-            if (hovered) DrawRectangleRec(item, theme.surfaceHover);
-            Color textColor = enabled ? theme.textPrimary : theme.buttonDisabledText;
-            DrawText(label.c_str(), (int)item.x + 6, (int)item.y + 3, 11, textColor);
-            if (!enabled && !reason.empty()) {
-                DrawText(reason.c_str(), (int)item.x + 6, (int)item.y + 17, 9, {110, 110, 118, 255});
-            }
-        });
-
-        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            outIndex = (int)i;
-            Close();
-            return true;
-        }
-        y += rowHeight;
-    }
-
-    if (justOpened) {
-        justOpened = false;
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, area)) {
+    if (hasPending) {
+        outIndex = pendingIndex;
+        hasPending = false;
         Close();
+        return true;
     }
-
     return false;
 }
 
 void ChoicePopup::FlushDeferredDraws() {
-    for (const auto& draw : deferredDraws) draw();
-    deferredDraws.clear();
 }

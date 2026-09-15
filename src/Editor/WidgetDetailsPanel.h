@@ -8,7 +8,7 @@ class WidgetEditorSession;
 class WidgetElement;
 class Widget;
 class VerticalBoxElement;
-class TextInputElement;
+class TextElement;
 
 class WidgetDetailsPanel : public Panel {
 public:
@@ -20,13 +20,14 @@ public:
 
 private:
     struct FieldRow {
-        TextInputElement* input = nullptr;
+        TextElement* input = nullptr;
         std::function<std::string(WidgetElement&)> getValue;
         std::function<void(WidgetElement&, const std::string&)> setValue;
     };
 
     void RebuildForSelection(WidgetElement* element);
     void AddStringField(VerticalBoxElement* list, const std::string& label,
+        bool numericOnly,
         std::function<std::string(WidgetElement&)> getValue,
         std::function<void(WidgetElement&, const std::string&)> setValue);
     void AddBoolField(VerticalBoxElement* list, const std::string& label,

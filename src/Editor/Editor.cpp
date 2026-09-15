@@ -18,6 +18,7 @@
 #include "ChoicePopup.h"
 #include "ConfirmPopup.h"
 #include "SearchableListPopup.h"
+#include "Core/Widgets/WidgetOverlay.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
 #include "LoadingPanel.h"
@@ -139,6 +140,7 @@ void Editor::Render() {
     ChoicePopup::FlushDeferredDraws();
     ConfirmPopup::FlushDeferredDraws();
     SearchableListPopup::FlushDeferredDraws();
+    WidgetOverlay::TickAndDraw(GetFrameTime(), { 0.0f, 0.0f, (float)w, (float)h });
 
     // Layer 9: loading overlay for async rebuild/packaging (blocks everything else visually).
     LoadingPanel::Get().Render();

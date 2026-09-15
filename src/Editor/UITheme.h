@@ -48,6 +48,7 @@ struct UIColorFieldInfo {
 namespace UITheme {
 
 const UIPalette& Get();
+Font GetFont();
 
 int PresetCount();
 const char* PresetName(int index);

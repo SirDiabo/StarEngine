@@ -1,5 +1,6 @@
 #include "UITheme.h"
 #include "Core/LayoutSerializer.h"
+#include "Core/Widgets/WidgetFont.h"
 #include <filesystem>
 #include <unordered_map>
 #include <cstdlib>
@@ -739,6 +740,10 @@ namespace UITheme {
 
 const UIPalette& Get() {
     return g_effectivePalette;
+}
+
+Font GetFont() {
+    return WidgetFont::Get();
 }
 
 int PresetCount() {

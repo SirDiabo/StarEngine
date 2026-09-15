@@ -22,9 +22,9 @@ public:
 
 private:
     bool open = false;
-    bool justOpened = false;
     Rectangle area{};
     std::vector<ChoiceOption> options;
 
-    static std::vector<std::function<void()>> deferredDraws;
+    bool hasPending = false;
+    int pendingIndex = -1;
 };

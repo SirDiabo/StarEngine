@@ -8,7 +8,6 @@
 #include "Core/Widgets/VerticalBoxElement.h"
 #include "Core/Widgets/ButtonElement.h"
 #include "Core/Widgets/TextElement.h"
-#include "Core/Widgets/TextInputElement.h"
 #include "Core/SafeParse.h"
 #include "raylib.h"
 #include <cstdio>
@@ -33,6 +32,7 @@ WidgetDetailsPanel::~WidgetDetailsPanel() {
 }
 
 void WidgetDetailsPanel::AddStringField(VerticalBoxElement* list, const std::string& label,
+    bool numericOnly,
     std::function<std::string(WidgetElement&)> getValue,
     std::function<void(WidgetElement&, const std::string&)> setValue) {
 
@@ -46,7 +46,9 @@ void WidgetDetailsPanel::AddStringField(VerticalBoxElement* list, const std::str
     labelText->offset = { 6.0f, 0.0f };
     list->AddChild(labelText);
 
-    auto* input = new TextInputElement();
+    auto* input = new TextElement();
+    input->editable = true;
+    input->numericOnly = numericOnly;
     input->size = { 0.0f, kFieldHeight };
     input->color = theme.textPrimary;
     input->backgroundColor = theme.fieldBg;
@@ -127,7 +129,7 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
 
     if (!element) return;
 
-    AddStringField(list, "Element Id",
+    AddStringField(list, "Element Id", false,
         [](WidgetElement& e) { return e.elementId; },
         [](WidgetElement& e, const std::string& v) { e.elementId = v; });
 
@@ -139,7 +141,7 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
         [](WidgetElement& e) { return e.selectable; },
         [](WidgetElement& e, bool v) { e.selectable = v; });
 
-    AddStringField(list, "Anchor X/Y",
+    AddStringField(list, "Anchor X/Y", false,
         [](WidgetElement& e) { return FormatFloat(e.anchor.x) + "," + FormatFloat(e.anchor.y); },
         [](WidgetElement& e, const std::string& v) {
             float x = 0.0f, y = 0.0f;
@@ -147,7 +149,7 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
             e.anchor = { x, y };
         });
 
-    AddStringField(list, "Pivot X/Y",
+    AddStringField(list, "Pivot X/Y", false,
         [](WidgetElement& e) { return FormatFloat(e.pivot.x) + "," + FormatFloat(e.pivot.y); },
         [](WidgetElement& e, const std::string& v) {
             float x = 0.0f, y = 0.0f;
@@ -155,7 +157,7 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
             e.pivot = { x, y };
         });
 
-    AddStringField(list, "Offset X/Y",
+    AddStringField(list, "Offset X/Y", false,
         [](WidgetElement& e) { return FormatFloat(e.offset.x) + "," + FormatFloat(e.offset.y); },
         [](WidgetElement& e, const std::string& v) {
             float x = 0.0f, y = 0.0f;
@@ -163,7 +165,7 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
             e.offset = { x, y };
         });
 
-    AddStringField(list, "Size X/Y",
+    AddStringField(list, "Size X/Y", false,
         [](WidgetElement& e) { return FormatFloat(e.size.x) + "," + FormatFloat(e.size.y); },
         [](WidgetElement& e, const std::string& v) {
             float x = 0.0f, y = 0.0f;
@@ -180,7 +182,9 @@ void WidgetDetailsPanel::RebuildForSelection(WidgetElement* element) {
                 [desc](WidgetElement& e) { return desc.getValue(e) == "true"; },
                 [desc](WidgetElement& e, bool v) { desc.setValue(e, v ? "true" : "false"); });
         } else {
-            AddStringField(list, desc.key, desc.getValue, desc.setValue);
+            AddStringField(list, desc.key,
+                desc.kind == WidgetFieldKind::Float || desc.kind == WidgetFieldKind::Int,
+                desc.getValue, desc.setValue);
         }
     }
 }

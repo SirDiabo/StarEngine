@@ -170,6 +170,13 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     }
 
     WidgetElement* hovered = focused ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
+
+    if (focused && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && widget->currentSelection && widget->currentSelection != hovered) {
+        widget->currentSelection->interactionState = WidgetInteractionState::Default;
+        widget->currentSelection->OnDeselected();
+        widget->currentSelection = nullptr;
+    }
+
     if (hovered) widget->SetSelection(hovered);
 
     bool confirmHeld = focused && PollBool(kConfirmMapping, device);

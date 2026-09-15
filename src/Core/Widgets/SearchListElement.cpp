@@ -1,0 +1,117 @@
+#include "SearchListElement.h"
+#include "TextElement.h"
+#include "BoxElement.h"
+#include "ButtonElement.h"
+#include <algorithm>
+
+namespace {
+
+std::string ToLowerCopy(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return (char)tolower(c); });
+    return out;
+}
+
+}
+
+SearchListElement::SearchListElement() {
+    searchBox = new TextElement();
+    searchBox->editable = true;
+    searchBox->placeholder = "Search...";
+    searchBox->fontSize = 13.0f;
+    searchBox->onTextChanged = [this](const std::string&) { RebuildRows(); };
+    AddChild(searchBox);
+
+    listBox = new BoxElement();
+    listBox->axis = BoxAxis::Vertical;
+    listBox->scrollEnabled = true;
+    listBox->backgroundColor = { 0, 0, 0, 0 };
+    AddChild(listBox);
+}
+
+void SearchListElement::SetEntries(std::vector<Entry> newEntries) {
+    entries = std::move(newEntries);
+    RebuildRows();
+}
+
+void SearchListElement::SetShowSearchBar(bool show) {
+    showSearchBar = show;
+    searchBox->visible = show;
+    RebuildRows();
+}
+
+Rectangle SearchListElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const {
+    float barH = showSearchBar ? searchBarHeight * uiScale : 0.0f;
+    if (childIndex == 0) {
+        return { ownRect.x, ownRect.y, ownRect.width, barH };
+    }
+    return { ownRect.x, ownRect.y + barH, ownRect.width, ownRect.height - barH };
+}
+
+void SearchListElement::OnDrawSelf(Rectangle rect, float uiScale) {
+    if (backgroundColor.a > 0) DrawRectangleRec(rect, backgroundColor);
+}
+
+void SearchListElement::RebuildRows() {
+    listBox->ClearChildren();
+    listBox->scrollOffset = 0.0f;
+
+    std::string query = ToLowerCopy(searchBox->text);
+    std::string lastCategory = "\x01";
+
+    for (const Entry& entry : entries) {
+        if (!query.empty() && ToLowerCopy(entry.label).find(query) == std::string::npos) continue;
+
+        if (!entry.category.empty() && entry.category != lastCategory) {
+            auto* header = new TextElement();
+            header->text = entry.category;
+            header->color = categoryHeaderColor;
+            header->fontSize = 11.0f;
+            header->anchor = { 0.0f, 0.5f };
+            header->pivot = { 0.0f, 0.5f };
+            header->offset = { 6.0f, 0.0f };
+            header->size = { 0.0f, categoryHeaderHeight };
+            listBox->AddChild(header);
+            lastCategory = entry.category;
+        }
+
+        bool hasReason = !entry.enabled && !entry.disabledReason.empty();
+        float thisRowHeight = hasReason ? rowHeight + 14.0f : rowHeight;
+
+        auto* row = new ButtonElement();
+        row->size = { 0.0f, thisRowHeight };
+        row->defaultColor = { 0, 0, 0, 0 };
+        row->hoveredColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
+        row->pressedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
+        row->disabled = !entry.enabled;
+        if (entry.enabled) {
+            row->onActivated = [this, entry]() {
+                if (onEntrySelected) onEntrySelected(entry.id);
+            };
+        }
+
+        auto* label = new TextElement();
+        label->text = entry.label;
+        label->color = entry.enabled ? rowColor : rowDisabledColor;
+        label->fontSize = 13.0f;
+        label->anchor = { 0.0f, 0.0f };
+        label->pivot = { 0.0f, 0.0f };
+        label->offset = { 8.0f, 2.0f };
+        label->size = { 0.0f, 18.0f };
+        row->AddChild(label);
+
+        if (hasReason) {
+            auto* reasonLabel = new TextElement();
+            reasonLabel->text = entry.disabledReason;
+            reasonLabel->color = rowDisabledReasonColor;
+            reasonLabel->fontSize = 10.0f;
+            reasonLabel->anchor = { 0.0f, 0.0f };
+            reasonLabel->pivot = { 0.0f, 0.0f };
+            reasonLabel->offset = { 8.0f, 18.0f };
+            reasonLabel->size = { 0.0f, 14.0f };
+            row->AddChild(reasonLabel);
+        }
+
+        listBox->AddChild(row);
+    }
+}
