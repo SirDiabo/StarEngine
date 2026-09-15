@@ -50,6 +50,7 @@ public:
 
 protected:
     void OnDrawSelf(Rectangle rect, float uiScale) override;
+    void OnTickSelf(float deltaTime, Rectangle rect, float uiScale) override;
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override;
 
 private:
@@ -62,4 +63,5 @@ private:
     BoxElement* listBox = nullptr;
     TextElement* createBox = nullptr;
     bool creatingNew = false;
+    std::string highlightedEntryId;
 };

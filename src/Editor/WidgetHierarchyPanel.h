@@ -30,6 +30,7 @@ private:
 
     WidgetEditorSession* session = nullptr;
     Widget* chrome = nullptr;
+    VerticalBoxElement* list = nullptr;
     std::vector<RowEntry> rowEntries;
     std::function<void(const std::string&, const std::string&)> dragCallback;
 

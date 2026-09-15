@@ -2,6 +2,7 @@
 #include "TextElement.h"
 #include "BoxElement.h"
 #include "ButtonElement.h"
+#include "raylib.h"
 #include <algorithm>
 
 namespace {
@@ -105,8 +106,20 @@ void SearchListElement::OnDrawSelf(Rectangle rect, float uiScale) {
     if (backgroundColor.a > 0) DrawRectangleRec(rect, backgroundColor);
 }
 
+void SearchListElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
+    if (!creatingNew && searchBox->isEditing && IsKeyPressed(KEY_ENTER) && !highlightedEntryId.empty()) {
+        if (onEntrySelected) onEntrySelected(highlightedEntryId);
+    }
+}
+
 void SearchListElement::RebuildRows() {
     listBox->ClearChildren();
+
+    bool anyExplicitCurrent = false;
+    for (const Entry& e : entries) {
+        if (e.isCurrent) { anyExplicitCurrent = true; break; }
+    }
+    highlightedEntryId.clear();
 
     std::string query = ToLowerCopy(searchBox->text);
     std::string lastCategory = "\x01";
@@ -127,12 +140,15 @@ void SearchListElement::RebuildRows() {
             lastCategory = entry.category;
         }
 
+        bool showAsCurrent = entry.isCurrent || (!anyExplicitCurrent && highlightedEntryId.empty() && entry.enabled);
+        if (showAsCurrent && highlightedEntryId.empty()) highlightedEntryId = entry.id;
+
         bool hasReason = !entry.enabled && !entry.disabledReason.empty();
         float thisRowHeight = hasReason ? rowHeight + 14.0f : rowHeight;
 
         auto* row = new ButtonElement();
         row->size = { 0.0f, thisRowHeight };
-        row->defaultColor = entry.isCurrent ? rowCurrentColor : Color{ 0, 0, 0, 0 };
+        row->defaultColor = showAsCurrent ? rowCurrentColor : Color{ 0, 0, 0, 0 };
         row->hoveredColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->selectedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->pressedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
@@ -145,7 +161,7 @@ void SearchListElement::RebuildRows() {
 
         auto* label = new TextElement();
         label->text = entry.label;
-        label->color = !entry.enabled ? rowDisabledColor : (entry.isCurrent ? rowCurrentTextColor : rowColor);
+        label->color = !entry.enabled ? rowDisabledColor : (showAsCurrent ? rowCurrentTextColor : rowColor);
         label->fontSize = 13.0f;
         label->anchor = { 0.0f, 0.0f };
         label->pivot = { 0.0f, 0.0f };

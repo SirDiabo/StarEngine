@@ -56,12 +56,12 @@ void EnsureDefaultMappings() {
 }
 
 bool KeyMatchesDevice(const std::string& key, const std::string& device, int& gamepadIndex) {
-    if (device == "Unclaimed") {
-        if (InputKeyBelongsToDevice(key, "Keyboard+Mouse", gamepadIndex)) return true;
-        gamepadIndex = 0;
-        return InputKeyBelongsToDevice(key, "Gamepad 0", gamepadIndex);
+    if (device == "Keyboard+Mouse" || device.rfind("Gamepad ", 0) == 0) {
+        return InputKeyBelongsToDevice(key, device, gamepadIndex);
     }
-    return InputKeyBelongsToDevice(key, device, gamepadIndex);
+    if (InputKeyBelongsToDevice(key, "Keyboard+Mouse", gamepadIndex)) return true;
+    gamepadIndex = 0;
+    return InputKeyBelongsToDevice(key, "Gamepad 0", gamepadIndex);
 }
 
 bool PollBool(const char* mappingName, const std::string& device) {

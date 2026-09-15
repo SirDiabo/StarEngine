@@ -81,23 +81,24 @@ void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement
 }
 
 void WidgetHierarchyPanel::Render() {
-    delete chrome;
-    chrome = new Widget();
+    if (!chrome) {
+        chrome = new Widget();
+        list = new VerticalBoxElement();
+        list->scrollEnabled = true;
+        list->childSpacing = 1.0f;
+        chrome->SetRoot(list);
+    }
+
     rowEntries.clear();
+    list->ClearChildren();
 
     const UIPalette& theme = UITheme::Get();
-
-    auto* list = new VerticalBoxElement();
-    list->scrollEnabled = true;
-    list->childSpacing = 1.0f;
     list->backgroundColor = theme.panelBg;
     list->size = { bounds.width, bounds.height };
 
     if (session && session->GetData().rootElement) {
         AddElementRow(list, session->GetData().rootElement, 0);
     }
-
-    chrome->SetRoot(list);
 
     float dt = GetFrameTime();
     chrome->Tick(dt, bounds, 1.0f);
