@@ -55,6 +55,7 @@ void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement
         deleteBtn->size = { 18.0f, 18.0f };
         deleteBtn->defaultColor = theme.buttonBg;
         deleteBtn->hoveredColor = theme.danger;
+        deleteBtn->selectedColor = theme.danger;
         deleteBtn->onActivated = [this, element]() {
             if (session) session->DeleteElement(element);
         };

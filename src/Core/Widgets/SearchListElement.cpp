@@ -132,6 +132,7 @@ void SearchListElement::RebuildRows() {
         row->size = { 0.0f, thisRowHeight };
         row->defaultColor = { 0, 0, 0, 0 };
         row->hoveredColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
+        row->selectedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->pressedColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };
         row->disabled = !entry.enabled;
         if (entry.enabled) {
@@ -170,6 +171,7 @@ void SearchListElement::RebuildRows() {
         createRow->size = { 0.0f, rowHeight };
         createRow->defaultColor = { 0, 0, 0, 0 };
         createRow->hoveredColor = rowHoveredColor;
+        createRow->selectedColor = rowHoveredColor;
         createRow->pressedColor = rowHoveredColor;
         createRow->onActivated = [this]() { EnterCreateMode(); };
 

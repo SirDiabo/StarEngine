@@ -86,6 +86,7 @@ void WidgetDetailsPanel::AddBoolField(VerticalBoxElement* list, const std::strin
     row->size = { 0.0f, kFieldHeight };
     row->defaultColor = current ? theme.accent : theme.buttonBg;
     row->hoveredColor = theme.buttonHover;
+    row->selectedColor = theme.buttonHover;
     row->pressedColor = theme.accent;
 
     auto* rowLabel = new TextElement();

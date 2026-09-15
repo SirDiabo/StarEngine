@@ -1,20 +1,27 @@
 #include "ColorPickerPopup.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/SliderElement.h"
+#include "Core/Widgets/RectangleElement.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/ButtonElement.h"
+#include "Core/Widgets/GridElement.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 
-static const float POPUP_W = 260.0f;
-static const float POPUP_H = 415.0f;
+namespace {
+
+const float POPUP_W = 260.0f;
+const float POPUP_H = 415.0f;
 
 struct PresetSwatch {
     const char* name;
     Color color;
 };
 
-static const PresetSwatch kPresetSwatches[] = {
+const PresetSwatch kPresetSwatches[] = {
     {"Red",    {225, 60, 60, 255}},
     {"Orange", {230, 140, 50, 255}},
     {"Yellow", {225, 210, 60, 255}},
@@ -28,47 +35,51 @@ static const PresetSwatch kPresetSwatches[] = {
     {"Black",  {20, 20, 20, 255}},
     {"Gray",   {130, 130, 130, 255}},
 };
-static const int kPresetSwatchCount = sizeof(kPresetSwatches) / sizeof(kPresetSwatches[0]);
+const int kPresetSwatchCount = sizeof(kPresetSwatches) / sizeof(kPresetSwatches[0]);
 
-static bool DragSlider(Rectangle r, float& value01, int sliderId, int& activeSlider) {
-    Vector2 mp = GetMousePosition();
-    bool hovered = CheckCollisionPointRec(mp, r);
-    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) activeSlider = sliderId;
+struct SliderRow {
+    SliderElement* slider;
+    TextElement* valueText;
+};
 
-    bool changed = false;
-    if (activeSlider == sliderId) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float nv = (mp.x - r.x) / r.width;
-            if (nv < 0.0f) nv = 0.0f;
-            if (nv > 1.0f) nv = 1.0f;
-            if (nv != value01) { value01 = nv; changed = true; }
-        } else {
-            activeSlider = -1;
-        }
-    }
+SliderRow BuildSliderRow(RectangleElement* parent, const std::string& labelText, float y, float contentW,
+                          const UIPalette& theme, std::function<void(float)> onChanged) {
+    auto* label = new TextElement();
+    label->text = labelText;
+    label->color = theme.textSecondary;
+    label->fontSize = 11.0f;
+    label->anchor = {0.0f, 0.0f};
+    label->pivot = {0.0f, 0.0f};
+    label->offset = {10.0f, y + 3.0f};
+    label->size = {14.0f, 14.0f};
+    parent->AddChild(label);
 
-    float hx = r.x + value01 * r.width;
-    DrawRectangleLinesEx({hx - 2, r.y - 2, 4, r.height + 4}, 2, WHITE);
-    DrawRectangleLinesEx({hx - 2, r.y - 2, 4, r.height + 4}, 1, BLACK);
-    return changed;
+    auto* slider = new SliderElement();
+    slider->anchor = {0.0f, 0.0f};
+    slider->pivot = {0.0f, 0.0f};
+    slider->offset = {24.0f, y};
+    slider->size = {contentW - 24.0f - 40.0f, 18.0f};
+    slider->borderColor = theme.fieldBorder;
+    slider->onValueChanged = onChanged;
+    parent->AddChild(slider);
+
+    auto* valueText = new TextElement();
+    valueText->color = theme.textPrimary;
+    valueText->fontSize = 11.0f;
+    valueText->anchor = {0.0f, 0.0f};
+    valueText->pivot = {0.0f, 0.0f};
+    valueText->offset = {10.0f + contentW - 40.0f + 4.0f, y + 3.0f};
+    valueText->size = {40.0f, 14.0f};
+    parent->AddChild(valueText);
+
+    return { slider, valueText };
 }
 
-static void DrawHueGradient(Rectangle r) {
-    static const Color stops[7] = {
-        {255, 0, 0, 255}, {255, 255, 0, 255}, {0, 255, 0, 255}, {0, 255, 255, 255},
-        {0, 0, 255, 255}, {255, 0, 255, 255}, {255, 0, 0, 255},
-    };
-    float segW = r.width / 6.0f;
-    for (int i = 0; i < 6; i++) {
-        DrawRectangleGradientH((int)(r.x + i * segW), (int)r.y, (int)segW + 1, (int)r.height, stops[i], stops[i + 1]);
-    }
 }
 
 void ColorPickerPopup::Open(Vector2 anchorPos, Color startColor) {
     open = true;
-    justOpened = true;
-    activeSlider = -1;
-    hexActive = false;
+    hasPending = false;
 
     original = startColor;
     current = startColor;
@@ -81,7 +92,7 @@ void ColorPickerPopup::Open(Vector2 anchorPos, Color startColor) {
     hh = hsv.x;
     ss = hsv.y;
     vv = hsv.z;
-    UpdateHexBuffer();
+    snprintf(hexBuf, sizeof(hexBuf), "%02X%02X%02X%02X", current.r, current.g, current.b, current.a);
 
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
@@ -89,19 +100,222 @@ void ColorPickerPopup::Open(Vector2 anchorPos, Color startColor) {
     float y = anchorPos.y;
     if (x + POPUP_W > screenW) x = screenW - POPUP_W - 4;
     if (y + POPUP_H > screenH) y = screenH - POPUP_H - 4;
-    area = {x, y, POPUP_W, POPUP_H};
+    area = { x, y, POPUP_W, POPUP_H };
+
+    const UIPalette& theme = UITheme::Get();
+
+    auto* panel = new RectangleElement();
+    panel->color = theme.panelBg;
+
+    float contentW = POPUP_W - 20.0f;
+    float fy = 10.0f;
+
+    auto* oldLabel = new TextElement();
+    oldLabel->text = "Old";
+    oldLabel->color = theme.textSecondary;
+    oldLabel->fontSize = 10.0f;
+    oldLabel->anchor = {0.0f, 0.0f};
+    oldLabel->pivot = {0.0f, 0.0f};
+    oldLabel->offset = {10.0f, fy};
+    oldLabel->size = {60.0f, 12.0f};
+    panel->AddChild(oldLabel);
+
+    float swatchW = (contentW - 8.0f) / 2.0f;
+    auto* newLabel = new TextElement();
+    newLabel->text = "New";
+    newLabel->color = theme.textSecondary;
+    newLabel->fontSize = 10.0f;
+    newLabel->anchor = {0.0f, 0.0f};
+    newLabel->pivot = {0.0f, 0.0f};
+    newLabel->offset = {10.0f + swatchW + 8.0f, fy};
+    newLabel->size = {60.0f, 12.0f};
+    panel->AddChild(newLabel);
+    fy += 12.0f;
+
+    auto* oldSwatch = new RectangleElement();
+    oldSwatch->color = original;
+    oldSwatch->anchor = {0.0f, 0.0f};
+    oldSwatch->pivot = {0.0f, 0.0f};
+    oldSwatch->offset = {10.0f, fy};
+    oldSwatch->size = {swatchW, 34.0f};
+    panel->AddChild(oldSwatch);
+
+    newSwatchEl = new RectangleElement();
+    newSwatchEl->color = current;
+    newSwatchEl->anchor = {0.0f, 0.0f};
+    newSwatchEl->pivot = {0.0f, 0.0f};
+    newSwatchEl->offset = {10.0f + swatchW + 8.0f, fy};
+    newSwatchEl->size = {swatchW, 34.0f};
+    panel->AddChild(newSwatchEl);
+    fy += 34.0f + 10.0f;
+
+    auto rRow = BuildSliderRow(panel, "R", fy, contentW, theme, [this](float v) { rf = v; SyncFromRGB(); RefreshControls(); });
+    rSlider = rRow.slider; rValueText = rRow.valueText;
+    fy += 22.0f;
+
+    auto gRow = BuildSliderRow(panel, "G", fy, contentW, theme, [this](float v) { gf = v; SyncFromRGB(); RefreshControls(); });
+    gSlider = gRow.slider; gValueText = gRow.valueText;
+    fy += 22.0f;
+
+    auto bRow = BuildSliderRow(panel, "B", fy, contentW, theme, [this](float v) { bf = v; SyncFromRGB(); RefreshControls(); });
+    bSlider = bRow.slider; bValueText = bRow.valueText;
+    fy += 22.0f;
+
+    auto aRow = BuildSliderRow(panel, "A", fy, contentW, theme, [this](float v) { af = v; SyncFromRGB(); RefreshControls(); });
+    aSlider = aRow.slider; aValueText = aRow.valueText;
+    fy += 26.0f;
+
+    auto hRow = BuildSliderRow(panel, "H", fy, contentW, theme, [this](float v) { hh = v; SyncFromHSV(); RefreshControls(); });
+    hSlider = hRow.slider; hValueText = hRow.valueText;
+    hSlider->minValue = 0.0f;
+    hSlider->maxValue = 360.0f;
+    hSlider->gradientStops = {
+        {255, 0, 0, 255}, {255, 255, 0, 255}, {0, 255, 0, 255}, {0, 255, 255, 255},
+        {0, 0, 255, 255}, {255, 0, 255, 255}, {255, 0, 0, 255},
+    };
+    fy += 22.0f;
+
+    auto sRow = BuildSliderRow(panel, "S", fy, contentW, theme, [this](float v) { ss = v; SyncFromHSV(); RefreshControls(); });
+    sSlider = sRow.slider; sValueText = sRow.valueText;
+    fy += 22.0f;
+
+    auto vRow = BuildSliderRow(panel, "V", fy, contentW, theme, [this](float v) { vv = v; SyncFromHSV(); RefreshControls(); });
+    vSlider = vRow.slider; vValueText = vRow.valueText;
+    fy += 28.0f;
+
+    auto* hexLabel = new TextElement();
+    hexLabel->text = "Hex";
+    hexLabel->color = theme.textSecondary;
+    hexLabel->fontSize = 11.0f;
+    hexLabel->anchor = {0.0f, 0.0f};
+    hexLabel->pivot = {0.0f, 0.0f};
+    hexLabel->offset = {10.0f, fy + 4.0f};
+    hexLabel->size = {30.0f, 14.0f};
+    panel->AddChild(hexLabel);
+
+    hexBox = new TextElement();
+    hexBox->editable = true;
+    hexBox->text = hexBuf;
+    hexBox->fontSize = 11.0f;
+    hexBox->color = theme.textPrimary;
+    hexBox->backgroundColor = theme.fieldBg;
+    hexBox->borderColor = theme.fieldBorder;
+    hexBox->editingBorderColor = theme.accent;
+    hexBox->anchor = {0.0f, 0.0f};
+    hexBox->pivot = {0.0f, 0.0f};
+    hexBox->offset = {42.0f, fy};
+    hexBox->size = {contentW - 32.0f, 20.0f};
+    hexBox->onTextCommitted = [this](const std::string& text) {
+        strncpy(hexBuf, text.c_str(), sizeof(hexBuf) - 1);
+        hexBuf[sizeof(hexBuf) - 1] = 0;
+        SyncFromHex();
+        RefreshControls();
+    };
+    panel->AddChild(hexBox);
+    fy += 30.0f;
+
+    auto* presetsLabel = new TextElement();
+    presetsLabel->text = "Presets";
+    presetsLabel->color = theme.textSecondary;
+    presetsLabel->fontSize = 10.0f;
+    presetsLabel->anchor = {0.0f, 0.0f};
+    presetsLabel->pivot = {0.0f, 0.0f};
+    presetsLabel->offset = {10.0f, fy};
+    presetsLabel->size = {80.0f, 12.0f};
+    panel->AddChild(presetsLabel);
+    fy += 14.0f;
+
+    auto* grid = new GridElement();
+    grid->columns = 6;
+    grid->columnWidth = 34.0f;
+    grid->rowHeight = 34.0f;
+    grid->cellSpacing = 4.0f;
+    grid->anchor = {0.0f, 0.0f};
+    grid->pivot = {0.0f, 0.0f};
+    grid->offset = {10.0f, fy};
+    int swRows = (kPresetSwatchCount + 5) / 6;
+    grid->size = {contentW, (float)swRows * (34.0f + 4.0f)};
+    for (int i = 0; i < kPresetSwatchCount; i++) {
+        auto* swatchBtn = new ButtonElement();
+        Color c = kPresetSwatches[i].color;
+        swatchBtn->defaultColor = c;
+        swatchBtn->hoveredColor = c;
+        swatchBtn->selectedColor = c;
+        swatchBtn->pressedColor = c;
+        swatchBtn->size = {0.0f, 0.0f};
+        swatchBtn->onActivated = [this, c]() {
+            rf = c.r / 255.0f;
+            gf = c.g / 255.0f;
+            bf = c.b / 255.0f;
+            SyncFromRGB();
+            RefreshControls();
+        };
+        grid->AddChild(swatchBtn);
+    }
+    panel->AddChild(grid);
+    fy += (float)swRows * (34.0f + 4.0f) + 8.0f;
+
+    float btnW = (contentW - 8.0f) / 2.0f;
+    auto* cancelBtn = new ButtonElement();
+    cancelBtn->defaultColor = theme.buttonBg;
+    cancelBtn->hoveredColor = theme.buttonHover;
+    cancelBtn->selectedColor = theme.buttonHover;
+    cancelBtn->pressedColor = theme.buttonPressed;
+    cancelBtn->anchor = {0.0f, 0.0f};
+    cancelBtn->pivot = {0.0f, 0.0f};
+    cancelBtn->offset = {10.0f, POPUP_H - 34.0f};
+    cancelBtn->size = {btnW, 24.0f};
+    cancelBtn->onActivated = [this]() {
+        pendingColor = original;
+        pendingConfirmed = false;
+        hasPending = true;
+    };
+    auto* cancelLabel = new TextElement();
+    cancelLabel->text = "Cancel";
+    cancelLabel->color = theme.buttonText;
+    cancelLabel->fontSize = 12.0f;
+    cancelLabel->anchor = {0.5f, 0.5f};
+    cancelLabel->pivot = {0.5f, 0.5f};
+    cancelBtn->AddChild(cancelLabel);
+    panel->AddChild(cancelBtn);
+
+    auto* confirmBtn = new ButtonElement();
+    confirmBtn->defaultColor = theme.buttonBg;
+    confirmBtn->hoveredColor = theme.buttonHover;
+    confirmBtn->selectedColor = theme.buttonHover;
+    confirmBtn->pressedColor = theme.buttonPressed;
+    confirmBtn->anchor = {0.0f, 0.0f};
+    confirmBtn->pivot = {0.0f, 0.0f};
+    confirmBtn->offset = {10.0f + btnW + 8.0f, POPUP_H - 34.0f};
+    confirmBtn->size = {btnW, 24.0f};
+    confirmBtn->onActivated = [this]() {
+        pendingColor = current;
+        pendingConfirmed = true;
+        hasPending = true;
+    };
+    auto* confirmLabel = new TextElement();
+    confirmLabel->text = "Confirm";
+    confirmLabel->color = theme.buttonText;
+    confirmLabel->fontSize = 12.0f;
+    confirmLabel->anchor = {0.5f, 0.5f};
+    confirmLabel->pivot = {0.5f, 0.5f};
+    confirmBtn->AddChild(confirmLabel);
+    panel->AddChild(confirmBtn);
+
+    RefreshControls();
+
+    WidgetOverlay::Open(panel, { area.x, area.y }, { area.width, area.height }, [this]() {
+        open = false;
+    });
 }
 
 void ColorPickerPopup::Close() {
     open = false;
+    WidgetOverlay::Close();
 }
 
 bool ColorPickerPopup::ContainsPoint(Vector2 point) const {
     return open && CheckCollisionPointRec(point, area);
-}
-
-void ColorPickerPopup::UpdateHexBuffer() {
-    snprintf(hexBuf, sizeof(hexBuf), "%02X%02X%02X%02X", current.r, current.g, current.b, current.a);
 }
 
 void ColorPickerPopup::SyncFromRGB() {
@@ -111,7 +325,7 @@ void ColorPickerPopup::SyncFromRGB() {
     hh = hsv.x;
     ss = hsv.y;
     vv = hsv.z;
-    UpdateHexBuffer();
+    snprintf(hexBuf, sizeof(hexBuf), "%02X%02X%02X%02X", current.r, current.g, current.b, current.a);
 }
 
 void ColorPickerPopup::SyncFromHSV() {
@@ -120,7 +334,7 @@ void ColorPickerPopup::SyncFromHSV() {
     rf = current.r / 255.0f;
     gf = current.g / 255.0f;
     bf = current.b / 255.0f;
-    UpdateHexBuffer();
+    snprintf(hexBuf, sizeof(hexBuf), "%02X%02X%02X%02X", current.r, current.g, current.b, current.a);
 }
 
 void ColorPickerPopup::SyncFromHex() {
@@ -151,169 +365,47 @@ void ColorPickerPopup::SyncFromHex() {
     vv = hsv.z;
 }
 
+void ColorPickerPopup::RefreshControls() {
+    rSlider->value = rf;
+    gSlider->value = gf;
+    bSlider->value = bf;
+    aSlider->value = af;
+    hSlider->value = hh;
+    sSlider->value = ss;
+    vSlider->value = vv;
+
+    rSlider->gradientStops = { Color{0, (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255},
+                                Color{255, (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255} };
+    gSlider->gradientStops = { Color{(unsigned char)(rf * 255), 0, (unsigned char)(bf * 255), 255},
+                                Color{(unsigned char)(rf * 255), 255, (unsigned char)(bf * 255), 255} };
+    bSlider->gradientStops = { Color{(unsigned char)(rf * 255), (unsigned char)(gf * 255), 0, 255},
+                                Color{(unsigned char)(rf * 255), (unsigned char)(gf * 255), 255, 255} };
+    aSlider->gradientStops = { Color{(unsigned char)(rf * 255), (unsigned char)(gf * 255), (unsigned char)(bf * 255), 0},
+                                Color{(unsigned char)(rf * 255), (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255} };
+    sSlider->gradientStops = { ColorFromHSV(hh, 0.0f, vv), ColorFromHSV(hh, 1.0f, vv) };
+    vSlider->gradientStops = { ColorFromHSV(hh, ss, 0.0f), ColorFromHSV(hh, ss, 1.0f) };
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.2f", rf); rValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.2f", gf); gValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.2f", bf); bValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.2f", af); aValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.0f", hh); hValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.2f", ss); sValueText->text = buf;
+    snprintf(buf, sizeof(buf), "%.2f", vv); vValueText->text = buf;
+
+    newSwatchEl->color = current;
+    if (!hexBox->isEditing) hexBox->text = hexBuf;
+}
+
 bool ColorPickerPopup::Render(Color& outColor, bool& outConfirmed) {
     if (!open) return false;
-
-    const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(area);
-
-    float fx = area.x + 10;
-    float fy = area.y + 10;
-    float contentW = area.width - 20;
-    Vector2 mp = GetMousePosition();
-
-    float swatchW = (contentW - 8) / 2.0f;
-    Rectangle oldSwatch = {fx, fy + 12, swatchW, 34};
-    Rectangle newSwatch = {fx + swatchW + 8, fy + 12, swatchW, 34};
-    DrawText("Old", (int)oldSwatch.x, (int)fy, 10, theme.textSecondary);
-    DrawText("New", (int)newSwatch.x, (int)fy, 10, theme.textSecondary);
-    DrawRectangleRec(oldSwatch, original);
-    DrawRectangleLinesEx(oldSwatch, 1, theme.fieldBorder);
-    DrawRectangleRec(newSwatch, current);
-    DrawRectangleLinesEx(newSwatch, 1, theme.fieldBorder);
-    fy += 12 + 34 + 10;
-
-    float labelW = 14.0f;
-    float valueW = 40.0f;
-    Rectangle track = {fx + labelW, fy, contentW - labelW - valueW, 18};
-    char valBuf[16];
-
-    DrawText("R", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            {0, (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255},
-                            {255, (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255});
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, rf, 0, activeSlider)) SyncFromRGB();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", rf);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 22;
-
-    track.y = fy;
-    DrawText("G", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            {(unsigned char)(rf * 255), 0, (unsigned char)(bf * 255), 255},
-                            {(unsigned char)(rf * 255), 255, (unsigned char)(bf * 255), 255});
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, gf, 1, activeSlider)) SyncFromRGB();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", gf);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 22;
-
-    track.y = fy;
-    DrawText("B", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            {(unsigned char)(rf * 255), (unsigned char)(gf * 255), 0, 255},
-                            {(unsigned char)(rf * 255), (unsigned char)(gf * 255), 255, 255});
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, bf, 2, activeSlider)) SyncFromRGB();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", bf);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 22;
-
-    track.y = fy;
-    DrawText("A", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            {(unsigned char)(rf * 255), (unsigned char)(gf * 255), (unsigned char)(bf * 255), 0},
-                            {(unsigned char)(rf * 255), (unsigned char)(gf * 255), (unsigned char)(bf * 255), 255});
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, af, 3, activeSlider)) SyncFromRGB();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", af);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 26;
-
-    float hueNorm = hh / 360.0f;
-    track.y = fy;
-    DrawText("H", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawHueGradient(track);
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, hueNorm, 4, activeSlider)) {
-        hh = hueNorm * 360.0f;
-        SyncFromHSV();
-    }
-    snprintf(valBuf, sizeof(valBuf), "%.0f", hh);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 22;
-
-    track.y = fy;
-    DrawText("S", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            ColorFromHSV(hh, 0.0f, vv), ColorFromHSV(hh, 1.0f, vv));
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, ss, 5, activeSlider)) SyncFromHSV();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", ss);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 22;
-
-    track.y = fy;
-    DrawText("V", (int)fx, (int)fy + 3, 11, theme.textSecondary);
-    DrawRectangleGradientH((int)track.x, (int)track.y, (int)track.width, (int)track.height,
-                            ColorFromHSV(hh, ss, 0.0f), ColorFromHSV(hh, ss, 1.0f));
-    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
-    if (DragSlider(track, vv, 6, activeSlider)) SyncFromHSV();
-    snprintf(valBuf, sizeof(valBuf), "%.2f", vv);
-    DrawText(valBuf, (int)(fx + contentW - valueW + 4), (int)fy + 3, 11, theme.textPrimary);
-    fy += 28;
-
-    DrawText("Hex", (int)fx, (int)fy + 4, 11, theme.textSecondary);
-    Rectangle hexBox = {fx + 32, fy, contentW - 32, 20};
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, hexBox)) hexActive = true;
-    GuiTextBox(hexBox, hexBuf, sizeof(hexBuf), hexActive);
-    if (hexActive && IsKeyPressed(KEY_ENTER)) {
-        SyncFromHex();
-        hexActive = false;
-    }
-    if (hexActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, hexBox)) {
-        SyncFromHex();
-        hexActive = false;
-    }
-    fy += 30;
-
-    DrawText("Presets", (int)fx, (int)fy, 10, theme.textSecondary);
-    fy += 14;
-    const float swSize = 34.0f;
-    const float swGap = 4.0f;
-    const int swCols = 6;
-    for (int i = 0; i < kPresetSwatchCount; i++) {
-        int col = i % swCols;
-        int row = i / swCols;
-        Rectangle sw = {fx + col * (swSize + swGap), fy + row * (swSize + swGap), swSize, swSize};
-        DrawRectangleRec(sw, kPresetSwatches[i].color);
-        bool swHovered = CheckCollisionPointRec(mp, sw);
-        DrawRectangleLinesEx(sw, swHovered ? 2 : 1, swHovered ? theme.textPrimary : theme.fieldBorder);
-        if (swHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            rf = kPresetSwatches[i].color.r / 255.0f;
-            gf = kPresetSwatches[i].color.g / 255.0f;
-            bf = kPresetSwatches[i].color.b / 255.0f;
-            SyncFromRGB();
-        }
-    }
-    int swRows = (kPresetSwatchCount + swCols - 1) / swCols;
-    fy += swRows * (swSize + swGap) + 8;
-
-    float btnW = (contentW - 8) / 2.0f;
-    Rectangle cancelBtn = {fx, area.y + area.height - 34, btnW, 24};
-    Rectangle confirmBtn = {fx + btnW + 8, area.y + area.height - 34, btnW, 24};
-
-    bool decided = false;
-    if (UIWidget::Button(cancelBtn, "Cancel")) {
-        outColor = original;
-        outConfirmed = false;
-        decided = true;
+    if (hasPending) {
+        outColor = pendingColor;
+        outConfirmed = pendingConfirmed;
+        hasPending = false;
         Close();
+        return true;
     }
-    if (UIWidget::Button(confirmBtn, "Confirm")) {
-        outColor = current;
-        outConfirmed = true;
-        decided = true;
-        Close();
-    }
-    if (decided) return true;
-
-    if (justOpened) {
-        justOpened = false;
-    } else if (!hexActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, area)) {
-        Close();
-    }
-
     return false;
 }
