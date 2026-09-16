@@ -54,10 +54,30 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
     std::string label = entry.label;
     bool draggable = allowReorder || allowReparent || allowExternalDrag;
     std::string kind = dragKind;
-    row->onActivated = [this, id, label, draggable, kind]() {
-        if (onEntrySelected) onEntrySelected(id);
-        if (draggable) DragDrop::Begin(kind, id, label, GetMousePosition());
-    };
+    bool renameEnabled = allowRename;
+    bool isRenamingThisRow = allowRename && entry.id == renamingId;
+    if (!isRenamingThisRow) {
+        row->onActivated = [this, id, label, draggable, kind, renameEnabled]() {
+            if (onEntrySelected) onEntrySelected(id);
+
+            bool startedRename = false;
+            if (renameEnabled) {
+                float now = (float)GetTime();
+                if (lastClickedId == id && (now - lastClickTime) < 0.35f) {
+                    renamingId = id;
+                    startedRename = true;
+                    RebuildRows();
+                }
+                lastClickedId = id;
+                lastClickTime = now;
+            }
+
+            if (draggable && !startedRename) DragDrop::Begin(kind, id, label, GetMousePosition());
+        };
+        row->onRightActivated = [this, id]() {
+            if (onEntryRightClicked) onEntryRightClicked(id);
+        };
+    }
 
     float textOffset = 8.0f + depth * indentWidth;
     if (entry.iconColor.a > 0) {
@@ -79,7 +99,23 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
     label_->pivot = { 0.0f, 0.5f };
     label_->offset = { textOffset, 0.0f };
     label_->size = { 0.0f, 16.0f };
+
+    if (isRenamingThisRow) {
+        label_->editable = true;
+        label_->onTextCommitted = [this, id](const std::string& newName) {
+            if (onRenameRequested && !newName.empty()) onRenameRequested(id, newName);
+            renamingId.clear();
+            RebuildRows();
+        };
+        label_->onEditCancelled = [this]() {
+            renamingId.clear();
+            RebuildRows();
+        };
+    }
+
     row->AddChild(label_);
+
+    if (isRenamingThisRow) label_->StartEditing();
 
     AddChild(row);
     visualIndex++;

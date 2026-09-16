@@ -188,6 +188,10 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
         hovered->OnConfirmed();
     }
 
+    if (focused && hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        if (hovered->onRightActivated) hovered->onRightActivated();
+    }
+
     int currentIndex = -1;
     for (int i = 0; i < (int)selectables.size(); i++) {
         if (selectables[i] == widget->currentSelection) { currentIndex = i; break; }

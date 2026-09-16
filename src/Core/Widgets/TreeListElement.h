@@ -32,6 +32,7 @@ public:
     bool allowReorder = true;
     bool allowReparent = false;
     bool allowExternalDrag = true;
+    bool allowRename = false;
     float rowHeight = 20.0f;
     float indentWidth = 16.0f;
 
@@ -44,9 +45,11 @@ public:
     Color dropIntoColor{ 70, 100, 70, 180 };
 
     std::function<void(const std::string&)> onEntrySelected;
+    std::function<void(const std::string&)> onEntryRightClicked;
     std::function<void(const std::string& draggedId, const std::string& targetId, TreeDropPosition pos)> onReorderOrReparent;
     std::function<void(const std::string& draggedId)> onExternalDragStarted;
     std::function<void(const std::string&)> onDeleteRequested;
+    std::function<void(const std::string& id, const std::string& newName)> onRenameRequested;
 
     void SetEntries(std::vector<Entry> newEntries);
 
@@ -66,4 +69,7 @@ private:
     std::vector<Entry> entries;
     std::vector<RowInfo> rowInfos;
     bool externalDragFired = false;
+    std::string renamingId;
+    std::string lastClickedId;
+    float lastClickTime = -1.0f;
 };

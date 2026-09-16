@@ -35,6 +35,7 @@ public:
     bool disabled = false;
     WidgetInteractionState interactionState = WidgetInteractionState::Default;
     std::function<void()> onActivated;
+    std::function<void()> onRightActivated;
 
     WidgetElement* parent = nullptr;
     Widget* owningWidget = nullptr;

@@ -178,6 +178,7 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         BlnF<TreeListElement>("TreeListElement", "AllowReorder", &TreeListElement::allowReorder),
         BlnF<TreeListElement>("TreeListElement", "AllowReparent", &TreeListElement::allowReparent),
         BlnF<TreeListElement>("TreeListElement", "AllowExternalDrag", &TreeListElement::allowExternalDrag),
+        BlnF<TreeListElement>("TreeListElement", "AllowRename", &TreeListElement::allowRename),
         FltF<TreeListElement>("TreeListElement", "RowHeight", &TreeListElement::rowHeight),
         FltF<TreeListElement>("TreeListElement", "IndentWidth", &TreeListElement::indentWidth),
         ColF<TreeListElement>("TreeListElement", "RowColor", &TreeListElement::rowColor),
