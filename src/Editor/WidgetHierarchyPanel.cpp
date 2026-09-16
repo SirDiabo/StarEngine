@@ -4,14 +4,34 @@
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/WidgetElement.h"
-#include "Core/Widgets/VerticalBoxElement.h"
-#include "Core/Widgets/ButtonElement.h"
-#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/TreeListElement.h"
 #include "raylib.h"
 
 namespace {
-constexpr float kRowHeight = 24.0f;
-constexpr float kIndentWidth = 14.0f;
+
+void FlattenEntries(WidgetElement* element, const std::string& parentId, WidgetEditorSession* session,
+                     std::vector<TreeListElement::Entry>& out) {
+    TreeListElement::Entry entry;
+    entry.id = element->elementId;
+    entry.label = element->elementId + "  (" + element->GetClassName() + ")";
+    entry.parentId = parentId;
+    entry.isCurrent = session && session->GetSelectedElement() == element;
+    out.push_back(entry);
+
+    for (WidgetElement* child : element->GetChildren()) {
+        FlattenEntries(child, element->elementId, session, out);
+    }
+}
+
+WidgetElement* FindById(WidgetElement* root, const std::string& id) {
+    if (!root) return nullptr;
+    if (root->elementId == id) return root;
+    for (WidgetElement* child : root->GetChildren()) {
+        if (WidgetElement* found = FindById(child, id)) return found;
+    }
+    return nullptr;
+}
+
 }
 
 void WidgetHierarchyPanel::Initialize() {
@@ -22,120 +42,59 @@ WidgetHierarchyPanel::~WidgetHierarchyPanel() {
     delete chrome;
 }
 
-void WidgetHierarchyPanel::AddElementRow(VerticalBoxElement* list, WidgetElement* element, int depth) {
-    const UIPalette& theme = UITheme::Get();
-    bool isHighlighted = session && session->IsHierarchyRowHighlighted(element);
-
-    auto* row = new ButtonElement();
-    row->size = { 0.0f, kRowHeight };
-    row->defaultColor = isHighlighted ? theme.surfaceSelected : theme.panelBg;
-    row->hoveredColor = isHighlighted ? theme.surfaceSelected : theme.surfaceHover;
-    row->selectedColor = isHighlighted ? theme.surfaceSelected : theme.surfaceHover;
-    row->pressedColor = theme.accent;
-    row->onActivated = [this, element]() {
-        if (session) session->SetSelectedElement(element);
-    };
-
-    auto* label = new TextElement();
-    label->text = element->elementId + "  (" + element->GetClassName() + ")";
-    label->color = theme.textPrimary;
-    label->fontSize = 13.0f;
-    label->anchor = { 0.0f, 0.5f };
-    label->pivot = { 0.0f, 0.5f };
-    label->offset = { 8.0f + depth * kIndentWidth, 0.0f };
-    label->size = { 260.0f, 18.0f };
-    row->AddChild(label);
-
-    bool canDelete = element->parent != nullptr;
-    if (canDelete) {
-        auto* deleteBtn = new ButtonElement();
-        deleteBtn->anchor = { 1.0f, 0.5f };
-        deleteBtn->pivot = { 1.0f, 0.5f };
-        deleteBtn->offset = { -4.0f, 0.0f };
-        deleteBtn->size = { 18.0f, 18.0f };
-        deleteBtn->defaultColor = theme.buttonBg;
-        deleteBtn->hoveredColor = theme.danger;
-        deleteBtn->selectedColor = theme.danger;
-        deleteBtn->onActivated = [this, element]() {
-            if (session) session->DeleteElement(element);
-        };
-
-        auto* deleteLabel = new TextElement();
-        deleteLabel->text = "x";
-        deleteLabel->color = theme.textPrimary;
-        deleteLabel->fontSize = 12.0f;
-        deleteLabel->anchor = { 0.5f, 0.5f };
-        deleteLabel->pivot = { 0.5f, 0.5f };
-        deleteLabel->size = { 18.0f, 18.0f };
-        deleteBtn->AddChild(deleteLabel);
-
-        row->AddChild(deleteBtn);
-    }
-
-    list->AddChild(row);
-    rowEntries.push_back({ element, row });
-
-    for (WidgetElement* child : element->GetChildren()) {
-        AddElementRow(list, child, depth + 1);
-    }
-}
-
 void WidgetHierarchyPanel::Render() {
     if (!chrome) {
         chrome = new Widget();
-        list = new VerticalBoxElement();
-        list->scrollEnabled = true;
-        list->childSpacing = 1.0f;
+        list = new TreeListElement();
+        list->dragKind = "WidgetElement";
+        list->allowReorder = true;
+        list->allowReparent = true;
+        list->allowExternalDrag = true;
+
+        list->onEntrySelected = [this](const std::string& id) {
+            if (!session) return;
+            WidgetElement* element = FindById(session->GetData().rootElement, id);
+            session->SetSelectedElement(element);
+        };
+        list->onReorderOrReparent = [this](const std::string& draggedId, const std::string& targetId, TreeDropPosition pos) {
+            if (!session) return;
+            WidgetElement* dragged = FindById(session->GetData().rootElement, draggedId);
+            WidgetElement* target = FindById(session->GetData().rootElement, targetId);
+            session->ReparentElement(dragged, target, pos);
+        };
+        list->onExternalDragStarted = [this](const std::string& draggedId) {
+            if (!session) return;
+            WidgetElement* element = FindById(session->GetData().rootElement, draggedId);
+            if (element && dragCallback) dragCallback(element->elementId, element->GetClassName());
+        };
+        list->onDeleteRequested = [this](const std::string& id) {
+            if (!session) return;
+            WidgetElement* element = FindById(session->GetData().rootElement, id);
+            if (element) session->DeleteElement(element);
+        };
+
         chrome->SetRoot(list);
     }
 
-    rowEntries.clear();
-    list->ClearChildren();
-
     const UIPalette& theme = UITheme::Get();
     list->backgroundColor = theme.panelBg;
+    list->rowColor = theme.textPrimary;
+    list->rowAltColor = { 0, 0, 0, 20 };
+    list->rowHoveredColor = theme.surfaceHover;
+    list->rowCurrentColor = theme.surfaceSelected;
+    list->rowCurrentTextColor = theme.textPrimary;
+    list->dropLineColor = theme.accent;
     list->size = { bounds.width, bounds.height };
 
+    std::vector<TreeListElement::Entry> entries;
     if (session && session->GetData().rootElement) {
-        AddElementRow(list, session->GetData().rootElement, 0);
+        FlattenEntries(session->GetData().rootElement, "", session, entries);
     }
+    list->SetEntries(entries);
 
     float dt = GetFrameTime();
     chrome->Tick(dt, bounds, 1.0f);
-
     Vector2 mouse = GetMousePosition();
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        dragPending = false;
-        dragCandidate = nullptr;
-        bool clickedARow = false;
-        for (RowEntry& entry : rowEntries) {
-            if (CheckCollisionPointRec(mouse, entry.rowWidget->lastResolvedRect)) {
-                clickedARow = true;
-                dragPending = true;
-                dragCandidate = entry.element;
-                dragStartMouse = mouse;
-                break;
-            }
-        }
-        if (!clickedARow && session) session->ClearHierarchyHighlight();
-    }
-
-    if (dragPending && dragCandidate) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mouse.x - dragStartMouse.x;
-            float dy = mouse.y - dragStartMouse.y;
-            if (dx * dx + dy * dy > 36.0f) {
-                if (dragCallback) dragCallback(dragCandidate->elementId, dragCandidate->GetClassName());
-                dragPending = false;
-                dragCandidate = nullptr;
-            }
-        } else {
-            dragPending = false;
-            dragCandidate = nullptr;
-        }
-    }
-
     WidgetInput::ProcessInput(chrome, "Editor", dt, mouse, 1.0f);
     chrome->Draw(bounds, 1.0f);
 }

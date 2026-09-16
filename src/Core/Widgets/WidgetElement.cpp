@@ -34,6 +34,26 @@ void WidgetElement::AddChild(WidgetElement* child) {
     children.push_back(child);
 }
 
+void WidgetElement::InsertChild(WidgetElement* child, int index) {
+    if (!child) return;
+    child->parent = this;
+    child->SetOwningWidgetRecursive(owningWidget);
+    if (index < 0 || index > (int)children.size()) index = (int)children.size();
+    children.insert(children.begin() + index, child);
+}
+
+WidgetElement* WidgetElement::DetachChild(WidgetElement* child) {
+    auto it = std::find(children.begin(), children.end(), child);
+    if (it == children.end()) return nullptr;
+    if (owningWidget && ContainsRecursive(*it, owningWidget->currentSelection)) {
+        owningWidget->currentSelection = nullptr;
+    }
+    WidgetElement* detached = *it;
+    children.erase(it);
+    detached->parent = nullptr;
+    return detached;
+}
+
 void WidgetElement::SetOwningWidgetRecursive(Widget* widget) {
     owningWidget = widget;
     for (WidgetElement* child : children) child->SetOwningWidgetRecursive(widget);

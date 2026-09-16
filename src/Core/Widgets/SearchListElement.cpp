@@ -13,6 +13,17 @@ std::string ToLowerCopy(const std::string& s) {
     return out;
 }
 
+bool EntriesEqual(const std::vector<SearchListElement::Entry>& a, const std::vector<SearchListElement::Entry>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); i++) {
+        if (a[i].id != b[i].id || a[i].label != b[i].label || a[i].category != b[i].category ||
+            a[i].enabled != b[i].enabled || a[i].disabledReason != b[i].disabledReason || a[i].isCurrent != b[i].isCurrent) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }
 
 SearchListElement::SearchListElement() {
@@ -48,6 +59,7 @@ SearchListElement::SearchListElement() {
 }
 
 void SearchListElement::SetEntries(std::vector<Entry> newEntries) {
+    if (EntriesEqual(entries, newEntries)) return;
     entries = std::move(newEntries);
     RebuildRows();
 }

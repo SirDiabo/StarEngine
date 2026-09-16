@@ -41,6 +41,8 @@ public:
     Rectangle lastResolvedRect{ 0.0f, 0.0f, 0.0f, 0.0f };
 
     void AddChild(WidgetElement* child);
+    void InsertChild(WidgetElement* child, int index);
+    WidgetElement* DetachChild(WidgetElement* child);
     void RemoveChild(WidgetElement* child);
     void RemoveChildAt(int index);
     void ClearChildren();

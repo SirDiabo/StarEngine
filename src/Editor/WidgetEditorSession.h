@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Widgets/WidgetAsset.h"
+#include "Core/Widgets/TreeListElement.h"
 #include <string>
 #include <functional>
 
@@ -28,6 +29,7 @@ public:
 
     WidgetElement* AddElement(const std::string& className, WidgetElement* parent);
     void DeleteElement(WidgetElement* element);
+    void ReparentElement(WidgetElement* element, WidgetElement* targetElement, TreeDropPosition pos);
 
     bool IsDirty() const { return dirty; }
     void MarkDirty() { dirty = true; }

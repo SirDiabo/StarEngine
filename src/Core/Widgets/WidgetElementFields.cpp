@@ -13,6 +13,7 @@
 #include "SearchListElement.h"
 #include "CheckBoxElement.h"
 #include "SliderElement.h"
+#include "TreeListElement.h"
 #include "Core/SafeParse.h"
 #include <cstdio>
 
@@ -172,6 +173,20 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         ColF<SliderElement>("SliderElement", "FillColor", &SliderElement::fillColor),
         ColF<SliderElement>("SliderElement", "HandleColor", &SliderElement::handleColor),
         ColF<SliderElement>("SliderElement", "BorderColor", &SliderElement::borderColor),
+
+        StrF<TreeListElement>("TreeListElement", "DragKind", &TreeListElement::dragKind),
+        BlnF<TreeListElement>("TreeListElement", "AllowReorder", &TreeListElement::allowReorder),
+        BlnF<TreeListElement>("TreeListElement", "AllowReparent", &TreeListElement::allowReparent),
+        BlnF<TreeListElement>("TreeListElement", "AllowExternalDrag", &TreeListElement::allowExternalDrag),
+        FltF<TreeListElement>("TreeListElement", "RowHeight", &TreeListElement::rowHeight),
+        FltF<TreeListElement>("TreeListElement", "IndentWidth", &TreeListElement::indentWidth),
+        ColF<TreeListElement>("TreeListElement", "RowColor", &TreeListElement::rowColor),
+        ColF<TreeListElement>("TreeListElement", "RowAltColor", &TreeListElement::rowAltColor),
+        ColF<TreeListElement>("TreeListElement", "RowHoveredColor", &TreeListElement::rowHoveredColor),
+        ColF<TreeListElement>("TreeListElement", "RowCurrentColor", &TreeListElement::rowCurrentColor),
+        ColF<TreeListElement>("TreeListElement", "RowCurrentTextColor", &TreeListElement::rowCurrentTextColor),
+        ColF<TreeListElement>("TreeListElement", "DropLineColor", &TreeListElement::dropLineColor),
+        ColF<TreeListElement>("TreeListElement", "DropIntoColor", &TreeListElement::dropIntoColor),
     };
     return fields;
 }
@@ -193,6 +208,7 @@ const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
         { "SearchListElement", []() -> WidgetElement* { return new SearchListElement(); } },
         { "CheckBoxElement", []() -> WidgetElement* { return new CheckBoxElement(); } },
         { "SliderElement", []() -> WidgetElement* { return new SliderElement(); } },
+        { "TreeListElement", []() -> WidgetElement* { return new TreeListElement(); } },
     };
     return types;
 }
