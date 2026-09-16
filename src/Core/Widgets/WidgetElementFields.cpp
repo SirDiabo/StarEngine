@@ -111,6 +111,9 @@ const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
         IntF<TextElement>("TextElement", "MaxLength", &TextElement::maxLength),
 
         ColF<RectangleElement>("RectangleElement", "Color", &RectangleElement::color),
+        FltF<RectangleElement>("RectangleElement", "CornerRadius", &RectangleElement::cornerRadius),
+        FltF<RectangleElement>("RectangleElement", "BorderThickness", &RectangleElement::borderThickness),
+        ColF<RectangleElement>("RectangleElement", "BorderColor", &RectangleElement::borderColor),
 
         ColF<ButtonElement>("ButtonElement", "DefaultColor", &ButtonElement::defaultColor),
         ColF<ButtonElement>("ButtonElement", "HoveredColor", &ButtonElement::hoveredColor),

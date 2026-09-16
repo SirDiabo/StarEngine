@@ -5,6 +5,7 @@
 #include "AssetPickerPopup.h"
 #include "ColorPickerPopup.h"
 #include "ConfirmPopup.h"
+#include "ChoicePopup.h"
 #include "raylib.h"
 #include <string>
 #include <vector>
@@ -18,6 +19,14 @@ struct ContentEntry {
     std::string typeName;
     std::string extension;
 };
+
+class Widget;
+class VerticalBoxElement;
+class HorizontalBoxElement;
+class BoxElement;
+class GridElement;
+class ButtonElement;
+class CheckBoxElement;
 
 class ContentBrowserPanel : public Panel {
 public:
@@ -57,6 +66,12 @@ private:
     void RevealInExplorer(const std::string& fullPath, bool isFolder);
 
     Texture2D GetIconForEntry(const ContentEntry& entry) const;
+    const Texture2D* GetIconTexturePtr(const ContentEntry& entry) const;
+    void BuildChrome();
+    void RebuildBreadcrumb(const std::vector<std::pair<std::string, std::string>>& crumbs);
+    void RebuildTiles(const std::vector<ContentEntry>& entries);
+    void OpenItemContextMenu(Vector2 pos);
+    void OpenGridContextMenu(Vector2 pos);
     void LoadIcons();
     void UnloadIcons();
     void OpenMaterialEditor(const std::string& fullPath);
@@ -67,13 +82,27 @@ private:
     float lastEntryClickTime = 0;
     int lastEntryClickIndex = -1;
 
-    bool contextMenuOpen = false;
-    bool contextMenuJustOpened = false;
-    Vector2 contextMenuPos{0, 0};
+    ChoicePopup gridContextMenu;
+    ChoicePopup itemContextMenu;
+    std::vector<const AssetTypeInfo*> gridMenuTypes;
+    std::vector<std::string> itemMenuActions;
 
-    bool itemContextMenuOpen = false;
-    bool itemContextMenuJustOpened = false;
-    Vector2 itemContextMenuPos{0, 0};
+    struct TileRef {
+        ButtonElement* button = nullptr;
+        std::string diskName;
+        bool isFolder = false;
+    };
+
+    Widget* chrome = nullptr;
+    VerticalBoxElement* chromeRoot = nullptr;
+    HorizontalBoxElement* breadcrumbBar = nullptr;
+    BoxElement* gridScroll = nullptr;
+    GridElement* tileGrid = nullptr;
+    std::vector<TileRef> tileButtons;
+    std::string lastBuiltFolder = "\x01";
+    std::string lastTileSignature;
+    bool tilesDirty = false;
+
     std::string contextTargetPath;
     std::string contextTargetDisplayName;
     std::string contextTargetExtension;
@@ -91,12 +120,6 @@ private:
     std::string pendingDeletePath;
     bool pendingDeleteIsFolder = false;
 
-    bool draggingAsset = false;
-    int dragEntryIndex = -1;
-    Vector2 dragPressPos{0, 0};
-    std::string dragEntryPath;
-    std::string dragEntryExt;
-
     bool isCreatingNewItem = false;
     bool isCreatingFolder = false;
     std::string pendingExtension;
@@ -112,8 +135,20 @@ private:
     bool materialEditorOpen = false;
     std::string materialEditorPath;
     StarMaterial materialEditorData;
-    char materialColorBuf[4][8] = {"", "", "", ""};
-    int materialActiveField = 0;
     AssetPickerPopup materialTexturePicker;
     ColorPickerPopup materialColorPicker;
+
+    void BuildMaterialEditorChrome();
+    Widget* materialChrome = nullptr;
+    TextElement* materialTitle = nullptr;
+    TextElement* materialChannelBoxes[4] = {nullptr, nullptr, nullptr, nullptr};
+    RectangleElement* materialSwatch = nullptr;
+    TextElement* materialLitLabel = nullptr;
+    CheckBoxElement* materialLitBox = nullptr;
+    TextElement* materialTexLabel = nullptr;
+    Vector2 swatchBtn2Pos{0, 0};
+    Vector2 texRowScreenPos{0, 0};
+
+    Widget* createNameChrome = nullptr;
+    TextElement* createNameBox = nullptr;
 };

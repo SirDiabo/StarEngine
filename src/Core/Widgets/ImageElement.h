@@ -8,6 +8,7 @@ public:
     std::string GetObjectKind() const override { return "ImageElement"; }
 
     std::string texturePath;
+    const Texture2D* directTexture = nullptr;
     Color tint{ 255, 255, 255, 255 };
 
 protected:

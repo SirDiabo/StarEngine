@@ -14,12 +14,25 @@
 #include "PropertyFields.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetInput.h"
+#include "Core/Widgets/DragDropController.h"
+#include "Core/Widgets/VerticalBoxElement.h"
+#include "Core/Widgets/HorizontalBoxElement.h"
+#include "Core/Widgets/BoxElement.h"
+#include "Core/Widgets/GridElement.h"
+#include "Core/Widgets/ButtonElement.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/ImageElement.h"
+#include "Core/Widgets/RectangleElement.h"
+#include "Core/Widgets/CheckBoxElement.h"
 #include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <algorithm>
 
 namespace fs = std::filesystem;
@@ -48,6 +61,9 @@ void ContentBrowserPanel::UnloadIcons() {
 
 ContentBrowserPanel::~ContentBrowserPanel() {
     UnloadIcons();
+    delete chrome;
+    delete materialChrome;
+    delete createNameChrome;
 }
 
 void ContentBrowserPanel::Initialize() {
@@ -69,6 +85,23 @@ Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const 
     auto fallback = icons.find("asset");
     if (fallback != icons.end()) return fallback->second;
     return Texture2D{};
+}
+
+const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entry) const {
+    std::string key = "asset";
+    if (entry.isFolder) key = "folder";
+    else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
+    else if (entry.extension == ".starmap")     key = "map";
+    else if (entry.extension == ".startex")     key = "texture";
+    else if (entry.extension == ".starmat")     key = "material";
+    else if (entry.extension == ".staranim")    key = "animation";
+    else if (entry.extension == ".starsound")   key = "sound";
+
+    auto it = icons.find(key);
+    if (it != icons.end() && it->second.id != 0) return &it->second;
+    auto fallback = icons.find("asset");
+    if (fallback != icons.end() && fallback->second.id != 0) return &fallback->second;
+    return nullptr;
 }
 
 std::string ContentBrowserPanel::GetCurrentFolderPath() const {
@@ -146,7 +179,6 @@ void ContentBrowserPanel::BeginRename(const ContentEntry& entry) {
     std::string stem = entry.isFolder ? entry.fullDiskName : fs::path(entry.fullDiskName).stem().string();
     snprintf(nameBuffer, sizeof(nameBuffer), "%s", stem.c_str());
     PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
-    itemContextMenuOpen = false;
 }
 
 void ContentBrowserPanel::ConfirmRename() {
@@ -246,7 +278,6 @@ void ContentBrowserPanel::RequestDelete(const std::string& fullPath, bool isFold
     pendingDeleteIsFolder = isFolder;
     std::string kind = isFolder ? "folder" : "item";
     deleteConfirm.Open("Move " + kind + " \"" + displayName + "\" to the trash?", "Delete");
-    itemContextMenuOpen = false;
 }
 
 void ContentBrowserPanel::RevealInExplorer(const std::string& fullPath, bool isFolder) {
@@ -269,7 +300,6 @@ void ContentBrowserPanel::BeginCreateFolder() {
     pendingExtension.clear();
     snprintf(nameBuffer, sizeof(nameBuffer), "NewFolder");
     PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
-    contextMenuOpen = false;
 }
 
 void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
@@ -278,7 +308,6 @@ void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
     pendingExtension = info.extension;
     snprintf(nameBuffer, sizeof(nameBuffer), "New%s", info.typeName.c_str());
     PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
-    contextMenuOpen = false;
 }
 
 void ContentBrowserPanel::ConfirmPendingCreate() {
@@ -378,122 +407,488 @@ void ContentBrowserPanel::HandleFileDrop() {
     UnloadDroppedFiles(dropped);
 }
 
+void ContentBrowserPanel::BuildMaterialEditorChrome() {
+    materialChrome = new Widget();
+    auto* panel = new RectangleElement();
+    panel->cornerRadius = 0.05f;
+    materialChrome->SetRoot(panel);
+
+    const UIPalette& theme = UITheme::Get();
+    panel->color = theme.panelBg;
+
+    materialTitle = new TextElement();
+    materialTitle->fontSize = 13.0f;
+    materialTitle->color = theme.textPrimary;
+    materialTitle->anchor = { 0.0f, 0.0f };
+    materialTitle->pivot = { 0.0f, 0.0f };
+    materialTitle->offset = { 8.0f, 6.0f };
+    materialTitle->size = { 0.0f, 16.0f };
+    panel->AddChild(materialTitle);
+
+    auto* colorLabel = new TextElement();
+    colorLabel->text = "Base Color";
+    colorLabel->fontSize = 11.0f;
+    colorLabel->color = theme.textSecondary;
+    colorLabel->anchor = { 0.0f, 0.0f };
+    colorLabel->pivot = { 0.0f, 0.0f };
+    colorLabel->offset = { 8.0f, 28.0f };
+    colorLabel->size = { 0.0f, 14.0f };
+    panel->AddChild(colorLabel);
+
+    const char* channelLabels[4] = {"R", "G", "B", "A"};
+    float chW = (320.0f - 16.0f - 3.0f * 6.0f) / 4.0f;
+    for (int i = 0; i < 4; i++) {
+        float cx = 8.0f + i * (chW + 6.0f);
+
+        auto* chLabel = new TextElement();
+        chLabel->text = channelLabels[i];
+        chLabel->fontSize = 10.0f;
+        chLabel->color = theme.textSecondary;
+        chLabel->anchor = { 0.0f, 0.0f };
+        chLabel->pivot = { 0.0f, 0.0f };
+        chLabel->offset = { cx, 44.0f };
+        chLabel->size = { chW, 12.0f };
+        panel->AddChild(chLabel);
+
+        auto* chBox = new TextElement();
+        chBox->editable = true;
+        chBox->numericOnly = true;
+        chBox->fontSize = 11.0f;
+        chBox->color = theme.textPrimary;
+        chBox->backgroundColor = theme.fieldBg;
+        chBox->borderColor = theme.fieldBorder;
+        chBox->editingBorderColor = theme.accent;
+        chBox->anchor = { 0.0f, 0.0f };
+        chBox->pivot = { 0.0f, 0.0f };
+        chBox->offset = { cx, 56.0f };
+        chBox->size = { chW, 18.0f };
+        int channel = i;
+        chBox->onTextChanged = [this, channel](const std::string& text) {
+            int v = atoi(text.c_str());
+            if (v < 0) v = 0;
+            if (v > 255) v = 255;
+            unsigned char* channels[4] = {&materialEditorData.baseColor.r, &materialEditorData.baseColor.g,
+                                           &materialEditorData.baseColor.b, &materialEditorData.baseColor.a};
+            *channels[channel] = (unsigned char)v;
+        };
+        panel->AddChild(chBox);
+        materialChannelBoxes[i] = chBox;
+    }
+
+    materialSwatch = new RectangleElement();
+    materialSwatch->anchor = { 1.0f, 0.0f };
+    materialSwatch->pivot = { 1.0f, 0.0f };
+    materialSwatch->offset = { -8.0f, 44.0f };
+    materialSwatch->size = { 24.0f, 24.0f };
+    materialSwatch->borderThickness = 1.0f;
+    materialSwatch->borderColor = theme.fieldBorder;
+    panel->AddChild(materialSwatch);
+
+    auto* swatchBtn = new ButtonElement();
+    swatchBtn->defaultColor = { 0, 0, 0, 0 };
+    swatchBtn->hoveredColor = { 0, 0, 0, 0 };
+    swatchBtn->selectedColor = { 0, 0, 0, 0 };
+    swatchBtn->pressedColor = { 0, 0, 0, 0 };
+    swatchBtn->anchor = { 1.0f, 0.0f };
+    swatchBtn->pivot = { 1.0f, 0.0f };
+    swatchBtn->offset = { -8.0f, 44.0f };
+    swatchBtn->size = { 24.0f, 24.0f };
+    swatchBtn->onActivated = [this]() {
+        if (!materialColorPicker.IsOpen()) {
+            Vector2 pos = swatchBtn2Pos;
+            materialColorPicker.Open(pos, materialEditorData.baseColor);
+        }
+    };
+    panel->AddChild(swatchBtn);
+
+    materialLitLabel = new TextElement();
+    materialLitLabel->text = "Lit";
+    materialLitLabel->fontSize = 11.0f;
+    materialLitLabel->anchor = { 0.0f, 0.0f };
+    materialLitLabel->pivot = { 0.0f, 0.0f };
+    materialLitLabel->offset = { 8.0f, 82.0f };
+    materialLitLabel->size = { 0.0f, 16.0f };
+    panel->AddChild(materialLitLabel);
+
+    materialLitBox = new CheckBoxElement();
+    materialLitBox->anchor = { 1.0f, 0.0f };
+    materialLitBox->pivot = { 1.0f, 0.0f };
+    materialLitBox->offset = { -8.0f, 80.0f };
+    materialLitBox->size = { 18.0f, 18.0f };
+    materialLitBox->onToggled = [this](bool value) { materialEditorData.lit = value; };
+    panel->AddChild(materialLitBox);
+
+    auto* texLabel = new TextElement();
+    texLabel->text = "Texture";
+    texLabel->fontSize = 11.0f;
+    texLabel->color = theme.textSecondary;
+    texLabel->anchor = { 0.0f, 0.0f };
+    texLabel->pivot = { 0.0f, 0.0f };
+    texLabel->offset = { 8.0f, 104.0f };
+    texLabel->size = { 0.0f, 14.0f };
+    panel->AddChild(texLabel);
+
+    auto* texRow = new ButtonElement();
+    texRow->defaultColor = theme.fieldBg;
+    texRow->hoveredColor = theme.surfaceHover;
+    texRow->selectedColor = theme.surfaceHover;
+    texRow->pressedColor = theme.surfaceHover;
+    texRow->anchor = { 0.0f, 0.0f };
+    texRow->pivot = { 0.0f, 0.0f };
+    texRow->offset = { 8.0f, 118.0f };
+    texRow->size = { 304.0f, 18.0f };
+    texRow->onActivated = [this]() {
+        if (!materialTexturePicker.IsOpen()) {
+            materialTexturePicker.Open(texRowScreenPos, ".startex");
+        }
+    };
+    panel->AddChild(texRow);
+
+    materialTexLabel = new TextElement();
+    materialTexLabel->fontSize = 11.0f;
+    materialTexLabel->color = theme.textPrimary;
+    materialTexLabel->anchor = { 0.0f, 0.5f };
+    materialTexLabel->pivot = { 0.0f, 0.5f };
+    materialTexLabel->offset = { 4.0f, 0.0f };
+    materialTexLabel->size = { 0.0f, 16.0f };
+    texRow->AddChild(materialTexLabel);
+
+    auto* saveBtn = new ButtonElement();
+    saveBtn->defaultColor = theme.buttonBg;
+    saveBtn->hoveredColor = theme.buttonHover;
+    saveBtn->selectedColor = theme.buttonHover;
+    saveBtn->pressedColor = theme.buttonPressed;
+    saveBtn->anchor = { 0.0f, 0.0f };
+    saveBtn->pivot = { 0.0f, 0.0f };
+    saveBtn->offset = { 8.0f, 194.0f };
+    saveBtn->size = { 150.0f, 22.0f };
+    saveBtn->onActivated = [this]() {
+        materialEditorData.SaveToFile(materialEditorPath);
+        AssetCache::Get().ReloadMaterial(materialEditorPath);
+        materialEditorOpen = false;
+    };
+    auto* saveLabel = new TextElement();
+    saveLabel->text = "Save";
+    saveLabel->fontSize = 12.0f;
+    saveLabel->color = theme.buttonText;
+    saveLabel->anchor = { 0.5f, 0.5f };
+    saveLabel->pivot = { 0.5f, 0.5f };
+    saveBtn->AddChild(saveLabel);
+    panel->AddChild(saveBtn);
+
+    auto* cancelBtn = new ButtonElement();
+    cancelBtn->defaultColor = theme.buttonBg;
+    cancelBtn->hoveredColor = theme.buttonHover;
+    cancelBtn->selectedColor = theme.buttonHover;
+    cancelBtn->pressedColor = theme.buttonPressed;
+    cancelBtn->anchor = { 0.0f, 0.0f };
+    cancelBtn->pivot = { 0.0f, 0.0f };
+    cancelBtn->offset = { 162.0f, 194.0f };
+    cancelBtn->size = { 150.0f, 22.0f };
+    cancelBtn->onActivated = [this]() { materialEditorOpen = false; };
+    auto* cancelLabel = new TextElement();
+    cancelLabel->text = "Cancel";
+    cancelLabel->fontSize = 12.0f;
+    cancelLabel->color = theme.buttonText;
+    cancelLabel->anchor = { 0.5f, 0.5f };
+    cancelLabel->pivot = { 0.5f, 0.5f };
+    cancelBtn->AddChild(cancelLabel);
+    panel->AddChild(cancelBtn);
+}
+
 void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
     materialEditorPath = fullPath;
     materialEditorData = StarMaterial{};
     StarMaterial::LoadFromFile(fullPath, materialEditorData);
-
-    snprintf(materialColorBuf[0], 8, "%d", materialEditorData.baseColor.r);
-    snprintf(materialColorBuf[1], 8, "%d", materialEditorData.baseColor.g);
-    snprintf(materialColorBuf[2], 8, "%d", materialEditorData.baseColor.b);
-    snprintf(materialColorBuf[3], 8, "%d", materialEditorData.baseColor.a);
-    materialActiveField = 0;
     materialTexturePicker.Close();
     materialColorPicker.Close();
     materialEditorOpen = true;
+    delete materialChrome;
+    materialChrome = nullptr;
 }
 
 void ContentBrowserPanel::RenderMaterialEditor() {
     if (!materialEditorOpen) return;
+    if (!materialChrome) BuildMaterialEditorChrome();
 
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp) || materialColorPicker.ContainsPoint(mp);
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
     Rectangle box = {screenW * 0.5f - 160, screenH * 0.5f - 111, 320, 222};
-    const UIPalette& theme = UITheme::Get();
 
     DrawRectangleRec({0, 0, screenW, screenH}, {0, 0, 0, 120});
-    UIWidget::Panel(box);
 
-    std::string title = fs::path(materialEditorPath).stem().string();
-    DrawText(title.c_str(), (int)box.x + 8, (int)box.y + 6, 13, theme.textPrimary);
-
-    float y = box.y + 28;
-    DrawText("Base Color", (int)box.x + 8, (int)y, 11, theme.textSecondary);
-    y += 16;
-
-    const char* channelLabels[4] = {"R", "G", "B", "A"};
+    materialTitle->text = fs::path(materialEditorPath).stem().string();
 
     if (materialColorPicker.IsOpen()) {
         Color live = materialColorPicker.GetLiveColor();
-        snprintf(materialColorBuf[0], 8, "%d", live.r);
-        snprintf(materialColorBuf[1], 8, "%d", live.g);
-        snprintf(materialColorBuf[2], 8, "%d", live.b);
-        snprintf(materialColorBuf[3], 8, "%d", live.a);
+        materialEditorData.baseColor = live;
     }
 
     unsigned char* channels[4] = {&materialEditorData.baseColor.r, &materialEditorData.baseColor.g,
                                    &materialEditorData.baseColor.b, &materialEditorData.baseColor.a};
-
-    float chW = (box.width - 16 - 3 * 6) / 4;
     for (int i = 0; i < 4; i++) {
-        float cx = box.x + 8 + i * (chW + 6);
-        DrawText(channelLabels[i], (int)cx, (int)y, 10, theme.textSecondary);
-        Rectangle r = {cx, y + 12, chW, 18};
-        int channelVal = *channels[i];
-        if (PropertyField::IntBox(r, materialColorBuf[i], 8, i + 1, materialActiveField, channelVal) && !materialColorPicker.IsOpen()) {
-            *channels[i] = (unsigned char)(channelVal < 0 ? 0 : (channelVal > 255 ? 255 : channelVal));
+        if (!materialChannelBoxes[i]->isEditing) {
+            materialChannelBoxes[i]->text = std::to_string((int)*channels[i]);
         }
     }
-    y += 38;
 
-    Color displayColor = materialColorPicker.IsOpen() ? materialColorPicker.GetLiveColor() : materialEditorData.baseColor;
-    Rectangle swatch = {box.x + box.width - 34, y - 34, 24, 24};
-    DrawRectangleRec(swatch, displayColor);
-    DrawRectangleLinesEx(swatch, 1, theme.fieldBorder);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, swatch) && !materialColorPicker.IsOpen()) {
-        materialColorPicker.Open({swatch.x, swatch.y + swatch.height}, materialEditorData.baseColor);
-    }
+    materialSwatch->color = materialEditorData.baseColor;
+    swatchBtn2Pos = { box.x + box.width - 34, box.y + 28 + 12 + 34 };
+
+    bool shadingAllowsLit = ShadingModel::ShouldUseLitShading();
+    const UIPalette& theme = UITheme::Get();
+    materialLitLabel->color = shadingAllowsLit ? theme.textSecondary : theme.buttonDisabledText;
+    materialLitBox->checked = materialEditorData.lit;
+    materialLitBox->disabled = !shadingAllowsLit;
+
+    materialTexLabel->text = materialEditorData.textureAssetPath.empty()
+                                  ? "None"
+                                  : fs::path(materialEditorData.textureAssetPath).stem().string();
+    texRowScreenPos = { box.x + 8, box.y + 118 + 18 };
 
     if (materialColorPicker.IsOpen()) {
         Color pickerResult;
         bool pickerConfirmed = false;
         if (materialColorPicker.Render(pickerResult, pickerConfirmed)) {
-            if (pickerConfirmed) {
-                materialEditorData.baseColor = pickerResult;
-            }
-            snprintf(materialColorBuf[0], 8, "%d", materialEditorData.baseColor.r);
-            snprintf(materialColorBuf[1], 8, "%d", materialEditorData.baseColor.g);
-            snprintf(materialColorBuf[2], 8, "%d", materialEditorData.baseColor.b);
-            snprintf(materialColorBuf[3], 8, "%d", materialEditorData.baseColor.a);
+            if (pickerConfirmed) materialEditorData.baseColor = pickerResult;
         }
     }
 
-    bool shadingAllowsLit = ShadingModel::ShouldUseLitShading();
-    Color litLabelColor = shadingAllowsLit ? theme.textSecondary : theme.buttonDisabledText;
-    DrawText("Lit", (int)box.x + 8, (int)y, 11, litLabelColor);
-    GuiSetState(shadingAllowsLit ? STATE_NORMAL : STATE_DISABLED);
-    PropertyField::BoolBox({box.x + box.width - 42, y - 2, 18, 18}, materialEditorData.lit);
-    GuiSetState(STATE_NORMAL);
-    y += 22;
-
-    DrawText("Texture", (int)box.x + 8, (int)y, 11, theme.textSecondary);
-    y += 14;
-    Rectangle texRow = {box.x + 8, y, box.width - 16, 18};
-    DrawRectangleRec(texRow, theme.fieldBg);
-    DrawRectangleLinesEx(texRow, 1, theme.fieldBorder);
-    std::string texLabel = materialEditorData.textureAssetPath.empty()
-                                ? "None"
-                                : fs::path(materialEditorData.textureAssetPath).stem().string();
-    DrawText(texLabel.c_str(), (int)texRow.x + 4, (int)texRow.y + 3, 11, theme.textPrimary);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, texRow) && !pickerBlocksInput) {
-        materialTexturePicker.Open({texRow.x, texRow.y + texRow.height}, ".startex");
-    }
-    y += 26;
     std::string pickedTex;
     if (materialTexturePicker.Render(pickedTex)) materialEditorData.textureAssetPath = pickedTex;
 
-    Rectangle saveBtn = {box.x + 8, box.y + box.height - 28, (box.width - 20) / 2, 22};
-    Rectangle closeBtn = {saveBtn.x + saveBtn.width + 4, saveBtn.y, saveBtn.width, 22};
-    if (UIWidget::Button(saveBtn, "Save") && !pickerBlocksInput) {
-        materialEditorData.SaveToFile(materialEditorPath);
-        AssetCache::Get().ReloadMaterial(materialEditorPath);
-        materialEditorOpen = false;
+    float dt = GetFrameTime();
+    materialChrome->Tick(dt, box, 1.0f);
+    if (!pickerBlocksInput) {
+        WidgetInput::ProcessInput(materialChrome, "MaterialEditor", dt, mp, 1.0f);
     }
-    if (UIWidget::Button(closeBtn, "Cancel") && !pickerBlocksInput) {
-        materialEditorOpen = false;
+    materialChrome->Draw(box, 1.0f);
+}
+
+void ContentBrowserPanel::BuildChrome() {
+    chrome = new Widget();
+    chromeRoot = new VerticalBoxElement();
+    chromeRoot->childSpacing = 0.0f;
+    chrome->SetRoot(chromeRoot);
+
+    breadcrumbBar = new HorizontalBoxElement();
+    breadcrumbBar->childSpacing = 2.0f;
+    breadcrumbBar->size = { 0.0f, 22.0f };
+    chromeRoot->AddChild(breadcrumbBar);
+
+    gridScroll = new BoxElement();
+    gridScroll->axis = BoxAxis::Vertical;
+    gridScroll->scrollEnabled = true;
+    gridScroll->backgroundColor = { 0, 0, 0, 0 };
+    chromeRoot->AddChild(gridScroll);
+
+    tileGrid = new GridElement();
+    tileGrid->cellSpacing = 8.0f;
+    gridScroll->AddChild(tileGrid);
+}
+
+void ContentBrowserPanel::RebuildBreadcrumb(const std::vector<std::pair<std::string, std::string>>& crumbs) {
+    const UIPalette& theme = UITheme::Get();
+    breadcrumbBar->ClearChildren();
+
+    auto* importBtn = new ButtonElement();
+    importBtn->size = { 18.0f, 18.0f };
+    importBtn->defaultColor = theme.buttonBg;
+    importBtn->hoveredColor = theme.buttonHover;
+    importBtn->selectedColor = theme.buttonHover;
+    importBtn->pressedColor = theme.buttonPressed;
+    importBtn->onActivated = [this]() { ImportAssetAuto(); };
+    auto* importLabel = new TextElement();
+    importLabel->text = "+";
+    importLabel->fontSize = 12.0f;
+    importLabel->color = theme.buttonText;
+    importLabel->anchor = { 0.5f, 0.5f };
+    importLabel->pivot = { 0.5f, 0.5f };
+    importBtn->AddChild(importLabel);
+    breadcrumbBar->AddChild(importBtn);
+
+    for (size_t i = 0; i < crumbs.size(); i++) {
+        if (i > 0) {
+            auto* sep = new TextElement();
+            sep->text = "|";
+            sep->fontSize = 12.0f;
+            sep->color = theme.textSecondary;
+            sep->size = { 8.0f, 18.0f };
+            sep->anchor = { 0.5f, 0.5f };
+            sep->pivot = { 0.5f, 0.5f };
+            breadcrumbBar->AddChild(sep);
+        }
+
+        std::string target = crumbs[i].second;
+        float labelW = (float)MeasureText(crumbs[i].first.c_str(), 12) + 10.0f;
+
+        auto* crumbBtn = new ButtonElement();
+        crumbBtn->size = { labelW, 18.0f };
+        crumbBtn->defaultColor = { 0, 0, 0, 0 };
+        crumbBtn->hoveredColor = theme.surfaceHover;
+        crumbBtn->selectedColor = theme.surfaceHover;
+        crumbBtn->pressedColor = theme.surfaceHover;
+        crumbBtn->onActivated = [this, target]() { NavigateToRelativeFolder(target); };
+        crumbBtn->elementId = "crumb:" + target;
+
+        auto* crumbLabel = new TextElement();
+        crumbLabel->text = crumbs[i].first;
+        crumbLabel->fontSize = 12.0f;
+        crumbLabel->color = theme.textPrimary;
+        crumbLabel->anchor = { 0.5f, 0.5f };
+        crumbLabel->pivot = { 0.5f, 0.5f };
+        crumbBtn->AddChild(crumbLabel);
+
+        breadcrumbBar->AddChild(crumbBtn);
     }
+}
+
+void ContentBrowserPanel::RebuildTiles(const std::vector<ContentEntry>& entries) {
+    const UIPalette& theme = UITheme::Get();
+    tileGrid->ClearChildren();
+    tileButtons.clear();
+
+    for (size_t i = 0; i < entries.size(); i++) {
+        const ContentEntry& entry = entries[i];
+        bool isSelected = (selectedIndex == (int)i);
+
+        auto* tile = new ButtonElement();
+        tile->size = { 0.0f, 0.0f };
+        tile->cornerRadius = 0.1f;
+        tile->defaultColor = theme.buttonBg;
+        tile->hoveredColor = theme.buttonHover;
+        tile->selectedColor = theme.buttonHover;
+        tile->pressedColor = theme.buttonPressed;
+        if (isSelected) {
+            tile->borderThickness = 1.5f;
+            tile->borderColor = theme.accent;
+        }
+
+        std::string diskName = entry.fullDiskName;
+        bool isFolder = entry.isFolder;
+        std::string extension = entry.extension;
+        std::string displayName = entry.displayName;
+        int index = (int)i;
+
+        tile->onActivated = [this, index, diskName, isFolder, extension, displayName]() {
+            float now = (float)GetTime();
+            if (lastEntryClickIndex == index && (now - lastEntryClickTime) < 0.3f) {
+                ContentEntry target;
+                target.displayName = displayName;
+                target.fullDiskName = diskName;
+                target.isFolder = isFolder;
+                target.extension = extension;
+                OpenEntry(target);
+            } else {
+                selectedIndex = index;
+                if (!isFolder) {
+                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / diskName;
+                    DragDrop::Begin("ContentAsset", fullPath.string(), displayName, GetMousePosition());
+                }
+            }
+            lastEntryClickTime = now;
+            lastEntryClickIndex = index;
+        };
+
+        tile->onRightActivated = [this, index, diskName, isFolder, extension, displayName]() {
+            selectedIndex = index;
+            fs::path fullPath = fs::path(GetCurrentFolderPath()) / diskName;
+            contextTargetPath = fullPath.string();
+            contextTargetDisplayName = displayName;
+            contextTargetExtension = extension;
+            contextTargetIsFolder = isFolder;
+            OpenItemContextMenu(GetMousePosition());
+        };
+
+        auto* icon = new ImageElement();
+        icon->directTexture = GetIconTexturePtr(entry);
+        icon->anchor = { 0.5f, 0.0f };
+        icon->pivot = { 0.5f, 0.0f };
+        icon->offset = { 0.0f, 4.0f };
+        icon->size = { tileSize - 16.0f, tileSize - 26.0f };
+        tile->AddChild(icon);
+
+        if (!icon->directTexture) {
+            auto* fallback = new RectangleElement();
+            fallback->color = isFolder ? Color{210, 180, 90, 255} : Color{90, 150, 210, 255};
+            fallback->anchor = { 0.5f, 0.0f };
+            fallback->pivot = { 0.5f, 0.0f };
+            fallback->offset = { 0.0f, tileSize * 0.2f };
+            fallback->size = { tileSize * 0.4f, tileSize * 0.4f };
+            tile->AddChild(fallback);
+        }
+
+        auto* label = new TextElement();
+        label->text = entry.displayName;
+        label->fontSize = 10.0f;
+        label->color = theme.textPrimary;
+        label->anchor = { 0.5f, 1.0f };
+        label->pivot = { 0.5f, 1.0f };
+        label->offset = { 0.0f, -2.0f };
+        label->size = { tileSize - 4.0f, 16.0f };
+
+        if (isRenamingItem && diskName == renamingOriginalDiskName) {
+            label->editable = true;
+            label->onTextCommitted = [this](const std::string& newName) {
+                snprintf(nameBuffer, sizeof(nameBuffer), "%s", newName.c_str());
+                ConfirmRename();
+                tilesDirty = true;
+            };
+            label->onEditCancelled = [this]() {
+                CancelRename();
+                tilesDirty = true;
+            };
+        }
+        tile->AddChild(label);
+
+        tileGrid->AddChild(tile);
+        tileButtons.push_back({ tile, diskName, isFolder });
+
+        if (isRenamingItem && diskName == renamingOriginalDiskName) label->StartEditing();
+    }
+}
+
+void ContentBrowserPanel::OpenItemContextMenu(Vector2 pos) {
+    bool showReimport = !contextTargetIsFolder &&
+        (contextTargetExtension == ".starasset" || contextTargetExtension == ".startex" ||
+         contextTargetExtension == ".starsound" || contextTargetExtension == ".staranim");
+    bool showPaste = !clipboardPath.empty();
+
+    itemMenuActions.clear();
+    std::vector<ChoiceOption> options;
+    auto add = [&](const char* label, const char* action) {
+        options.push_back({ label });
+        itemMenuActions.push_back(action);
+    };
+
+    add("Open", "Open");
+    add("Rename", "Rename");
+    add("Duplicate", "Duplicate");
+    add("Copy", "Copy");
+    if (showPaste) add("Paste", "Paste");
+    add("Copy Path", "CopyPath");
+    if (showReimport) add("Reimport", "Reimport");
+    add("View in Explorer", "Reveal");
+    add("Delete", "Delete");
+
+    itemContextMenu.Open(pos, 150.0f, options);
+}
+
+void ContentBrowserPanel::OpenGridContextMenu(Vector2 pos) {
+    gridMenuTypes.clear();
+    std::vector<ChoiceOption> options;
+    options.push_back({ "New Folder" });
+    gridMenuTypes.push_back(nullptr);
+
+    for (const AssetTypeInfo& info : AssetTypeRegistry::Get().GetFilteredTypes()) {
+        if (!info.createAsset) continue;
+        options.push_back({ "New " + info.typeName });
+        gridMenuTypes.push_back(&info);
+    }
+
+    gridContextMenu.Open(pos, 150.0f, options);
 }
 
 void ContentBrowserPanel::Render() {
@@ -507,26 +902,19 @@ void ContentBrowserPanel::Render() {
         return;
     }
 
+    if (!chrome) BuildChrome();
+
     Rectangle client = { bounds.x, bounds.y, bounds.width, bounds.height };
     Vector2 mousePos = GetMousePosition();
-    const bool importEnabled = true;
-    const bool gridInputBlocked = contextMenuOpen || materialEditorOpen || isCreatingNewItem ||
-                                   itemContextMenuOpen || isRenamingItem || deleteConfirm.IsOpen();
+    const bool gridInputBlocked = materialEditorOpen || isCreatingNewItem ||
+                                   deleteConfirm.IsOpen() || gridContextMenu.IsOpen() || itemContextMenu.IsOpen();
 
-    if (importEnabled && !gridInputBlocked && CheckCollisionPointRec(mousePos, client)) {
+    if (!gridInputBlocked && CheckCollisionPointRec(mousePos, client)) {
         HandleFileDrop();
     }
 
-    // Breadcrumb path bar
     Rectangle pathBar = {client.x, client.y, client.width, 22};
     DrawRectangleRec(pathBar, theme.tabBar);
-
-    float pathLabelX = pathBar.x + 6;
-    if (importEnabled) {
-        Rectangle importBtn = {pathBar.x + 2, pathBar.y + 2, 18, 18};
-        if (UIWidget::Button(importBtn, "+") && !gridInputBlocked) ImportAssetAuto();
-        pathLabelX = importBtn.x + importBtn.width + 6;
-    }
 
     std::vector<std::pair<std::string, std::string>> crumbs;
     crumbs.push_back({"Content", ""});
@@ -545,331 +933,197 @@ void ContentBrowserPanel::Render() {
         }
     }
 
-    const int crumbFontSize = 12;
-    float cursorX = pathLabelX;
-    for (size_t i = 0; i < crumbs.size(); i++) {
-        if (i > 0) {
-            const char* separator = " |";
-            int sepW = MeasureText(separator, crumbFontSize);
-            DrawText(separator, (int)cursorX, (int)pathBar.y + 4, crumbFontSize, theme.textSecondary);
-            cursorX += (float)(sepW + 6);
-        }
-
-        int labelW = MeasureText(crumbs[i].first.c_str(), crumbFontSize);
-        Rectangle crumbRect = {cursorX, pathBar.y + 2, (float)labelW, 18};
-
-        Color crumbColor = theme.textPrimary;
-        if (!gridInputBlocked) {
-            UIWidget::Interaction crumbIntr = UIWidget::Interact(crumbRect, true);
-            if (crumbIntr.hovered) crumbColor = theme.accent;
-            if (crumbIntr.clicked) NavigateToRelativeFolder(crumbs[i].second);
-        }
-
-        DrawText(crumbs[i].first.c_str(), (int)cursorX, (int)pathBar.y + 4, crumbFontSize, crumbColor);
-        cursorX += (float)labelW;
+    if (currentRelativeFolder != lastBuiltFolder) {
+        RebuildBreadcrumb(crumbs);
+        lastBuiltFolder = currentRelativeFolder;
+        tilesDirty = true;
     }
 
-    if (!currentRelativeFolder.empty()) {
-        int backW = MeasureText("< Back", 12) + 12;
-        Rectangle backBtn = {client.x + client.width - backW - 4, client.y + 2, (float)backW, 18};
-        if (UIWidget::Button(backBtn, "< Back") && !gridInputBlocked) NavigateUp();
-    }
-
-    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
     std::vector<ContentEntry> entries = ScanCurrentFolder();
+
+    std::string signature;
+    for (const ContentEntry& e : entries) signature += e.fullDiskName + "|";
+    signature += "#" + std::to_string(selectedIndex) + "#" + (isRenamingItem ? renamingOriginalDiskName : "");
+    if (signature != lastTileSignature || tilesDirty) {
+        RebuildTiles(entries);
+        lastTileSignature = signature;
+        tilesDirty = false;
+    }
 
     float padding = 8.0f;
     float cellSize = tileSize + padding;
-    int cols = (int)((gridArea.width - padding) / cellSize);
+    int cols = (int)((client.width - padding) / cellSize);
     if (cols < 1) cols = 1;
+    int rows = ((int)entries.size() + cols - 1) / cols;
 
-    float startX = gridArea.x + padding;
-    float startY = gridArea.y + padding;
+    tileGrid->columns = cols;
+    tileGrid->columnWidth = tileSize;
+    tileGrid->rowHeight = tileSize;
+    tileGrid->size = { 0.0f, (float)rows * cellSize + padding };
 
-    BeginScissorMode((int)gridArea.x, (int)gridArea.y, (int)gridArea.width, (int)gridArea.height);
+    Rectangle gridArea = {client.x, client.y + 22, client.width, client.height - 22};
+    gridScroll->size = { 0.0f, gridArea.height };
+    chromeRoot->backgroundColor = { 0, 0, 0, 0 };
+    chromeRoot->size = { client.width, client.height };
 
-    int dropTargetFolderIndex = -1;
-    bool rightClickConsumedByEntry = false;
-    bool leftClickConsumedByEntry = false;
+    float dt = GetFrameTime();
+    Rectangle inner = { client.x + padding, client.y, client.width - padding * 2.0f, client.height };
+    chrome->Tick(dt, inner, 1.0f);
+    if (!gridInputBlocked) {
+        WidgetInput::ProcessInput(chrome, "Editor", dt, mousePos, 1.0f);
+    }
+    chrome->Draw(inner, 1.0f);
 
-    for (size_t i = 0; i < entries.size(); i++) {
-        int col = (int)i % cols;
-        int row = (int)i / cols;
-        float tx = startX + col * cellSize;
-        float ty = startY + row * cellSize;
+    if (DragDrop::Matches("ContentAsset")) {
+        const std::string& draggedPath = DragDrop::Payload();
+        std::string destFolder;
 
-        Rectangle tileRect = {tx, ty, tileSize, tileSize};
-        Rectangle iconRect  = {tx + 4, ty + 4, tileSize - 8, tileSize - 22};
-        Rectangle labelRect = {tx, ty + tileSize - 18, tileSize, 18};
-
-        bool tileHovered = CheckCollisionPointRec(mousePos, tileRect);
-        if (draggingAsset && entries[i].isFolder && tileHovered) {
-            dropTargetFolderIndex = (int)i;
+        for (const TileRef& tile : tileButtons) {
+            if (!tile.isFolder) continue;
+            if (!CheckCollisionPointRec(mousePos, tile.button->lastResolvedRect)) continue;
+            DrawRectangleRoundedLinesEx(tile.button->lastResolvedRect, 0.1f, 4, 2.0f, {110, 200, 130, 255});
+            destFolder = (fs::path(GetCurrentFolderPath()) / tile.diskName).string();
+            break;
         }
 
-        bool isSelected = (selectedIndex == (int)i);
-        Color tileBg = UIWidget::SelectableBg(tileHovered, isSelected, theme.buttonBg);
-        if (draggingAsset && (int)i == dropTargetFolderIndex)
-            tileBg = {70, 110, 80, 255};
-
-        DrawRectangleRounded(tileRect, 0.1f, 4, tileBg);
-        if (isSelected) DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, theme.accent);
-        if (draggingAsset && (int)i == dropTargetFolderIndex)
-            DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, {110, 200, 130, 255});
-
-        Texture2D icon = GetIconForEntry(entries[i]);
-        if (icon.id != 0) {
-            DrawTexturePro(icon,
-                {0, 0, (float)icon.width, (float)icon.height},
-                {iconRect.x + 4, iconRect.y, iconRect.width - 8, iconRect.height},
-                {0, 0}, 0, WHITE);
-        } else {
-            Color iconColor = entries[i].isFolder ? Color{210, 180, 90, 255} : Color{90, 150, 210, 255};
-            DrawRectangleRec({iconRect.x + iconRect.width * 0.25f, iconRect.y + iconRect.height * 0.2f,
-                              iconRect.width * 0.5f, iconRect.height * 0.6f}, iconColor);
-        }
-
-        bool renamingThis = isRenamingItem && entries[i].fullDiskName == renamingOriginalDiskName;
-
-        if (!renamingThis) {
-            std::string label = entries[i].displayName;
-            int labelW = MeasureText(label.c_str(), 10);
-            if (labelW > (int)tileSize - 6) label = label.substr(0, (int)(tileSize / 7)) + "..";
-            int lx = (int)(tx + tileSize / 2 - MeasureText(label.c_str(), 10) / 2);
-            DrawText(label.c_str(), lx, (int)labelRect.y + 3, 10, theme.textPrimary);
-        } else {
-            GuiTextBox({labelRect.x + 2, labelRect.y, labelRect.width - 4, labelRect.height},
-                       nameBuffer, sizeof(nameBuffer), true);
-            if (IsKeyPressed(KEY_ENTER)) ConfirmRename();
-            if (IsKeyPressed(KEY_ESCAPE)) CancelRename();
-        }
-
-        if (!gridInputBlocked && tileHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            leftClickConsumedByEntry = true;
-            float currentTime = (float)GetTime();
-            if (lastEntryClickIndex == (int)i && (currentTime - lastEntryClickTime) < 0.3f) {
-                OpenEntry(entries[i]);
-            } else {
-                selectedIndex = (int)i;
-                if (!entries[i].isFolder) {
-                    dragEntryIndex = (int)i;
-                    dragPressPos   = mousePos;
-                    fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
-                    dragEntryPath = fullPath.string();
-                    dragEntryExt  = entries[i].extension;
-                }
+        if (destFolder.empty()) {
+            for (WidgetElement* child : breadcrumbBar->GetChildren()) {
+                if (child->elementId.rfind("crumb:", 0) != 0) continue;
+                if (!CheckCollisionPointRec(mousePos, child->lastResolvedRect)) continue;
+                DrawRectangleLinesEx(child->lastResolvedRect, 2.0f, {110, 200, 130, 255});
+                std::string rel = child->elementId.substr(6);
+                fs::path root = fs::path(Project::Get().GetRootPath()) / "Content";
+                destFolder = rel.empty() ? root.string() : (root / rel).string();
+                break;
             }
-            lastEntryClickTime = currentTime;
-            lastEntryClickIndex = (int)i;
         }
 
-        if (!gridInputBlocked && tileHovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            selectedIndex = (int)i;
-            fs::path fullPath = fs::path(GetCurrentFolderPath()) / entries[i].fullDiskName;
-            contextTargetPath = fullPath.string();
-            contextTargetDisplayName = entries[i].displayName;
-            contextTargetExtension = entries[i].extension;
-            contextTargetIsFolder = entries[i].isFolder;
-            itemContextMenuOpen = true;
-            itemContextMenuJustOpened = true;
-            itemContextMenuPos = mousePos;
-            rightClickConsumedByEntry = true;
-        }
-
-        if (!entries[i].isFolder && dragEntryIndex == (int)i && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mousePos.x - dragPressPos.x;
-            float dy = mousePos.y - dragPressPos.y;
-            if (dx*dx + dy*dy > 36) draggingAsset = true;
-        }
-    }
-
-    if (isCreatingNewItem) {
-        int col = (int)entries.size() % cols;
-        int row = (int)entries.size() / cols;
-        float tx = startX + col * cellSize;
-        float ty = startY + row * cellSize;
-        Rectangle tileRect = {tx, ty, tileSize, tileSize};
-        DrawRectangleRounded(tileRect, 0.1f, 4, {55, 80, 100, 255});
-        DrawRectangleRoundedLinesEx(tileRect, 0.1f, 4, 1.5f, theme.accent);
-        GuiTextBox({tx + 2, ty + tileSize - 20, tileSize - 4, 18}, nameBuffer, sizeof(nameBuffer), true);
-        if (IsKeyPressed(KEY_ENTER)) ConfirmPendingCreate();
-        if (IsKeyPressed(KEY_ESCAPE)) CancelPendingCreate();
-    }
-
-    EndScissorMode();
-
-    if (!gridInputBlocked && !leftClickConsumedByEntry && selectedIndex != -1 &&
-        IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        selectedIndex = -1;
-    }
-
-    if (draggingAsset) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            std::string label = fs::path(dragEntryPath).stem().string();
-            int lw = MeasureText(label.c_str(), 12) + 16;
-            DrawRectangleRec({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, {55, 55, 75, 220});
-            DrawRectangleLinesEx({mousePos.x + 10, mousePos.y - 2, (float)lw, 18}, 1, {120, 120, 200, 255});
-            DrawRectangleRec({mousePos.x + 14, mousePos.y + 2, 10, 10}, {90, 150, 210, 255});
-            DrawText(label.c_str(), (int)mousePos.x + 28, (int)mousePos.y + 1, 12, WHITE);
-        } else {
-            if (dropTargetFolderIndex != -1) {
-                fs::path destFolder = fs::path(GetCurrentFolderPath()) / entries[dropTargetFolderIndex].fullDiskName;
-                fs::path destPath = destFolder / fs::path(dragEntryPath).filename();
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            if (!destFolder.empty()) {
+                fs::path destPath = fs::path(destFolder) / fs::path(draggedPath).filename();
                 std::error_code ec;
                 if (fs::exists(destPath, ec)) {
                     importStatus = "Move failed: " + destPath.filename().string() + " already exists there";
                 } else {
-                    fs::rename(dragEntryPath, destPath, ec);
+                    fs::rename(draggedPath, destPath, ec);
                     importStatus = !ec ? "Moved " + destPath.stem().string()
                                         : "Move failed: " + ec.message();
+                    tilesDirty = true;
                 }
-            } else if (onAssetDragged) {
-                onAssetDragged(dragEntryPath, dragEntryExt, mousePos);
+            } else if (onAssetDragged && !CheckCollisionPointRec(mousePos, client)) {
+                std::string ext = fs::path(draggedPath).extension().string();
+                onAssetDragged(draggedPath, ext, mousePos);
             }
-            draggingAsset = false;
-            dragEntryIndex = -1;
+            DragDrop::Consume();
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !draggingAsset) dragEntryIndex = -1;
+    if (isCreatingNewItem) {
+        Rectangle createRect = { client.x + padding, client.y + client.height - 48.0f, tileSize, 20.0f };
+        if (!createNameChrome) {
+            createNameChrome = new Widget();
+            createNameBox = new TextElement();
+            createNameBox->editable = true;
+            createNameBox->text = nameBuffer;
+            createNameChrome->SetRoot(createNameBox);
+            createNameBox->onTextCommitted = [this](const std::string& text) {
+                snprintf(nameBuffer, sizeof(nameBuffer), "%s", text.c_str());
+                ConfirmPendingCreate();
+                tilesDirty = true;
+            };
+            createNameBox->onEditCancelled = [this]() {
+                CancelPendingCreate();
+                tilesDirty = true;
+            };
+            createNameBox->StartEditing();
+        }
 
-    if (!contextMenuOpen && !isCreatingNewItem && !materialEditorOpen && !itemContextMenuOpen &&
-        !isRenamingItem && !rightClickConsumedByEntry &&
-        IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, gridArea)) {
-        contextMenuOpen = true;
-        contextMenuJustOpened = true;
-        contextMenuPos = mousePos;
+        const UIPalette& theme2 = UITheme::Get();
+        createNameBox->fontSize = 11.0f;
+        createNameBox->color = theme2.textPrimary;
+        createNameBox->backgroundColor = theme2.fieldBg;
+        createNameBox->borderColor = theme2.fieldBorder;
+        createNameBox->editingBorderColor = theme2.accent;
+
+        float dt2 = GetFrameTime();
+        createNameChrome->Tick(dt2, createRect, 1.0f);
+        WidgetInput::ProcessInput(createNameChrome, "ContentBrowserCreate", dt2, mousePos, 1.0f);
+        createNameChrome->Draw(createRect, 1.0f);
+    } else if (createNameChrome) {
+        delete createNameChrome;
+        createNameChrome = nullptr;
+        createNameBox = nullptr;
     }
 
-    if (contextMenuOpen) {
-        const std::vector<AssetTypeInfo>& allAssetTypes = AssetTypeRegistry::Get().GetFilteredTypes();
-        std::vector<const AssetTypeInfo*> creatableTypes;
-        for (const AssetTypeInfo& info : allAssetTypes) {
-            if (info.createAsset) creatableTypes.push_back(&info);
+    if (!gridInputBlocked && !isRenamingItem && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) &&
+        CheckCollisionPointRec(mousePos, gridArea)) {
+        bool overTile = false;
+        for (const TileRef& tile : tileButtons) {
+            if (CheckCollisionPointRec(mousePos, tile.button->lastResolvedRect)) { overTile = true; break; }
         }
+        if (!overTile) OpenGridContextMenu(mousePos);
+    }
 
-        float menuHeight = 30.0f * (1 + creatableTypes.size());
-        float popupX = contextMenuPos.x;
-        float popupY = contextMenuPos.y;
-        if (popupX + 150 > bounds.x + bounds.width)  popupX = bounds.x + bounds.width - 150;
-        if (popupY + menuHeight > bounds.y + bounds.height) popupY = bounds.y + bounds.height - menuHeight;
-        if (popupX < bounds.x) popupX = bounds.x;
-        if (popupY < bounds.y) popupY = bounds.y;
-        Rectangle popup = {popupX, popupY, 150, menuHeight};
-
-        if (contextMenuJustOpened) {
-            contextMenuJustOpened = false;
-        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            contextMenuOpen = false;
+    int gridChoice = -1;
+    if (gridContextMenu.Render(gridChoice)) {
+        if (gridChoice >= 0 && gridChoice < (int)gridMenuTypes.size()) {
+            if (gridMenuTypes[gridChoice] == nullptr) BeginCreateFolder();
+            else BeginCreateAsset(*gridMenuTypes[gridChoice]);
         }
+    }
 
-        if (contextMenuOpen) {
-            UIWidget::Panel(popup);
+    int itemChoice = -1;
+    if (itemContextMenu.Render(itemChoice)) {
+        if (itemChoice >= 0 && itemChoice < (int)itemMenuActions.size()) {
+            const std::string& action = itemMenuActions[itemChoice];
 
-            Rectangle folderBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 24};
-            if (UIWidget::Button(folderBtn, "New Folder")) BeginCreateFolder();
+            ContentEntry target;
+            target.displayName = contextTargetDisplayName;
+            target.fullDiskName = contextTargetIsFolder ? contextTargetDisplayName
+                                                        : fs::path(contextTargetPath).filename().string();
+            target.isFolder = contextTargetIsFolder;
+            target.extension = contextTargetExtension;
 
-            for (size_t i = 0; i < creatableTypes.size(); i++) {
-                Rectangle btn = {popup.x + 4, popup.y + 4 + (float)(i + 1) * 30, popup.width - 8, 24};
-                std::string label = "New " + creatableTypes[i]->typeName;
-                if (UIWidget::Button(btn, label.c_str())) BeginCreateAsset(*creatableTypes[i]);
+            if (action == "Open") {
+                OpenEntry(target);
+            } else if (action == "Rename") {
+                BeginRename(target);
+                tilesDirty = true;
+            } else if (action == "Duplicate") {
+                DuplicateEntry(contextTargetPath, contextTargetIsFolder);
+                tilesDirty = true;
+            } else if (action == "Copy") {
+                CopyToClipboard(contextTargetPath, contextTargetIsFolder);
+            } else if (action == "Paste") {
+                PasteFromClipboard();
+                tilesDirty = true;
+            } else if (action == "CopyPath") {
+                fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+                std::error_code ec;
+                fs::path rel = fs::relative(contextTargetPath, contentRoot, ec);
+                std::string virtualPath = "Content/" + (ec ? contextTargetPath : rel.generic_string());
+                SetClipboardText(virtualPath.c_str());
+                importStatus = "Copied path to clipboard";
+            } else if (action == "Reimport") {
+                std::string result = AssetImporter::Reimport(contextTargetPath);
+                importStatus = result.empty() ? "Reimport failed" : "Reimported " + contextTargetDisplayName;
+            } else if (action == "Reveal") {
+                RevealInExplorer(contextTargetPath, contextTargetIsFolder);
+            } else if (action == "Delete") {
+                RequestDelete(contextTargetPath, contextTargetIsFolder, contextTargetDisplayName);
             }
         }
     }
 
-    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
-        IsKeyPressed(KEY_DELETE)) {
-        const ContentEntry& entry = entries[selectedIndex];
-        fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;
-        RequestDelete(fullPath.string(), entry.isFolder, entry.displayName);
-    }
-
-    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
-        IsKeyPressed(KEY_F2)) {
-        BeginRename(entries[selectedIndex]);
-    }
-
-    if (itemContextMenuOpen) {
-        bool showReimport = !contextTargetIsFolder &&
-            (contextTargetExtension == ".starasset" || contextTargetExtension == ".startex" ||
-             contextTargetExtension == ".starsound" || contextTargetExtension == ".staranim");
-        bool showPaste = !clipboardPath.empty();
-
-        std::vector<std::string> items = {"Open", "Rename", "Duplicate", "Copy"};
-        if (showPaste) items.push_back("Paste");
-        items.push_back("Copy Path");
-        if (showReimport) items.push_back("Reimport");
-        items.push_back("View in Explorer");
-        items.push_back("Delete");
-
-        float menuHeight = 26.0f * (float)items.size() + 4.0f;
-        float popupX = itemContextMenuPos.x;
-        float popupY = itemContextMenuPos.y;
-        if (popupX + 150 > bounds.x + bounds.width)  popupX = bounds.x + bounds.width - 150;
-        if (popupY + menuHeight > bounds.y + bounds.height) popupY = bounds.y + bounds.height - menuHeight;
-        if (popupX < bounds.x) popupX = bounds.x;
-        if (popupY < bounds.y) popupY = bounds.y;
-        Rectangle popup = {popupX, popupY, 150, menuHeight};
-
-        if (itemContextMenuJustOpened) {
-            itemContextMenuJustOpened = false;
-        } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            itemContextMenuOpen = false;
+    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size()) {
+        if (IsKeyPressed(KEY_DELETE)) {
+            const ContentEntry& entry = entries[selectedIndex];
+            fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;
+            RequestDelete(fullPath.string(), entry.isFolder, entry.displayName);
         }
-
-        if (itemContextMenuOpen) {
-            UIWidget::Panel(popup);
-
-            for (size_t i = 0; i < items.size(); i++) {
-                Rectangle btn = {popup.x + 4, popup.y + 4 + (float)i * 26, popup.width - 8, 22};
-                if (!UIWidget::Button(btn, items[i].c_str())) continue;
-
-                if (items[i] == "Open") {
-                    ContentEntry target;
-                    target.displayName = contextTargetDisplayName;
-                    target.fullDiskName = contextTargetIsFolder ? contextTargetDisplayName
-                                                                  : fs::path(contextTargetPath).filename().string();
-                    target.isFolder = contextTargetIsFolder;
-                    target.extension = contextTargetExtension;
-                    OpenEntry(target);
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Rename") {
-                    ContentEntry target;
-                    target.displayName = contextTargetDisplayName;
-                    target.fullDiskName = contextTargetIsFolder ? contextTargetDisplayName
-                                                                  : fs::path(contextTargetPath).filename().string();
-                    target.isFolder = contextTargetIsFolder;
-                    target.extension = contextTargetExtension;
-                    BeginRename(target);
-                } else if (items[i] == "Duplicate") {
-                    DuplicateEntry(contextTargetPath, contextTargetIsFolder);
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Copy") {
-                    CopyToClipboard(contextTargetPath, contextTargetIsFolder);
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Paste") {
-                    PasteFromClipboard();
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Copy Path") {
-                    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
-                    std::error_code ec;
-                    fs::path rel = fs::relative(contextTargetPath, contentRoot, ec);
-                    std::string virtualPath = "Content/" + (ec ? contextTargetPath : rel.generic_string());
-                    SetClipboardText(virtualPath.c_str());
-                    importStatus = "Copied path to clipboard";
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Reimport") {
-                    std::string result = AssetImporter::Reimport(contextTargetPath);
-                    importStatus = result.empty() ? "Reimport failed" : "Reimported " + contextTargetDisplayName;
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "View in Explorer") {
-                    RevealInExplorer(contextTargetPath, contextTargetIsFolder);
-                    itemContextMenuOpen = false;
-                } else if (items[i] == "Delete") {
-                    RequestDelete(contextTargetPath, contextTargetIsFolder, contextTargetDisplayName);
-                }
-                break;
-            }
+        if (IsKeyPressed(KEY_F2)) {
+            BeginRename(entries[selectedIndex]);
+            tilesDirty = true;
         }
     }
 
@@ -879,17 +1133,14 @@ void ContentBrowserPanel::Render() {
             std::string trashError;
             if (OSTrash::MoveToTrash(pendingDeletePath, trashError)) {
                 importStatus = pendingDeleteIsFolder ? "Moved folder to trash" : "Moved to trash";
-                if (selectedIndex >= 0 && selectedIndex < (int)entries.size() &&
-                    fs::path(GetCurrentFolderPath()) / entries[selectedIndex].fullDiskName == fs::path(pendingDeletePath)) {
-                    selectedIndex = -1;
-                }
+                selectedIndex = -1;
+                tilesDirty = true;
             } else {
                 importStatus = "Delete failed: " + trashError;
             }
         }
         pendingDeletePath.clear();
     }
-
 
     if (!importStatus.empty()) {
         DrawText(importStatus.c_str(), (int)client.x + 8, (int)(client.y + client.height - 16), 11,
