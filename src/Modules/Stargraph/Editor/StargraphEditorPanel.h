@@ -7,6 +7,7 @@
 #include "Editor/RegistryPickerPopup.h"
 #include "Editor/SearchableListPopup.h"
 #include "Editor/ChoicePopup.h"
+#include "Core/Widgets/TreeListElement.h"
 #include "Editor/GizmoRenderer.h"
 #include <string>
 #include <vector>
@@ -15,8 +16,26 @@
 #include <functional>
 
 class ViewportPanel;
+
+template <typename T>
+inline void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDropPosition pos) {
+    if (fromIndex < 0 || fromIndex >= (int)items.size()) return;
+    if (toIndex < 0 || toIndex >= (int)items.size()) return;
+    if (fromIndex == toIndex) return;
+
+    T moved = items[fromIndex];
+    items.erase(items.begin() + fromIndex);
+
+    int insertAt = toIndex;
+    if (fromIndex < toIndex) insertAt--;
+    if (pos == TreeDropPosition::After) insertAt++;
+    if (insertAt < 0) insertAt = 0;
+    if (insertAt > (int)items.size()) insertAt = (int)items.size();
+
+    items.insert(items.begin() + insertAt, moved);
+}
+
 class Widget;
-class TreeListElement;
 class VerticalBoxElement;
 class TextElement;
 
@@ -110,6 +129,11 @@ private:
     int leftContextKind = -1;
     int leftContextIndex = -1;
     void BuildLeftPanelChrome();
+    void BuildComponentChrome();
+    Widget* compChrome = nullptr;
+    VerticalBoxElement* compRoot = nullptr;
+    TreeListElement* compList = nullptr;
+    TextElement* compEmptyText = nullptr;
     void ClearOtherLeftSelections(int keepKind);
     void RemoveFunctionAt(int index);
     TextElement* graphNameText = nullptr;
@@ -192,9 +216,6 @@ private:
     Rectangle screenBounds{};
 
 
-    int componentDragIndex = -1;
-    Vector2 componentDragPos{0, 0};
-    bool componentDragActive = false;
 
     std::string elementDragName;
     std::string elementDragClass;

@@ -1396,34 +1396,28 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (componentDragActive && componentDragIndex >= 0 && componentDragIndex < (int)graph.GetComponents().size()) {
+    if (DragDrop::Matches("StargraphComponent")) {
         Vector2 mp = GetMousePosition();
-        const ComponentDecl& comp = graph.GetComponents()[componentDragIndex];
-        std::string label = "Get: " + comp.name;
-        int w = (int)MeasureText(label.c_str(), 12) + 12;
-        DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
-        DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
-        DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
-
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        const std::string& compName = DragDrop::Payload();
+        const ComponentDecl* comp = nullptr;
+        for (const ComponentDecl& c : graph.GetComponents()) {
+            if (c.name == compName) { comp = &c; break; }
+        }
+        if (comp && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mp, graphArea)) {
                 Node* node = ActiveGraph().CreateNode("Get_Component");
-                node->title = "Get: " + comp.name;
-                node->componentClass = comp.componentType;
+                node->title = "Get: " + comp->name;
+                node->componentClass = comp->componentType;
                 for (Pin& p : node->inputs) {
-                    if (p.name == "Component_Name") p.defaultValue = comp.name;
+                    if (p.name == "Component_Name") p.defaultValue = comp->name;
                 }
                 Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
                 node->posX = snapped.x;
                 node->posY = snapped.y;
                 isDirty = true;
             }
-            componentDragActive = false;
-            componentDragIndex = -1;
+            DragDrop::Consume();
         }
-    } else if (componentDragIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        componentDragActive = false;
-        componentDragIndex = -1;
     }
 
     if (elementDragActive) {

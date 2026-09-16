@@ -19,24 +19,6 @@
 #include <filesystem>
 
 
-template <typename T>
-static void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDropPosition pos) {
-    if (fromIndex < 0 || fromIndex >= (int)items.size()) return;
-    if (toIndex < 0 || toIndex >= (int)items.size()) return;
-    if (fromIndex == toIndex) return;
-
-    T moved = items[fromIndex];
-    items.erase(items.begin() + fromIndex);
-
-    int insertAt = toIndex;
-    if (fromIndex < toIndex) insertAt--;
-    if (pos == TreeDropPosition::After) insertAt++;
-    if (insertAt < 0) insertAt = 0;
-    if (insertAt > (int)items.size()) insertAt = (int)items.size();
-
-    items.insert(items.begin() + insertAt, moved);
-}
-
 static std::vector<std::string> GetParameterlessCustomEventNames(Stargraph& graph) {
     std::vector<std::string> names;
     for (Node* node : graph.GetNodesOfType("Custom_Event")) {
@@ -271,8 +253,7 @@ void StargraphEditorPanel::ClearOtherLeftSelections(int keepKind) {
     if (keepKind != 0) { selectedFunctionIndex = -1; lastValidFunctionIndex = -1; }
     if (keepKind != 1) { selectedVariableIndex = -1; lastValidVariableIndex = -1; }
     if (keepKind != 2) { selectedLocalVariableIndex = -1; lastValidLocalVariableIndex = -1; }
-    selectedComponentIndex = -1;
-    lastValidComponentIndex = -1;
+    if (keepKind != 3) { selectedComponentIndex = -1; lastValidComponentIndex = -1; }
     selectedNodeId = -1;
     selectedNodeIds.clear();
 }

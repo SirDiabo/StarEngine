@@ -1,4 +1,5 @@
 #include "StargraphEditorPanel.h"
+#include "Core/Widgets/Widget.h"
 #include "Editor/BasicActorDefs.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
@@ -16,6 +17,8 @@ const float StargraphEditorPanel::previewToolbarHeight = 28.0f;
 StargraphEditorPanel::~StargraphEditorPanel() {
     if (previewRenderTargetWidth != 0) UnloadRenderTexture(previewRenderTarget);
     for (auto& kv : previewIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
+    delete leftChrome;
+    delete compChrome;
 }
 
 static void PreviewUpdateOrbitPosition(Camera3D& camera, float yaw, float pitch, float radius, Vector3 target) {

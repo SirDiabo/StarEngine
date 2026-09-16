@@ -8,23 +8,107 @@
 #include "Core/SafeParse.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetInput.h"
+#include "Core/Widgets/TreeListElement.h"
+#include "Core/Widgets/VerticalBoxElement.h"
+#include "Core/Widgets/TextElement.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
 
+void StargraphEditorPanel::BuildComponentChrome() {
+    compChrome = new Widget();
+    compRoot = new VerticalBoxElement();
+    compRoot->childSpacing = 4.0f;
+    compChrome->SetRoot(compRoot);
+
+    compList = new TreeListElement();
+    compList->dragKind = "StargraphComponent";
+    compList->allowReorder = true;
+    compList->allowReparent = true;
+    compList->allowExternalDrag = true;
+    compList->allowRename = false;
+    compList->rowHeight = 18.0f;
+    compList->scrollEnabled = true;
+
+    compList->onEntrySelected = [this](const std::string& id) {
+        std::vector<ComponentDecl>& comps = graph.GetComponents();
+        for (size_t i = 0; i < comps.size(); i++) {
+            if (comps[i].name == id) {
+                selectedComponentIndex = (int)i;
+                lastValidComponentIndex = (int)i;
+                break;
+            }
+        }
+        ClearOtherLeftSelections(3);
+    };
+
+    compList->onDeleteRequested = [this](const std::string& id) {
+        std::vector<ComponentDecl>& comps = graph.GetComponents();
+        for (size_t i = 0; i < comps.size(); i++) {
+            if (comps[i].name != id) continue;
+            for (ComponentDecl& child : comps) {
+                if (child.parentName == id) child.parentName = comps[i].parentName;
+            }
+            graph.RemoveComponent(i);
+            selectedComponentIndex = -1;
+            lastValidComponentIndex = -1;
+            isDirty = true;
+            break;
+        }
+    };
+
+    compList->onReorderOrReparent = [this](const std::string& draggedId, const std::string& targetId, TreeDropPosition pos) {
+        std::vector<ComponentDecl>& comps = graph.GetComponents();
+        int fromIndex = -1, toIndex = -1;
+        for (size_t i = 0; i < comps.size(); i++) {
+            if (comps[i].name == draggedId) fromIndex = (int)i;
+            if (comps[i].name == targetId) toIndex = (int)i;
+        }
+        if (fromIndex < 0 || toIndex < 0) return;
+
+        std::string checkName = targetId;
+        while (!checkName.empty()) {
+            if (checkName == draggedId) return;
+            std::string nextParent;
+            for (const ComponentDecl& c : comps) {
+                if (c.name == checkName) { nextParent = c.parentName; break; }
+            }
+            checkName = nextParent;
+        }
+
+        if (pos == TreeDropPosition::Into) {
+            comps[fromIndex].parentName = targetId;
+        } else {
+            comps[fromIndex].parentName = comps[toIndex].parentName;
+            MoveInList(comps, fromIndex, toIndex, pos);
+        }
+        isDirty = true;
+    };
+
+    compRoot->AddChild(compList);
+
+    compEmptyText = new TextElement();
+    compEmptyText->text = "No components";
+    compEmptyText->fontSize = 11.0f;
+    compEmptyText->anchor = { 0.0f, 0.0f };
+    compEmptyText->pivot = { 0.0f, 0.0f };
+    compEmptyText->offset = { 8.0f, 0.0f };
+    compEmptyText->size = { 0.0f, 16.0f };
+    compRoot->AddChild(compEmptyText);
+}
+
 void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel(area);
 
-    Vector2 mousePos = GetMousePosition();
     float y = area.y + 6;
     bool popupWasOpenThisFrame = addComponentMenu.IsOpen();
-    bool leftClickConsumedByComponent = false;
 
     DrawText("Components", (int)area.x + 8, (int)y, 12, theme.textSecondary);
 
-    // Add Component button.
     Rectangle addBtn = {area.x + area.width - 50, y - 2, 44, 16};
     if (UIWidget::Button(addBtn, "+ Add")) {
         if (addComponentMenu.IsOpen()) addComponentMenu.Close();
@@ -35,67 +119,54 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     DrawLine((int)area.x + 4, (int)y, (int)(area.x + area.width - 4), (int)y, theme.panelBorder);
     y += 6;
 
+    if (!compChrome) BuildComponentChrome();
+
     std::vector<ComponentDecl>& comps = graph.GetComponents();
-    float listBottom = area.y + area.height - 4;
 
-    for (size_t i = 0; i < comps.size() && y + 18 <= listBottom; i++) {
-        Rectangle row = {area.x + 4, y, area.width - 8, 18};
-        bool isSelected = (selectedComponentIndex == (int)i);
-
-        DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
-        DrawRectangleRec({area.x + 8, y + 4, 10, 10}, {90, 150, 210, 255});
-
-        std::string label = comps[i].name + " (" + comps[i].componentType + ")";
-        DrawText(label.c_str(), (int)area.x + 24, (int)y + 2, 11, theme.textPrimary);
-
-        if (CheckCollisionPointRec(mousePos, row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            leftClickConsumedByComponent = true;
-            selectedComponentIndex = (int)i;
-            lastValidComponentIndex = (int)i;
-            selectedNodeId = -1;
-            selectedNodeIds.clear();
-            selectedVariableIndex = -1;
-            lastValidVariableIndex = -1;
-            selectedFunctionIndex = -1;
-            lastValidFunctionIndex = -1;
-            selectedLocalVariableIndex = -1;
-            lastValidLocalVariableIndex = -1;
-            componentDragIndex = (int)i;
-            componentDragActive = false;
-            componentDragPos = mousePos;
-        }
-
-        if (componentDragIndex >= 0 && componentDragIndex < (int)comps.size() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mousePos.x - componentDragPos.x;
-            float dy = mousePos.y - componentDragPos.y;
-            if (!componentDragActive && (dx*dx + dy*dy > 25)) {
-                componentDragActive = true;
-            }
-        }
-
-        if (isSelected && IsKeyPressed(KEY_DELETE)) {
-            graph.RemoveComponent(i);
-            selectedComponentIndex = -1;
-            lastValidComponentIndex = -1;
-            isDirty = true;
-            break;
-        }
-
-        y += 20;
+    std::vector<TreeListElement::Entry> entries;
+    entries.reserve(comps.size());
+    for (size_t i = 0; i < comps.size(); i++) {
+        TreeListElement::Entry entry;
+        entry.id = comps[i].name;
+        entry.label = comps[i].name + " (" + comps[i].componentType + ")";
+        entry.parentId = comps[i].parentName;
+        entry.iconColor = {90, 150, 210, 255};
+        entry.isCurrent = (selectedComponentIndex == (int)i);
+        entries.push_back(entry);
     }
+    compList->SetEntries(entries);
 
-    if (comps.empty()) {
-        DrawText("No components", (int)area.x + 8, (int)y, 11, theme.textSecondary);
-    }
+    compList->backgroundColor = { 0, 0, 0, 0 };
+    compList->rowColor = theme.textPrimary;
+    compList->rowAltColor = { 0, 0, 0, 20 };
+    compList->rowHoveredColor = theme.surfaceHover;
+    compList->rowCurrentColor = theme.surfaceSelected;
+    compList->rowCurrentTextColor = theme.textPrimary;
+    compList->dropLineColor = theme.accent;
+
+    float listHeight = area.y + area.height - 4 - y;
+    compList->size = { 0.0f, comps.empty() ? 0.0f : listHeight };
+    compList->visible = !comps.empty();
+    compEmptyText->visible = comps.empty();
+    compEmptyText->color = theme.textSecondary;
+
+    compRoot->backgroundColor = { 0, 0, 0, 0 };
+    Rectangle inner = { area.x + 4, y, area.width - 8, listHeight };
+    compRoot->size = { inner.width, inner.height };
+
+    float dt = GetFrameTime();
+    compChrome->Tick(dt, inner, 1.0f);
+    WidgetInput::ProcessInput(compChrome, "Editor", dt, GetMousePosition(), 1.0f);
+    compChrome->Draw(inner, 1.0f);
 
     if (addComponentMenu.IsOpen()) {
-        std::vector<SearchableListPopup::Entry> entries;
-        entries.push_back({"Components", "SceneComponent", "SceneComponent"});
+        std::vector<SearchableListPopup::Entry> menuEntries;
+        menuEntries.push_back({"Components", "SceneComponent", "SceneComponent"});
         for (const ComponentTypeInfo& typeInfo : ComponentRegistry::Get().GetAll()) {
-            entries.push_back({"Components", typeInfo.componentType, typeInfo.componentType});
+            menuEntries.push_back({"Components", typeInfo.componentType, typeInfo.componentType});
         }
 
-        std::string picked = addComponentMenu.Render(entries, screenBounds);
+        std::string picked = addComponentMenu.Render(menuEntries, screenBounds);
         if (!picked.empty()) {
             ComponentDecl comp;
             comp.componentType = picked;
@@ -103,20 +174,14 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
             graph.AddComponent(comp);
             selectedComponentIndex = (int)graph.GetComponents().size() - 1;
             lastValidComponentIndex = selectedComponentIndex;
-            selectedNodeId = -1;
-            selectedNodeIds.clear();
-            selectedVariableIndex = -1;
-            lastValidVariableIndex = -1;
-            selectedFunctionIndex = -1;
-            lastValidFunctionIndex = -1;
-            selectedLocalVariableIndex = -1;
-            lastValidLocalVariableIndex = -1;
+            ClearOtherLeftSelections(3);
             isDirty = true;
         }
     }
 
-    if (!popupWasOpenThisFrame && !leftClickConsumedByComponent && selectedComponentIndex != -1 &&
-        previewGizmoState.hoverAxis == -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (!popupWasOpenThisFrame && selectedComponentIndex != -1 &&
+        previewGizmoState.hoverAxis == -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+        !CheckCollisionPointRec(GetMousePosition(), area)) {
         selectedComponentIndex = -1;
     }
 }
