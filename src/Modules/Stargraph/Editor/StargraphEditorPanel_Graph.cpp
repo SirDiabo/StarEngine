@@ -7,6 +7,7 @@
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
 #include "Editor/BasicActorDefs.h"
+#include "Core/Widgets/DragDropController.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -1305,83 +1306,94 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
 
     EndScissorMode();
 
-    if (variableDragActive && variableDragIndex >= 0 && variableDragIndex < (int)(variableDragIsLocal ? ActiveGraph() : graph).GetVariables().size()) {
+    bool varDragIsLocal = DragDrop::Matches("StargraphLocalVariable");
+    if (DragDrop::Matches("StargraphVariable") || varDragIsLocal) {
         Vector2 mp = GetMousePosition();
-        const Variable& var = (variableDragIsLocal ? ActiveGraph() : graph).GetVariables()[variableDragIndex];
-        bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
-        bool alt  = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
-        bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
-        std::string label = ctrl && alt ? ("Load Saved: " + var.name)
-                           : ctrl        ? ("Save: " + var.name)
-                           : shift       ? ("Get Saved: " + var.name)
-                           : alt         ? ("Set: " + var.name)
-                                         : ("Get: " + var.name);
-        std::string hint = "  (Alt=Set, Ctrl=Save, Ctrl+Alt=Load Saved, Shift=Get Saved)";
-        std::string full = label + hint;
-        int w = (int)MeasureText(full.c_str(), 12) + 12;
-        DrawRectangleRec({mp.x + 12, mp.y - 4, (float)w, 20}, {60, 60, 65, 255});
-        DrawRectangleLinesEx({mp.x + 12, mp.y - 4, (float)w, 20}, 1, {100, 100, 110, 255});
-        DrawText(label.c_str(), (int)(mp.x + 18), (int)(mp.y), 12, WHITE);
-        DrawText(hint.c_str(), (int)(mp.x + 18 + MeasureText(label.c_str(), 12)), (int)(mp.y), 12, {130, 130, 140, 255});
+        Stargraph& sourceGraph = varDragIsLocal ? ActiveGraph() : graph;
+        int varIndex = atoi(DragDrop::Payload().c_str());
+        if (varIndex >= 0 && varIndex < (int)sourceGraph.GetVariables().size()) {
+            const Variable& var = sourceGraph.GetVariables()[varIndex];
+            bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            bool alt  = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+            bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+            std::string hint = "  (Alt=Set, Ctrl=Save, Ctrl+Alt=Load Saved, Shift=Get Saved)";
+            DrawText(hint.c_str(), (int)(mp.x + 18), (int)(mp.y + 18), 12, {130, 130, 140, 255});
 
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointRec(mp, graphArea)) {
-                Node* node = nullptr;
-                const Variable& var = (variableDragIsLocal ? ActiveGraph() : graph).GetVariables()[variableDragIndex];
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                if (CheckCollisionPointRec(mp, graphArea)) {
+                    Node* node = nullptr;
+                    if (ctrl && alt) {
+                        node = ActiveGraph().CreateNode("Load_Saved_Variable");
+                        node->title = "Load Saved: " + var.name;
+                        for (Pin& p : node->inputs) {
+                            if (p.name == "Variable_Name") p.defaultValue = var.name;
+                        }
+                        for (Pin& p : node->outputs) {
+                            if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
+                        }
+                    } else if (ctrl) {
+                        node = ActiveGraph().CreateNode("Save_Variable");
+                        node->title = "Save: " + var.name;
+                        for (Pin& p : node->inputs) {
+                            if (p.name == "Variable_Name") p.defaultValue = var.name;
+                        }
+                    } else if (shift) {
+                        node = ActiveGraph().CreateNode("Get_Saved_Variable");
+                        node->title = "Get Saved: " + var.name;
+                        for (Pin& p : node->inputs) {
+                            if (p.name == "Variable_Name") p.defaultValue = var.name;
+                        }
+                        for (Pin& p : node->outputs) {
+                            if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
+                        }
+                    } else if (alt) {
+                        node = ActiveGraph().CreateNode("Set_Variable");
+                        node->title = "Set: " + var.name;
+                        for (Pin& p : node->inputs) {
+                            if (p.name == "Variable_Name") p.defaultValue = var.name;
+                            if (p.name == "Value")         { p.type = var.type; p.objectKind = var.objectKind; }
+                        }
+                    } else {
+                        node = ActiveGraph().CreateNode("Get_Variable");
+                        node->title = "Get: " + var.name;
+                        for (Pin& p : node->inputs) {
+                            if (p.name == "Variable_Name") p.defaultValue = var.name;
+                        }
+                        for (Pin& p : node->outputs) {
+                            if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
+                        }
+                    }
 
-                if (ctrl && alt) {
-                    node = ActiveGraph().CreateNode("Load_Saved_Variable");
-                    node->title = "Load Saved: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") p.defaultValue = var.name;
-                    }
-                    for (Pin& p : node->outputs) {
-                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
-                    }
-                } else if (ctrl) {
-                    node = ActiveGraph().CreateNode("Save_Variable");
-                    node->title = "Save: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") p.defaultValue = var.name;
-                    }
-                } else if (shift) {
-                    node = ActiveGraph().CreateNode("Get_Saved_Variable");
-                    node->title = "Get Saved: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") p.defaultValue = var.name;
-                    }
-                    for (Pin& p : node->outputs) {
-                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
-                    }
-                } else if (IsKeyDown(KEY_LEFT_ALT)) {
-                    node = ActiveGraph().CreateNode("Set_Variable");
-                    node->title = "Set: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") p.defaultValue = var.name;
-                        if (p.name == "Value")         { p.type = var.type; p.objectKind = var.objectKind; }
-                    }
-                } else {
-                    node = ActiveGraph().CreateNode("Get_Variable");
-                    node->title = "Get: " + var.name;
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") p.defaultValue = var.name;
-                    }
-                    for (Pin& p : node->outputs) {
-                        if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; }
-                    }
+                    Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
+                    node->posX = snapped.x;
+                    node->posY = snapped.y;
+                    isDirty = true;
                 }
-
-                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
-                node->posX = snapped.x;
-                node->posY = snapped.y;
-                isDirty = true;
+                DragDrop::Consume();
             }
-            variableDragActive = false;
-            variableDragIndex = -1;
         }
-    } else if (variableDragIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        variableDragActive = false;
-        variableDragIndex = -1;
+    }
+
+    if (DragDrop::Matches("StargraphFunction")) {
+        Vector2 mp = GetMousePosition();
+        int funcIndex = atoi(DragDrop::Payload().c_str());
+        if (funcIndex >= 0 && funcIndex < (int)graph.GetFunctions().size()) {
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                if (CheckCollisionPointRec(mp, graphArea)) {
+                    const FunctionDef& func = graph.GetFunctions()[funcIndex];
+                    Node* node = ActiveGraph().CreateNode("Call_Function");
+                    node->title = "Call: " + func.name;
+                    for (Pin& p : node->inputs) {
+                        if (p.name == "Function Name") p.defaultValue = func.name;
+                    }
+                    Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
+                    node->posX = snapped.x;
+                    node->posY = snapped.y;
+                    isDirty = true;
+                }
+                DragDrop::Consume();
+            }
+        }
     }
 
     if (componentDragActive && componentDragIndex >= 0 && componentDragIndex < (int)graph.GetComponents().size()) {

@@ -77,8 +77,6 @@ void StargraphEditorPanel::ResetTransientEditState() {
     audioPathPicker.Close();
     canvasState.scroll = {0, 0};
     canvasState.didPan = false;
-    variableDragActive = false;
-    variableDragIndex = -1;
     componentDragActive = false;
     componentDragIndex = -1;
 }
@@ -87,8 +85,6 @@ void StargraphEditorPanel::Close() {
     isOpen = false;
     filePath.clear();
     isDirty = false;
-    variableDragActive = false;
-    variableDragIndex = -1;
     componentDragActive = false;
     componentDragIndex = -1;
     keyPickerOpen = false;

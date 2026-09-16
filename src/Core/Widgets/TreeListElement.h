@@ -52,6 +52,7 @@ public:
     std::function<void(const std::string& id, const std::string& newName)> onRenameRequested;
 
     void SetEntries(std::vector<Entry> newEntries);
+    void BeginRename(const std::string& id);
 
     void Draw(Rectangle rect, float uiScale) override;
 

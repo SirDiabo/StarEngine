@@ -35,6 +35,12 @@ void TreeListElement::SetEntries(std::vector<Entry> newEntries) {
     RebuildRows();
 }
 
+void TreeListElement::BeginRename(const std::string& id) {
+    if (!allowRename) return;
+    renamingId = id;
+    RebuildRows();
+}
+
 void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualIndex) {
     const Entry& entry = entries[entryIndex];
 

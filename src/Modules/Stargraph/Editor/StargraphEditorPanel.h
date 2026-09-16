@@ -6,6 +6,7 @@
 #include "Editor/AssetPickerPopup.h"
 #include "Editor/RegistryPickerPopup.h"
 #include "Editor/SearchableListPopup.h"
+#include "Editor/ChoicePopup.h"
 #include "Editor/GizmoRenderer.h"
 #include <string>
 #include <vector>
@@ -14,6 +15,10 @@
 #include <functional>
 
 class ViewportPanel;
+class Widget;
+class TreeListElement;
+class VerticalBoxElement;
+class TextElement;
 
 class StargraphEditorPanel {
 public:
@@ -94,6 +99,23 @@ private:
 
     int openFunctionIndex = -1;
     Rectangle leftPanelBounds{};
+
+    Widget* leftChrome = nullptr;
+    VerticalBoxElement* leftRoot = nullptr;
+    TreeListElement* funcList = nullptr;
+    TreeListElement* varList = nullptr;
+    TreeListElement* localVarList = nullptr;
+    VerticalBoxElement* localVarSection = nullptr;
+    ChoicePopup leftContextMenu;
+    int leftContextKind = -1;
+    int leftContextIndex = -1;
+    void BuildLeftPanelChrome();
+    void ClearOtherLeftSelections(int keepKind);
+    void RemoveFunctionAt(int index);
+    TextElement* graphNameText = nullptr;
+    TextElement* localVarHeader = nullptr;
+    int pendingRenameList = -1;
+    int pendingRenameIndex = -1;
     Stargraph& ActiveGraph() {
         if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size())
             return graph.GetFunctions()[openFunctionIndex].graph;
@@ -136,37 +158,15 @@ private:
 
     int selectedVariableIndex = -1;
     int lastValidVariableIndex = -1;
-    bool varContextMenuOpen = false;
-    int varContextMenuIndex = -1;
-    float varContextMenuAnchorY = 0;
-    int renamingVariableIndex = -1;
-    char varNameBuffer[128] = "";
-    bool addingVariable = false;
-    int variableNameActiveField = 0;
-    bool variableDragIsLocal = false;
     int listeningForKeyPinId = 0;
 
     int selectedFunctionIndex = -1;
     int lastValidFunctionIndex = -1;
-    bool funcContextMenuOpen = false;
-    int funcContextMenuIndex = -1;
-    float funcContextMenuAnchorY = 0;
-    int renamingFunctionIndex = -1;
-    char funcNameBuffer[128] = "";
-    bool addingFunction = false;
-    int functionNameActiveField = 0;
     int lastFunctionClickIndex = -1;
     float lastFunctionClickTime = -1;
 
     int selectedLocalVariableIndex = -1;
     int lastValidLocalVariableIndex = -1;
-    bool localVarContextMenuOpen = false;
-    int localVarContextMenuIndex = -1;
-    float localVarContextMenuAnchorY = 0;
-    int renamingLocalVariableIndex = -1;
-    char localVarNameBuffer[128] = "";
-    bool addingLocalVariable = false;
-    int localVariableNameActiveField = 0;
 
     struct ArrayElemBuf { char text[3][64] = {"", "", ""}; };
     std::vector<ArrayElemBuf> varArrayBufs;
@@ -191,9 +191,6 @@ private:
     Rectangle graphArea{};
     Rectangle screenBounds{};
 
-    int variableDragIndex = -1;
-    Vector2 variableDragPos{0, 0};
-    bool variableDragActive = false;
 
     int componentDragIndex = -1;
     Vector2 componentDragPos{0, 0};

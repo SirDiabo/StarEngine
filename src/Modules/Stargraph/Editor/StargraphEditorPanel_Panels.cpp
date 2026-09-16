@@ -6,11 +6,36 @@
 #include "Core/SaveFileRegistry.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetInput.h"
+#include "Core/Widgets/TreeListElement.h"
+#include "Core/Widgets/VerticalBoxElement.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/ButtonElement.h"
 #include "raygui.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+
+
+template <typename T>
+static void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDropPosition pos) {
+    if (fromIndex < 0 || fromIndex >= (int)items.size()) return;
+    if (toIndex < 0 || toIndex >= (int)items.size()) return;
+    if (fromIndex == toIndex) return;
+
+    T moved = items[fromIndex];
+    items.erase(items.begin() + fromIndex);
+
+    int insertAt = toIndex;
+    if (fromIndex < toIndex) insertAt--;
+    if (pos == TreeDropPosition::After) insertAt++;
+    if (insertAt < 0) insertAt = 0;
+    if (insertAt > (int)items.size()) insertAt = (int)items.size();
+
+    items.insert(items.begin() + insertAt, moved);
+}
 
 static std::vector<std::string> GetParameterlessCustomEventNames(Stargraph& graph) {
     std::vector<std::string> names;
@@ -32,370 +57,325 @@ static std::vector<std::string> GetProjectInputMappingNames() {
     return NamedListRegistry::Get().GetList(InputMappingRegistry::Category());
 }
 
+void StargraphEditorPanel::BuildLeftPanelChrome() {
+    leftChrome = new Widget();
+    leftRoot = new VerticalBoxElement();
+    leftRoot->scrollEnabled = true;
+    leftRoot->childSpacing = 4.0f;
+    leftChrome->SetRoot(leftRoot);
+
+    auto makeHeader = [](const char* label) {
+        auto* text = new TextElement();
+        text->text = label;
+        text->fontSize = 12.0f;
+        text->anchor = { 0.0f, 0.5f };
+        text->pivot = { 0.0f, 0.5f };
+        text->offset = { 8.0f, 0.0f };
+        text->size = { 0.0f, 18.0f };
+        return text;
+    };
+
+    auto makeButton = [](const char* label, std::function<void()> onClick) {
+        auto* btn = new ButtonElement();
+        btn->size = { 0.0f, 18.0f };
+        btn->onActivated = onClick;
+        auto* text = new TextElement();
+        text->text = label;
+        text->fontSize = 11.0f;
+        text->anchor = { 0.5f, 0.5f };
+        text->pivot = { 0.5f, 0.5f };
+        btn->AddChild(text);
+        return btn;
+    };
+
+    auto makeList = [](const char* dragKind, bool allowExternal) {
+        auto* list = new TreeListElement();
+        list->dragKind = dragKind;
+        list->allowReorder = true;
+        list->allowReparent = false;
+        list->allowExternalDrag = allowExternal;
+        list->allowRename = true;
+        list->rowHeight = 18.0f;
+        list->scrollEnabled = false;
+        return list;
+    };
+
+    leftRoot->AddChild(makeHeader("Graphs"));
+
+    graphNameText = new TextElement();
+    graphNameText->fontSize = 12.0f;
+    graphNameText->anchor = { 0.0f, 0.5f };
+    graphNameText->pivot = { 0.0f, 0.5f };
+    graphNameText->offset = { 16.0f, 0.0f };
+    graphNameText->size = { 0.0f, 18.0f };
+    leftRoot->AddChild(graphNameText);
+
+    leftRoot->AddChild(makeHeader("Functions"));
+
+    funcList = makeList("StargraphFunction", true);
+    funcList->onEntrySelected = [this](const std::string& id) {
+        int index = atoi(id.c_str());
+        selectedFunctionIndex = index;
+        lastValidFunctionIndex = index;
+        ClearOtherLeftSelections(0);
+
+        float now = (float)GetTime();
+        if (lastFunctionClickIndex == index && (now - lastFunctionClickTime) < 0.3f) {
+            OpenFunctionGraph(index);
+        }
+        lastFunctionClickTime = now;
+        lastFunctionClickIndex = index;
+    };
+    funcList->onRenameRequested = [this](const std::string& id, const std::string& newName) {
+        int index = atoi(id.c_str());
+        if (index >= 0 && index < (int)graph.GetFunctions().size()) {
+            graph.RenameFunction(index, newName);
+            isDirty = true;
+        }
+    };
+    funcList->onDeleteRequested = [this](const std::string& id) {
+        RemoveFunctionAt(atoi(id.c_str()));
+    };
+    funcList->onEntryRightClicked = [this](const std::string& id) {
+        leftContextKind = 0;
+        leftContextIndex = atoi(id.c_str());
+        leftContextMenu.Open(GetMousePosition(), 110.0f, { { "Rename" }, { "Delete" } });
+    };
+    funcList->onReorderOrReparent = [this](const std::string& draggedId, const std::string& targetId, TreeDropPosition pos) {
+        MoveInList(graph.GetFunctions(), atoi(draggedId.c_str()), atoi(targetId.c_str()), pos);
+        isDirty = true;
+    };
+    leftRoot->AddChild(funcList);
+
+    leftRoot->AddChild(makeButton("+ Function", [this]() {
+        graph.AddFunction("NewFunction");
+        int index = (int)graph.GetFunctions().size() - 1;
+        selectedFunctionIndex = index;
+        lastValidFunctionIndex = index;
+        isDirty = true;
+        pendingRenameList = 0;
+        pendingRenameIndex = index;
+    }));
+
+    leftRoot->AddChild(makeHeader("Variables"));
+
+    varList = makeList("StargraphVariable", true);
+    varList->onEntrySelected = [this](const std::string& id) {
+        int index = atoi(id.c_str());
+        selectedVariableIndex = index;
+        lastValidVariableIndex = index;
+        ClearOtherLeftSelections(1);
+    };
+    varList->onRenameRequested = [this](const std::string& id, const std::string& newName) {
+        int index = atoi(id.c_str());
+        std::vector<Variable>& vars = graph.GetVariables();
+        if (index >= 0 && index < (int)vars.size()) {
+            vars[index].name = newName;
+            isDirty = true;
+        }
+    };
+    varList->onDeleteRequested = [this](const std::string& id) {
+        int index = atoi(id.c_str());
+        std::vector<Variable>& vars = graph.GetVariables();
+        if (index >= 0 && index < (int)vars.size()) {
+            vars.erase(vars.begin() + index);
+            selectedVariableIndex = -1;
+            if (lastValidVariableIndex == index) lastValidVariableIndex = -1;
+            isDirty = true;
+        }
+    };
+    varList->onEntryRightClicked = [this](const std::string& id) {
+        leftContextKind = 1;
+        leftContextIndex = atoi(id.c_str());
+        leftContextMenu.Open(GetMousePosition(), 110.0f, { { "Rename" }, { "Delete" } });
+    };
+    varList->onReorderOrReparent = [this](const std::string& draggedId, const std::string& targetId, TreeDropPosition pos) {
+        MoveInList(graph.GetVariables(), atoi(draggedId.c_str()), atoi(targetId.c_str()), pos);
+        isDirty = true;
+    };
+    leftRoot->AddChild(varList);
+
+    leftRoot->AddChild(makeButton("+ Variable", [this]() {
+        Variable v;
+        v.name = "NewVar";
+        v.type = PinType::Boolean;
+        graph.AddVariable(v);
+        int index = (int)graph.GetVariables().size() - 1;
+        selectedVariableIndex = index;
+        lastValidVariableIndex = index;
+        isDirty = true;
+        pendingRenameList = 1;
+        pendingRenameIndex = index;
+    }));
+
+    localVarSection = new VerticalBoxElement();
+    localVarSection->childSpacing = 4.0f;
+    localVarSection->backgroundColor = { 0, 0, 0, 0 };
+
+    localVarHeader = makeHeader("Local Variables");
+    localVarSection->AddChild(localVarHeader);
+
+    localVarList = makeList("StargraphLocalVariable", true);
+    localVarList->onEntrySelected = [this](const std::string& id) {
+        int index = atoi(id.c_str());
+        selectedLocalVariableIndex = index;
+        lastValidLocalVariableIndex = index;
+        ClearOtherLeftSelections(2);
+    };
+    localVarList->onRenameRequested = [this](const std::string& id, const std::string& newName) {
+        int index = atoi(id.c_str());
+        std::vector<Variable>& localVars = ActiveGraph().GetVariables();
+        if (index >= 0 && index < (int)localVars.size()) {
+            localVars[index].name = newName;
+            isDirty = true;
+        }
+    };
+    localVarList->onDeleteRequested = [this](const std::string& id) {
+        int index = atoi(id.c_str());
+        std::vector<Variable>& localVars = ActiveGraph().GetVariables();
+        if (index >= 0 && index < (int)localVars.size()) {
+            localVars.erase(localVars.begin() + index);
+            selectedLocalVariableIndex = -1;
+            if (lastValidLocalVariableIndex == index) lastValidLocalVariableIndex = -1;
+            isDirty = true;
+        }
+    };
+    localVarList->onEntryRightClicked = [this](const std::string& id) {
+        leftContextKind = 2;
+        leftContextIndex = atoi(id.c_str());
+        leftContextMenu.Open(GetMousePosition(), 110.0f, { { "Rename" }, { "Delete" } });
+    };
+    localVarList->onReorderOrReparent = [this](const std::string& draggedId, const std::string& targetId, TreeDropPosition pos) {
+        MoveInList(ActiveGraph().GetVariables(), atoi(draggedId.c_str()), atoi(targetId.c_str()), pos);
+        isDirty = true;
+    };
+    localVarSection->AddChild(localVarList);
+
+    localVarSection->AddChild(makeButton("+ Local Variable", [this]() {
+        Variable v;
+        v.name = "NewLocalVar";
+        v.type = PinType::Boolean;
+        ActiveGraph().AddVariable(v);
+        int index = (int)ActiveGraph().GetVariables().size() - 1;
+        selectedLocalVariableIndex = index;
+        lastValidLocalVariableIndex = index;
+        isDirty = true;
+        pendingRenameList = 2;
+        pendingRenameIndex = index;
+    }));
+
+    leftRoot->AddChild(localVarSection);
+}
+
+void StargraphEditorPanel::ClearOtherLeftSelections(int keepKind) {
+    if (keepKind != 0) { selectedFunctionIndex = -1; lastValidFunctionIndex = -1; }
+    if (keepKind != 1) { selectedVariableIndex = -1; lastValidVariableIndex = -1; }
+    if (keepKind != 2) { selectedLocalVariableIndex = -1; lastValidLocalVariableIndex = -1; }
+    selectedComponentIndex = -1;
+    lastValidComponentIndex = -1;
+    selectedNodeId = -1;
+    selectedNodeIds.clear();
+}
+
+void StargraphEditorPanel::RemoveFunctionAt(int index) {
+    if (index < 0 || index >= (int)graph.GetFunctions().size()) return;
+    graph.RemoveFunction(index);
+    selectedFunctionIndex = -1;
+    if (lastValidFunctionIndex == index) lastValidFunctionIndex = -1;
+    if (openFunctionIndex == index) CloseFunctionGraph();
+    else if (openFunctionIndex > index) openFunctionIndex--;
+    isDirty = true;
+}
+
 void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     const UIPalette& theme = UITheme::Get();
     UIWidget::Panel(panel);
     leftPanelBounds = panel;
 
-    Vector2 mousePos = GetMousePosition();
-    float y = panel.y + 8;
+    if (!leftChrome) BuildLeftPanelChrome();
 
-    auto sectionHeader = [&](const char* label) {
-        DrawText(label, (int)panel.x + 8, (int)y, 12, theme.textSecondary);
-        y += 18;
-        DrawLine((int)panel.x + 4, (int)y, (int)(panel.x + panel.width - 4), (int)y, theme.panelBorder);
-        y += 6;
+    auto styleList = [&](TreeListElement* list, int count) {
+        list->backgroundColor = { 0, 0, 0, 0 };
+        list->rowColor = theme.textPrimary;
+        list->rowAltColor = { 0, 0, 0, 20 };
+        list->rowHoveredColor = theme.surfaceHover;
+        list->rowCurrentColor = theme.surfaceSelected;
+        list->rowCurrentTextColor = theme.textPrimary;
+        list->dropLineColor = theme.accent;
+        list->size = { 0.0f, (float)count * 19.0f + 2.0f };
     };
 
-    sectionHeader("Graphs");
-    DrawRectangleRec({panel.x + 4, y, panel.width - 8, 18}, theme.fieldBg);
-    DrawText(graph.assetName.c_str(), (int)panel.x + 20, (int)y + 2, 12, theme.textPrimary);
-    y += 22;
-
-    bool funcContextMenuWasOpenThisFrame = funcContextMenuOpen;
-    bool wasAddingFunctionThisFrame = addingFunction;
-    bool varContextMenuWasOpenThisFrame = varContextMenuOpen;
-    bool wasAddingVariableThisFrame = addingVariable;
-    bool localVarContextMenuWasOpenThisFrame = localVarContextMenuOpen;
-    bool wasAddingLocalVariableThisFrame = addingLocalVariable;
-
-    y += 8;
-    sectionHeader("Functions");
-    bool leftClickConsumedByFunction = false;
+    graphNameText->text = graph.assetName;
+    graphNameText->color = theme.textPrimary;
 
     std::vector<FunctionDef>& funcs = graph.GetFunctions();
+    std::vector<TreeListElement::Entry> funcEntries;
+    funcEntries.reserve(funcs.size());
     for (size_t i = 0; i < funcs.size(); i++) {
-        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-        bool isSelected = (selectedFunctionIndex == (int)i);
-
-        DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
-
-        if (renamingFunctionIndex == (int)i) {
-            std::string nameOut = funcs[i].name;
-            if (PropertyField::StringBox({panel.x + 12, y, panel.width - 18, 18}, funcNameBuffer,
-                                          sizeof(funcNameBuffer), 1, functionNameActiveField, nameOut)) {
-                if (!nameOut.empty()) graph.RenameFunction(i, nameOut);
-                renamingFunctionIndex = -1;
-                functionNameActiveField = 0;
-                isDirty = true;
-            } else if (IsKeyPressed(KEY_ESCAPE)) {
-                renamingFunctionIndex = -1;
-                functionNameActiveField = 0;
-            }
-        } else {
-            DrawText(funcs[i].name.c_str(), (int)panel.x + 12, (int)y + 2, 12, theme.textPrimary);
-
-            if (CheckCollisionPointRec(mousePos, row)) {
-                if (!funcContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    leftClickConsumedByFunction = true;
-                    selectedFunctionIndex = (int)i;
-                    lastValidFunctionIndex = (int)i;
-                    selectedVariableIndex = -1;
-                    lastValidVariableIndex = -1;
-                    selectedComponentIndex = -1;
-                    lastValidComponentIndex = -1;
-                    selectedLocalVariableIndex = -1;
-                    lastValidLocalVariableIndex = -1;
-                    selectedNodeId = -1;
-                    selectedNodeIds.clear();
-
-                    float currentTime = (float)GetTime();
-                    if (lastFunctionClickIndex == (int)i && (currentTime - lastFunctionClickTime) < 0.3f) {
-                        OpenFunctionGraph((int)i);
-                    }
-                    lastFunctionClickTime = currentTime;
-                    lastFunctionClickIndex = (int)i;
-                }
-                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                    leftClickConsumedByFunction = true;
-                    selectedFunctionIndex = (int)i;
-                    funcContextMenuOpen = true;
-                    funcContextMenuIndex = (int)i;
-                    funcContextMenuAnchorY = y;
-                }
-            }
-        }
-
-        if (isSelected && IsKeyPressed(KEY_DELETE)) {
-            graph.RemoveFunction(i);
-            selectedFunctionIndex = -1;
-            if (lastValidFunctionIndex == (int)i) lastValidFunctionIndex = -1;
-            if (openFunctionIndex == (int)i) CloseFunctionGraph();
-            else if (openFunctionIndex > (int)i) openFunctionIndex--;
-            isDirty = true;
-            break;
-        }
-
-        y += 22;
+        TreeListElement::Entry entry;
+        entry.id = std::to_string(i);
+        entry.label = funcs[i].name;
+        entry.isCurrent = (selectedFunctionIndex == (int)i);
+        funcEntries.push_back(entry);
     }
-
-    if (addingFunction) {
-        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-        DrawRectangleRec(row, theme.fieldBg);
-
-        std::string nameOut = funcNameBuffer;
-        if (PropertyField::StringBox({panel.x + 12, y, panel.width - 18, 18}, funcNameBuffer,
-                                      sizeof(funcNameBuffer), 1, functionNameActiveField, nameOut)) {
-            if (!nameOut.empty()) {
-                graph.AddFunction(nameOut);
-                selectedFunctionIndex = (int)graph.GetFunctions().size() - 1;
-                lastValidFunctionIndex = selectedFunctionIndex;
-                isDirty = true;
-            }
-            addingFunction = false;
-            functionNameActiveField = 0;
-        } else if (IsKeyPressed(KEY_ESCAPE)) {
-            addingFunction = false;
-            functionNameActiveField = 0;
-        }
-        y += 22;
-    }
-
-    Rectangle addFuncBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
-    UIWidget::Button(addFuncBtn, "+ Function");
-
-    if (!funcContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addFuncBtn)) {
-        snprintf(funcNameBuffer, sizeof(funcNameBuffer), "NewFunction");
-        PropertyField::ForceActivate(funcNameBuffer, sizeof(funcNameBuffer));
-        addingFunction = true;
-        functionNameActiveField = 1;
-    }
-    y += 24;
-
-    if (!funcContextMenuWasOpenThisFrame && !wasAddingFunctionThisFrame && !leftClickConsumedByFunction &&
-        selectedFunctionIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        selectedFunctionIndex = -1;
-    }
-
-    y += 8;
-    sectionHeader("Variables");
-    bool leftClickConsumedByVariable = false;
+    funcList->SetEntries(funcEntries);
+    styleList(funcList, (int)funcs.size());
 
     std::vector<Variable>& vars = graph.GetVariables();
+    std::vector<TreeListElement::Entry> varEntries;
+    varEntries.reserve(vars.size());
     for (size_t i = 0; i < vars.size(); i++) {
-        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-        bool isSelected = (selectedVariableIndex == (int)i);
-
-        DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
-        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(vars[i].type));
-
-        if (renamingVariableIndex == (int)i) {
-            std::string nameOut = vars[i].name;
-            if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
-                                          sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
-                vars[i].name = nameOut;
-                renamingVariableIndex = -1;
-                variableNameActiveField = 0;
-                isDirty = true;
-            } else if (IsKeyPressed(KEY_ESCAPE)) {
-                renamingVariableIndex = -1;
-                variableNameActiveField = 0;
-            }
-        } else {
-            std::string label = vars[i].name + (vars[i].isArray ? " []" : "");
-            DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, theme.textPrimary);
-
-            if (CheckCollisionPointRec(mousePos, row)) {
-                if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    leftClickConsumedByVariable = true;
-                    selectedVariableIndex = (int)i;
-                    lastValidVariableIndex = (int)i;
-                    selectedFunctionIndex = -1;
-                    lastValidFunctionIndex = -1;
-                    selectedComponentIndex = -1;
-                    lastValidComponentIndex = -1;
-                    selectedLocalVariableIndex = -1;
-                    lastValidLocalVariableIndex = -1;
-                    selectedNodeId = -1;
-                    selectedNodeIds.clear();
-                    variableDragIndex = (int)i;
-                    variableDragIsLocal = false;
-                    variableDragActive = false;
-                    variableDragPos = mousePos;
-                }
-                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                    leftClickConsumedByVariable = true;
-                    selectedVariableIndex = (int)i;
-                    selectedComponentIndex = -1;
-                    lastValidComponentIndex = -1;
-                    varContextMenuOpen = true;
-                    varContextMenuIndex = (int)i;
-                    varContextMenuAnchorY = y;
-                }
-            }
-        }
-
-        if (variableDragIndex >= 0 && variableDragIndex < (int)vars.size() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            float dx = mousePos.x - variableDragPos.x;
-            float dy = mousePos.y - variableDragPos.y;
-            if (!variableDragActive && (dx*dx + dy*dy > 25)) {
-                variableDragActive = true;
-            }
-        }
-
-        if (isSelected && IsKeyPressed(KEY_DELETE)) {
-            vars.erase(vars.begin() + i);
-            selectedVariableIndex = -1;
-            if (lastValidVariableIndex == (int)i) lastValidVariableIndex = -1;
-            isDirty = true;
-            break;
-        }
-
-        y += 22;
+        TreeListElement::Entry entry;
+        entry.id = std::to_string(i);
+        entry.label = vars[i].name + (vars[i].isArray ? " []" : "");
+        entry.iconColor = GetPinColor(vars[i].type);
+        entry.isCurrent = (selectedVariableIndex == (int)i);
+        varEntries.push_back(entry);
     }
+    varList->SetEntries(varEntries);
+    styleList(varList, (int)vars.size());
 
-    if (addingVariable) {
-        Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-        DrawRectangleRec(row, theme.fieldBg);
-        DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
-
-        std::string nameOut = varNameBuffer;
-        if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, varNameBuffer,
-                                      sizeof(varNameBuffer), 1, variableNameActiveField, nameOut)) {
-            if (!nameOut.empty()) {
-                Variable v;
-                v.name = nameOut;
-                v.type = PinType::Boolean;
-                graph.AddVariable(v);
-                selectedVariableIndex = (int)graph.GetVariables().size() - 1;
-                lastValidVariableIndex = selectedVariableIndex;
-                isDirty = true;
-            }
-            addingVariable = false;
-            variableNameActiveField = 0;
-        } else if (IsKeyPressed(KEY_ESCAPE)) {
-            addingVariable = false;
-            variableNameActiveField = 0;
-        }
-        y += 22;
-    }
-
-    Rectangle addBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
-    UIWidget::Button(addBtn, "+ Variable");
-    
-    if (!varContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addBtn)) {
-        snprintf(varNameBuffer, sizeof(varNameBuffer), "NewVar");
-        PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
-        addingVariable = true;
-        variableNameActiveField = 1;
-    }
-    y += 24;
-
-    if (!varContextMenuWasOpenThisFrame && !wasAddingVariableThisFrame && !leftClickConsumedByVariable &&
-        selectedVariableIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        selectedVariableIndex = -1;
-    }
-
-    if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
-        y += 8;
-        sectionHeader(("Local Variables (" + graph.GetFunctions()[openFunctionIndex].name + ")").c_str());
-        bool leftClickConsumedByLocalVariable = false;
+    bool hasOpenFunction = openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size();
+    localVarSection->visible = hasOpenFunction;
+    if (hasOpenFunction) {
+        localVarHeader->text = "Local Variables (" + graph.GetFunctions()[openFunctionIndex].name + ")";
+        localVarHeader->color = theme.textSecondary;
 
         std::vector<Variable>& localVars = ActiveGraph().GetVariables();
+        std::vector<TreeListElement::Entry> localEntries;
+        localEntries.reserve(localVars.size());
         for (size_t i = 0; i < localVars.size(); i++) {
-            Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-            bool isSelected = (selectedLocalVariableIndex == (int)i);
-
-            DrawRectangleRec(row, isSelected ? theme.surfaceSelected : theme.fieldBg);
-            DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(localVars[i].type));
-
-            if (renamingLocalVariableIndex == (int)i) {
-                std::string nameOut = localVars[i].name;
-                if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, localVarNameBuffer,
-                                              sizeof(localVarNameBuffer), 1, localVariableNameActiveField, nameOut)) {
-                    localVars[i].name = nameOut;
-                    renamingLocalVariableIndex = -1;
-                    localVariableNameActiveField = 0;
-                    isDirty = true;
-                } else if (IsKeyPressed(KEY_ESCAPE)) {
-                    renamingLocalVariableIndex = -1;
-                    localVariableNameActiveField = 0;
-                }
-            } else {
-                std::string label = localVars[i].name + (localVars[i].isArray ? " []" : "");
-                DrawText(label.c_str(), (int)panel.x + 24, (int)y + 2, 12, theme.textPrimary);
-
-                if (CheckCollisionPointRec(mousePos, row)) {
-                    if (!localVarContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        leftClickConsumedByLocalVariable = true;
-                        selectedLocalVariableIndex = (int)i;
-                        lastValidLocalVariableIndex = (int)i;
-                        selectedVariableIndex = -1;
-                        lastValidVariableIndex = -1;
-                        selectedFunctionIndex = -1;
-                        lastValidFunctionIndex = -1;
-                        selectedComponentIndex = -1;
-                        lastValidComponentIndex = -1;
-                        selectedNodeId = -1;
-                        selectedNodeIds.clear();
-                        variableDragIndex = (int)i;
-                        variableDragIsLocal = true;
-                        variableDragActive = false;
-                        variableDragPos = mousePos;
-                    }
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                        leftClickConsumedByLocalVariable = true;
-                        selectedLocalVariableIndex = (int)i;
-                        localVarContextMenuOpen = true;
-                        localVarContextMenuIndex = (int)i;
-                        localVarContextMenuAnchorY = y;
-                    }
-                }
-            }
-
-            if (isSelected && IsKeyPressed(KEY_DELETE)) {
-                localVars.erase(localVars.begin() + i);
-                selectedLocalVariableIndex = -1;
-                if (lastValidLocalVariableIndex == (int)i) lastValidLocalVariableIndex = -1;
-                isDirty = true;
-                break;
-            }
-
-            y += 22;
+            TreeListElement::Entry entry;
+            entry.id = std::to_string(i);
+            entry.label = localVars[i].name + (localVars[i].isArray ? " []" : "");
+            entry.iconColor = GetPinColor(localVars[i].type);
+            entry.isCurrent = (selectedLocalVariableIndex == (int)i);
+            localEntries.push_back(entry);
         }
-
-        if (addingLocalVariable) {
-            Rectangle row = {panel.x + 4, y, panel.width - 8, 18};
-            DrawRectangleRec(row, theme.fieldBg);
-            DrawRectangleRec({panel.x + 8, y + 4, 10, 10}, GetPinColor(PinType::Boolean));
-
-            std::string nameOut = localVarNameBuffer;
-            if (PropertyField::StringBox({panel.x + 24, y, panel.width - 30, 18}, localVarNameBuffer,
-                                          sizeof(localVarNameBuffer), 1, localVariableNameActiveField, nameOut)) {
-                if (!nameOut.empty()) {
-                    Variable v;
-                    v.name = nameOut;
-                    v.type = PinType::Boolean;
-                    ActiveGraph().AddVariable(v);
-                    selectedLocalVariableIndex = (int)ActiveGraph().GetVariables().size() - 1;
-                    lastValidLocalVariableIndex = selectedLocalVariableIndex;
-                    isDirty = true;
-                }
-                addingLocalVariable = false;
-                localVariableNameActiveField = 0;
-            } else if (IsKeyPressed(KEY_ESCAPE)) {
-                addingLocalVariable = false;
-                localVariableNameActiveField = 0;
-            }
-            y += 22;
-        }
-
-        Rectangle addLocalBtn = {panel.x + 4, y + 4, panel.width - 8, 16};
-        UIWidget::Button(addLocalBtn, "+ Local Variable");
-
-        if (!localVarContextMenuOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, addLocalBtn)) {
-            snprintf(localVarNameBuffer, sizeof(localVarNameBuffer), "NewLocalVar");
-            PropertyField::ForceActivate(localVarNameBuffer, sizeof(localVarNameBuffer));
-            addingLocalVariable = true;
-            localVariableNameActiveField = 1;
-        }
-        y += 24;
-
-        if (!localVarContextMenuWasOpenThisFrame && !wasAddingLocalVariableThisFrame && !leftClickConsumedByLocalVariable &&
-            selectedLocalVariableIndex != -1 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            selectedLocalVariableIndex = -1;
-        }
+        localVarList->SetEntries(localEntries);
+        styleList(localVarList, (int)localVars.size());
+        localVarSection->size = { 0.0f, (float)localVars.size() * 19.0f + 50.0f };
+    } else {
+        localVarSection->size = { 0.0f, 0.0f };
     }
+
+    if (pendingRenameIndex >= 0) {
+        std::string id = std::to_string(pendingRenameIndex);
+        if (pendingRenameList == 0) funcList->BeginRename(id);
+        else if (pendingRenameList == 1) varList->BeginRename(id);
+        else if (pendingRenameList == 2) localVarList->BeginRename(id);
+        pendingRenameIndex = -1;
+        pendingRenameList = -1;
+    }
+
+    leftRoot->backgroundColor = { 0, 0, 0, 0 };
+    leftRoot->size = { panel.width, panel.height };
+
+    float dt = GetFrameTime();
+    Rectangle inner = { panel.x + 4, panel.y + 8, panel.width - 8, panel.height - 12 };
+    leftChrome->Tick(dt, inner, 1.0f);
+    WidgetInput::ProcessInput(leftChrome, "Editor", dt, GetMousePosition(), 1.0f);
+    leftChrome->Draw(inner, 1.0f);
 }
 
 void StargraphEditorPanel::RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField) {
@@ -1040,86 +1020,38 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     }
 }
 void StargraphEditorPanel::RenderLeftPanelPopups() {
-    Rectangle panel = leftPanelBounds;
-    Vector2 mousePos = GetMousePosition();
+    if (!leftContextMenu.IsOpen()) return;
 
-    if (funcContextMenuOpen) {
-        std::vector<FunctionDef>& funcs = graph.GetFunctions();
-        Rectangle popup = {panel.x + panel.width, funcContextMenuAnchorY - 4, 110, 50};
-        UIWidget::Panel(popup);
+    int choice = -1;
+    if (!leftContextMenu.Render(choice)) return;
 
-        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        if (UIWidget::Button(renameBtn, "Rename") && funcContextMenuIndex < (int)funcs.size()) {
-            snprintf(funcNameBuffer, sizeof(funcNameBuffer), "%s", funcs[funcContextMenuIndex].name.c_str());
-            PropertyField::ForceActivate(funcNameBuffer, sizeof(funcNameBuffer));
-            renamingFunctionIndex = funcContextMenuIndex;
-            functionNameActiveField = 1;
-            funcContextMenuOpen = false;
-        }
-        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete")) {
-            graph.RemoveFunction(funcContextMenuIndex);
-            selectedFunctionIndex = -1;
-            if (lastValidFunctionIndex == funcContextMenuIndex) lastValidFunctionIndex = -1;
-            if (openFunctionIndex == funcContextMenuIndex) CloseFunctionGraph();
-            else if (openFunctionIndex > funcContextMenuIndex) openFunctionIndex--;
-            funcContextMenuOpen = false;
-            isDirty = true;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            funcContextMenuOpen = false;
-        }
-    }
-
-    if (varContextMenuOpen) {
-        std::vector<Variable>& vars = graph.GetVariables();
-        Rectangle popup = {panel.x + panel.width, varContextMenuAnchorY - 4, 110, 50};
-        UIWidget::Panel(popup);
-
-        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        if (UIWidget::Button(renameBtn, "Rename") && varContextMenuIndex < (int)vars.size()) {
-            snprintf(varNameBuffer, sizeof(varNameBuffer), "%s", vars[varContextMenuIndex].name.c_str());
-            PropertyField::ForceActivate(varNameBuffer, sizeof(varNameBuffer));
-            renamingVariableIndex = varContextMenuIndex;
-            variableNameActiveField = 1;
-            varContextMenuOpen = false;
-        }
-        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete") && varContextMenuIndex < (int)vars.size()) {
-            vars.erase(vars.begin() + varContextMenuIndex);
-            selectedVariableIndex = -1;
-            if (lastValidVariableIndex == varContextMenuIndex) lastValidVariableIndex = -1;
-            varContextMenuOpen = false;
-            isDirty = true;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            varContextMenuOpen = false;
+    if (choice == 0) {
+        std::string id = std::to_string(leftContextIndex);
+        if (leftContextKind == 0) funcList->BeginRename(id);
+        else if (leftContextKind == 1) varList->BeginRename(id);
+        else if (leftContextKind == 2) localVarList->BeginRename(id);
+    } else if (choice == 1) {
+        if (leftContextKind == 0) {
+            RemoveFunctionAt(leftContextIndex);
+        } else if (leftContextKind == 1) {
+            std::vector<Variable>& vars = graph.GetVariables();
+            if (leftContextIndex >= 0 && leftContextIndex < (int)vars.size()) {
+                vars.erase(vars.begin() + leftContextIndex);
+                selectedVariableIndex = -1;
+                if (lastValidVariableIndex == leftContextIndex) lastValidVariableIndex = -1;
+                isDirty = true;
+            }
+        } else if (leftContextKind == 2) {
+            std::vector<Variable>& localVars = ActiveGraph().GetVariables();
+            if (leftContextIndex >= 0 && leftContextIndex < (int)localVars.size()) {
+                localVars.erase(localVars.begin() + leftContextIndex);
+                selectedLocalVariableIndex = -1;
+                if (lastValidLocalVariableIndex == leftContextIndex) lastValidLocalVariableIndex = -1;
+                isDirty = true;
+            }
         }
     }
 
-    if (localVarContextMenuOpen && openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
-        std::vector<Variable>& localVars = ActiveGraph().GetVariables();
-        Rectangle popup = {panel.x + panel.width, localVarContextMenuAnchorY - 4, 110, 50};
-        UIWidget::Panel(popup);
-
-        Rectangle renameBtn = {popup.x + 4, popup.y + 4, popup.width - 8, 18};
-        if (UIWidget::Button(renameBtn, "Rename") && localVarContextMenuIndex < (int)localVars.size()) {
-            snprintf(localVarNameBuffer, sizeof(localVarNameBuffer), "%s", localVars[localVarContextMenuIndex].name.c_str());
-            PropertyField::ForceActivate(localVarNameBuffer, sizeof(localVarNameBuffer));
-            renamingLocalVariableIndex = localVarContextMenuIndex;
-            localVariableNameActiveField = 1;
-            localVarContextMenuOpen = false;
-        }
-        if (UIWidget::Button({popup.x + 4, popup.y + 26, popup.width - 8, 18}, "Delete") && localVarContextMenuIndex < (int)localVars.size()) {
-            localVars.erase(localVars.begin() + localVarContextMenuIndex);
-            selectedLocalVariableIndex = -1;
-            if (lastValidLocalVariableIndex == localVarContextMenuIndex) lastValidLocalVariableIndex = -1;
-            localVarContextMenuOpen = false;
-            isDirty = true;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, popup)) {
-            localVarContextMenuOpen = false;
-        }
-    }
+    leftContextKind = -1;
+    leftContextIndex = -1;
 }
