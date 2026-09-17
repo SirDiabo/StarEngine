@@ -695,7 +695,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
         }
 
         {
-            const char* separator = " | ";
+            const char* separator = " / ";
             int sepW = MeasureText(separator, crumbFontSize);
             DrawText(separator, (int)cursorX, (int)bar.y + 4, crumbFontSize, theme.textSecondary);
             cursorX += (float)sepW;

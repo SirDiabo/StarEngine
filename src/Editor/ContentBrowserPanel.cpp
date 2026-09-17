@@ -51,6 +51,7 @@ void ContentBrowserPanel::LoadIcons() {
     load("material",    "icon_material.png");
     load("animation",   "icon_anim.png");
     load("sound",       "icon_sound.png");
+    load("widget",      "icon_widget.png");
     iconsLoaded = true;
 }
 
@@ -70,32 +71,16 @@ void ContentBrowserPanel::Initialize() {
     name = "Content Browser";
 }
 
-Texture2D ContentBrowserPanel::GetIconForEntry(const ContentEntry& entry) const {
-    std::string key = "asset";
-    if (entry.isFolder) key = "folder";
-    else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
-    else if (entry.extension == ".starmap")     key = "map";
-    else if (entry.extension == ".startex")     key = "texture";
-    else if (entry.extension == ".starmat")     key = "material";
-    else if (entry.extension == ".staranim")    key = "animation";
-    else if (entry.extension == ".starsound")   key = "sound";
-
-    auto it = icons.find(key);
-    if (it != icons.end()) return it->second;
-    auto fallback = icons.find("asset");
-    if (fallback != icons.end()) return fallback->second;
-    return Texture2D{};
-}
-
 const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entry) const {
     std::string key = "asset";
     if (entry.isFolder) key = "folder";
-    else if (entry.extension == ".staractor" || entry.extension == ".stargraph") key = "actor";
+    else if (entry.extension == ".staractor")   key = "actor";
     else if (entry.extension == ".starmap")     key = "map";
     else if (entry.extension == ".startex")     key = "texture";
     else if (entry.extension == ".starmat")     key = "material";
     else if (entry.extension == ".staranim")    key = "animation";
     else if (entry.extension == ".starsound")   key = "sound";
+    else if (entry.extension == ".starwidget")  key = "widget";
 
     auto it = icons.find(key);
     if (it != icons.end() && it->second.id != 0) return &it->second;
@@ -712,7 +697,7 @@ void ContentBrowserPanel::RebuildBreadcrumb(const std::vector<std::pair<std::str
     for (size_t i = 0; i < crumbs.size(); i++) {
         if (i > 0) {
             auto* sep = new TextElement();
-            sep->text = "|";
+            sep->text = "/";
             sep->fontSize = 12.0f;
             sep->color = theme.textSecondary;
             sep->size = { 8.0f, 18.0f };
