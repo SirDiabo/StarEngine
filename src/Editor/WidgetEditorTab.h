@@ -10,7 +10,7 @@ class WidgetEditorSession;
 class WidgetPalettePanel;
 class WidgetHierarchyPanel;
 class WidgetCanvasPanel;
-class WidgetDetailsPanel;
+class DetailsPanel;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -51,7 +51,7 @@ private:
     WidgetPalettePanel* palettePanel = nullptr;
     WidgetHierarchyPanel* hierarchyPanel = nullptr;
     WidgetCanvasPanel* canvasPanel = nullptr;
-    WidgetDetailsPanel* detailsPanel = nullptr;
+    DetailsPanel* detailsPanel = nullptr;
     LogPanel* logPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
 

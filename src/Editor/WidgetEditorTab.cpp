@@ -3,7 +3,9 @@
 #include "WidgetPalettePanel.h"
 #include "WidgetHierarchyPanel.h"
 #include "WidgetCanvasPanel.h"
-#include "WidgetDetailsPanel.h"
+#include "DetailsPanel.h"
+#include "WidgetElementDetailsBuilder.h"
+#include "Core/Widgets/WidgetElement.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
 #include "Editor/UITheme.h"
@@ -59,7 +61,7 @@ void WidgetEditorTab::Initialize() {
     palettePanel = new WidgetPalettePanel();
     hierarchyPanel = new WidgetHierarchyPanel();
     canvasPanel = new WidgetCanvasPanel();
-    detailsPanel = new WidgetDetailsPanel();
+    detailsPanel = new DetailsPanel();
 
     palettePanel->Initialize();
     hierarchyPanel->Initialize();
@@ -69,7 +71,15 @@ void WidgetEditorTab::Initialize() {
     palettePanel->SetSession(session);
     hierarchyPanel->SetSession(session);
     canvasPanel->SetSession(session);
-    detailsPanel->SetSession(session);
+    detailsPanel->buildRows = [this]() -> std::vector<PropertyRow> {
+        WidgetElement* selected = session ? session->GetSelectedElement() : nullptr;
+        if (!selected) return {};
+        std::function<WidgetElement*()> currentElement = [this]() -> WidgetElement* {
+            return session ? session->GetSelectedElement() : nullptr;
+        };
+        std::function<void()> onEdited = [this]() { if (session) session->MarkDirty(); };
+        return BuildWidgetElementPropertyRows(*selected, currentElement, onEdited);
+    };
 
     std::vector<Panel*> panels = { palettePanel, hierarchyPanel, canvasPanel, detailsPanel };
     if (logPanel) panels.push_back(logPanel);

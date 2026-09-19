@@ -1,6 +1,7 @@
 #include "LevelEditorTab.h"
 #include "ViewportPanel.h"
 #include "DetailsPanel.h"
+#include "ActorDetailsBuilder.h"
 #include "OutlinerPanel.h"
 #include "ContentBrowserPanel.h"
 #include "LogPanel.h"
@@ -8,6 +9,7 @@
 #include "PlaceActorsPanel.h"
 #include "MenuBar.h"
 #include "Core/LayoutSerializer.h"
+#include <cstdlib>
 #include "NativeFileDialog.h"
 #include <filesystem>
 
@@ -35,12 +37,38 @@ void LevelEditorTab::Initialize() {
     viewportPanel->SetLogPanel(logPanel);
 
     // Wire viewport -> details and outliner selection pointers.
-    detailsPanel->starMap            = viewportPanel->GetStarMap();
-    detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
-    detailsPanel->onOpenAsset = [this](const std::string& path, const std::string& ext) {
-        if (onAssetOpened) onAssetOpened(path, ext);
+    detailsPanel->buildRows = [this]() -> std::vector<PropertyRow> {
+        const StarMap* map = viewportPanel->GetStarMap();
+        int* idx = viewportPanel->GetSelectedActorIndexPtr();
+        if (!map || !idx || *idx < 0 || *idx >= (int)map->GetInstances().size()) return {};
+        ActorInstance& inst = const_cast<ActorInstance&>(map->GetInstances()[*idx]);
+
+        std::function<ActorInstance*()> currentInstance = [this]() -> ActorInstance* {
+            const StarMap* m = viewportPanel->GetStarMap();
+            int* i = viewportPanel->GetSelectedActorIndexPtr();
+            if (!m || !i || *i < 0 || *i >= (int)m->GetInstances().size()) return nullptr;
+            return const_cast<ActorInstance*>(&m->GetInstances()[*i]);
+        };
+        std::function<void()> onEdited = [this]() { viewportPanel->MarkDirty(); };
+        std::function<void(const std::string&, const std::string&)> onOpenAsset =
+            [this](const std::string& path, const std::string& ext) {
+                if (onAssetOpened) onAssetOpened(path, ext);
+            };
+        return BuildActorPropertyRows(inst, currentInstance, onEdited, onOpenAsset);
     };
-    detailsPanel->onEdited = [this]() {
+    detailsPanel->onAssetPicked = [this](const std::string& rowId, const std::string& pickedPath) {
+        const StarMap* map = viewportPanel->GetStarMap();
+        int* idx = viewportPanel->GetSelectedActorIndexPtr();
+        if (!map || !idx || *idx < 0 || *idx >= (int)map->GetInstances().size()) return;
+        ActorInstance& inst = const_cast<ActorInstance&>(map->GetInstances()[*idx]);
+        if (rowId == "mesh") {
+            inst.meshAssetPath = pickedPath;
+        } else if (rowId.rfind("material:", 0) == 0) {
+            int slot = atoi(rowId.c_str() + 9);
+            if (slot >= 0 && slot < (int)inst.materialAssetPaths.size()) inst.materialAssetPaths[slot] = pickedPath;
+        } else if (rowId == "sound") {
+            inst.component.fields["Sound"] = pickedPath;
+        }
         viewportPanel->MarkDirty();
     };
     viewportPanel->onToggleFullscreen = [this]() {
@@ -122,8 +150,6 @@ void LevelEditorTab::BuildDefaultLayout() {
 
 void LevelEditorTab::Render(float x, float y, float width, float height) {
     // Sync starmap pointers each frame in case the viewport loaded a new map.
-    detailsPanel->starMap            = viewportPanel->GetStarMap();
-    detailsPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     outlinerPanel->starMap            = viewportPanel->GetStarMap();
     outlinerPanel->selectedActorIndex = viewportPanel->GetSelectedActorIndexPtr();
     viewportPanel->isFullscreen = dockArea.IsPanelMaximized("Viewport");
