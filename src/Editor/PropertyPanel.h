@@ -60,6 +60,10 @@ public:
     Color axisXColor{ 225, 100, 100, 255 };
     Color axisYColor{ 110, 210, 120, 255 };
     Color axisZColor{ 100, 150, 230, 255 };
+    Color checkBoxColor{ 40, 40, 45, 255 };
+    Color checkBoxHoveredColor{ 55, 55, 60, 255 };
+    Color checkBoxBorderColor{ 90, 90, 95, 255 };
+    Color checkBoxCheckColor{ 90, 140, 220, 255 };
     float rowHeight = 20.0f;
     float labelWidth = 90.0f;
 

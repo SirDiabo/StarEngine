@@ -46,6 +46,10 @@ void DetailsPanel::Render() {
     panelElement->fieldEditingBorder = theme.accent;
     panelElement->buttonBg = theme.buttonBg;
     panelElement->buttonHover = theme.buttonHover;
+    panelElement->checkBoxColor = theme.fieldBg;
+    panelElement->checkBoxHoveredColor = theme.surfaceHover;
+    panelElement->checkBoxBorderColor = theme.fieldBorder;
+    panelElement->checkBoxCheckColor = theme.accent;
     panelElement->SetProperties(rows);
 
     bool pickerOpen = assetPicker.IsOpen();

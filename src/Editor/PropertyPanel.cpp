@@ -238,6 +238,10 @@ void PropertyPanel::RebuildRows() {
             case PropertyRowKind::Bool: {
                 auto* check = new CheckBoxElement();
                 check->size = { rowHeight - 2.0f, rowHeight - 2.0f };
+                check->boxColor = checkBoxColor;
+                check->hoveredBoxColor = checkBoxHoveredColor;
+                check->borderColor = checkBoxBorderColor;
+                check->checkColor = checkBoxCheckColor;
                 std::function<void(bool)> setBool = row.setBool;
                 check->onToggled = [setBool](bool value) { if (setBool) setBool(value); };
                 rowBox->AddChild(check);
