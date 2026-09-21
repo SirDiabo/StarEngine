@@ -54,6 +54,10 @@ private:
     void RenderNode(DockNode* node);
     void RenderSplitter(DockNode* node);
     void RenderTabBar(DockNode* node);
+    void RenderPanel(Panel* panel);
+    void UpdateFocus();
+    Panel* FindPanelAt(Vector2 pos) const;
+    Panel* FindPanelByOwner(const void* owner) const;
 
     void EndDrag(Vector2 mousePos);
     void RemoveFromSource();
@@ -86,6 +90,9 @@ private:
     std::vector<FloatingPanel> floating;
 
     std::string maximizedPanelName;
+
+    Panel* focusedPanel = nullptr;
+    double lastRenderTime = -1000.0;
 
     Rectangle lastArea = { 0, 0, 0, 0 };
 };

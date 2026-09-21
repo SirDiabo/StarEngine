@@ -1,5 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "Editor/BasicActorDefs.h"
 #include "Editor/UITheme.h"
 #include "Editor/UIWidgets.h"
@@ -174,7 +175,7 @@ void StargraphEditorPanel::UpdatePreviewCamera(Rectangle client) {
         }
     }
 
-    if (IsKeyPressed(KEY_F) && selectedComponentIndex >= 0 && selectedComponentIndex < (int)graph.GetComponents().size()) {
+    if (WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_F) && selectedComponentIndex >= 0 && selectedComponentIndex < (int)graph.GetComponents().size()) {
         Vector3 wp, wr, ws;
         PreviewComputeDeclWorldTransform(graph.GetComponents(), graph.GetComponents()[selectedComponentIndex], wp, wr, ws);
         previewCameraTarget = wp;
@@ -315,7 +316,7 @@ void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
         lastValidComponentIndex = hit;
     }
 
-    if (!previewFlying) {
+    if (!previewFlying && WidgetInput::ScopeHasKeyboard()) {
         if (IsKeyPressed(KEY_Q)) previewGizmoMode = GizmoMode::Select;
         if (IsKeyPressed(KEY_W)) previewGizmoMode = GizmoMode::Move;
         if (IsKeyPressed(KEY_E)) previewGizmoMode = GizmoMode::Rotate;

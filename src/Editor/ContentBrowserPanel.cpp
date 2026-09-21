@@ -11,7 +11,6 @@
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
-#include "PropertyFields.h"
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "Core/Widgets/Widget.h"
@@ -26,7 +25,6 @@
 #include "Core/Widgets/ImageElement.h"
 #include "Core/Widgets/RectangleElement.h"
 #include "Core/Widgets/CheckBoxElement.h"
-#include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -163,7 +161,6 @@ void ContentBrowserPanel::BeginRename(const ContentEntry& entry) {
     renamingIsFolder = entry.isFolder;
     std::string stem = entry.isFolder ? entry.fullDiskName : fs::path(entry.fullDiskName).stem().string();
     snprintf(nameBuffer, sizeof(nameBuffer), "%s", stem.c_str());
-    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
 }
 
 void ContentBrowserPanel::ConfirmRename() {
@@ -284,7 +281,6 @@ void ContentBrowserPanel::BeginCreateFolder() {
     isCreatingFolder = true;
     pendingExtension.clear();
     snprintf(nameBuffer, sizeof(nameBuffer), "NewFolder");
-    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
 }
 
 void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
@@ -292,7 +288,6 @@ void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
     isCreatingFolder = false;
     pendingExtension = info.extension;
     snprintf(nameBuffer, sizeof(nameBuffer), "New%s", info.typeName.c_str());
-    PropertyField::ForceActivate(nameBuffer, sizeof(nameBuffer));
 }
 
 void ContentBrowserPanel::ConfirmPendingCreate() {
@@ -647,7 +642,7 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     float dt = GetFrameTime();
     materialChrome->Tick(dt, box, 1.0f);
     if (!pickerBlocksInput) {
-        WidgetInput::ProcessInput(materialChrome, "MaterialEditor", dt, mp, 1.0f);
+        WidgetInput::ProcessInput(materialChrome, WidgetInput::kEditorDevice, dt, mp, 1.0f);
     }
     materialChrome->Draw(box, 1.0f);
 }
@@ -1032,7 +1027,7 @@ void ContentBrowserPanel::Render() {
 
         float dt2 = GetFrameTime();
         createNameChrome->Tick(dt2, createRect, 1.0f);
-        WidgetInput::ProcessInput(createNameChrome, "ContentBrowserCreate", dt2, mousePos, 1.0f);
+        WidgetInput::ProcessInput(createNameChrome, WidgetInput::kEditorDevice, dt2, mousePos, 1.0f);
         createNameChrome->Draw(createRect, 1.0f);
     } else if (createNameChrome) {
         delete createNameChrome;
@@ -1100,7 +1095,7 @@ void ContentBrowserPanel::Render() {
         }
     }
 
-    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size()) {
+    if (!gridInputBlocked && selectedIndex >= 0 && selectedIndex < (int)entries.size() && WidgetInput::ScopeHasKeyboard()) {
         if (IsKeyPressed(KEY_DELETE)) {
             const ContentEntry& entry = entries[selectedIndex];
             fs::path fullPath = fs::path(GetCurrentFolderPath()) / entry.fullDiskName;

@@ -33,6 +33,7 @@ public:
     float navigateCooldown = 0.0f;
     bool confirmWasHeld = false;
     bool cancelWasHeld = false;
+    bool hadKeyboardFocus = false;
 
     WidgetComponent* owningComponent = nullptr;
 

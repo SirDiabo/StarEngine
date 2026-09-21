@@ -11,7 +11,29 @@
 
 namespace {
 
-std::unordered_map<std::string, Widget*> focusedWidgetByDevice;
+struct FocusState {
+    const void* owner = nullptr;
+    Widget* widget = nullptr;
+};
+
+struct WidgetEntry {
+    Widget* widget = nullptr;
+    const void* owner = nullptr;
+    double lastSeen = 0.0;
+    unsigned long long sequence = 0;
+};
+
+const double kLiveWindow = 0.25;
+const double kCaptureWindow = 0.15;
+
+std::unordered_map<std::string, FocusState> focusByDevice;
+std::unordered_map<std::string, std::vector<const void*>> modalsByDevice;
+std::unordered_map<const Widget*, WidgetEntry> entries;
+std::unordered_map<const void*, Widget*> lastWidgetByOwner;
+
+const void* inputScope = nullptr;
+unsigned long long nextSequence = 0;
+double lastCaptureTime = -1000.0;
 
 const char* kNavigateMapping = "UI_Navigate";
 const char* kConfirmMapping = "UI_Confirm";
@@ -127,32 +149,248 @@ BoxElement* HitTestScrollable(WidgetElement* element, Vector2 point) {
     return nullptr;
 }
 
+
+bool IsManagedDevice(const std::string& device) {
+    return device == WidgetInput::kEditorDevice;
+}
+
+bool IsLive(const WidgetEntry& entry) {
+    return GetTime() - entry.lastSeen <= kLiveWindow;
+}
+
+const void* TopModal(const std::string& device) {
+    auto it = modalsByDevice.find(device);
+    if (it == modalsByDevice.end() || it->second.empty()) return nullptr;
+    return it->second.back();
+}
+
+const void* OwnerOf(const Widget* widget) {
+    auto it = entries.find(widget);
+    if (it != entries.end()) return it->second.owner;
+    return static_cast<const void*>(widget);
+}
+
+Widget* ResolveWidgetForOwner(const void* owner) {
+    auto last = lastWidgetByOwner.find(owner);
+    if (last != lastWidgetByOwner.end()) {
+        auto e = entries.find(last->second);
+        if (e != entries.end() && e->second.owner == owner && IsLive(e->second)) return last->second;
+    }
+    Widget* best = nullptr;
+    unsigned long long bestSequence = ~0ull;
+    for (auto& kv : entries) {
+        const WidgetEntry& e = kv.second;
+        if (e.owner != owner || !IsLive(e)) continue;
+        if (e.sequence < bestSequence) {
+            bestSequence = e.sequence;
+            best = e.widget;
+        }
+    }
+    return best;
+}
+
+void ClaimFocusInternal(Widget* widget, const void* owner, const std::string& device) {
+    FocusState& state = focusByDevice[device];
+    state.owner = owner;
+    state.widget = widget;
+    if (widget) lastWidgetByOwner[owner] = widget;
+}
+
+bool IsFocusedInternal(const Widget* widget, const void* owner, const std::string& device) {
+    if (const void* modal = TopModal(device)) return modal == owner;
+    auto it = focusByDevice.find(device);
+    if (it == focusByDevice.end()) return true;
+    return it->second.widget == widget;
+}
+
+bool MoveSelectionSpatially(Widget* from, WidgetElement* current, int dx, int dy, const std::string& device) {
+    const void* modalOwner = TopModal(device);
+    Rectangle cur = current->lastResolvedRect;
+    Vector2 curCenter = { cur.x + cur.width * 0.5f, cur.y + cur.height * 0.5f };
+
+    Widget* bestWidget = nullptr;
+    WidgetElement* bestElement = nullptr;
+    const void* bestOwner = nullptr;
+    float bestScore = 1e30f;
+
+    for (auto& kv : entries) {
+        const WidgetEntry& entry = kv.second;
+        if (!IsLive(entry)) continue;
+        if (modalOwner && modalOwner != entry.owner) continue;
+        Widget* candidateWidget = entry.widget;
+        if (!candidateWidget || !candidateWidget->rootElement || !candidateWidget->rootElement->visible) continue;
+
+        Rectangle clip = candidateWidget->rootElement->lastResolvedRect;
+        std::vector<WidgetElement*> candidates;
+        candidateWidget->rootElement->CollectSelectables(candidates);
+
+        for (WidgetElement* candidate : candidates) {
+            if (candidate == current) continue;
+            Rectangle r = candidate->lastResolvedRect;
+            if (r.width <= 0.0f || r.height <= 0.0f) continue;
+            Vector2 center = { r.x + r.width * 0.5f, r.y + r.height * 0.5f };
+            if (!CheckCollisionPointRec(center, clip)) continue;
+
+            float gap;
+            if (dx > 0) gap = r.x - (cur.x + cur.width);
+            else if (dx < 0) gap = cur.x - (r.x + r.width);
+            else if (dy > 0) gap = r.y - (cur.y + cur.height);
+            else gap = cur.y - (r.y + r.height);
+            if (gap < -2.0f) continue;
+
+            float along = (center.x - curCenter.x) * (float)dx + (center.y - curCenter.y) * (float)dy;
+            if (along <= 0.0f) continue;
+            float perpendicular = (dx != 0) ? fabsf(center.y - curCenter.y) : fabsf(center.x - curCenter.x);
+
+            float score = along + perpendicular * 2.0f;
+            if (score < bestScore) {
+                bestScore = score;
+                bestWidget = candidateWidget;
+                bestElement = candidate;
+                bestOwner = entry.owner;
+            }
+        }
+    }
+
+    if (!bestElement) return false;
+
+    if (bestWidget == from) {
+        from->SetSelection(bestElement);
+    } else {
+        ClaimFocusInternal(bestWidget, bestOwner, device);
+        bestWidget->SetSelection(bestElement);
+        bestWidget->navigateCooldown = 0.25f;
+    }
+    return true;
+}
+
 }
 
 namespace WidgetInput {
 
+void SetInputScope(const void* owner) {
+    inputScope = owner;
+}
+
 void ClaimFocus(Widget* widget, const std::string& device) {
-    focusedWidgetByDevice[device] = widget;
+    if (!widget) return;
+    ClaimFocusInternal(widget, OwnerOf(widget), device);
+}
+
+void ClaimOwnerFocus(const void* owner, const std::string& device) {
+    FocusState& state = focusByDevice[device];
+    if (state.owner == owner) return;
+    state.owner = owner;
+    state.widget = ResolveWidgetForOwner(owner);
 }
 
 void ReleaseFocus(const std::string& device) {
-    focusedWidgetByDevice.erase(device);
+    focusByDevice.erase(device);
 }
 
 bool IsFocused(const Widget* widget, const std::string& device) {
-    auto it = focusedWidgetByDevice.find(device);
-    if (it == focusedWidgetByDevice.end()) return true;
-    return it->second == widget;
+    return IsFocusedInternal(widget, OwnerOf(widget), device);
+}
+
+const void* GetFocusOwner(const std::string& device) {
+    auto it = focusByDevice.find(device);
+    if (it == focusByDevice.end()) return nullptr;
+    return it->second.owner;
+}
+
+void PushModal(const void* owner, const std::string& device) {
+    std::vector<const void*>& stack = modalsByDevice[device];
+    if (std::find(stack.begin(), stack.end(), owner) == stack.end()) stack.push_back(owner);
+}
+
+void PopModal(const void* owner, const std::string& device) {
+    auto it = modalsByDevice.find(device);
+    if (it == modalsByDevice.end()) return;
+    std::vector<const void*>& stack = it->second;
+    stack.erase(std::remove(stack.begin(), stack.end(), owner), stack.end());
+}
+
+bool HasModal(const std::string& device) {
+    return TopModal(device) != nullptr;
+}
+
+void MarkKeyboardCaptured() {
+    lastCaptureTime = GetTime();
+}
+
+bool IsKeyboardCaptured() {
+    return GetTime() - lastCaptureTime <= kCaptureWindow;
+}
+
+bool ScopeHasKeyboard() {
+    if (IsKeyboardCaptured()) return false;
+    if (!inputScope) return true;
+    if (const void* modal = TopModal(kEditorDevice)) return modal == inputScope;
+    auto it = focusByDevice.find(kEditorDevice);
+    if (it == focusByDevice.end()) return true;
+    return it->second.owner == inputScope;
+}
+
+bool WidgetHasKeyboard(const Widget* widget) {
+    if (!widget || IsKeyboardCaptured()) return false;
+    const void* owner = OwnerOf(widget);
+    const void* modal = TopModal(kEditorDevice);
+    if (modal && modal != owner) return false;
+    return IsFocusedInternal(widget, owner, kEditorDevice);
+}
+
+void Forget(const Widget* widget) {
+    entries.erase(widget);
+    for (auto it = lastWidgetByOwner.begin(); it != lastWidgetByOwner.end();) {
+        if (it->second == widget) it = lastWidgetByOwner.erase(it);
+        else ++it;
+    }
+    for (auto& kv : focusByDevice) {
+        if (kv.second.widget == widget) kv.second.widget = nullptr;
+    }
+    for (auto& kv : modalsByDevice) {
+        std::vector<const void*>& stack = kv.second;
+        stack.erase(std::remove(stack.begin(), stack.end(), static_cast<const void*>(widget)), stack.end());
+    }
 }
 
 void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Vector2 localMousePos, float uiScale) {
     if (!widget || !widget->rootElement) return;
     EnsureDefaultMappings();
 
-    bool focused = IsFocused(widget, device);
+    const bool managed = IsManagedDevice(device);
+    const void* owner = inputScope ? inputScope : static_cast<const void*>(widget);
+    const Rectangle rootRect = widget->rootElement->lastResolvedRect;
+
+    if (managed) {
+        WidgetEntry& entry = entries[widget];
+        if (entry.sequence == 0) entry.sequence = ++nextSequence;
+        entry.widget = widget;
+        entry.owner = owner;
+        entry.lastSeen = GetTime();
+
+        auto focusIt = focusByDevice.find(device);
+        if (focusIt != focusByDevice.end() && focusIt->second.owner == owner && !focusIt->second.widget) {
+            focusIt->second.widget = widget;
+            lastWidgetByOwner[owner] = widget;
+        }
+    }
+
+    const void* modalOwner = TopModal(device);
+    const bool blocked = modalOwner && modalOwner != owner;
+    const bool mouseActive = !blocked;
+
+    const bool anyPress = IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
+        || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)
+        || IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE);
+    if (managed && mouseActive && !modalOwner && anyPress && CheckCollisionPointRec(localMousePos, rootRect)) {
+        ClaimFocusInternal(widget, owner, device);
+    }
+
+    const bool focused = !blocked && IsFocusedInternal(widget, owner, device);
 
     float wheel = GetMouseWheelMove();
-    if (focused && wheel != 0.0f) {
+    if (mouseActive && wheel != 0.0f) {
         BoxElement* scrollTarget = HitTestScrollable(widget->rootElement, localMousePos);
         if (scrollTarget) {
             float scale = (uiScale > 0.0f) ? uiScale : 1.0f;
@@ -174,21 +412,27 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
         widget->SetSelection(selectables.front());
     }
 
-    WidgetElement* hovered = focused ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
+    WidgetElement* hovered = mouseActive ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
 
-    if (focused && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        widget->SetSelection(hovered);
+    if (mouseActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (hovered || CheckCollisionPointRec(localMousePos, rootRect) || IsKeyboardCaptured()) {
+            widget->SetSelection(hovered);
+        }
     }
 
-    bool confirmHeld = focused && PollBool(kConfirmMapping, device);
-    bool cancelHeld = focused && PollBool(kCancelMapping, device);
+    const bool justFocused = focused && !widget->hadKeyboardFocus;
+    widget->hadKeyboardFocus = focused;
+
+    const bool confirmRaw = focused && PollBool(kConfirmMapping, device);
+    const bool cancelRaw = focused && PollBool(kCancelMapping, device);
+    const bool keyActive = focused && !justFocused && !IsKeyboardCaptured();
     bool mouseHeld = hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
-    if (focused && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         hovered->OnConfirmed();
     }
 
-    if (focused && hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+    if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
         if (hovered->onRightActivated) hovered->onRightActivated();
     }
 
@@ -203,7 +447,7 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     if (widget->navigateCooldown > 0.0f) widget->navigateCooldown -= deltaTime;
 
-    if (focused && currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
+    if (keyActive && currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
         Vector2 nav = PollAxis2D(kNavigateMapping, device);
         int dx = 0, dy = 0;
         if (fabsf(nav.y) > fabsf(nav.x)) dy = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
@@ -215,7 +459,11 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
             if (current && current->parent) {
                 next = current->parent->GetNextSelectableInDirection(current, dx, dy);
             }
-            if (!next) {
+            bool movedSpatially = false;
+            if (!next && current && managed) {
+                movedSpatially = MoveSelectionSpatially(widget, current, dx, dy, device);
+            }
+            if (!next && !movedSpatially) {
                 int step = (dy != 0) ? dy : dx;
                 int nextIndex = currentIndex + step;
                 if (nextIndex >= 0 && nextIndex < (int)selectables.size()) {
@@ -227,16 +475,16 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
         }
     }
 
-    if (confirmHeld && !widget->confirmWasHeld && widget->currentSelection) {
+    if (keyActive && confirmRaw && !widget->confirmWasHeld && widget->currentSelection) {
         widget->currentSelection->OnConfirmed();
     }
-    widget->confirmWasHeld = confirmHeld;
-    widget->cancelWasHeld = cancelHeld;
+    widget->confirmWasHeld = confirmRaw;
+    widget->cancelWasHeld = cancelRaw;
 
     WidgetElement* pressedElement = nullptr;
     if (mouseHeld) pressedElement = hovered;
-    else if (confirmHeld) pressedElement = widget->currentSelection;
-    SyncStates(widget->rootElement, focused ? widget->currentSelection : nullptr, focused ? hovered : nullptr, pressedElement);
+    else if (keyActive && confirmRaw) pressedElement = widget->currentSelection;
+    SyncStates(widget->rootElement, focused ? widget->currentSelection : nullptr, hovered, pressedElement);
 }
 
 }

@@ -1,9 +1,11 @@
 #include "Widget.h"
 #include "WidgetElement.h"
 #include "Runtime/WidgetBehavior.h"
+#include "WidgetInput.h"
 #include "raylib.h"
 
 Widget::~Widget() {
+    WidgetInput::Forget(this);
     if (behavior) behavior->OnDestruct(this);
     delete behavior;
     delete rootElement;

@@ -25,14 +25,14 @@ void Open(WidgetElement* content, Vector2 anchorPos, Vector2 desiredSize, std::f
     g_onClosed = onClosed;
     g_justOpened = true;
     g_dimBackground = dimBackground;
-    WidgetInput::ClaimFocus(g_overlayWidget, kOverlayDevice);
+    WidgetInput::PushModal(g_overlayWidget, kOverlayDevice);
 }
 
 void Close() {
     if (!g_overlayWidget) return;
     Widget* closing = g_overlayWidget;
     g_overlayWidget = nullptr;
-    WidgetInput::ReleaseFocus(kOverlayDevice);
+    WidgetInput::PopModal(closing, kOverlayDevice);
     delete closing;
     if (g_onClosed) {
         std::function<void()> cb = g_onClosed;
@@ -57,7 +57,7 @@ void TickAndDraw(float deltaTime, Rectangle screenBounds) {
 
     bool closeRequested = false;
     if (!g_justOpened) {
-        if (IsKeyPressed(KEY_ESCAPE)) closeRequested = true;
+        if (IsKeyPressed(KEY_ESCAPE) && !WidgetInput::IsKeyboardCaptured()) closeRequested = true;
         bool clickedOutside = (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
             && !CheckCollisionPointRec(GetMousePosition(), g_overlayRect);
         if (clickedOutside) closeRequested = true;

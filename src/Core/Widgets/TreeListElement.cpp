@@ -4,6 +4,7 @@
 #include "RectangleElement.h"
 #include "DragDropController.h"
 #include "Widget.h"
+#include "WidgetInput.h"
 #include "raylib.h"
 
 namespace {
@@ -144,6 +145,7 @@ void TreeListElement::RebuildRows() {
 void TreeListElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
     if (!onDeleteRequested || !owningWidget || !owningWidget->currentSelection) return;
     if (!IsKeyPressed(KEY_DELETE)) return;
+    if (!WidgetInput::WidgetHasKeyboard(owningWidget)) return;
 
     const std::vector<WidgetElement*>& rowElements = GetChildren();
     for (size_t i = 0; i < rowElements.size() && i < rowInfos.size(); i++) {

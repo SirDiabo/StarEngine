@@ -7,6 +7,7 @@
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
 #include "Core/Widgets/WidgetRenderer.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "Core/RenderSettings.h"
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
@@ -52,6 +53,7 @@ void ViewportPanel::Initialize() {
 }
 
 ViewportPanel::~ViewportPanel() {
+    WidgetInput::PopModal(static_cast<const Panel*>(this), WidgetInput::kEditorDevice);
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
     if (pieRenderTarget.id != 0) UnloadRenderTexture(pieRenderTarget);
     for (auto& kv : editorIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
@@ -385,7 +387,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         }
     }
 
-    if (IsKeyPressed(KEY_F) && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
+    if (WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_F) && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
         cameraTarget = {inst.posX, inst.posY, inst.posZ};
     }
@@ -573,20 +575,20 @@ void ViewportPanel::HandleMapInteraction(Rectangle client) {
         }
     }
 
-    if (!playing) {
+    if (!playing && WidgetInput::ScopeHasKeyboard()) {
         if (IsKeyPressed(KEY_Q)) gizmoMode = GizmoMode::Select;
         if (IsKeyPressed(KEY_W)) gizmoMode = GizmoMode::Move;
         if (IsKeyPressed(KEY_E)) gizmoMode = GizmoMode::Rotate;
         if (IsKeyPressed(KEY_R)) gizmoMode = GizmoMode::Scale;
     }
 
-    if (IsKeyPressed(KEY_DELETE) && selectedActorIndex >= 0) {
+    if (!playing && WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_DELETE) && selectedActorIndex >= 0) {
         starMap.RemoveInstance((size_t)selectedActorIndex);
         selectedActorIndex = -1;
         mapDirty = true;
     }
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && mapDirty) SaveMap();
+    if (WidgetInput::ScopeHasKeyboard() && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && mapDirty) SaveMap();
 }
 
 void ViewportPanel::RenderToolbar() {
@@ -695,6 +697,10 @@ void ViewportPanel::RenderToolbar() {
 }
 
 void ViewportPanel::Render() {
+    const Panel* focusOwner = static_cast<const Panel*>(this);
+    if (playing) WidgetInput::PushModal(focusOwner, WidgetInput::kEditorDevice);
+    else WidgetInput::PopModal(focusOwner, WidgetInput::kEditorDevice);
+
     Rectangle toolbar = {bounds.x, bounds.y, bounds.width, toolbarHeight};
     Rectangle client  = {bounds.x, toolbar.y + toolbarHeight, bounds.width, bounds.height - toolbarHeight};
     int clientWidth   = (int)client.width;

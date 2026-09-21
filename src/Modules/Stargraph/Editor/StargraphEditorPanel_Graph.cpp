@@ -8,6 +8,7 @@
 #include "Editor/UIWidgets.h"
 #include "Editor/BasicActorDefs.h"
 #include "Core/Widgets/DragDropController.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raygui.h"
 #include "raymath.h"
 #include <algorithm>
@@ -1495,15 +1496,17 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
+    const bool graphKeys = WidgetInput::ScopeHasKeyboard();
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) && editingPinId == 0) {
+    if (graphKeys && IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
+
+    if (graphKeys && IsKeyDown(KEY_LEFT_CONTROL) && editingPinId == 0) {
         if (IsKeyPressed(KEY_C)) CopySelectedNodes();
         else if (IsKeyPressed(KEY_V)) PasteNodes();
         else if (IsKeyPressed(KEY_D)) DuplicateSelected();
     }
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
+    if (graphKeys && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {
         SaveGraph();
     }
 }

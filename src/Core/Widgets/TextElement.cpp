@@ -1,6 +1,7 @@
 #include "TextElement.h"
 #include "WidgetFont.h"
 #include "Core/Utf8.h"
+#include "WidgetInput.h"
 #include "raylib.h"
 #include <cstdio>
 #include <cstdlib>
@@ -66,6 +67,7 @@ void TextElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
     selectable = editable;
     if (!editable) return;
     if (!isEditing) { dragging = false; return; }
+    WidgetInput::MarkKeyboardCaptured();
 
     if (dragging) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {

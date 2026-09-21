@@ -4,6 +4,7 @@
 #include "UITheme.h"
 #include "UIWidgets.h"
 #include "Core/SafeParse.h"
+#include "Core/Widgets/WidgetInput.h"
 #include <algorithm>
 #include <cstdio>
 
@@ -53,9 +54,78 @@ void DockArea::LayoutNode(DockNode* node, Rectangle area) {
 
 // Main render: panel content only, no overlays
 
+void DockArea::RenderPanel(Panel* panel) {
+    WidgetInput::SetInputScope(panel);
+    panel->Render();
+    WidgetInput::SetInputScope(nullptr);
+}
+
+Panel* DockArea::FindPanelByOwner(const void* owner) const {
+    if (!owner) return nullptr;
+    for (Panel* p : panels) {
+        if (static_cast<const void*>(p) == owner) return p;
+    }
+    for (const FloatingPanel& fp : floating) {
+        if (static_cast<const void*>(fp.panel) == owner) return fp.panel;
+    }
+    return nullptr;
+}
+
+Panel* DockArea::FindPanelAt(Vector2 pos) const {
+    for (int i = (int)floating.size() - 1; i >= 0; i--) {
+        const FloatingPanel& fp = floating[i];
+        if (fp.panel && fp.panel->IsVisible() && CheckCollisionPointRec(pos, fp.bounds)) return fp.panel;
+    }
+    if (!CheckCollisionPointRec(pos, lastArea)) return nullptr;
+
+    if (!maximizedPanelName.empty()) {
+        Panel* p = GetPanel(maximizedPanelName);
+        return (p && p->IsVisible()) ? p : nullptr;
+    }
+
+    DockNode* leaf = FindLeafAt(pos);
+    if (!leaf || leaf->panelNames.empty()) return nullptr;
+    int idx = leaf->activeTab;
+    if (idx < 0 || idx >= (int)leaf->panelNames.size()) idx = 0;
+    Panel* p = GetPanel(leaf->panelNames[idx]);
+    return (p && p->IsVisible()) ? p : nullptr;
+}
+
+void DockArea::UpdateFocus() {
+    const std::string device = WidgetInput::kEditorDevice;
+    double now = GetTime();
+    bool resumed = (now - lastRenderTime) > 0.25;
+    lastRenderTime = now;
+
+    if (WidgetInput::HasModal(device)) return;
+
+    bool pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
+        || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)
+        || IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE);
+    if (pressed) {
+        Panel* hit = FindPanelAt(GetMousePosition());
+        if (hit) {
+            focusedPanel = hit;
+            WidgetInput::ClaimOwnerFocus(hit, device);
+        }
+        return;
+    }
+
+    Panel* owned = FindPanelByOwner(WidgetInput::GetFocusOwner(device));
+    if (owned) {
+        focusedPanel = owned;
+        return;
+    }
+
+    if (resumed && focusedPanel && FindPanelByOwner(focusedPanel)) {
+        WidgetInput::ClaimOwnerFocus(focusedPanel, device);
+    }
+}
+
 void DockArea::Render(Rectangle area) {
     lastArea = area;
     if (!root) return;
+    UpdateFocus();
     // Reset cursor each frame; hover checks below will override if still applicable.
     if (!dragging && !pendingDrag && !activeSplitter)
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
@@ -72,7 +142,7 @@ void DockArea::Render(Rectangle area) {
             content.y      += DOCK_TAB_HEIGHT;
             content.height -= DOCK_TAB_HEIGHT;
             p->bounds = content;
-            p->Render();
+            RenderPanel(p);
             return;
         }
         maximizedPanelName.clear();
@@ -134,7 +204,7 @@ void DockArea::RenderOverlays() {
         }
 
         p->bounds = content;
-        p->Render();
+        RenderPanel(p);
     }
 
     // Pending drag: wait for mouse to move past threshold before committing to drag.
@@ -194,7 +264,7 @@ void DockArea::RenderNode(DockNode* node) {
                 content.y      += DOCK_TAB_HEIGHT;
                 content.height -= DOCK_TAB_HEIGHT;
                 p->bounds = content;
-                p->Render();
+                RenderPanel(p);
             }
         }
     } else {
