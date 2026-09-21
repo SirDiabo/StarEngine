@@ -25,6 +25,8 @@ std::string FormatDragValue(float v) {
 
 void TextElement::BeginEditing() {
     isEditing = true;
+    autoStarted = false;
+    edgeNavRequest = 0;
     textAtEditStart = text;
     cursorPos = (int)text.size();
     cursorBlinkTimer = 0.0f;
@@ -32,18 +34,32 @@ void TextElement::BeginEditing() {
 
 void TextElement::CommitEditing() {
     isEditing = false;
+    autoStarted = false;
     if (onTextCommitted) onTextCommitted(text);
 }
 
 void TextElement::CancelEditing() {
     text = textAtEditStart;
     isEditing = false;
+    autoStarted = false;
     if (onEditCancelled) onEditCancelled();
 }
 
 void TextElement::StartEditing() {
     if (!editable) return;
     if (!isEditing) BeginEditing();
+}
+
+void TextElement::StartEditingFromNavigation() {
+    if (!editable || disabled || isEditing) return;
+    BeginEditing();
+    autoStarted = true;
+}
+
+int TextElement::ConsumeEdgeNavRequest() {
+    int request = edgeNavRequest;
+    edgeNavRequest = 0;
+    return request;
 }
 
 void TextElement::OnConfirmed() {
@@ -58,7 +74,14 @@ void TextElement::OnConfirmed() {
 }
 
 void TextElement::OnDeselected() {
-    if (isEditing) CommitEditing();
+    if (isEditing) {
+        if (autoStarted && text == textAtEditStart) {
+            isEditing = false;
+            autoStarted = false;
+        } else {
+            CommitEditing();
+        }
+    }
     dragging = false;
     WidgetElement::OnDeselected();
 }
@@ -128,6 +151,8 @@ void TextElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
         if (cursorPos > 0) {
             cursorPos--;
             while (cursorPos > 0 && (text[cursorPos] & 0xC0) == 0x80) cursorPos--;
+        } else {
+            edgeNavRequest = -1;
         }
         cursorBlinkTimer = 0.0f;
     }
@@ -135,6 +160,8 @@ void TextElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
         if (cursorPos < (int)text.size()) {
             cursorPos++;
             while (cursorPos < (int)text.size() && (text[cursorPos] & 0xC0) == 0x80) cursorPos++;
+        } else {
+            edgeNavRequest = 1;
         }
         cursorBlinkTimer = 0.0f;
     }
@@ -170,7 +197,7 @@ void TextElement::OnDrawSelf(Rectangle rect, float uiScale) {
     }
 
     DrawRectangleRec(rect, backgroundColor);
-    Color border = isEditing ? editingBorderColor : borderColor;
+    Color border = (isEditing || interactionState == WidgetInteractionState::Selected) ? editingBorderColor : borderColor;
     DrawRectangleLinesEx(rect, 1.0f, border);
 
     float padding = 4.0f * uiScale;

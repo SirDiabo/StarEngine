@@ -309,7 +309,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
 
     float dt = GetFrameTime();
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client) && !playing) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mp, client) && !playing && !WidgetInput::IsMouseBlocked()) {
         flying = true;
         lookStart = mp;
         flyPosition = camera.position;
@@ -363,14 +363,14 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
     }
 
     float scroll = GetMouseWheelMove();
-    if (scroll != 0 && CheckCollisionPointRec(mp, client) && !playing) {
+    if (scroll != 0 && CheckCollisionPointRec(mp, client) && !playing && !WidgetInput::IsMouseBlocked()) {
         orbitRadius -= scroll * 100.0f;
         if (orbitRadius < 100.0f) orbitRadius = 100.0f;
     }
 
     bool altOrbitHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
     if ((IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) || (altOrbitHeld && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)))
-        && CheckCollisionPointRec(mp, client) && !playing) {
+        && CheckCollisionPointRec(mp, client) && !playing && !WidgetInput::IsMouseBlocked()) {
         orbiting = true;
         orbitStart = mp;
     }
@@ -557,7 +557,7 @@ void ViewportPanel::HandleMapInteraction(Rectangle client) {
 
     if (!CheckCollisionPointRec(mp, client) && gizmoDragState.dragAxis == -1) return;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !gizmoActive) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !gizmoActive && !WidgetInput::IsMouseBlocked()) {
         selectedActorIndex = -1;
 
         Vector2 localMp = {mp.x - client.x, mp.y - client.y};
@@ -642,7 +642,7 @@ void ViewportPanel::RenderToolbar() {
         DrawRectangleRec(playBtn, theme.success);
         DrawText(">", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn) || IsKeyDown(KEY_LEFT_ALT) && (IsKeyDown(KEY_P)) && !playing) {
+        if (!WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn) || IsKeyDown(KEY_LEFT_ALT) && (IsKeyDown(KEY_P)) && !playing) {
             playing = true;
             savedYaw = yaw;
             savedPitch = pitch;
@@ -669,7 +669,7 @@ void ViewportPanel::RenderToolbar() {
             }
         }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing || World::Get().ConsumeQuitRequest()) {
+        if (!WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing || World::Get().ConsumeQuitRequest()) {
             GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;

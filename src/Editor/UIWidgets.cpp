@@ -1,5 +1,6 @@
 #include "UIWidgets.h"
 #include "UITheme.h"
+#include "Core/Widgets/WidgetInput.h"
 #include <vector>
 
 namespace UIWidget {
@@ -8,7 +9,7 @@ Interaction Interact(Rectangle r, bool enabled) {
     Interaction s;
     if (!enabled) return s;
     Vector2 mp = GetMousePosition();
-    s.hovered = CheckCollisionPointRec(mp, r);
+    s.hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, r);
     s.pressed = s.hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     s.clicked = s.hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     return s;
@@ -102,7 +103,7 @@ void ScrollableTextBox(Rectangle r, const std::string& content, float& scrollOff
     float visibleHeight = r.height - padding * 2;
 
     Vector2 mouse = GetMousePosition();
-    if (CheckCollisionPointRec(mouse, r)) {
+    if (!WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mouse, r)) {
         scrollOffset -= GetMouseWheelMove() * lineHeight * 3;
     }
 

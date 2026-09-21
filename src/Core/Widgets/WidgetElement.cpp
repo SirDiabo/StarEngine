@@ -42,10 +42,15 @@ void WidgetElement::InsertChild(WidgetElement* child, int index) {
     children.insert(children.begin() + index, child);
 }
 
+static void RememberSelection(Widget* widget) {
+    if (widget && widget->currentSelection) widget->pendingSelectionKey = widget->currentSelection->selectionKey;
+}
+
 WidgetElement* WidgetElement::DetachChild(WidgetElement* child) {
     auto it = std::find(children.begin(), children.end(), child);
     if (it == children.end()) return nullptr;
     if (owningWidget && ContainsRecursive(*it, owningWidget->currentSelection)) {
+        RememberSelection(owningWidget);
         owningWidget->currentSelection = nullptr;
     }
     WidgetElement* detached = *it;
@@ -63,6 +68,7 @@ void WidgetElement::RemoveChild(WidgetElement* child) {
     auto it = std::find(children.begin(), children.end(), child);
     if (it == children.end()) return;
     if (owningWidget && ContainsRecursive(*it, owningWidget->currentSelection)) {
+        RememberSelection(owningWidget);
         owningWidget->currentSelection = nullptr;
     }
     delete *it;
@@ -72,6 +78,7 @@ void WidgetElement::RemoveChild(WidgetElement* child) {
 void WidgetElement::RemoveChildAt(int index) {
     if (index < 0 || index >= (int)children.size()) return;
     if (owningWidget && ContainsRecursive(children[index], owningWidget->currentSelection)) {
+        RememberSelection(owningWidget);
         owningWidget->currentSelection = nullptr;
     }
     delete children[index];
@@ -82,7 +89,8 @@ void WidgetElement::ClearChildren() {
     if (owningWidget && owningWidget->currentSelection) {
         for (WidgetElement* child : children) {
             if (ContainsRecursive(child, owningWidget->currentSelection)) {
-                owningWidget->currentSelection = nullptr;
+                RememberSelection(owningWidget);
+        owningWidget->currentSelection = nullptr;
                 break;
             }
         }

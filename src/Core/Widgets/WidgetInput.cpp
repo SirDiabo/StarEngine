@@ -1,4 +1,5 @@
 #include "WidgetInput.h"
+#include "TextElement.h"
 #include "Widget.h"
 #include "WidgetElement.h"
 #include "BoxElement.h"
@@ -30,6 +31,14 @@ std::unordered_map<std::string, FocusState> focusByDevice;
 std::unordered_map<std::string, std::vector<const void*>> modalsByDevice;
 std::unordered_map<const Widget*, WidgetEntry> entries;
 std::unordered_map<const void*, Widget*> lastWidgetByOwner;
+
+struct Occluder {
+    Rectangle rect;
+    const void* owner;
+};
+
+std::vector<Occluder> occluders;
+std::vector<Occluder> occludersNext;
 
 const void* inputScope = nullptr;
 unsigned long long nextSequence = 0;
@@ -98,12 +107,17 @@ bool PollBool(const char* mappingName, const std::string& device) {
     return false;
 }
 
-Vector2 PollAxis2D(const char* mappingName, const std::string& device) {
+bool IsArrowOrPadBinding(const std::string& key) {
+    return key == "UP" || key == "DOWN" || key == "LEFT" || key == "RIGHT" || key.rfind("GAMEPAD", 0) == 0;
+}
+
+Vector2 PollAxis2D(const char* mappingName, const std::string& device, bool arrowsOnly = false) {
     Vector2 result{0.0f, 0.0f};
     const InputMapping* mapping = InputMappingRegistry::Get().Find(mappingName);
     if (!mapping) return result;
     for (const InputMappingBinding& binding : mapping->bindings) {
         int gamepadIndex = 0;
+        if (arrowsOnly && !IsArrowOrPadBinding(binding.key)) continue;
         if (!KeyMatchesDevice(binding.key, device, gamepadIndex)) continue;
         float raw = 0.0f;
         if (!PollInputKey(binding.key, raw, gamepadIndex)) continue;
@@ -203,6 +217,25 @@ bool IsFocusedInternal(const Widget* widget, const void* owner, const std::strin
     return it->second.widget == widget;
 }
 
+void BeginEditIfText(WidgetElement* element) {
+    if (TextElement* text = dynamic_cast<TextElement*>(element)) text->StartEditingFromNavigation();
+}
+
+void RestoreSelection(Widget* widget, std::vector<WidgetElement*>& selectables) {
+    if (widget->currentSelection) return;
+    selectables.clear();
+    widget->rootElement->CollectSelectables(selectables);
+    if (selectables.empty()) return;
+    WidgetElement* pick = nullptr;
+    if (!widget->pendingSelectionKey.empty()) {
+        for (WidgetElement* candidate : selectables) {
+            if (candidate->selectionKey == widget->pendingSelectionKey) { pick = candidate; break; }
+        }
+    }
+    widget->pendingSelectionKey.clear();
+    widget->SetSelection(pick ? pick : selectables.front());
+}
+
 bool MoveSelectionSpatially(Widget* from, WidgetElement* current, int dx, int dy, const std::string& device) {
     const void* modalOwner = TopModal(device);
     Rectangle cur = current->lastResolvedRect;
@@ -257,10 +290,14 @@ bool MoveSelectionSpatially(Widget* from, WidgetElement* current, int dx, int dy
     if (bestWidget == from) {
         from->SetSelection(bestElement);
     } else {
+        if (TextElement* leaving = dynamic_cast<TextElement*>(current)) {
+            if (leaving->isEditing) leaving->OnDeselected();
+        }
         ClaimFocusInternal(bestWidget, bestOwner, device);
         bestWidget->SetSelection(bestElement);
         bestWidget->navigateCooldown = 0.25f;
     }
+    BeginEditIfText(bestElement);
     return true;
 }
 
@@ -268,8 +305,34 @@ bool MoveSelectionSpatially(Widget* from, WidgetElement* current, int dx, int dy
 
 namespace WidgetInput {
 
+void BeginFrame() {
+    occluders.swap(occludersNext);
+    occludersNext.clear();
+}
+
 void SetInputScope(const void* owner) {
     inputScope = owner;
+}
+
+const void* GetInputScope() {
+    return inputScope;
+}
+
+void AddOccluder(Rectangle rect, const void* owner) {
+    occludersNext.push_back({ rect, owner });
+}
+
+bool IsMouseOccluded(Vector2 position, const void* owner) {
+    for (const Occluder& occluder : occluders) {
+        if (occluder.owner != owner && CheckCollisionPointRec(position, occluder.rect)) return true;
+    }
+    return false;
+}
+
+bool IsMouseBlocked() {
+    const void* modal = TopModal(kEditorDevice);
+    if (modal && modal != inputScope) return true;
+    return IsMouseOccluded(GetMousePosition(), inputScope);
 }
 
 void ClaimFocus(Widget* widget, const std::string& device) {
@@ -378,7 +441,8 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     const void* modalOwner = TopModal(device);
     const bool blocked = modalOwner && modalOwner != owner;
-    const bool mouseActive = !blocked;
+    const bool occluded = managed && IsMouseOccluded(localMousePos, owner);
+    const bool mouseActive = !blocked && !occluded;
 
     const bool anyPress = IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
         || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)
@@ -408,9 +472,7 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     std::vector<WidgetElement*> selectables;
     widget->rootElement->CollectSelectables(selectables);
 
-    if (!widget->currentSelection && !selectables.empty()) {
-        widget->SetSelection(selectables.front());
-    }
+    RestoreSelection(widget, selectables);
 
     WidgetElement* hovered = mouseActive ? HitTestSelectable(widget->rootElement, localMousePos) : nullptr;
 
@@ -426,6 +488,10 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     const bool confirmRaw = focused && PollBool(kConfirmMapping, device);
     const bool cancelRaw = focused && PollBool(kCancelMapping, device);
     const bool keyActive = focused && !justFocused && !IsKeyboardCaptured();
+    TextElement* editingText = dynamic_cast<TextElement*>(widget->currentSelection);
+    if (editingText && !editingText->isEditing) editingText = nullptr;
+    const bool editingNav = focused && !justFocused && editingText != nullptr;
+    const int edgeRequest = editingNav ? editingText->ConsumeEdgeNavRequest() : 0;
     bool mouseHeld = hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
     if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -435,6 +501,8 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
         if (hovered->onRightActivated) hovered->onRightActivated();
     }
+
+    if (!widget->currentSelection) RestoreSelection(widget, selectables);
 
     int currentIndex = -1;
     for (int i = 0; i < (int)selectables.size(); i++) {
@@ -447,11 +515,17 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     if (widget->navigateCooldown > 0.0f) widget->navigateCooldown -= deltaTime;
 
-    if (keyActive && currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
-        Vector2 nav = PollAxis2D(kNavigateMapping, device);
+    if ((keyActive || editingNav) && currentIndex >= 0 && widget->navigateCooldown <= 0.0f) {
+        Vector2 nav = PollAxis2D(kNavigateMapping, device, editingNav);
         int dx = 0, dy = 0;
-        if (fabsf(nav.y) > fabsf(nav.x)) dy = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
-        else dx = nav.x > 0.4f ? 1 : (nav.x < -0.4f ? -1 : 0);
+        if (editingNav) {
+            dy = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
+            if (dy == 0) dx = edgeRequest;
+        } else if (fabsf(nav.y) > fabsf(nav.x)) {
+            dy = nav.y > 0.4f ? -1 : (nav.y < -0.4f ? 1 : 0);
+        } else {
+            dx = nav.x > 0.4f ? 1 : (nav.x < -0.4f ? -1 : 0);
+        }
 
         if (dx != 0 || dy != 0) {
             WidgetElement* current = widget->currentSelection;
@@ -470,13 +544,18 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
                     next = selectables[nextIndex];
                 }
             }
-            if (next) widget->SetSelection(next);
+            if (next) {
+                widget->SetSelection(next);
+                BeginEditIfText(next);
+            }
             widget->navigateCooldown = 0.25f;
         }
     }
 
     if (keyActive && confirmRaw && !widget->confirmWasHeld && widget->currentSelection) {
-        widget->currentSelection->OnConfirmed();
+        WidgetElement* target = widget->currentSelection;
+        if (target->onKeyActivated) target->onKeyActivated();
+        else target->OnConfirmed();
     }
     widget->confirmWasHeld = confirmRaw;
     widget->cancelWasHeld = cancelRaw;

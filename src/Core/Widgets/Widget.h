@@ -34,6 +34,7 @@ public:
     bool confirmWasHeld = false;
     bool cancelWasHeld = false;
     bool hadKeyboardFocus = false;
+    std::string pendingSelectionKey;
 
     WidgetComponent* owningComponent = nullptr;
 

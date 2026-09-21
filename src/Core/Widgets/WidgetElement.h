@@ -36,6 +36,8 @@ public:
     WidgetInteractionState interactionState = WidgetInteractionState::Default;
     std::function<void()> onActivated;
     std::function<void()> onRightActivated;
+    std::function<void()> onKeyActivated;
+    std::string selectionKey;
 
     WidgetElement* parent = nullptr;
     Widget* owningWidget = nullptr;

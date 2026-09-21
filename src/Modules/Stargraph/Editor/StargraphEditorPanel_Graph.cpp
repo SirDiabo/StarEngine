@@ -710,6 +710,8 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
     graphArea = area;
     Vector2 mousePos = GetMousePosition();
+    const bool mouseInGraph = CheckCollisionPointRec(mousePos, area) && !WidgetInput::IsMouseBlocked();
+    auto pressedInGraph = [&](int button) { return mouseInGraph && IsMouseButtonPressed(button); };
 
     if (keyPickerOpen) {
         if (IsKeyPressed(KEY_ESCAPE)) {
@@ -731,7 +733,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     }
                 }
                 listeningForKeyPinId = 0;
-            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            } else if (pressedInGraph(MOUSE_BUTTON_LEFT)) {
                 listeningForKeyPinId = 0;
             }
         }
@@ -760,7 +762,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
         if (hovered) {
             GraphCanvas::DrawWire(from, to, 3.0f, {255, 80, 80, 255});
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (pressedInGraph(MOUSE_BUTTON_LEFT)) {
                 RemoveSpecificLink(link.outputPinId, link.inputPinId);
                 break;
             }
@@ -808,7 +810,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
             if (showTargetPin && CheckCollisionPointCircle(mousePos, {nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV({nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (targetLinked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(targetPin->id);
                     } else if (linkFromPin == -1) {
@@ -823,7 +825,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 bool linked = false;
                 for (const Link& lk : ActiveGraph().GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
                 DrawCircleV({nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(outputPin->id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -869,7 +871,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             DrawText(displayTitle.c_str(), (int)nx + (targetPin ? 16 : 8), (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                if (pressedInGraph(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (IsKeyDown(KEY_LEFT_CONTROL)) {
                         bool found = false;
                         for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
@@ -906,7 +908,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 }
             }
             
-            if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !pressedInGraph(MOUSE_BUTTON_LEFT)) {
                 Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea,
                     {mousePos.x - nodeDragOffset.x, mousePos.y - nodeDragOffset.y});
                 Vector2 snapped = GraphCanvas::SnapToGrid(rawWorld);
@@ -975,7 +977,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 bool isDraggingLink = linkFromPin != -1;
                 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                     DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                         if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                             RemoveLinkFromPin(pin.id);
                         } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1026,7 +1028,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 11,
                              listening ? WHITE : LIGHTGRAY);
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !nodeMenuOpen) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && !nodeMenuOpen) {
                         if (CheckCollisionPointRec(mousePos, listenBtn)) {
                             listeningForKeyPinId = pin.id;
                             editingPinId = 0;
@@ -1052,7 +1054,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         DrawText(pin.defaultValue.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
                     }
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         keyPickerKind = PinPickerKind::FunctionName;
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
@@ -1073,7 +1075,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
                     }
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         keyPickerKind = PinPickerKind::ComponentRef;
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
@@ -1098,7 +1100,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
                     DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
                         actorClassPickerVarIndex = -1;
                         actorClassPicker.OpenWithExtras({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor",
@@ -1123,7 +1125,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
                     }
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         keyPickerKind = PinPickerKind::MappingName;
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
@@ -1153,7 +1155,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
             if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (pressedInGraph(MOUSE_BUTTON_LEFT)) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1189,7 +1191,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
 if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(pin.id);
                     } else if (linked && IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -1204,7 +1206,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
 
         if (CheckCollisionPointRec(mousePos, {nx, ny, scaledNodeWidth, scaledHeaderHeight}) && CheckCollisionPointRec(mousePos, graphArea)) {
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+            if (pressedInGraph(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                 if (IsKeyDown(KEY_LEFT_CONTROL)) {
                     bool found = false;
                     for (int sid : selectedNodeIds) if (sid == nodeIdInt) { found = true; break; }
@@ -1241,7 +1243,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             }
         }
 
-        if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (draggingNode && selectedNodeId == nodeIdInt && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !pressedInGraph(MOUSE_BUTTON_LEFT)) {
             Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea,
                 {mousePos.x - nodeDragOffset.x, mousePos.y - nodeDragOffset.y});
             Vector2 snapped = GraphCanvas::SnapToGrid(rawWorld);
@@ -1449,7 +1451,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !draggingNode && editingPinId == 0 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
         if (!GetNodeAtPos(mousePos)) {
             if (!IsKeyDown(KEY_LEFT_CONTROL)) {
                 selectedNodeId = -1;

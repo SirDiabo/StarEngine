@@ -108,6 +108,8 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
     label_->size = { 0.0f, 16.0f };
 
     if (isRenamingThisRow) {
+        float available = lastResolvedRect.width - textOffset - 12.0f;
+        label_->size.x = available > 80.0f ? available : 160.0f;
         label_->editable = true;
         label_->onTextCommitted = [this, id](const std::string& newName) {
             if (onRenameRequested && !newName.empty()) onRenameRequested(id, newName);
@@ -124,6 +126,7 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
 
     if (isRenamingThisRow) label_->StartEditing();
 
+    row->selectionKey = entry.id;
     AddChild(row);
     visualIndex++;
 

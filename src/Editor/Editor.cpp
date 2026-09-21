@@ -19,6 +19,7 @@
 #include "ConfirmPopup.h"
 #include "SearchableListPopup.h"
 #include "Core/Widgets/WidgetOverlay.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/DragDropController.h"
 #include "ImportDetailsPanel.h"
 #include "AboutPanel.h"
@@ -80,7 +81,10 @@ LogPanel* Editor::GetLogPanel() const {
 }
 
 void Editor::Render() {
+    WidgetInput::BeginFrame();
+
     if (projectBrowser->IsVisible()) {
+        WidgetInput::PopModal(&*menuBar, WidgetInput::kEditorDevice);
         projectBrowser->Render();
         return;
     }
@@ -95,7 +99,12 @@ void Editor::Render() {
     }
 
     // Layer 1: menu bar background and buttons.
+    const void* menuOwner = &*menuBar;
+    WidgetInput::SetInputScope(menuOwner);
     menuBar->RenderBar();
+    WidgetInput::SetInputScope(nullptr);
+    if (menuBar->activeMenu >= 0) WidgetInput::PushModal(menuOwner, WidgetInput::kEditorDevice);
+    else WidgetInput::PopModal(menuOwner, WidgetInput::kEditorDevice);
 
     float tabBarY  = MENU_BAR_H;
     float contentY = MENU_BAR_H + EDITOR_TAB_BAR_H;
@@ -127,7 +136,9 @@ void Editor::Render() {
     }
 
     // Layer 5: menu popup (above everything).
+    WidgetInput::SetInputScope(menuOwner);
     menuBar->RenderPopup();
+    WidgetInput::SetInputScope(nullptr);
 
     // Layer 6: import details popup (above everything but asset picker dropdowns).
     ImportDetailsPanel::Get().Render();

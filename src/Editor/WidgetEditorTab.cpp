@@ -131,7 +131,7 @@ void WidgetEditorTab::ApplyDesignerLayout() {
     }
 
     auto detailsLeaf = std::make_unique<DockNode>();
-    detailsLeaf->panelNames = { "Element Details" };
+    detailsLeaf->panelNames = { "Details" };
 
     auto centerAndRight = std::make_unique<DockNode>();
     centerAndRight->type = DockNode::Type::SplitH;
@@ -331,7 +331,6 @@ void WidgetEditorTab::BuildMenus(MenuBar* menuBar) {
         dockArea.IsPanelVisible("Palette"),
         dockArea.IsPanelVisible("Hierarchy"),
         dockArea.IsPanelVisible("Canvas"),
-        dockArea.IsPanelVisible("Element Details"),
         dockArea.IsPanelVisible("Details"),
         dockArea.IsPanelVisible("Logs"),
         false, false,
@@ -340,7 +339,7 @@ void WidgetEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "Save" } },
         { "Asset",  { "Find in Content Browser" } },
-        { "Window", { "Palette", "Hierarchy", "Canvas", "Element Details", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
+        { "Window", { "Palette", "Hierarchy", "Canvas", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -350,7 +349,7 @@ bool WidgetEditorTab::IsOpen() const {
 }
 
 void WidgetEditorTab::ResetLayout() {
-    for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Element Details", "Details", "Logs" })
+    for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Details", "Logs" })
         dockArea.SetPanelVisible(n, true);
 
     if (inGraphMode) {

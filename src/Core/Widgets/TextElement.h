@@ -27,6 +27,8 @@ public:
     std::function<void()> onEditCancelled;
 
     void StartEditing();
+    void StartEditingFromNavigation();
+    int ConsumeEdgeNavRequest();
     void OnConfirmed() override;
     void OnDeselected() override;
 
@@ -42,6 +44,8 @@ private:
     int cursorPos = 0;
     float cursorBlinkTimer = 0.0f;
     std::string textAtEditStart;
+    bool autoStarted = false;
+    int edgeNavRequest = 0;
 
     bool dragging = false;
     int dragStartMouseX = 0;

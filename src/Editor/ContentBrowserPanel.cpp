@@ -735,6 +735,7 @@ void ContentBrowserPanel::RebuildTiles(const std::vector<ContentEntry>& entries)
         bool isSelected = (selectedIndex == (int)i);
 
         auto* tile = new ButtonElement();
+        tile->selectionKey = entry.fullDiskName;
         tile->size = { 0.0f, 0.0f };
         tile->cornerRadius = 0.1f;
         tile->defaultColor = theme.buttonBg;
@@ -770,6 +771,15 @@ void ContentBrowserPanel::RebuildTiles(const std::vector<ContentEntry>& entries)
             }
             lastEntryClickTime = now;
             lastEntryClickIndex = index;
+        };
+
+        tile->onKeyActivated = [this, diskName, isFolder, extension, displayName]() {
+            ContentEntry target;
+            target.displayName = displayName;
+            target.fullDiskName = diskName;
+            target.isFolder = isFolder;
+            target.extension = extension;
+            OpenEntry(target);
         };
 
         tile->onRightActivated = [this, index, diskName, isFolder, extension, displayName]() {

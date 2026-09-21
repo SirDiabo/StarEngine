@@ -55,9 +55,10 @@ void DockArea::LayoutNode(DockNode* node, Rectangle area) {
 // Main render: panel content only, no overlays
 
 void DockArea::RenderPanel(Panel* panel) {
+    const void* previousScope = WidgetInput::GetInputScope();
     WidgetInput::SetInputScope(panel);
     panel->Render();
-    WidgetInput::SetInputScope(nullptr);
+    WidgetInput::SetInputScope(previousScope);
 }
 
 Panel* DockArea::FindPanelByOwner(const void* owner) const {
@@ -167,6 +168,8 @@ void DockArea::RenderOverlays() {
         const UIPalette& theme = UITheme::Get();
 
         Rectangle full    = fp.bounds;
+        WidgetInput::AddOccluder(full, p);
+        WidgetInput::SetInputScope(p);
         Rectangle header  = { full.x, full.y, full.width, FLOAT_HEADER_H };
         Rectangle content = { full.x, full.y + FLOAT_HEADER_H,
                                full.width, full.height - FLOAT_HEADER_H };
@@ -206,6 +209,7 @@ void DockArea::RenderOverlays() {
         p->bounds = content;
         RenderPanel(p);
     }
+    WidgetInput::SetInputScope(nullptr);
 
     // Pending drag: wait for mouse to move past threshold before committing to drag.
     if (pendingDrag) {
