@@ -9,6 +9,7 @@
 #include "Editor/ChoicePopup.h"
 #include "Core/Widgets/TreeListElement.h"
 #include "Editor/GizmoRenderer.h"
+#include "Editor/PropertyPanel.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -68,7 +69,9 @@ public:
     void RenderLeftPanel(Rectangle area);
     void RenderLeftPanelPopups();
     void RenderGraph(Rectangle area);
-    void RenderRightPanel(Rectangle area);
+    std::vector<PropertyRow> BuildDetailsRows();
+    void OnDetailAssetPicked(const std::string& fullRowId, const std::string& pickedPath);
+    void RenderDetailPickers(Rectangle area);
     void RenderNodeContextMenu();
 
     void RenderPreviewViewport(Rectangle area);
@@ -78,13 +81,18 @@ public:
 private:
     void ResetTransientEditState();
 
-    void RenderComponentDetails(Rectangle panel, float& y);
-    void RenderCustomEventDetails(Rectangle panel, float y, Node& node);
-    void RenderCallCustomEventDetails(Rectangle panel, float y, Node& node);
-    void RenderCallFunctionDetails(Rectangle panel, float y, Node& node);
-    void RenderVariableArrayEditor(Rectangle panel, float& y, Variable& var, int& activeField);
-    void RenderVariableDetailsBody(Rectangle panel, float y, Variable& var, int detailIndex, bool isLocal);
-    void RenderFunctionDetails(Rectangle panel, float y, FunctionDef& fn, int detailIndex);
+    void BuildComponentRows(std::vector<PropertyRow>& rows, int index);
+    void BuildVariableRows(std::vector<PropertyRow>& rows, int index, bool isLocal);
+    void BuildFunctionRows(std::vector<PropertyRow>& rows, int index);
+    void BuildCustomEventRows(std::vector<PropertyRow>& rows, int nodeId);
+    void BuildCallCustomEventRows(std::vector<PropertyRow>& rows, int nodeId);
+    void BuildCallFunctionRows(std::vector<PropertyRow>& rows, int nodeId);
+    void BuildGenericNodeRows(std::vector<PropertyRow>& rows, int nodeId);
+    ComponentDecl* DetailComponent(int index);
+    Variable* DetailVariable(int index, bool isLocal);
+    FunctionDef* DetailFunction(int index);
+    Node* DetailNode(int nodeId);
+    void ResetDetailPickers();
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
 
@@ -192,9 +200,6 @@ private:
     int selectedLocalVariableIndex = -1;
     int lastValidLocalVariableIndex = -1;
 
-    struct ArrayElemBuf { char text[3][64] = {"", "", ""}; };
-    std::vector<ArrayElemBuf> varArrayBufs;
-
     bool keyPickerOpen = false;
     int keyPickerPinId = 0;
     Vector2 keyPickerPos{0, 0};
@@ -226,22 +231,11 @@ private:
     int lastValidComponentIndex = -1;
     SearchableListPopup addComponentMenu;
 
-    AssetPickerPopup componentMaterialPicker;
-    AssetPickerPopup audioPathPicker;
-    int materialSlotPickerIndex = -1;
     AssetPickerPopup actorClassPicker;
     int actorClassPickerPinId = 0;
-    int actorClassPickerVarIndex = -1;
     ViewportPanel* viewportPanel = nullptr;
-    int lastComponentDetailIndex = -1;
-    int componentActiveField = 0;
-    char compNameBuf[128] = "";
-    char compPosBuf[3][32] = {"", "", ""};
-    char compRotBuf[3][32] = {"", "", ""};
-    char compScaleBuf[3][32] = {"", "", ""};
-    std::unordered_map<std::string, std::array<char, 32>> genericFieldBufs;
-    std::unordered_map<std::string, AssetPickerPopup> genericAssetPickers;
     std::string activeDeviceFieldKey;
+    std::string lastDetailsSelectionKey;
 
     RegistryPickerPopup inputMappingPicker;
     SearchableListPopup inputKeyPicker;
@@ -250,25 +244,11 @@ private:
     int inputKeyPickerBindingIndex = -1;
     int listeningForInputBindingMappingIndex = -1;
     int listeningForInputBindingIndex = -1;
-    char compInputScaleBuf[8][32] = {};
-
-    int lastEventDetailNodeId = -1;
-    char eventNameBuf[128] = "";
-    int eventActiveField = 0;
-
-    int lastFuncCallDetailNodeId = -1;
-    char funcCallNameBuf[128] = "";
-    int funcCallActiveField = 0;
-    char eventParamNameBuf[8][64] = {};
-
-    int lastFuncDetailIndex = -1;
-    char funcNameEditBuf[128] = "";
-    int funcDetailActiveField = 0;
-    char funcInputNameBuf[8][64] = {};
-    char funcOutputNameBuf[8][64] = {};
 
     RegistryPickerPopup savePicker;
     std::string saveTargetFieldKey;
+    int saveTargetKind = 0;
+    int saveTargetIndex = -1;
 
     bool showSelfActorDetails = false;
 

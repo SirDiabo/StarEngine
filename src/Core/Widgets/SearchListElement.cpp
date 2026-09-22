@@ -3,6 +3,8 @@
 #include "BoxElement.h"
 #include "ButtonElement.h"
 #include "raylib.h"
+#include <cstdint>
+#include <string>
 #include <algorithm>
 
 namespace {
@@ -159,7 +161,7 @@ void SearchListElement::RebuildRows() {
         float thisRowHeight = hasReason ? rowHeight + 14.0f : rowHeight;
 
         auto* row = new ButtonElement();
-        row->selectionKey = entry.id;
+        row->selectionKey = std::to_string(reinterpret_cast<uintptr_t>(this)) + ":" + entry.id;
         row->size = { 0.0f, thisRowHeight };
         row->defaultColor = showAsCurrent ? rowCurrentColor : Color{ 0, 0, 0, 0 };
         row->hoveredColor = entry.enabled ? rowHoveredColor : Color{ 0, 0, 0, 0 };

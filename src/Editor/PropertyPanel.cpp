@@ -4,6 +4,8 @@
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/ButtonElement.h"
 #include "Core/Widgets/CheckBoxElement.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -12,13 +14,18 @@ namespace {
 class LabeledRow : public WidgetElement {
 public:
     float labelWidth = 90.0f;
+    bool hasTrailing = false;
+    float trailingWidth = 20.0f;
 
 protected:
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
         float lw = labelWidth * uiScale;
+        float tw = trailingWidth * uiScale;
+        float gap = 4.0f * uiScale;
+        if (hasTrailing && childIndex == 2) return { ownRect.x + ownRect.width - tw, ownRect.y, tw, ownRect.height };
         if (childIndex == 0) return { ownRect.x, ownRect.y, lw, ownRect.height };
         float controlX = ownRect.x + lw;
-        float controlW = ownRect.width - lw;
+        float controlW = ownRect.width - lw - (hasTrailing ? tw + gap : 0.0f);
         if (child->size.x > 0.0f) {
             return { controlX, ownRect.y, child->size.x * uiScale, ownRect.height };
         }
@@ -29,11 +36,16 @@ protected:
 class TripletRow : public WidgetElement {
 public:
     int count = 3;
+    bool hasTrailing = false;
+    float trailingWidth = 20.0f;
 
 protected:
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
         float gap = 4.0f * uiScale;
-        float slotW = (ownRect.width - gap * (float)(count - 1)) / (float)count;
+        float tw = trailingWidth * uiScale;
+        if (hasTrailing && childIndex == count * 2) return { ownRect.x + ownRect.width - tw, ownRect.y, tw, ownRect.height };
+        float usable = ownRect.width - (hasTrailing ? tw + gap : 0.0f);
+        float slotW = (usable - gap * (float)(count - 1)) / (float)count;
         int slot = childIndex / 2;
         bool isLabel = (childIndex % 2) == 0;
         float slotX = ownRect.x + (float)slot * (slotW + gap);
@@ -43,15 +55,50 @@ protected:
     }
 };
 
+class CellRow : public WidgetElement {
+public:
+    float indent = 0.0f;
+
+protected:
+    Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
+        float gap = 4.0f * uiScale;
+        int n = (int)children.size();
+        float fixedTotal = 0.0f;
+        int flexCount = 0;
+        for (WidgetElement* c : children) {
+            if (c->size.x > 0.0f) fixedTotal += c->size.x * uiScale;
+            else flexCount++;
+        }
+        float available = ownRect.width - indent * uiScale - gap * (float)(n > 0 ? n - 1 : 0) - fixedTotal;
+        float flexW = flexCount > 0 ? std::max(0.0f, available) / (float)flexCount : 0.0f;
+        float x = ownRect.x + indent * uiScale;
+        for (int i = 0; i < childIndex; i++) {
+            float w = children[i]->size.x > 0.0f ? children[i]->size.x * uiScale : flexW;
+            x += w + gap;
+        }
+        float w = child->size.x > 0.0f ? child->size.x * uiScale : flexW;
+        return { x, ownRect.y, w, ownRect.height };
+    }
+};
+
 bool RowsShapeEqual(const std::vector<PropertyRow>& a, const std::vector<PropertyRow>& b) {
     if (a.size() != b.size()) return false;
     for (size_t i = 0; i < a.size(); i++) {
         if (a[i].id != b[i].id || a[i].kind != b[i].kind || a[i].label != b[i].label ||
-            a[i].enumOptions != b[i].enumOptions) {
+            a[i].enumOptions != b[i].enumOptions || a[i].indent != b[i].indent ||
+            a[i].trailingLabel.empty() != b[i].trailingLabel.empty() || a[i].integer != b[i].integer ||
+            a[i].commitOnly != b[i].commitOnly || a[i].cells.size() != b[i].cells.size()) {
             return false;
+        }
+        for (size_t c = 0; c < a[i].cells.size(); c++) {
+            if (a[i].cells[c].kind != b[i].cells[c].kind || a[i].cells[c].width != b[i].cells[c].width) return false;
         }
     }
     return true;
+}
+
+std::string FormatInteger(float v) {
+    return std::to_string((int)std::lround(v));
 }
 
 std::string FormatFloat(float v) {
@@ -94,6 +141,30 @@ void PropertyPanel::RebuildRows() {
     rowWidgets.clear();
     rowWidgets.resize(rows.size());
 
+    auto addTrailing = [this](WidgetElement* rowElement, RowWidgets& rw, size_t i, const PropertyRow& row) {
+        auto* btn = new ButtonElement();
+        btn->size = { 20.0f, rowHeight };
+        btn->defaultColor = row.trailingColor.a > 0 ? row.trailingColor : buttonBg;
+        btn->hoveredColor = buttonHover;
+        btn->selectedColor = buttonHover;
+        btn->pressedColor = buttonHover;
+        btn->onActivated = [this, i]() {
+            if (i >= rows.size() || i >= rowWidgets.size()) return;
+            if (rows[i].onTrailingPressed && rowWidgets[i].trailingButton) {
+                rows[i].onTrailingPressed(rowWidgets[i].trailingButton->lastResolvedRect);
+            }
+        };
+        auto* lbl = new TextElement();
+        lbl->text = row.trailingLabel;
+        lbl->fontSize = 10.0f;
+        lbl->anchor = { 0.5f, 0.5f };
+        lbl->pivot = { 0.5f, 0.5f };
+        btn->AddChild(lbl);
+        rowElement->AddChild(btn);
+        rw.trailingButton = btn;
+        rw.trailingLabel = lbl;
+    };
+
     for (size_t i = 0; i < rows.size(); i++) {
         const PropertyRow& row = rows[i];
         RowWidgets& rw = rowWidgets[i];
@@ -132,6 +203,71 @@ void PropertyPanel::RebuildRows() {
             continue;
         }
 
+        if (row.kind == PropertyRowKind::Cells) {
+            auto* cellRow = new CellRow();
+            cellRow->size = { 0.0f, rowHeight };
+            cellRow->indent = row.indent;
+            rw.cells.resize(row.cells.size());
+            for (size_t c = 0; c < row.cells.size(); c++) {
+                const PropertyCell& cell = row.cells[c];
+                RowWidgets::CellWidgets& cw = rw.cells[c];
+                if (cell.kind == PropertyCellKind::Label) {
+                    auto* text = new TextElement();
+                    text->fontSize = 11.0f;
+                    text->anchor = { 0.0f, 0.5f };
+                    text->pivot = { 0.0f, 0.5f };
+                    text->offset = { 4.0f, 0.0f };
+                    text->size = { cell.width, rowHeight };
+                    cellRow->AddChild(text);
+                    cw.text = text;
+                } else if (cell.kind == PropertyCellKind::Text || cell.kind == PropertyCellKind::Number) {
+                    auto* box = new TextElement();
+                    box->editable = true;
+                    box->numericOnly = (cell.kind == PropertyCellKind::Number);
+                    box->fontSize = 11.0f;
+                    box->backgroundColor = fieldBg;
+                    box->borderColor = fieldBorder;
+                    box->editingBorderColor = fieldEditingBorder;
+                    box->placeholder = cell.placeholder;
+                    box->size = { cell.width, rowHeight };
+                    box->onTextCommitted = [this, i, c](const std::string& text) {
+                        if (i >= rows.size() || c >= rows[i].cells.size()) return;
+                        const PropertyCell& current = rows[i].cells[c];
+                        if (current.kind == PropertyCellKind::Number) {
+                            if (current.onNumber) current.onNumber((float)atof(text.c_str()));
+                        } else if (current.onText) {
+                            current.onText(text);
+                        }
+                    };
+                    cellRow->AddChild(box);
+                    cw.text = box;
+                } else {
+                    auto* btn = new ButtonElement();
+                    btn->size = { cell.width, rowHeight };
+                    btn->defaultColor = cell.color.a > 0 ? cell.color : buttonBg;
+                    btn->hoveredColor = buttonHover;
+                    btn->selectedColor = buttonHover;
+                    btn->pressedColor = buttonHover;
+                    btn->onActivated = [this, i, c]() {
+                        if (i >= rows.size() || c >= rows[i].cells.size() || i >= rowWidgets.size() || c >= rowWidgets[i].cells.size()) return;
+                        const PropertyCell& current = rows[i].cells[c];
+                        ButtonElement* self = rowWidgets[i].cells[c].button;
+                        if (current.onPressed && self) current.onPressed(self->lastResolvedRect);
+                    };
+                    auto* label = new TextElement();
+                    label->fontSize = 11.0f;
+                    label->anchor = { 0.5f, 0.5f };
+                    label->pivot = { 0.5f, 0.5f };
+                    btn->AddChild(label);
+                    cellRow->AddChild(btn);
+                    cw.button = btn;
+                    cw.buttonLabel = label;
+                }
+            }
+            root->AddChild(cellRow);
+            continue;
+        }
+
         if (row.kind == PropertyRowKind::Vec3 || row.kind == PropertyRowKind::Vec2) {
             int count = (row.kind == PropertyRowKind::Vec3) ? 3 : 2;
 
@@ -148,6 +284,7 @@ void PropertyPanel::RebuildRows() {
             auto* triplet = new TripletRow();
             triplet->count = count;
             triplet->size = { 0.0f, rowHeight };
+            triplet->hasTrailing = !row.trailingLabel.empty();
 
             const char* axisNames[3] = { "X", "Y", "Z" };
             Color axisColors[3] = { axisXColor, axisYColor, axisZColor };
@@ -185,6 +322,7 @@ void PropertyPanel::RebuildRows() {
                 triplet->AddChild(box);
                 *boxes[a] = box;
             }
+            if (triplet->hasTrailing) addTrailing(triplet, rw, i, row);
             root->AddChild(triplet);
             continue;
         }
@@ -192,6 +330,7 @@ void PropertyPanel::RebuildRows() {
         auto* rowBox = new LabeledRow();
         rowBox->size = { 0.0f, rowHeight };
         rowBox->labelWidth = labelWidth;
+        rowBox->hasTrailing = !row.trailingLabel.empty();
 
         auto* label = new TextElement();
         label->text = row.label;
@@ -224,13 +363,26 @@ void PropertyPanel::RebuildRows() {
                 box->borderColor = fieldBorder;
                 box->editingBorderColor = fieldEditingBorder;
                 box->size = { 0.0f, rowHeight };
+                box->placeholder = row.placeholder;
                 std::function<void(const std::string&)> setString = row.setString;
                 std::function<void(float)> setFloat = row.setFloat;
                 bool isFloat = (row.kind == PropertyRowKind::Float);
-                box->onTextChanged = [setString, setFloat, isFloat](const std::string& text) {
-                    if (isFloat) { if (setFloat) setFloat((float)atof(text.c_str())); }
-                    else if (setString) setString(text);
-                };
+                bool isInteger = row.integer;
+                if (row.commitOnly && !isFloat) {
+                    box->onTextCommitted = [this, i](const std::string& text) {
+                        if (i < rows.size() && rows[i].setString) rows[i].setString(text);
+                    };
+                } else {
+                    box->onTextChanged = [setString, setFloat, isFloat, isInteger](const std::string& text) {
+                        if (isFloat) {
+                            float value = (float)atof(text.c_str());
+                            if (isInteger) value = std::round(value);
+                            if (setFloat) setFloat(value);
+                        } else if (setString) {
+                            setString(text);
+                        }
+                    };
+                }
                 rowBox->AddChild(box);
                 rw.textField = box;
                 break;
@@ -307,6 +459,7 @@ void PropertyPanel::RebuildRows() {
             default: break;
         }
 
+        if (rowBox->hasTrailing) addTrailing(rowBox, rw, i, row);
         root->AddChild(rowBox);
     }
 
@@ -326,7 +479,7 @@ void PropertyPanel::RefreshValues() {
                 if (rw.textField && !rw.textField->isEditing) rw.textField->text = row.stringValue;
                 break;
             case PropertyRowKind::Float:
-                if (rw.textField && !rw.textField->isEditing) rw.textField->text = FormatFloat(row.floatValue);
+                if (rw.textField && !rw.textField->isEditing) rw.textField->text = row.integer ? FormatInteger(row.floatValue) : FormatFloat(row.floatValue);
                 break;
             case PropertyRowKind::Bool:
                 if (rw.checkBox) rw.checkBox->checked = row.boolValue;
@@ -345,8 +498,36 @@ void PropertyPanel::RefreshValues() {
                 if (rw.assetOrEnumLabel) rw.assetOrEnumLabel->text = row.stringValue;
                 if (rw.assetOrEnumButton && row.iconColor.a > 0) rw.assetOrEnumButton->defaultColor = row.iconColor;
                 break;
+            case PropertyRowKind::Cells:
+                for (size_t c = 0; c < row.cells.size() && c < rw.cells.size(); c++) {
+                    const PropertyCell& cell = row.cells[c];
+                    RowWidgets::CellWidgets& cw = rw.cells[c];
+                    if (cw.text) {
+                        if (cell.kind == PropertyCellKind::Label) {
+                            cw.text->text = cell.text;
+                            cw.text->color = cell.textColor.a > 0 ? cell.textColor : labelColor;
+                        } else if (!cw.text->isEditing) {
+                            cw.text->text = (cell.kind == PropertyCellKind::Number)
+                                ? (cell.integer ? FormatInteger(cell.number) : FormatFloat(cell.number))
+                                : cell.text;
+                        }
+                    }
+                    if (cw.button) {
+                        cw.button->defaultColor = cell.color.a > 0 ? cell.color : buttonBg;
+                        if (cw.buttonLabel) {
+                            cw.buttonLabel->text = cell.text;
+                            cw.buttonLabel->color = cell.textColor.a > 0 ? cell.textColor : Color{ 255, 255, 255, 255 };
+                        }
+                    }
+                }
+                break;
             default:
                 break;
+        }
+
+        if (rw.trailingButton) {
+            rw.trailingButton->defaultColor = row.trailingColor.a > 0 ? row.trailingColor : buttonBg;
+            if (rw.trailingLabel) rw.trailingLabel->text = row.trailingLabel;
         }
     }
 }

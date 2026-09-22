@@ -1,13 +1,11 @@
 #pragma once
-#include "Core/Panel.h"
+#include "Editor/DetailsPanel.h"
 
 class StargraphEditorPanel;
 
-class StargraphDetailsPanel : public Panel {
+class StargraphDetailsPanel : public DetailsPanel {
 public:
-    void Initialize() override;
-    void Render() override;
-    void SetSession(StargraphEditorPanel* s) { session = s; }
+    void SetSession(StargraphEditorPanel* s);
 
 private:
     StargraphEditorPanel* session = nullptr;

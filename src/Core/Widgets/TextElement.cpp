@@ -50,6 +50,15 @@ void TextElement::StartEditing() {
     if (!isEditing) BeginEditing();
 }
 
+void TextElement::FinishEditingOnFocusLoss() {
+    if (autoStarted && text == textAtEditStart) {
+        isEditing = false;
+        autoStarted = false;
+        return;
+    }
+    CommitEditing();
+}
+
 void TextElement::StartEditingFromNavigation() {
     if (!editable || disabled || isEditing) return;
     BeginEditing();
@@ -74,14 +83,7 @@ void TextElement::OnConfirmed() {
 }
 
 void TextElement::OnDeselected() {
-    if (isEditing) {
-        if (autoStarted && text == textAtEditStart) {
-            isEditing = false;
-            autoStarted = false;
-        } else {
-            CommitEditing();
-        }
-    }
+    if (isEditing) FinishEditingOnFocusLoss();
     dragging = false;
     WidgetElement::OnDeselected();
 }
@@ -91,6 +93,13 @@ void TextElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
     if (!editable) return;
     if (!isEditing) { dragging = false; return; }
     WidgetInput::MarkKeyboardCaptured();
+
+    bool pressedOutside = (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
+        && !CheckCollisionPointRec(GetMousePosition(), rect);
+    if (pressedOutside) {
+        FinishEditingOnFocusLoss();
+        return;
+    }
 
     if (dragging) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {

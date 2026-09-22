@@ -492,7 +492,9 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     if (editingText && !editingText->isEditing) editingText = nullptr;
     const bool editingNav = focused && !justFocused && editingText != nullptr;
     const int edgeRequest = editingNav ? editingText->ConsumeEdgeNavRequest() : 0;
-    bool mouseHeld = hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    if (mouseActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) widget->pressOrigin = hovered;
+    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) widget->pressOrigin = nullptr;
+    bool mouseHeld = hovered && widget->pressOrigin == hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
     if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         hovered->OnConfirmed();

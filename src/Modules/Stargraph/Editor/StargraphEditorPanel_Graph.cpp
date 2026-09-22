@@ -1102,7 +1102,6 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
-                        actorClassPickerVarIndex = -1;
                         actorClassPicker.OpenWithExtras({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor",
                                                          BasicActorClassPickerEntries());
                         editingPinId = 0;

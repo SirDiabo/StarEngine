@@ -16,6 +16,7 @@ public:
 
     std::function<std::vector<PropertyRow>()> buildRows;
     std::function<void(const std::string& rowId, const std::string& pickedPath)> onAssetPicked;
+    std::function<void()> onRenderExtras;
 
 private:
     Widget* chrome = nullptr;

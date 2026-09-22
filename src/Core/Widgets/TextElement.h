@@ -38,6 +38,7 @@ protected:
 
 private:
     void BeginEditing();
+    void FinishEditingOnFocusLoss();
     void CommitEditing();
     void CancelEditing();
 

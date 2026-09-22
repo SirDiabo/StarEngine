@@ -20,7 +20,29 @@ enum class PropertyRowKind {
     Vec3,
     Asset,
     Enum,
+    Button,
+    Cells
+};
+
+enum class PropertyCellKind {
+    Label,
+    Text,
+    Number,
     Button
+};
+
+struct PropertyCell {
+    PropertyCellKind kind = PropertyCellKind::Button;
+    float width = 0.0f;
+    std::string text;
+    float number = 0.0f;
+    bool integer = false;
+    Color color{ 0, 0, 0, 0 };
+    Color textColor{ 0, 0, 0, 0 };
+    std::string placeholder;
+    std::function<void(const std::string&)> onText;
+    std::function<void(float)> onNumber;
+    std::function<void(Rectangle)> onPressed;
 };
 
 struct PropertyRow {
@@ -35,6 +57,15 @@ struct PropertyRow {
     std::vector<std::string> enumOptions;
     std::string assetExtension;
     Color iconColor{ 0, 0, 0, 0 };
+
+    bool integer = false;
+    bool commitOnly = false;
+    std::string placeholder;
+    std::vector<PropertyCell> cells;
+    float indent = 0.0f;
+    std::string trailingLabel;
+    Color trailingColor{ 0, 0, 0, 0 };
+    std::function<void(Rectangle)> onTrailingPressed;
 
     std::function<void(const std::string&)> setString;
     std::function<void(float)> setFloat;
@@ -88,6 +119,15 @@ private:
         TextElement* vecZ = nullptr;
         ButtonElement* assetOrEnumButton = nullptr;
         TextElement* assetOrEnumLabel = nullptr;
+        ButtonElement* trailingButton = nullptr;
+        TextElement* trailingLabel = nullptr;
+
+        struct CellWidgets {
+            TextElement* text = nullptr;
+            ButtonElement* button = nullptr;
+            TextElement* buttonLabel = nullptr;
+        };
+        std::vector<CellWidgets> cells;
     };
     std::vector<RowWidgets> rowWidgets;
 };

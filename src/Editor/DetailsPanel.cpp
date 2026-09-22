@@ -65,4 +65,6 @@ void DetailsPanel::Render() {
     if (assetPicker.Render(picked)) {
         if (onAssetPicked) onAssetPicked(pendingAssetRowId, picked);
     }
+
+    if (onRenderExtras) onRenderExtras();
 }

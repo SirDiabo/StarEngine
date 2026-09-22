@@ -6,6 +6,8 @@
 #include "Widget.h"
 #include "WidgetInput.h"
 #include "raylib.h"
+#include <cstdint>
+#include <string>
 
 namespace {
 
@@ -126,7 +128,7 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
 
     if (isRenamingThisRow) label_->StartEditing();
 
-    row->selectionKey = entry.id;
+    row->selectionKey = std::to_string(reinterpret_cast<uintptr_t>(this)) + ":" + entry.id;
     AddChild(row);
     visualIndex++;
 
