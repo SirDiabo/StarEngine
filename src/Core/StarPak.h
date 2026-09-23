@@ -29,6 +29,7 @@ class Reader {
 public:
     bool LoadFile(const std::string& pakPath);
     bool LoadFromExecutable(const std::string& exePath);
+    bool LoadBuffer(const std::vector<uint8_t>& buffer);
 
     bool HasEntry(const std::string& virtualPath) const;
     std::vector<uint8_t> ReadEntry(const std::string& virtualPath) const;

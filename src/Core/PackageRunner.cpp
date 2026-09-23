@@ -152,6 +152,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile);
     }
     if (isWeb) configureArgs.push_back("-DPLATFORM=Web");
+    if (isWeb) configureArgs.push_back("-DCMAKE_EXE_LINKER_FLAGS=-sALLOW_MEMORY_GROWTH=1 -sASYNCIFY=1 -sUSE_WEBGL2=1");
     else if (options.renderer == GameRenderer::Software) {
         configureArgs.push_back("-DPLATFORM=RGFW");
         configureArgs.push_back("-DOPENGL_VERSION=Software");
@@ -189,9 +190,148 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     }
 
     if (isWeb) {
-        
+        std::error_code ec;
+        fs::create_directories(options.outputDir, ec);
+        if (ec) {
+            result.error = "Could not create output directory: " + ec.message();
+            return result;
+        }
+
+        fs::path foundHtml;
+        fs::path foundJs;
+        fs::path foundWasm;
+        for (const auto& entry : fs::directory_iterator(buildDir, ec)) {
+            if (!entry.is_regular_file()) continue;
+            std::string ext = entry.path().extension().string();
+            if (ext == ".html" && foundHtml.empty()) foundHtml = entry.path();
+            else if (ext == ".js" && foundJs.empty()) foundJs = entry.path();
+            else if (ext == ".wasm" && foundWasm.empty()) foundWasm = entry.path();
+        }
+
+        if (foundHtml.empty() && foundJs.empty()) {
+            result.error = "Build succeeded but no HTML/JS output was found in the build directory.";
+            return result;
+        }
+
+        auto copyIfExists = [&](const fs::path& src, const fs::path& dst) {
+            if (src.empty()) return;
+            fs::copy_file(src, dst, fs::copy_options::overwrite_existing, ec);
+            ec.clear();
+        };
+
+        fs::path outputHtml = fs::path(options.outputDir) / foundHtml.filename().string();
+        copyIfExists(foundHtml, outputHtml);
+        copyIfExists(foundJs, fs::path(options.outputDir) / foundJs.filename().string());
+        copyIfExists(foundWasm, fs::path(options.outputDir) / foundWasm.filename().string());
+
+        fs::path outputExe = !foundHtml.empty() ? outputHtml : fs::path(options.outputDir) / foundJs.filename().string();
+
+        const ProjectSettings& settings = Project::Get().GetSettings();
+        if (!settings.name.empty()) {
+            if (!foundHtml.empty()) {
+                std::string renamedFilename = settings.name + ".html";
+                fs::path renamedPath = fs::path(options.outputDir) / renamedFilename;
+                if (renamedPath != outputHtml) {
+                    std::error_code renameEc;
+                    fs::rename(outputHtml, renamedPath, renameEc);
+                    if (!renameEc) outputExe = renamedPath;
+                }
+            } else if (!foundJs.empty()) {
+                std::string htmlFilename = settings.name + ".html";
+                fs::path generatedHtml = fs::path(options.outputDir) / htmlFilename;
+                std::ofstream htmlOut(generatedHtml);
+                htmlOut << "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n";
+                htmlOut << "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n";
+                htmlOut << "  <title>" << settings.name << "</title>\n";
+                htmlOut << "  <style>body{margin:0;padding:0;background:#000;overflow:hidden;}canvas{display:block;width:100vw;height:100vh;}</style>\n";
+                htmlOut << "</head>\n<body>\n";
+                htmlOut << "  <canvas id=\"canvas\"></canvas>\n";
+                htmlOut << "  <script>var Module={canvas:document.getElementById('canvas')};</script>\n";
+                htmlOut << "  <script src=\"" << foundJs.filename().string() << "\"></script>\n</body>\n</html>\n";
+                outputHtml = generatedHtml;
+                outputExe = generatedHtml;
+            }
+        }
+
+        fs::path defaultIcon = engineRoot / "Assets" / "logo.png";
+        if (fs::exists(defaultIcon)) {
+            fs::copy_file(defaultIcon, fs::path(options.outputDir) / "icon.png",
+                           fs::copy_options::overwrite_existing, ec);
+            ec.clear();
+        }
+
+        fs::path contentRoot = fs::path(options.projectRoot) / "Content";
+        std::string cipherKey = options.cipher == CookCipher::None ? "" : GenerateCipherKey();
+
+        fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
+        std::vector<uint8_t> inputMappingsBytes;
+        if (fs::exists(inputMappingsSource)) {
+            std::ifstream mappingsIn(inputMappingsSource, std::ios::binary);
+            inputMappingsBytes.assign(std::istreambuf_iterator<char>(mappingsIn), std::istreambuf_iterator<char>());
+        }
+
+        PackagedGameConfig bootConfig;
+        bootConfig.name = settings.name;
+        bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
+        bootConfig.shadingType = RenderSettings::Get().GetShadingType();
+        bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
+        bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
+        bootConfig.renderer = rendererKey;
+        bootConfig.cipher = CookCipherName(options.cipher);
+        bootConfig.cipherKey = cipherKey;
+
+        const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
+        if (activeTechnique && activeTechnique->collectPackagedSettings) {
+            bootConfig.moduleSettings = activeTechnique->collectPackagedSettings();
+        }
+
+        if (options.format == PackageFormat::SingleFile) {
+            fs::path pakTempPath = fs::path(options.outputDir) / "content.starpak";
+
+            std::vector<PackageCooker::ExtraPakFile> extraFiles;
+            if (!inputMappingsBytes.empty()) {
+                extraFiles.push_back({StarPak::kInputMappingsPath, inputMappingsBytes});
+            }
+
+            CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
+                                                                options.cipher, cipherKey, bootConfig.ToText(), extraFiles);
+            if (!cookResult.success) {
+                result.error = "Cooking failed: " + cookResult.error;
+                return result;
+            }
+            result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
+                " files into a single .starpak.\n";
+            if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
+                " files into a single .starpak.\n");
+
+            fs::path bootstrapPath = fs::path(options.outputDir) / (foundJs.stem().string() + ".starproject");
+            std::ofstream out(bootstrapPath);
+            out << bootConfig.ToText();
+        } else {
+            fs::path outputContentDir = fs::path(options.outputDir) / "Content";
+
+            CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string(),
+                                                                options.cipher, cipherKey);
+            if (!cookResult.success) {
+                result.error = "Cooking failed: " + cookResult.error;
+                return result;
+            }
+            result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n";
+            if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) + " files.\n");
+
+            if (!inputMappingsBytes.empty()) {
+                fs::path outputMappingsPath = fs::path(options.outputDir) / "Config" / "InputMappings.cfg";
+                std::ofstream mappingsOut(outputMappingsPath, std::ios::binary);
+                mappingsOut.write(reinterpret_cast<const char*>(inputMappingsBytes.data()), (std::streamsize)inputMappingsBytes.size());
+            }
+
+            fs::path bootstrapPath = fs::path(options.outputDir) / (foundJs.stem().string() + ".starproject");
+            std::ofstream out(bootstrapPath);
+            out << bootConfig.ToText();
+        }
+
         result.success = true;
-        result.outputExecutable = buildDir.string();
+        result.outputExecutable = outputHtml.string();
         return result;
     }
 

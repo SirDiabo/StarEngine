@@ -31,6 +31,10 @@
 #include <cstdio>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 namespace fs = std::filesystem;
 
 static std::string FindBootstrapFile(const fs::path& exeDir) {
@@ -38,8 +42,31 @@ static std::string FindBootstrapFile(const fs::path& exeDir) {
     for (const auto& entry : fs::directory_iterator(exeDir, ec)) {
         if (entry.path().extension() == ".starproject") return entry.path().string();
     }
+
+    fs::path candidate = exeDir / (fs::path(exeDir).stem().string() + ".starproject");
+    if (fs::exists(candidate)) return candidate.string();
+
     return "";
 }
+
+#ifdef __EMSCRIPTEN__
+static std::vector<uint8_t> g_webPakBytes;
+static bool g_webPakReady = false;
+
+extern "C" void OnWebPakLoaded(void* userData, void* data, int size) {
+    g_webPakBytes.assign((uint8_t*)data, (uint8_t*)data + size);
+    g_webPakReady = true;
+}
+
+static std::string FetchTextSync(const std::string& url) {
+    std::string script = "(() => { try { var xhr = new XMLHttpRequest(); xhr.open('GET', '" + url + "', false); xhr.send(null); if (xhr.status === 200) return xhr.responseText; } catch(e) {} return ''; })()";
+    char* raw = emscripten_run_script_string(script.c_str());
+    if (!raw) return "";
+    std::string text(raw);
+    free(raw);
+    return text;
+}
+#endif
 
 int main(int argc, char* argv[]) {
     std::string resolvedExe = GetExecutablePath();
@@ -49,6 +76,12 @@ int main(int argc, char* argv[]) {
     fs::path exeDir = exePath.empty() ? fs::current_path() : exePath.parent_path();
     if (exeDir.empty()) exeDir = fs::current_path();
     exeDir = fs::absolute(exeDir, ec);
+
+    std::string bootstrapPath = FindBootstrapFile(exeDir);
+    if (bootstrapPath.empty()) {
+        fs::path cwd = fs::current_path();
+        bootstrapPath = FindBootstrapFile(cwd);
+    }
 
     PackagedGameConfig config;
 
@@ -78,14 +111,89 @@ int main(int argc, char* argv[]) {
         freopen_s(&consoleErr, "CONOUT$", "w", stderr);
 #endif
         std::string bootstrapPath = FindBootstrapFile(exeDir);
-        if (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
+        fs::path bootstrapDir = exeDir;
+        if (bootstrapPath.empty()) {
+            fs::path cwd = fs::current_path();
+            bootstrapPath = FindBootstrapFile(cwd);
+            if (!bootstrapPath.empty()) bootstrapDir = cwd;
+        }
+
+        bool bootstrapLoaded = false;
+        bool pakLoaded = false;
+#ifdef __EMSCRIPTEN__
+        if (bootstrapPath.empty()) {
+            fs::path candidate = bootstrapDir / "StarEngineGame.starproject";
+            if (fs::exists(candidate)) bootstrapPath = candidate.string();
+        }
+
+        if (!bootstrapLoaded && !bootstrapPath.empty() && PackagedGameConfig::LoadFromFile(bootstrapPath, config)) {
+            bootstrapLoaded = true;
+        }
+
+        if (!bootstrapLoaded) {
+            std::string text = FetchTextSync("StarEngineGame.starproject");
+            if (!text.empty() && PackagedGameConfig::LoadFromText(text, config)) {
+                bootstrapLoaded = true;
+            }
+        }
+
+        if (!pakLoaded) {
+            emscripten_async_wget_data("content.starpak", NULL, OnWebPakLoaded, NULL);
+            for (int i = 0; i < 600 && !g_webPakReady; ++i) emscripten_sleep(50);
+            if (g_webPakReady) {
+                StarPak::Reader sibling;
+                if (sibling.LoadBuffer(g_webPakBytes)) {
+                    pakLoaded = true;
+                    if (sibling.HasEntry(StarPak::kInputMappingsPath)) {
+                        std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
+                        InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
+                    }
+                    CookedFile::SetActivePak(std::move(sibling), CookCipherFromName(config.cipher), config.cipherKey);
+                    TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+                }
+            }
+        }
+
+        if (!pakLoaded) {
+            ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
+            CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+            InputMappingRegistry::Get().Load(bootstrapDir.string());
+            TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+        }
+#else
+        if (bootstrapPath.empty()) {
+            fs::path candidate = bootstrapDir / (fs::path(bootstrapDir).stem().string() + ".starproject");
+            if (fs::exists(candidate)) bootstrapPath = candidate.string();
+        }
+
+        if (!bootstrapLoaded && (bootstrapPath.empty() || !PackagedGameConfig::LoadFromFile(bootstrapPath, config))) {
             TraceLog(LOG_ERROR, "GameMain: no embedded pak and no .starproject bootstrap found next to the exe");
             return 1;
         }
-        ContentPathResolver::SetContentRoot((exeDir / "Content").string());
-        CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
-        InputMappingRegistry::Get().Load(exeDir.string());
-        TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+
+        fs::path siblingPak = bootstrapDir / "content.starpak";
+        if (fs::exists(siblingPak)) {
+            StarPak::Reader sibling;
+            if (sibling.LoadFile(siblingPak.string())) {
+                if (sibling.HasEntry(StarPak::kInputMappingsPath)) {
+                    std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
+                    InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
+                }
+                CookedFile::SetActivePak(std::move(sibling), CookCipherFromName(config.cipher), config.cipherKey);
+                TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+            } else {
+                ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
+                CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+                InputMappingRegistry::Get().Load(bootstrapDir.string());
+                TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+            }
+        } else {
+            ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
+            CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+            InputMappingRegistry::Get().Load(bootstrapDir.string());
+            TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+        }
+#endif
     }
 
     RegisterAllModules();

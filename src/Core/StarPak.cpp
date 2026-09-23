@@ -116,6 +116,10 @@ bool Reader::LoadFile(const std::string& pakPath) {
     return ParseFromBuffer(std::move(buffer));
 }
 
+bool Reader::LoadBuffer(const std::vector<uint8_t>& buffer) {
+    return ParseFromBuffer(std::vector<uint8_t>(buffer));
+}
+
 bool Reader::LoadFromExecutable(const std::string& exePath) {
     std::ifstream in(exePath, std::ios::binary);
     if (!in.is_open()) return false;
