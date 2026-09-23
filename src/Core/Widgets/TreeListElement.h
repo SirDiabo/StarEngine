@@ -71,6 +71,7 @@ private:
     std::vector<RowInfo> rowInfos;
     bool externalDragFired = false;
     std::string renamingId;
+    bool needsDeferredRebuild = false;
     std::string lastClickedId;
     float lastClickTime = -1.0f;
 };

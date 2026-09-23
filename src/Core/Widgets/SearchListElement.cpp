@@ -38,6 +38,9 @@ SearchListElement::SearchListElement() {
         listBox->scrollOffset = 0.0f;
         RebuildRows();
     };
+    searchBox->onTextCommitted = [this](const std::string&) {
+        if (!creatingNew && !highlightedEntryId.empty() && onEntrySelected) onEntrySelected(highlightedEntryId);
+    };
     AddChild(searchBox);
 
     listBox = new BoxElement();
@@ -118,12 +121,6 @@ void SearchListElement::ExitCreateMode() {
 
 void SearchListElement::OnDrawSelf(Rectangle rect, float uiScale) {
     if (backgroundColor.a > 0) DrawRectangleRec(rect, backgroundColor);
-}
-
-void SearchListElement::OnTickSelf(float deltaTime, Rectangle rect, float uiScale) {
-    if (!creatingNew && searchBox->isEditing && IsKeyPressed(KEY_ENTER) && !highlightedEntryId.empty()) {
-        if (onEntrySelected) onEntrySelected(highlightedEntryId);
-    }
 }
 
 void SearchListElement::RebuildRows() {

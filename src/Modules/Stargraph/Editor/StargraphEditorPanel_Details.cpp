@@ -472,6 +472,12 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
     rows.push_back(HeaderRow("comp.type", comp.componentType));
     rows.push_back(StringRow("comp.name", "Name", comp.name, [this, idx](const std::string& value) {
         if (ComponentDecl* c = DetailComponent(idx)) {
+            std::string oldName = c->name;
+            if (oldName != value) {
+                for (ComponentDecl& other : graph.GetComponents()) {
+                    if (other.parentName == oldName) other.parentName = value;
+                }
+            }
             c->name = value;
             isDirty = true;
         }
@@ -769,9 +775,6 @@ void StargraphEditorPanel::RenderDetailPickers(Rectangle panel) {
                                 InputMappingRegistry::Get().SetMapping(mappingName, mapping);
                             }
                         }
-                        listeningForInputBindingMappingIndex = -1;
-                        listeningForInputBindingIndex = -1;
-                    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         listeningForInputBindingMappingIndex = -1;
                         listeningForInputBindingIndex = -1;
                     }

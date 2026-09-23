@@ -133,6 +133,7 @@ void StargraphEditorPanel::BuildLeftPanelChrome() {
         int index = (int)graph.GetFunctions().size() - 1;
         selectedFunctionIndex = index;
         lastValidFunctionIndex = index;
+        ClearOtherLeftSelections(0);
         isDirty = true;
         pendingRenameList = 0;
         pendingRenameIndex = index;
@@ -184,6 +185,7 @@ void StargraphEditorPanel::BuildLeftPanelChrome() {
         int index = (int)graph.GetVariables().size() - 1;
         selectedVariableIndex = index;
         lastValidVariableIndex = index;
+        ClearOtherLeftSelections(1);
         isDirty = true;
         pendingRenameList = 1;
         pendingRenameIndex = index;
@@ -240,6 +242,7 @@ void StargraphEditorPanel::BuildLeftPanelChrome() {
         int index = (int)ActiveGraph().GetVariables().size() - 1;
         selectedLocalVariableIndex = index;
         lastValidLocalVariableIndex = index;
+        ClearOtherLeftSelections(2);
         isDirty = true;
         pendingRenameList = 2;
         pendingRenameIndex = index;

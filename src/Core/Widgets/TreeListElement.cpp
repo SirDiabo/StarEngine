@@ -33,9 +33,12 @@ TreeListElement::TreeListElement() {
 }
 
 void TreeListElement::SetEntries(std::vector<Entry> newEntries) {
-    if (EntriesEqual(entries, newEntries)) return;
-    entries = std::move(newEntries);
-    RebuildRows();
+    bool changed = !EntriesEqual(entries, newEntries);
+    if (changed) entries = std::move(newEntries);
+    if (changed || needsDeferredRebuild) {
+        needsDeferredRebuild = false;
+        RebuildRows();
+    }
 }
 
 void TreeListElement::BeginRename(const std::string& id) {
@@ -116,11 +119,11 @@ void TreeListElement::AddRowRecursive(int entryIndex, int depth, int& visualInde
         label_->onTextCommitted = [this, id](const std::string& newName) {
             if (onRenameRequested && !newName.empty()) onRenameRequested(id, newName);
             renamingId.clear();
-            RebuildRows();
+            needsDeferredRebuild = true;
         };
         label_->onEditCancelled = [this]() {
             renamingId.clear();
-            RebuildRows();
+            needsDeferredRebuild = true;
         };
     }
 
