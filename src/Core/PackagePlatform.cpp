@@ -5,7 +5,7 @@ namespace {
 
 bool CommandExists(const std::string& name) {
 #ifdef _WIN32
-    std::string cmd = "where " + name + " >nul 2>nul";
+    std::string cmd = "where.exe " + name + " >nul 2>nul";
 #else
     std::string cmd = "which " + name + " >/dev/null 2>&1";
 #endif

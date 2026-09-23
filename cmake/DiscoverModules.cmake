@@ -63,7 +63,10 @@ foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
         endforeach()
 
         if(EXISTS "${_normalized_dir}/CMakeLists.txt")
-            add_subdirectory("${_normalized_dir}" "${CMAKE_BINARY_DIR}/modules/${_module_name}")
+            if(_starengine_module_editor_only AND STARENGINE_BUILD_GAME)
+            else()
+                add_subdirectory("${_normalized_dir}" "${CMAKE_BINARY_DIR}/modules/${_module_name}")
+            endif()
         elseif(_starengine_module_editor_only)
             file(GLOB_RECURSE _module_sources CONFIGURE_DEPENDS
                 "${_normalized_dir}/*.cpp" "${_normalized_dir}/*.c")
