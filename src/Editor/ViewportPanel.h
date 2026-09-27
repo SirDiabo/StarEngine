@@ -12,6 +12,8 @@
 
 class Actor;
 class LogPanel;
+class Widget;
+class TextElement;
 
 class ViewportPanel : public Panel {
 public:
@@ -30,6 +32,7 @@ public:
     const std::string& GetMapPath() const { return mapPath; }
     bool IsMapLoaded() const { return mapLoaded; }
     bool IsMapDirty() const { return mapDirty; }
+    bool IsDirty() const override { return mapDirty; }
 
     bool IsPlaying() const { return playing; }
 
@@ -102,7 +105,9 @@ private:
     bool gridSnapEnabled = false;
     float gridStepSize = 100.0f;
     char gridStepBuf[32] = "100.0";
-    int toolbarActiveField = 0;
+
+    Widget* toolbarChrome = nullptr;
+    TextElement* gridStepField = nullptr;
 
     static const float toolbarHeight;
 };

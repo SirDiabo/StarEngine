@@ -12,7 +12,6 @@
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/DragDropController.h"
@@ -885,7 +884,8 @@ void ContentBrowserPanel::Render() {
     if (!iconsLoaded && IsWindowReady()) LoadIcons();
 
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(bounds);
+    DrawRectangleRec(bounds, theme.panelBg);
+    DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     if (Project::Get().GetRootPath().empty()) {
         DrawText("No Project Loaded", (int)bounds.x + 10, (int)bounds.y + 10, 14, theme.textSecondary);

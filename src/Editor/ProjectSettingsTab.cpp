@@ -1,5 +1,4 @@
 #include "ProjectSettingsTab.h"
-#include "PropertyFields.h"
 #include "MenuBar.h"
 #include "Core/Project.h"
 #include "Core/NamedListRegistry.h"
@@ -7,13 +6,40 @@
 #include "Core/RenderSettings.h"
 #include "Core/ShadingTechniqueRegistry.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 #include <filesystem>
 #include <cstdio>
 
 namespace fs = std::filesystem;
+
+static bool InlineButton(Rectangle r, const char* label) {
+    const UIPalette& theme = UITheme::Get();
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRec(r, hovered ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(r, 1, theme.buttonBorder);
+    int tw = MeasureText(label, 11);
+    DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11, theme.textPrimary);
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+static bool InlineBoolBox(Rectangle r, bool& value) {
+    const UIPalette& theme = UITheme::Get();
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRec(r, hovered ? theme.surfaceHover : theme.fieldBg);
+    DrawRectangleLinesEx(r, 1, theme.fieldBorder);
+    if (value) {
+        float pad = r.width * 0.22f;
+        DrawRectangleRec({r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2}, theme.accent);
+    }
+    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        value = !value;
+        return true;
+    }
+    return false;
+}
 
 void ProjectSettingsTab::Initialize() {
     title     = "Project Settings";
@@ -175,14 +201,34 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
     DrawText("Render Scale", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle scaleRow = {fx, fy, 100.0f, 20};
-    float renderScalePct = RenderSettings::Get().GetRenderScale() * 100.0f;
-    float prevRenderScalePct = renderScalePct;
-    PropertyField::FloatBox(scaleRow, renderScaleBuf, sizeof(renderScaleBuf), 4, activeField, renderScalePct);
-    DrawText("%", (int)scaleRow.x + 106, (int)scaleRow.y + 4, 12, theme.textSecondary);
-    if (renderScalePct != prevRenderScalePct) {
-        if (renderScalePct < 10.0f) renderScalePct = 10.0f;
-        RenderSettings::Get().SetRenderScale(renderScalePct / 100.0f);
+    if (!renderScaleChrome) {
+        renderScaleChrome = new Widget();
+        auto* root = new WidgetElement();
+        renderScaleChrome->SetRoot(root);
+        renderScaleField = new TextElement();
+        renderScaleField->editable = true;
+        renderScaleField->numericOnly = true;
+        renderScaleField->fontSize = 12.0f;
+        renderScaleField->backgroundColor = theme.fieldBg;
+        renderScaleField->borderColor = theme.fieldBorder;
+        renderScaleField->editingBorderColor = theme.accent;
+        renderScaleField->onTextCommitted = [this](const std::string& text) {
+            float pct = (float)atof(text.c_str());
+            if (pct < 10.0f) pct = 10.0f;
+            RenderSettings::Get().SetRenderScale(pct / 100.0f);
+        };
+        root->AddChild(renderScaleField);
     }
+    if (!renderScaleField->isEditing) {
+        renderScaleField->text = renderScaleBuf;
+    }
+    renderScaleField->size = { scaleRow.width, scaleRow.height };
+    renderScaleField->offset = { scaleRow.x, scaleRow.y };
+    float dt = GetFrameTime();
+    renderScaleChrome->Tick(dt, {0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    WidgetInput::ProcessInput(renderScaleChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    renderScaleChrome->Draw({0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    DrawText("%", (int)scaleRow.x + 106, (int)scaleRow.y + 4, 12, theme.textSecondary);
     fy += 20;
     DrawText("Percentage of the window resolution the 3D scene renders at, upscaled with nearest-neighbor.",
               (int)fx, (int)fy, 10, theme.textSecondary);
@@ -233,12 +279,12 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
         DrawText(saveFileName.c_str(), (int)nameCol.x + 6, (int)nameCol.y + 4, 12, theme.textPrimary);
 
         bool encrypted = SaveFileRegistry::Get().IsEncrypted(saveFileName);
-        if (PropertyField::BoolBox(encRow, encrypted)) {
+        if (InlineBoolBox(encRow, encrypted)) {
             SaveFileRegistry::Get().SetEncrypted(saveFileName, encrypted);
         }
         DrawText("Enc", (int)encRow.x + 22, (int)encRow.y + 2, 10, theme.textSecondary);
 
-        if (UIWidget::Button(delBtn, "x")) removeName = saveFileName;
+        if (InlineButton(delBtn, "x")) removeName = saveFileName;
 
         fy += 22;
     }
@@ -246,12 +292,30 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
 
     Rectangle newNameRow = {fx, fy, fw - 60, 20};
     Rectangle addBtn     = {fx + fw - 56, fy, 56, 20};
-    PropertyField::StringBox(newNameRow, newSaveFileBuf, sizeof(newSaveFileBuf), 3, activeField, newSaveFileName,
-                              true, "New save file name");
-    if (UIWidget::Button(addBtn, "+ Add") && !newSaveFileName.empty()) {
+    if (!newSaveNameChrome) {
+        newSaveNameChrome = new Widget();
+        auto* root = new WidgetElement();
+        newSaveNameChrome->SetRoot(root);
+        newSaveNameField = new TextElement();
+        newSaveNameField->editable = true;
+        newSaveNameField->fontSize = 12.0f;
+        newSaveNameField->placeholder = "New save file name";
+        newSaveNameField->backgroundColor = theme.fieldBg;
+        newSaveNameField->borderColor = theme.fieldBorder;
+        newSaveNameField->editingBorderColor = theme.accent;
+        newSaveNameField->onTextChanged = [this](const std::string& text) { newSaveFileName = text; };
+        root->AddChild(newSaveNameField);
+    }
+    newSaveNameField->size = { newNameRow.width, newNameRow.height };
+    newSaveNameField->offset = { newNameRow.x, newNameRow.y };
+    float dt2 = GetFrameTime();
+    newSaveNameChrome->Tick(dt2, {0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    WidgetInput::ProcessInput(newSaveNameChrome, WidgetInput::kEditorDevice, dt2, GetMousePosition(), 1.0f);
+    newSaveNameChrome->Draw({0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    if (InlineButton(addBtn, "+ Add") && !newSaveFileName.empty()) {
         NamedListRegistry::Get().AddEntry(SaveFileRegistry::Category(), newSaveFileName);
         newSaveFileName.clear();
-        newSaveFileBuf[0] = '\0';
+        newSaveNameField->text.clear();
     }
     fy += 30;
 }

@@ -9,6 +9,7 @@ public:
 
     const char* GetName() const { return name; }
     bool IsVisible() const { return visible; }
+    virtual bool IsDirty() const { return false; }
     void SetVisible(bool v) { visible = v; }
 
     Rectangle bounds = { 0, 0, 300, 400 };

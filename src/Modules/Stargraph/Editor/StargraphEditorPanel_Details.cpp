@@ -6,7 +6,6 @@
 #include "Core/SaveFileRegistry.h"
 #include "Core/SafeParse.h"
 #include "Editor/UITheme.h"
-#include "Editor/UIWidgets.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/TreeListElement.h"
@@ -101,7 +100,8 @@ void StargraphEditorPanel::BuildComponentChrome() {
 
 void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(area);
+    DrawRectangleRec(area, theme.panelBg);
+    DrawRectangleLinesEx(area, 1, theme.panelBorder);
 
     float y = area.y + 6;
     bool popupWasOpenThisFrame = addComponentMenu.IsOpen();
@@ -109,7 +109,13 @@ void StargraphEditorPanel::RenderComponentOutliner(Rectangle area) {
     DrawText("Components", (int)area.x + 8, (int)y, 12, theme.textSecondary);
 
     Rectangle addBtn = {area.x + area.width - 50, y - 2, 44, 16};
-    if (UIWidget::Button(addBtn, "+ Add")) {
+    bool addHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), addBtn);
+    DrawRectangleRec(addBtn, addHov ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(addBtn, 1, theme.buttonBorder);
+    int addTextW = MeasureText("+ Add", 10);
+    DrawText("+ Add", (int)(addBtn.x + (addBtn.width - addTextW) / 2.0f),
+             (int)(addBtn.y + (addBtn.height - 10) / 2.0f), 10, theme.textPrimary);
+    if (addHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (addComponentMenu.IsOpen()) addComponentMenu.Close();
         else addComponentMenu.Open({addBtn.x, addBtn.y + addBtn.height});
     }

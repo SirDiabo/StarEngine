@@ -3,6 +3,9 @@
 #include <string>
 #include <vector>
 
+class Widget;
+class TextElement;
+
 struct ProjectInfo {
     std::string name;
     std::string path;
@@ -43,4 +46,8 @@ private:
 
     void ScanProjects();
     void LoadLogoIfNeeded();
+
+    Widget* chrome = nullptr;
+    TextElement* nameField = nullptr;
+    void EnsureChrome();
 };

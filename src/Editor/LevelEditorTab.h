@@ -22,6 +22,7 @@ public:
 
     LogPanel*            GetLogPanel()     const { return logPanel; }
     ViewportPanel*       GetViewport()     const { return viewportPanel; }
+    bool IsDirty() const override;
     ContentBrowserPanel* GetContentPanel() const { return contentPanel; }
 
     bool HasUnsavedLevelChanges() const;

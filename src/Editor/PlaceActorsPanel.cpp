@@ -1,6 +1,6 @@
 #include "PlaceActorsPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "Core/EmbeddedAssets.h"
 
 PlaceActorsPanel::~PlaceActorsPanel() {
@@ -35,7 +35,8 @@ void PlaceActorsPanel::Render() {
     if (!iconsLoaded && IsWindowReady()) LoadIcons();
 
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(bounds);
+    DrawRectangleRec(bounds, theme.panelBg);
+    DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     Vector2 mousePos = GetMousePosition();
     const std::vector<BasicActorDef>& defs = GetBasicActorDefs();
@@ -45,9 +46,9 @@ void PlaceActorsPanel::Render() {
 
     for (size_t i = 0; i < defs.size(); i++) {
         Rectangle row = {bounds.x + 4, y, bounds.width - 8, rowHeight - 4};
-        bool hovered = CheckCollisionPointRec(mousePos, row);
+        bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mousePos, row);
 
-        DrawRectangleRounded(row, 0.15f, 4, UIWidget::SelectableBg(hovered, false, theme.buttonBg));
+        DrawRectangleRounded(row, 0.15f, 4, hovered ? theme.surfaceHover : theme.buttonBg);
 
         Rectangle iconRect = {row.x + 6, row.y + 5, rowHeight - 14, rowHeight - 14};
         Texture2D icon = GetIconForDef(defs[i]);

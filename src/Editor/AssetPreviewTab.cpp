@@ -2,7 +2,8 @@
 #include "MenuBar.h"
 #include "AssetImporter.h"
 #include "Core/StarAsset.h"
-#include "raygui.h"
+#include "UITheme.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 #include <filesystem>
 #include <filesystem>
@@ -43,13 +44,20 @@ void AssetPreviewTab::Render(float x, float y, float width, float height) {
 
     DrawText(title.c_str(), (int)x + 6, (int)y + 8, 13, WHITE);
 
+    const UIPalette& theme = UITheme::Get();
     float reimportW = 70.0f;
     Rectangle reimportBtn = {x + width - reimportW - 4, y + 3, reimportW, PREVIEW_TOP_H - 6};
-    if (GuiButton(reimportBtn, "Reimport")) {
+    bool reimportHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), reimportBtn);
+    DrawRectangleRec(reimportBtn, reimportHov ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(reimportBtn, 1, theme.buttonBorder);
+    int reimportTextW = MeasureText("Reimport", 11);
+    DrawText("Reimport", (int)(reimportBtn.x + (reimportBtn.width - reimportTextW) / 2.0f),
+             (int)(reimportBtn.y + (reimportBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+    if (reimportHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         std::string reimported = AssetImporter::Reimport(assetPath);
         if (!reimported.empty()) {
             viewport.OnReimport();
-    ImportDetailsPanel::Get().Open(assetPath, assetType, true);
+            ImportDetailsPanel::Get().Open(assetPath, assetType, true);
         }
     }
 

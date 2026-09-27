@@ -1,6 +1,5 @@
 #include "LoadingPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
 #include <cmath>
 
 LoadingPanel& LoadingPanel::Get() {
@@ -34,7 +33,8 @@ void LoadingPanel::Render() {
     float boxW = 520.0f;
     float boxH = 110.0f;
     Rectangle box = {screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH};
-    UIWidget::Panel(box);
+    DrawRectangleRec(box, theme.panelBg);
+    DrawRectangleLinesEx(box, 1, theme.panelBorder);
 
     DrawText(title.c_str(), (int)box.x + 16, (int)box.y + 16, 16, theme.textPrimary);
 

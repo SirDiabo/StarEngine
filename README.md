@@ -6,8 +6,6 @@ StarEngine is a indie-first game engine for games in the style of the fifth cons
 
 Built on [raylib](https://github.com/raysan5/raylib) for windowing, input, audio, and rendering.
 
-Uses [raygui](https://github.com/raysan5/raygui) for editor UI controls.
-
 ## Projects
 
 Projects are stored as `.starproject` files in `Documents/StarProjects/`.
@@ -72,4 +70,4 @@ If you find StarEngine useful, consider [supporting me on Ko-fi](https://ko-fi.c
 
 StarEngine is released under the [MIT License](LICENSE).
 
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for licenses of included third-party components (raylib, raygui).
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for licenses of included third-party components (raylib).

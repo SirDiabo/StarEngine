@@ -1,8 +1,7 @@
 #include "StargraphEditorPanel.h"
 #include "Editor/ViewportPanel.h"
 #include "Editor/UITheme.h"
-#include "Editor/UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/WidgetInput.h"
 
 const float StargraphEditorPanel::minNodeWidth   = 160.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
@@ -72,7 +71,6 @@ void StargraphEditorPanel::ResetTransientEditState() {
     listeningForKeyPinId = 0;
     keyPickerOpen = false;
     keyPickerPinId = 0;
-    keyPickerSearch[0] = '\0';
     ResetDetailPickers();
     canvasState.scroll = {0, 0};
     canvasState.didPan = false;
@@ -110,7 +108,13 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
     float btnLeft = area.x + 8;
 
     Rectangle saveBtn = {btnLeft, btnY, 50, 22};
-    if (UIWidget::Button(saveBtn, "Save")) {
+    bool saveHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), saveBtn);
+    DrawRectangleRec(saveBtn, saveHov ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(saveBtn, 1, theme.buttonBorder);
+    int saveTextW = MeasureText("Save", 11);
+    DrawText("Save", (int)(saveBtn.x + (saveBtn.width - saveTextW) / 2.0f),
+             (int)(saveBtn.y + (saveBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+    if (saveHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         SaveGraph();
     }
     btnLeft += 54;
@@ -127,7 +131,13 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
     float btnRight = area.x + area.width - 4;
 
     Rectangle closeBtn = {btnRight - 22, btnY, 22, 22};
-    if (UIWidget::Button(closeBtn, "X")) {
+    bool closeHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), closeBtn);
+    DrawRectangleRec(closeBtn, closeHov ? theme.dangerBg : theme.buttonBg);
+    DrawRectangleLinesEx(closeBtn, 1, theme.buttonBorder);
+    int closeTextW = MeasureText("X", 11);
+    DrawText("X", (int)(closeBtn.x + (closeBtn.width - closeTextW) / 2.0f),
+             (int)(closeBtn.y + (closeBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+    if (closeHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (isDirty) SaveGraph();
         Close();
         return;

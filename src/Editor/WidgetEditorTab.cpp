@@ -348,6 +348,10 @@ bool WidgetEditorTab::IsOpen() const {
     return session && session->IsOpen();
 }
 
+bool WidgetEditorTab::IsDirty() const {
+    return session && session->IsDirty();
+}
+
 void WidgetEditorTab::ResetLayout() {
     for (const std::string& n : { "Palette", "Hierarchy", "Canvas", "Details", "Logs" })
         dockArea.SetPanelVisible(n, true);

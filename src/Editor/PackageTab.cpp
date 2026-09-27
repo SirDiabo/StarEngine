@@ -4,12 +4,91 @@
 #include "Core/PackageRunner.h"
 #include "LoadingPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
+#include <vector>
 #include <filesystem>
 
 namespace fs = std::filesystem;
+
+static bool PackageTabButton(Rectangle r, const char* label, bool enabled = true) {
+    const UIPalette& theme = UITheme::Get();
+    bool hovered = enabled && !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRec(r, !enabled ? theme.buttonBg : (hovered ? theme.buttonHover : theme.buttonBg));
+    DrawRectangleLinesEx(r, 1, theme.buttonBorder);
+    int tw = MeasureText(label, 11);
+    DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11,
+             enabled ? theme.textPrimary : theme.textSecondary);
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+static void PackageTabWrapLine(const std::string& line, int fontSize, float maxWidth, std::vector<std::string>& out) {
+    if (line.empty()) { out.push_back(""); return; }
+    std::string current;
+    for (char c : line) {
+        std::string candidate = current + c;
+        if (!current.empty() && MeasureText(candidate.c_str(), fontSize) > maxWidth) {
+            out.push_back(current);
+            current = std::string(1, c);
+        } else {
+            current = candidate;
+        }
+    }
+    out.push_back(current);
+}
+
+static void PackageTabScrollableLog(Rectangle r, const std::string& content, float& scrollOffset) {
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleRec(r, theme.fieldBg);
+    DrawRectangleLinesEx(r, 1, theme.fieldBorder);
+
+    float lineHeight = 13.0f;
+    float padding = 6.0f;
+    int fontSize = 10;
+    float maxTextWidth = r.width - padding * 2 - 8.0f;
+
+    std::vector<std::string> lines;
+    std::string rawLine;
+    for (char c : content) {
+        if (c == '\n') {
+            PackageTabWrapLine(rawLine, fontSize, maxTextWidth, lines);
+            rawLine.clear();
+        } else {
+            rawLine += c;
+        }
+    }
+    PackageTabWrapLine(rawLine, fontSize, maxTextWidth, lines);
+
+    float contentHeight = (float)lines.size() * lineHeight;
+    float visibleHeight = r.height - padding * 2;
+
+    if (!WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r)) {
+        scrollOffset -= GetMouseWheelMove() * lineHeight * 3;
+    }
+
+    float maxScroll = (contentHeight > visibleHeight) ? (contentHeight - visibleHeight) : 0.0f;
+    if (scrollOffset < 0.0f) scrollOffset = 0.0f;
+    if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+
+    BeginScissorMode((int)r.x + 1, (int)r.y + 1, (int)r.width - 2, (int)r.height - 2);
+    float y = r.y + padding - scrollOffset;
+    for (const std::string& l : lines) {
+        if (y > r.y - lineHeight && y < r.y + r.height) {
+            DrawText(l.c_str(), (int)(r.x + padding), (int)y, fontSize, theme.textSecondary);
+        }
+        y += lineHeight;
+    }
+    EndScissorMode();
+
+    if (contentHeight > visibleHeight) {
+        float scrollRatio = (maxScroll > 0.0f) ? scrollOffset / maxScroll : 0.0f;
+        float barHeight = (visibleHeight / contentHeight) * visibleHeight;
+        if (barHeight < 20.0f) barHeight = 20.0f;
+        float barY = r.y + padding + scrollRatio * (visibleHeight - barHeight);
+        DrawRectangleRec({r.x + r.width - 7, barY, 4, barHeight}, {100, 100, 100, 180});
+        DrawRectangleLinesEx({r.x + r.width - 7, barY, 4, barHeight}, 1, {150, 150, 150, 255});
+    }
+}
 
 void PackageTab::Initialize() {
     title     = "Package Project";
@@ -21,7 +100,7 @@ void PackageTab::Initialize() {
     }
 
     renderer = Project::Get().GetSettings().renderer;
-    outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
+    outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged").string();
 }
 
 static Rectangle SelectRow(float x, float y, float w, float h) {
@@ -30,7 +109,8 @@ static Rectangle SelectRow(float x, float y, float w, float h) {
 
 void PackageTab::Render(float x, float y, float width, float height) {
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel({x, y, width, height});
+    DrawRectangleRec({x, y, width, height}, theme.panelBg);
+    DrawRectangleLinesEx({x, y, width, height}, 1, theme.panelBorder);
 
     if (packageRunning) {
         LoadingPanel::Get().SetStatusLine(packageTask.GetLatestLine());
@@ -137,7 +217,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     DrawRectangleLinesEx(outputRow, 1, theme.fieldBorder);
     DrawText(outputDir.c_str(), (int)outputRow.x + 6, (int)outputRow.y + 5, 11, theme.textPrimary);
     Rectangle browseButton = {outputRow.x + outputRow.width + 6, fy, browseWidth, 22};
-    if (UIWidget::Button(browseButton, "Browse...") && !anyPopupOpen) {
+    if (PackageTabButton(browseButton, "Browse...") && !anyPopupOpen) {
         std::string chosen = NativeFileDialog::OpenFolder("Choose Output Folder", outputDir);
         if (!chosen.empty()) outputDir = chosen;
     }
@@ -146,7 +226,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     // Package button
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
-    if (UIWidget::Button(packageButton, "Package", platformReady && !packageRunning) && !anyPopupOpen) {
+    if (PackageTabButton(packageButton, "Package", platformReady && !packageRunning) && !anyPopupOpen) {
         if (hasUnsavedLevelChanges && hasUnsavedLevelChanges()) {
             unsavedLevelPopup.Open(
                 "The open level has unsaved changes. The packaged build will use the version last saved to disk unless you save first.",
@@ -169,7 +249,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
         fy += 22;
 
         Rectangle copyButton = {fx, fy, 100.0f, 20.0f};
-        if (UIWidget::Button(copyButton, "Copy Log") && !anyPopupOpen) {
+        if (PackageTabButton(copyButton, "Copy Log") && !anyPopupOpen) {
             SetClipboardText(resultLog.c_str());
         }
         fy += 26;
@@ -178,14 +258,11 @@ void PackageTab::Render(float x, float y, float width, float height) {
         if (logHeight < 100.0f) logHeight = 100.0f;
         float logWidth = width - 32.0f;
         Rectangle logBox = {fx, fy, logWidth, logHeight};
-        UIWidget::ScrollableTextBox(logBox, resultLog, logScrollOffset);
+        PackageTabScrollableLog(logBox, resultLog, logScrollOffset);
     }
 
     int platformChoice = 0;
-    if (platformPopup.Render(platformChoice)) {
-        selectedPlatformIndex = platformChoice;
-        outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
-    }
+    if (platformPopup.Render(platformChoice)) selectedPlatformIndex = platformChoice;
 
     int rendererChoice = 0;
     if (rendererPopup.Render(rendererChoice)) {

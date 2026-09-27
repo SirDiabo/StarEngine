@@ -72,7 +72,6 @@ else()
     add_dependencies(StarEngine generate_modules)
 
     target_include_directories(StarEngine PRIVATE src)
-    target_include_directories(StarEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/raygui")
     target_include_directories(StarEngine PRIVATE "${CMAKE_BINARY_DIR}")
 
     target_link_libraries(StarEngine PRIVATE raylib)

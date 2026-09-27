@@ -3,7 +3,6 @@
 #include "Core/Widgets/WidgetInput.h"
 #include "Editor/BasicActorDefs.h"
 #include "Editor/UITheme.h"
-#include "Editor/UIWidgets.h"
 #include "Runtime/Actor.h"
 #include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
@@ -326,7 +325,8 @@ void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
 
 void StargraphEditorPanel::RenderPreviewToolbar(Rectangle toolbarArea) {
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(toolbarArea);
+    DrawRectangleRec(toolbarArea, theme.panelBg);
+    DrawRectangleLinesEx(toolbarArea, 1, theme.panelBorder);
 
     float bx = toolbarArea.x + 6;
     float by = toolbarArea.y + 3;

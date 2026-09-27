@@ -2,10 +2,9 @@
 #include "Core/StarAsset.h"
 #include "Core/Project.h"
 #include "AssetImporter.h"
-#include "PropertyFields.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetInput.h"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -21,15 +20,9 @@ void ImportDetailsPanel::LoadFromAsset() {
     StarAsset asset;
     StarAsset::LoadFromFile(assetPath, asset);
 
-    snprintf(posBuf[0], sizeof(posBuf[0]), "%.2f", asset.importPosX);
-    snprintf(posBuf[1], sizeof(posBuf[1]), "%.2f", asset.importPosY);
-    snprintf(posBuf[2], sizeof(posBuf[2]), "%.2f", asset.importPosZ);
-    snprintf(rotBuf[0], sizeof(rotBuf[0]), "%.2f", asset.importRotX);
-    snprintf(rotBuf[1], sizeof(rotBuf[1]), "%.2f", asset.importRotY);
-    snprintf(rotBuf[2], sizeof(rotBuf[2]), "%.2f", asset.importRotZ);
-    snprintf(scaleBuf[0], sizeof(scaleBuf[0]), "%.2f", asset.importScaleX);
-    snprintf(scaleBuf[1], sizeof(scaleBuf[1]), "%.2f", asset.importScaleY);
-    snprintf(scaleBuf[2], sizeof(scaleBuf[2]), "%.2f", asset.importScaleZ);
+    posX = asset.importPosX; posY = asset.importPosY; posZ = asset.importPosZ;
+    rotX = asset.importRotX; rotY = asset.importRotY; rotZ = asset.importRotZ;
+    scaleX = asset.importScaleX; scaleY = asset.importScaleY; scaleZ = asset.importScaleZ;
     materialSlots = asset.materialSlots;
     hasSkeleton = asset.hasSkeleton;
     skeletonBoneCount = (int)asset.skeleton.size();
@@ -39,15 +32,9 @@ void ImportDetailsPanel::SaveToAsset() {
     StarAsset asset;
     StarAsset::LoadFromFile(assetPath, asset);
 
-    asset.importPosX = (float)atof(posBuf[0]);
-    asset.importPosY = (float)atof(posBuf[1]);
-    asset.importPosZ = (float)atof(posBuf[2]);
-    asset.importRotX = (float)atof(rotBuf[0]);
-    asset.importRotY = (float)atof(rotBuf[1]);
-    asset.importRotZ = (float)atof(rotBuf[2]);
-    asset.importScaleX = (float)atof(scaleBuf[0]);
-    asset.importScaleY = (float)atof(scaleBuf[1]);
-    asset.importScaleZ = (float)atof(scaleBuf[2]);
+    asset.importPosX = posX; asset.importPosY = posY; asset.importPosZ = posZ;
+    asset.importRotX = rotX; asset.importRotY = rotY; asset.importRotZ = rotZ;
+    asset.importScaleX = scaleX; asset.importScaleY = scaleY; asset.importScaleZ = scaleZ;
     asset.materialSlots = materialSlots;
 
     asset.SaveToFile(assetPath);
@@ -58,7 +45,6 @@ void ImportDetailsPanel::Open(const std::string& path, const std::string& type, 
     assetPath = path;
     assetType = type;
     inlinePanel = inlinePanelMode;
-    activeField = 0;
     materialPicker.Close();
     materialSlotPickerIndex = -1;
     LoadFromAsset();
@@ -75,7 +61,6 @@ void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::st
     assetPath.clear();
     assetType = type;
     inlinePanel = false;
-    activeField = 0;
     materialPicker.Close();
     materialSlotPickerIndex = -1;
 
@@ -88,12 +73,8 @@ void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::st
     animationOnlyTargetMesh.clear();
     compatibleMeshPaths.clear();
 
-    snprintf(posBuf[0], sizeof(posBuf[0]), "%.2f", 0.0f);
-    snprintf(posBuf[1], sizeof(posBuf[1]), "%.2f", 0.0f);
-    snprintf(posBuf[2], sizeof(posBuf[2]), "%.2f", 0.0f);
-    snprintf(rotBuf[0], sizeof(rotBuf[0]), "%.2f", 0.0f);
-    snprintf(rotBuf[1], sizeof(rotBuf[1]), "%.2f", 0.0f);
-    snprintf(rotBuf[2], sizeof(rotBuf[2]), "%.2f", 0.0f);
+    posX = posY = posZ = 0.0f;
+    rotX = rotY = rotZ = 0.0f;
 
     float defaultScale = 1.0f;
     if (type == "StaticMesh") {
@@ -108,9 +89,7 @@ void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::st
         hasAnimations = !preview.animationNames.empty();
         pendingAnimationNames = preview.animationNames;
     }
-    snprintf(scaleBuf[0], sizeof(scaleBuf[0]), "%.2f", defaultScale);
-    snprintf(scaleBuf[1], sizeof(scaleBuf[1]), "%.2f", defaultScale);
-    snprintf(scaleBuf[2], sizeof(scaleBuf[2]), "%.2f", defaultScale);
+    scaleX = scaleY = scaleZ = defaultScale;
 
     if (hasAnimations) {
         std::string contentRoot = Project::Get().GetRootPath() + "/Content";
@@ -142,6 +121,7 @@ void ImportDetailsPanel::Close() {
     pendingImport = false;
     materialPicker.Close();
     materialSlotPickerIndex = -1;
+    WidgetInput::PopModal(this, WidgetInput::kEditorDevice);
 }
 
 void ImportDetailsPanel::ApplyAndClose() {
@@ -149,159 +129,260 @@ void ImportDetailsPanel::ApplyAndClose() {
     Close();
 }
 
-void ImportDetailsPanel::Render() {
-    if (!open || inlinePanel) return;
-
-    bool isMesh = (assetType == "StaticMesh");
-    float animSectionH = (pendingImport && hasAnimations)
-        ? (44.0f + pendingAnimationNames.size() * 14.0f + (animationOnly ? 18.0f : 0.0f))
-        : 0.0f;
-    float boxWidth = 340;
-    float boxHeight = isMesh ? (196.0f + (hasSkeleton ? 20.0f : 0.0f) + materialSlots.size() * 24.0f +
-                                 (materialSlots.empty() ? 0.0f : 38.0f) + animSectionH)
-                              : 120.0f;
-
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-    Rectangle box = {screenW * 0.5f - boxWidth * 0.5f, screenH * 0.5f - boxHeight * 0.5f, boxWidth, boxHeight};
-
-    DrawRectangle(0, 0, (int)screenW, (int)screenH, {0, 0, 0, 140});
-    UIWidget::Panel(box);
-
-    RenderBody(box, boxWidth, true);
-
-    Rectangle importBtn = {box.x + boxWidth - 154, box.y + boxHeight - 28, 70, 22};
-    Rectangle skipBtn = {box.x + boxWidth - 80, box.y + boxHeight - 28, 70, 22};
-    Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = materialPicker.IsOpen();
-    if (UIWidget::Button(importBtn, pendingImport ? "Import" : "Apply") && !pickerBlocksInput) {
-        if (pendingImport) {
-            if (animationOnly) {
-                AssetImporter::CookAnimationsOnly(pendingSrcPath, pendingTargetFolder);
-            } else {
-                std::string created = AssetImporter::Cook(pendingSrcPath, assetType, pendingExtension, pendingTargetFolder);
-                if (!created.empty()) {
-                    assetPath = created;
-                    StarAsset freshAsset;
-                    StarAsset::LoadFromFile(assetPath, freshAsset);
-                    materialSlots = freshAsset.materialSlots;
-                    SaveToAsset();
-                }
-            }
+void ImportDetailsPanel::ApplyImportOrSave() {
+    if (pendingImport) {
+        if (animationOnly) {
+            AssetImporter::CookAnimationsOnly(pendingSrcPath, pendingTargetFolder);
         } else {
-            SaveToAsset();
+            std::string created = AssetImporter::Cook(pendingSrcPath, assetType, pendingExtension, pendingTargetFolder);
+            if (!created.empty()) {
+                assetPath = created;
+                StarAsset freshAsset;
+                StarAsset::LoadFromFile(assetPath, freshAsset);
+                materialSlots = freshAsset.materialSlots;
+                SaveToAsset();
+            }
         }
-        Close();
-    }
-    if (UIWidget::Button(skipBtn, pendingImport ? "Cancel" : "Skip") && !pickerBlocksInput) {
-        Close();
-    }
-}
-
-void ImportDetailsPanel::RenderInline(Rectangle area) {
-    if (!open || !inlinePanel) return;
-
-    const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(area);
-
-    DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, theme.sectionHeader);
-    Rectangle inner = {area.x, area.y + 24, area.width, area.height - 24};
-
-    int prevActiveField = activeField;
-    RenderBody(inner, inner.width, false);
-
-    if ((prevActiveField != 0 && activeField == 0) || pendingSave) {
+    } else {
         SaveToAsset();
-        pendingSave = false;
     }
+    Close();
 }
 
-void ImportDetailsPanel::RenderBody(Rectangle box, float boxWidth, bool modal) {
+void ImportDetailsPanel::EnsureChrome() {
+    if (chrome) return;
+    chrome = new Widget();
+    panel = new PropertyPanel();
+    chrome->SetRoot(panel->GetRootElement());
+    panel->onAssetFieldClicked = [this](const std::string& rowId, const std::string& ext, Vector2 pos) {
+        if (rowId.rfind("mat:", 0) == 0) {
+            materialSlotPickerIndex = atoi(rowId.c_str() + 4);
+            materialPicker.Open(pos, ext);
+        }
+    };
+}
+
+void ImportDetailsPanel::ApplyPanelTheme() {
     const UIPalette& theme = UITheme::Get();
+    panel->labelColor = theme.textSecondary;
+    panel->headerColor = theme.sectionHeader;
+    panel->readOnlyColor = { 110, 110, 118, 255 };
+    panel->fieldBg = theme.fieldBg;
+    panel->fieldBorder = theme.fieldBorder;
+    panel->fieldEditingBorder = theme.accent;
+    panel->buttonBg = theme.buttonBg;
+    panel->buttonHover = theme.buttonHover;
+    panel->checkBoxColor = theme.fieldBg;
+    panel->checkBoxHoveredColor = theme.surfaceHover;
+    panel->checkBoxBorderColor = theme.fieldBorder;
+    panel->checkBoxCheckColor = theme.accent;
+}
 
-    std::string titleStem = pendingImport ? fs::path(pendingSrcPath).stem().string() : fs::path(assetPath).stem().string();
-    std::string title = (pendingImport ? "Import - " : "Import Options - ") + titleStem;
-    if (modal) DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, theme.sectionHeader);
-
-    Vector2 mp = GetMousePosition();
-    bool pickerBlocksInput = materialPicker.IsOpen();
-    float y = box.y + (modal ? 30 : 8);
-
+std::vector<PropertyRow> ImportDetailsPanel::BuildRows(bool modal) {
+    std::vector<PropertyRow> rows;
     bool isMesh = (assetType == "StaticMesh");
 
-    auto vec3Row = [&](const char* label, char bufs[3][32], int firstFieldId) {
-        DrawText(label, (int)box.x + 10, (int)y, 11, theme.sectionHeader);
-        y += 16;
-        Rectangle row = {box.x + 10, y, boxWidth - 20, 18};
-        float vx = (float)atof(bufs[0]), vy = (float)atof(bufs[1]), vz = (float)atof(bufs[2]);
-        PropertyField::Vec3Row(row, bufs[0], bufs[1], bufs[2], firstFieldId, activeField, vx, vy, vz,
-                                !pickerBlocksInput);
-        y += 24;
-    };
-
-    if (isMesh) {
-        vec3Row("Position", posBuf, 1);
-        vec3Row("Rotation", rotBuf, 4);
-        vec3Row("Scale", scaleBuf, 7);
+    if (!isMesh) {
+        PropertyRow r;
+        r.id = "none";
+        r.kind = PropertyRowKind::ReadOnlyText;
+        r.stringValue = "No import options for this asset type yet.";
+        rows.push_back(r);
+    } else {
+        auto vec3Row = [&rows](const std::string& id, const std::string& label, float x, float y, float z,
+                               std::function<void(float, float, float)> setter) {
+            PropertyRow r;
+            r.id = id;
+            r.kind = PropertyRowKind::Vec3;
+            r.label = label;
+            r.vec3[0] = x; r.vec3[1] = y; r.vec3[2] = z;
+            r.setVec3 = std::move(setter);
+            rows.push_back(r);
+        };
+        vec3Row("pos", "Position", posX, posY, posZ, [this, modal](float x, float y, float z) {
+            posX = x; posY = y; posZ = z;
+            if (!modal) SaveToAsset();
+        });
+        vec3Row("rot", "Rotation", rotX, rotY, rotZ, [this, modal](float x, float y, float z) {
+            rotX = x; rotY = y; rotZ = z;
+            if (!modal) SaveToAsset();
+        });
+        vec3Row("scale", "Scale", scaleX, scaleY, scaleZ, [this, modal](float x, float y, float z) {
+            scaleX = x; scaleY = y; scaleZ = z;
+            if (!modal) SaveToAsset();
+        });
 
         if (hasSkeleton) {
-            std::string skelLabel = "Skeleton: " + std::to_string(skeletonBoneCount) + " bones";
-            DrawText(skelLabel.c_str(), (int)box.x + 10, (int)y, 11, theme.textSecondary);
-            y += 20;
+            PropertyRow r;
+            r.id = "skel";
+            r.kind = PropertyRowKind::ReadOnlyText;
+            r.label = "Skeleton";
+            r.stringValue = std::to_string(skeletonBoneCount) + " bones";
+            rows.push_back(r);
         }
 
         if (materialSlots.empty()) {
-            DrawText("No material slots", (int)box.x + 10, (int)y, 10, theme.textSecondary);
-            y += 20;
+            PropertyRow r;
+            r.id = "matnone";
+            r.kind = PropertyRowKind::ReadOnlyText;
+            r.label = "Materials";
+            r.stringValue = "No material slots";
+            rows.push_back(r);
         } else {
-            DrawText("Materials", (int)box.x + 10, (int)y, 11, theme.sectionHeader);
-            y += 14;
+            PropertyRow h;
+            h.id = "math";
+            h.kind = PropertyRowKind::Header;
+            h.label = "Materials";
+            rows.push_back(h);
             for (size_t i = 0; i < materialSlots.size(); i++) {
-                Rectangle rowRect = {box.x + 10, y, boxWidth - 20, 18};
-                DrawRectangleRec(rowRect, theme.fieldBg);
-                DrawRectangleLinesEx(rowRect, 1, theme.fieldBorder);
-                std::string slotName = materialSlots[i].usemtlName.empty() ? ("Slot " + std::to_string(i)) : materialSlots[i].usemtlName;
-                DrawText(slotName.c_str(), (int)rowRect.x + 4, (int)rowRect.y + 3, 10, theme.textSecondary);
-                std::string matLabel = materialSlots[i].materialPath.empty() ?
-                    (pendingImport ? "(will create)" : "None") :
-                    fs::path(materialSlots[i].materialPath).stem().string();
-                DrawText(matLabel.c_str(), (int)(rowRect.x + rowRect.width * 0.5f), (int)rowRect.y + 3, 10, theme.textPrimary);
-                if (!pendingImport && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-                    CheckCollisionPointRec(mp, rowRect) && !pickerBlocksInput) {
-                    materialPicker.Open({rowRect.x, rowRect.y + rowRect.height}, ".starmat");
-                    materialSlotPickerIndex = (int)i;
-                }
-                y += 24;
-            }
-            std::string pickedMat;
-            if (!pendingImport && materialPicker.Render(pickedMat)) {
-                if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size()) {
-                    materialSlots[materialSlotPickerIndex].materialPath = pickedMat;
-                    pendingSave = true;
+                std::string slotName = materialSlots[i].usemtlName.empty()
+                    ? ("Slot " + std::to_string(i)) : materialSlots[i].usemtlName;
+                if (pendingImport) {
+                    PropertyRow r;
+                    r.id = "mat:" + std::to_string(i);
+                    r.kind = PropertyRowKind::ReadOnlyText;
+                    r.label = slotName;
+                    r.stringValue = "(will create)";
+                    rows.push_back(r);
+                } else {
+                    std::string display = materialSlots[i].materialPath.empty()
+                        ? "None" : fs::path(materialSlots[i].materialPath).stem().string();
+                    PropertyRow r;
+                    r.id = "mat:" + std::to_string(i);
+                    r.kind = PropertyRowKind::Asset;
+                    r.label = slotName;
+                    r.assetExtension = ".starmat";
+                    r.stringValue = display;
+                    rows.push_back(r);
                 }
             }
         }
 
         if (pendingImport && hasAnimations) {
-            DrawText("Animations", (int)box.x + 10, (int)y, 11, theme.sectionHeader);
-            y += 14;
-            for (const std::string& animName : pendingAnimationNames) {
-                DrawText(animName.c_str(), (int)box.x + 14, (int)y, 10, theme.textSecondary);
-                y += 14;
+            PropertyRow h;
+            h.id = "animh";
+            h.kind = PropertyRowKind::Header;
+            h.label = "Animations";
+            rows.push_back(h);
+            for (size_t i = 0; i < pendingAnimationNames.size(); i++) {
+                PropertyRow r;
+                r.id = "anim:" + std::to_string(i);
+                r.kind = PropertyRowKind::ReadOnlyText;
+                r.stringValue = pendingAnimationNames[i];
+                rows.push_back(r);
             }
-            Rectangle animOnlyRow = {box.x + 10, y, 18, 18};
-            GuiCheckBox(animOnlyRow, "Only Import Animation", &animationOnly);
-            y += 22;
+            PropertyRow b;
+            b.id = "animonly";
+            b.kind = PropertyRowKind::Bool;
+            b.label = "Only Import Animation";
+            b.boolValue = animationOnly;
+            b.setBool = [this](bool v) { animationOnly = v; };
+            rows.push_back(b);
             if (animationOnly) {
-                std::string targetLabel = animationOnlyTargetMesh.empty()
-                    ? "No compatible mesh found in project"
-                    : ("Target mesh: " + fs::path(animationOnlyTargetMesh).stem().string());
-                DrawText(targetLabel.c_str(), (int)box.x + 10, (int)y, 10, theme.textSecondary);
-                y += 18;
+                PropertyRow r;
+                r.id = "animtarget";
+                r.kind = PropertyRowKind::ReadOnlyText;
+                r.label = "Target Mesh";
+                r.stringValue = animationOnlyTargetMesh.empty()
+                    ? "No compatible mesh found" : fs::path(animationOnlyTargetMesh).stem().string();
+                rows.push_back(r);
             }
         }
-    } else {
-        DrawText("No import options for this asset type yet.", (int)box.x + 10, (int)y, 11, theme.textSecondary);
-        y += 24;
+    }
+
+    if (modal) {
+        PropertyRow buttons;
+        buttons.id = "buttons";
+        buttons.kind = PropertyRowKind::Cells;
+        PropertyCell skip;
+        skip.kind = PropertyCellKind::Button;
+        skip.text = pendingImport ? "Cancel" : "Skip";
+        skip.onPressed = [this](Rectangle) { Close(); };
+        PropertyCell apply;
+        apply.kind = PropertyCellKind::Button;
+        apply.text = pendingImport ? "Import" : "Apply";
+        apply.onPressed = [this](Rectangle) { ApplyImportOrSave(); };
+        buttons.cells = { skip, apply };
+        rows.push_back(buttons);
+    }
+
+    return rows;
+}
+
+void ImportDetailsPanel::Render() {
+    if (!open || inlinePanel) return;
+    EnsureChrome();
+
+    std::string titleStem = pendingImport ? fs::path(pendingSrcPath).stem().string() : fs::path(assetPath).stem().string();
+    std::string title = (pendingImport ? "Import - " : "Import Options - ") + titleStem;
+
+    std::vector<PropertyRow> rows = BuildRows(true);
+    ApplyPanelTheme();
+    panel->SetProperties(rows);
+
+    float titleH = 30.0f;
+    float boxWidth = 340.0f;
+    float boxHeight = titleH + (float)rows.size() * panel->rowHeight + 14.0f;
+
+    float screenW = (float)GetScreenWidth();
+    float screenH = (float)GetScreenHeight();
+    Rectangle box = { screenW * 0.5f - boxWidth * 0.5f, screenH * 0.5f - boxHeight * 0.5f, boxWidth, boxHeight };
+    Rectangle body = { box.x + 6.0f, box.y + titleH, boxWidth - 12.0f, boxHeight - titleH - 6.0f };
+
+    DrawRectangle(0, 0, (int)screenW, (int)screenH, { 0, 0, 0, 140 });
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleRec(box, theme.panelBg);
+    DrawRectangleLinesEx(box, 1, theme.panelBorder);
+    DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, theme.sectionHeader);
+
+    WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
+    WidgetInput::SetInputScope(this);
+
+    bool pickerOpen = materialPicker.IsOpen();
+    float dt = GetFrameTime();
+    chrome->Tick(dt, body, 1.0f);
+    if (!pickerOpen) {
+        WidgetInput::ProcessInput(chrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    }
+    chrome->Draw(body, 1.0f);
+    WidgetInput::SetInputScope(nullptr);
+
+    std::string picked;
+    if (materialPicker.Render(picked)) {
+        if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size()) {
+            materialSlots[materialSlotPickerIndex].materialPath = picked;
+        }
+    }
+
+}
+
+void ImportDetailsPanel::RenderInline(Rectangle area) {
+    if (!open || !inlinePanel) return;
+    EnsureChrome();
+
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleRec(area, theme.panelBg);
+    DrawRectangleLinesEx(area, 1, theme.panelBorder);
+    DrawText("Import Details", (int)area.x + 10, (int)area.y + 6, 12, theme.sectionHeader);
+    Rectangle inner = { area.x, area.y + 24, area.width, area.height - 24 };
+
+    std::vector<PropertyRow> rows = BuildRows(false);
+    ApplyPanelTheme();
+    panel->SetProperties(rows);
+
+    bool pickerOpen = materialPicker.IsOpen();
+    float dt = GetFrameTime();
+    chrome->Tick(dt, inner, 1.0f);
+    if (!pickerOpen) {
+        WidgetInput::ProcessInput(chrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    }
+    chrome->Draw(inner, 1.0f);
+
+    std::string picked;
+    if (materialPicker.Render(picked)) {
+        if (materialSlotPickerIndex >= 0 && materialSlotPickerIndex < (int)materialSlots.size()) {
+            materialSlots[materialSlotPickerIndex].materialPath = picked;
+            SaveToAsset();
+        }
     }
 }

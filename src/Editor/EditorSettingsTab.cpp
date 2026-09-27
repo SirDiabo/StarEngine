@@ -1,8 +1,7 @@
 #include "EditorSettingsTab.h"
 #include "MenuBar.h"
-#include "PropertyFields.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "NativeFileDialog.h"
 #include "raylib.h"
 #include <string>
@@ -10,17 +9,41 @@
 #include <cstdlib>
 
 static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
-    UIWidget::Interaction s = UIWidget::Interact(r);
     const UIPalette& theme = UITheme::Get();
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
 
-    DrawRectangleRec(r, UIWidget::SelectableBg(s.hovered, active, theme.buttonBg));
+    DrawRectangleRec(r, active ? theme.surfaceSelected : (hovered ? theme.surfaceHover : theme.buttonBg));
     DrawRectangleLinesEx(r, 1, active ? theme.accent : theme.buttonBorder);
 
     int tw = MeasureText(label, 11);
     DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11,
              active ? theme.textPrimary : theme.textSecondary);
 
-    return s.clicked;
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+static bool StyledButton(Rectangle r, const char* label) {
+    const UIPalette& theme = UITheme::Get();
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRec(r, hovered ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(r, 1, theme.buttonBorder);
+    int tw = MeasureText(label, 11);
+    DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11, theme.textPrimary);
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+static bool ColorSwatchField(Rectangle r, const std::string& label, Color value) {
+    const UIPalette& theme = UITheme::Get();
+    float swatchSize = r.height - 4;
+    Rectangle swatch = {r.x + r.width - swatchSize - 2, r.y + 2, swatchSize, swatchSize};
+
+    DrawText(label.c_str(), (int)r.x + 2, (int)(r.y + (r.height - 11) / 2.0f), 11, theme.textSecondary);
+
+    DrawRectangleRec(swatch, value);
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), swatch);
+    DrawRectangleLinesEx(swatch, hovered ? 2 : 1, hovered ? theme.textPrimary : theme.fieldBorder);
+
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 static std::string StarEngineDir() {
@@ -91,7 +114,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
 
     DrawText("Colors", (int)fx, (int)fy, 14, theme.accent);
     Rectangle resetBtn = {fx + maxRowWidth - 90, fy - 3, 90, 20};
-    if (UIWidget::Button(resetBtn, "Reset Colors")) {
+    if (StyledButton(resetBtn, "Reset Colors")) {
         UITheme::ClearAllOverrides();
     }
     fy += 22;
@@ -105,7 +128,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     float contentHeight = fieldCount * rowH;
 
     Vector2 mouse = GetMousePosition();
-    if (CheckCollisionPointRec(mouse, listArea)) {
+    if (!WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mouse, listArea)) {
         colorListScroll -= GetMouseWheelMove() * 20.0f;
     }
     float maxScroll = contentHeight > listArea.height ? contentHeight - listArea.height : 0.0f;
@@ -129,7 +152,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
             std::string label = field.name;
             if (UITheme::HasOverride(i)) label += " *";
 
-            if (PropertyField::ColorField(row, label.c_str(), value) && !colorPicker.IsOpen()) {
+            if (ColorSwatchField(row, label, value) && !colorPicker.IsOpen()) {
                 colorPicker.Open({row.x + row.width, row.y}, value);
                 editingColorField = i;
             }
@@ -139,7 +162,7 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     EndScissorMode();
 
     Rectangle exportBtn = {fx, listArea.y + listArea.height + 8, rowWidth, 24};
-    if (UIWidget::Button(exportBtn, "Export Theme...")) {
+    if (StyledButton(exportBtn, "Export Theme...")) {
         std::string path = NativeFileDialog::SaveFile(
             "Export Theme", StarEngineDir(), "my_theme.startheme", "StarEngine Theme", "*.startheme");
         if (!path.empty()) {

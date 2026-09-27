@@ -1,6 +1,5 @@
 #include "DetailsPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
@@ -16,7 +15,8 @@ DetailsPanel::~DetailsPanel() {
 
 void DetailsPanel::Render() {
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(bounds);
+    DrawRectangleRec(bounds, theme.panelBg);
+    DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     if (!chrome) {
         chrome = new Widget();

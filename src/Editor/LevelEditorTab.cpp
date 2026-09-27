@@ -13,6 +13,10 @@
 #include "NativeFileDialog.h"
 #include <filesystem>
 
+bool LevelEditorTab::IsDirty() const {
+    return viewportPanel && viewportPanel->IsMapDirty();
+}
+
 void LevelEditorTab::Initialize() {
     title     = "Level Editor";
     permanent = true;

@@ -152,6 +152,10 @@ bool StargraphEditorTab::IsOpen() const {
     return panel && panel->IsOpen();
 }
 
+bool StargraphEditorTab::IsDirty() const {
+    return panel && panel->IsDirty();
+}
+
 void StargraphEditorTab::ResetLayout() {
     for (const std::string& name : { "Preview", "Components", "My Stargraph", "Graph", "Details", "Logs" })
         dockArea.SetPanelVisible(name, true);

@@ -1,6 +1,6 @@
 #include "LogPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 
 void LogPanel::Initialize() {
@@ -34,7 +34,9 @@ static Color LogEntryColor(LogLevel level) {
 }
 
 void LogPanel::Render() {
-    UIWidget::Panel(bounds);
+    const UIPalette& theme = UITheme::Get();
+    DrawRectangleRec(bounds, theme.panelBg);
+    DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
 
     float lineHeight = 15.0f;
     float padding = 4.0f;
@@ -43,7 +45,7 @@ void LogPanel::Render() {
 
     Vector2 mouse = GetMousePosition();
     Rectangle contentArea = { bounds.x + padding, bounds.y + padding, bounds.width - padding * 2, visibleHeight };
-    if (CheckCollisionPointRec(mouse, contentArea)) {
+    if (!WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mouse, contentArea)) {
         scrollOffset -= GetMouseWheelMove() * lineHeight * 3;
     }
 

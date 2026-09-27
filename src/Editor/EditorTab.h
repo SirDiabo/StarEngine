@@ -16,6 +16,7 @@ public:
     virtual void OnDeactivated() {}
 
     virtual bool IsOpen() const { return true; }
+    virtual bool IsDirty() const { return false; }
 
     virtual std::string GetAssetPath() const { return ""; }
 

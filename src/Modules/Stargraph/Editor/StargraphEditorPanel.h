@@ -73,11 +73,14 @@ public:
     void OnDetailAssetPicked(const std::string& fullRowId, const std::string& pickedPath);
     void RenderDetailPickers(Rectangle area);
     void RenderNodeContextMenu();
+    void SpawnNodeFromMenu(const std::string& nodeTypeIdIn, const std::string& sourceKind);
 
     void RenderPreviewViewport(Rectangle area);
     void SetPreviewFullscreen(bool v) { previewFullscreen = v; }
     void SetOnTogglePreviewFullscreen(std::function<void()> cb) { onTogglePreviewFullscreen = cb; }
 
+public:
+    bool IsDirty() const { return isDirty; }
 private:
     void ResetTransientEditState();
 
@@ -181,10 +184,16 @@ private:
     Vector2 nodeMenuPos{0, 0};
     int filterCompatibleWithPin = -1;
     float nodeMenuScrollOffset = 0;
-    char nodeMenuSearch[64] = "";
+    std::string nodeMenuSearch;
+    int nodeMenuHighlighted = 0;
+    Widget* nodeMenuChrome = nullptr;
+    TextElement* nodeMenuSearchField = nullptr;
 
     int editingPinId = 0;
-    char editBuffer[256] = "";
+
+    Widget* pinEditChrome = nullptr;
+    TextElement* pinEditField = nullptr;
+    bool pinEditActiveThisFrame = false;
 
     std::vector<std::string> varValueSnapshot;
 
@@ -204,9 +213,8 @@ private:
     int keyPickerPinId = 0;
     Vector2 keyPickerPos{0, 0};
     float keyPickerWidth = 0;
-    char keyPickerSearch[64] = "";
-    float keyPickerScroll = 0;
     bool keyPickerJustOpened = false;
+    SearchableListPopup searchableKeyPicker;
     enum class PinPickerKind { Key, FunctionName, ComponentRef, MappingName };
     PinPickerKind keyPickerKind = PinPickerKind::Key;
 

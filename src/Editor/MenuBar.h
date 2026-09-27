@@ -4,6 +4,9 @@
 #include <vector>
 #include <functional>
 
+class Widget;
+class BoxElement;
+
 struct MenuEntry {
     std::string label;
     std::vector<std::string> items;
@@ -37,6 +40,8 @@ public:
 
 private:
     float GetMenuButtonX(int index) const;
+    void RebuildBar();
+    void RebuildPopup();
     std::vector<MenuEntry> menus;
     MenuActionFn onAction;
     float menuBarHeight = 20.0f;
@@ -44,4 +49,10 @@ private:
     Texture2D logo{};
     bool logoLoaded = false;
     float logoOffsetX = 4.0f;
+
+    Widget* barChrome = nullptr;
+    BoxElement* barRoot = nullptr;
+    Widget* popupChrome = nullptr;
+    BoxElement* popupRoot = nullptr;
+    int builtPopupMenu = -2;
 };

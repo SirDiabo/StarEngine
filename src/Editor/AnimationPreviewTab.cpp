@@ -4,13 +4,23 @@
 #include "Core/Project.h"
 #include "Runtime/AssetCache.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 #include <filesystem>
 #include <cmath>
 #include <cstdio>
 
 namespace fs = std::filesystem;
+
+static bool AnimPreviewButton(Rectangle r, const char* label) {
+    const UIPalette& theme = UITheme::Get();
+    bool hovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRec(r, hovered ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(r, 1, theme.buttonBorder);
+    int tw = MeasureText(label, 11);
+    DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11, theme.textPrimary);
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
 
 static const float TOP_H = 28.0f;
 static const float BOTTOM_H = 56.0f;
@@ -106,7 +116,7 @@ void AnimationPreviewTab::Render(float x, float y, float width, float height) {
     ry += 16;
     Rectangle meshBtn = {rightPanel.x + 10, ry, rightPanel.width - 20, 22};
     std::string meshLabel = meshPath.empty() ? "(none)" : fs::path(meshPath).stem().string();
-    if (UIWidget::Button(meshBtn, meshLabel.c_str())) {
+    if (AnimPreviewButton(meshBtn, meshLabel.c_str())) {
         if (meshPicker.IsOpen()) meshPicker.Close();
         else meshPicker.Open({meshBtn.x, meshBtn.y + meshBtn.height});
     }
@@ -136,10 +146,10 @@ void AnimationPreviewTab::Render(float x, float y, float width, float height) {
     DrawLine((int)bottom.x, (int)bottom.y, (int)(bottom.x + bottom.width), (int)bottom.y, LINE_COL);
 
     Rectangle playBtn = {bottom.x + 10, bottom.y + 8, 70, 24};
-    if (UIWidget::Button(playBtn, playing ? "Pause" : "Play")) playing = !playing;
+    if (AnimPreviewButton(playBtn, playing ? "Pause" : "Play")) playing = !playing;
 
     Rectangle stopBtn = {bottom.x + 88, bottom.y + 8, 60, 24};
-    if (UIWidget::Button(stopBtn, "Stop")) { playing = false; timeSeconds = 0.0f; }
+    if (AnimPreviewButton(stopBtn, "Stop")) { playing = false; timeSeconds = 0.0f; }
 
     float scrubX = bottom.x + 158;
     float scrubW = bottom.width - 168;

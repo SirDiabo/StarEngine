@@ -26,8 +26,6 @@
 #include "LoadingPanel.h"
 #include "Core/LayoutSerializer.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "raygui.h"
 #include "raylib.h"
 #include <filesystem>
 #include <algorithm>
@@ -159,6 +157,17 @@ void Editor::Render() {
     LoadingPanel::Get().Render();
 }
 
+static bool EditorTabCloseButton(Rectangle r, bool& outHovered) {
+    Vector2 mp = GetMousePosition();
+    const UIPalette& theme = UITheme::Get();
+    outHovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, r);
+    if (outHovered) DrawRectangleRec(r, theme.danger);
+    Color textColor = outHovered ? theme.buttonText : theme.textSecondary;
+    int textW = MeasureText("x", 10);
+    DrawText("x", (int)(r.x + (r.width - textW) / 2.0f), (int)(r.y + (r.height - 10) / 2.0f), 10, textColor);
+    return outHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
 void Editor::RenderEditorTabBar(float x, float y, float width) {
     const UIPalette& theme = UITheme::Get();
 
@@ -173,7 +182,8 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
 
     for (int i = 0; i < (int)editorTabs.size(); i++) {
         EditorTab* tab = editorTabs[i].get();
-        const std::string& title = tab->GetTitle();
+        std::string title = tab->GetTitle();
+        if (tab->IsDirty()) title += " *";
         float textW = (float)MeasureText(title.c_str(), 12);
         float tabW  = textW + tabPad * 2 + (tab->IsPermanent() ? 0 : closeW + 4);
 
@@ -182,7 +192,7 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
         bool active  = (i == activeEditorTab);
 
         // Beveled editor tab style (trapezoid approximated with a rectangle + indicator line).
-        DrawRectangleRec(tabRect, UIWidget::SelectableBg(hovered, active, theme.tabBar));
+        DrawRectangleRec(tabRect, active ? theme.surfaceSelected : (hovered ? theme.surfaceHover : theme.tabBar));
         if (active)
             DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 2), (int)tabRect.width, 2, theme.accent);
 
@@ -193,8 +203,7 @@ void Editor::RenderEditorTabBar(float x, float y, float width) {
         bool closeHov = false;
         if (!tab->IsPermanent()) {
             Rectangle closeRect = { tabX + tabW - closeW - 3, y + (EDITOR_TAB_BAR_H - closeW) / 2.0f, closeW, closeW };
-            closeClicked = UIWidget::IconButton(closeRect, "x");
-            closeHov = CheckCollisionPointRec(mouse, closeRect);
+            closeClicked = EditorTabCloseButton(closeRect, closeHov);
 
             if (closeClicked) {
                 editorTabs[i]->SaveLayout(GetLayoutPath());

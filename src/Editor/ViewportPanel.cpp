@@ -17,10 +17,10 @@
 #include "Core/EmbeddedAssets.h"
 #include "LogPanel.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
-#include "PropertyFields.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "Core/Widgets/TextElement.h"
 #include "GizmoRenderer.h"
-#include "raygui.h"
 #include "raymath.h"
 #include "rlgl.h"
 #include <filesystem>
@@ -622,10 +622,35 @@ void ViewportPanel::RenderToolbar() {
         bx += bs + 4;
 
         Rectangle stepFieldRect = {bx, by + 2, 56, bs - 4};
-        float stepValue = gridStepSize;
-        if (PropertyField::FloatBox(stepFieldRect, gridStepBuf, sizeof(gridStepBuf), 1, toolbarActiveField, stepValue)) {
-            if (stepValue > 0.001f) gridStepSize = stepValue;
+        if (!toolbarChrome) {
+            toolbarChrome = new Widget();
+            auto* root = new WidgetElement();
+            toolbarChrome->SetRoot(root);
+            gridStepField = new TextElement();
+            gridStepField->editable = true;
+            gridStepField->numericOnly = true;
+            gridStepField->fontSize = 12.0f;
+            gridStepField->backgroundColor = theme.fieldBg;
+            gridStepField->borderColor = theme.fieldBorder;
+            gridStepField->editingBorderColor = theme.accent;
+            gridStepField->onTextCommitted = [this](const std::string& text) {
+                float v = (float)atof(text.c_str());
+                if (v > 0.001f) gridStepSize = v;
+            };
+            root->AddChild(gridStepField);
         }
+        if (!gridStepField->isEditing) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%g", gridStepSize);
+            gridStepField->text = buf;
+        }
+        gridStepField->size = { stepFieldRect.width, stepFieldRect.height };
+        gridStepField->offset = { stepFieldRect.x, stepFieldRect.y };
+        Rectangle toolbarBounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+        float dt = GetFrameTime();
+        toolbarChrome->Tick(dt, toolbarBounds, 1.0f);
+        WidgetInput::ProcessInput(toolbarChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+        toolbarChrome->Draw(toolbarBounds, 1.0f);
     }
 
     float btnRight = bounds.x + bounds.width - 4;
@@ -684,13 +709,24 @@ void ViewportPanel::RenderToolbar() {
 
     if (mapLoaded) {
         Rectangle saveBtn = {btnRight - 50, btnY, 50, 22};
-        if (UIWidget::Button(saveBtn, "Save")) SaveMap();
+        bool saveHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), saveBtn);
+        DrawRectangleRec(saveBtn, saveHov ? theme.buttonHover : theme.buttonBg);
+        DrawRectangleLinesEx(saveBtn, 1, theme.buttonBorder);
+        int saveTextW = MeasureText("Save", 11);
+        DrawText("Save", (int)(saveBtn.x + (saveBtn.width - saveTextW) / 2.0f),
+                 (int)(saveBtn.y + (saveBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+        if (saveHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) SaveMap();
         btnRight -= 54;
-        if (mapDirty) DrawText("*", (int)btnRight - 10, (int)btnY + 4, 14, {200, 160, 60, 255});
 
         if (!playing) {
             Rectangle packageBtn = {btnRight - 66, btnY, 66, 22};
-            if (UIWidget::Button(packageBtn, "Package")) onPackageRequested();
+            bool packageHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), packageBtn);
+            DrawRectangleRec(packageBtn, packageHov ? theme.buttonHover : theme.buttonBg);
+            DrawRectangleLinesEx(packageBtn, 1, theme.buttonBorder);
+            int packageTextW = MeasureText("Package", 11);
+            DrawText("Package", (int)(packageBtn.x + (packageBtn.width - packageTextW) / 2.0f),
+                     (int)(packageBtn.y + (packageBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+            if (packageHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) onPackageRequested();
             btnRight -= 70;
         }
     }

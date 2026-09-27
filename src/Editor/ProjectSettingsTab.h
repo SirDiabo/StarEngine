@@ -7,6 +7,8 @@
 #include <vector>
 
 class MenuBar;
+class Widget;
+class TextElement;
 
 class ProjectSettingsTab : public EditorTab {
 public:
@@ -36,4 +38,9 @@ private:
     char newSaveFileBuf[64] = "";
     std::string newSaveFileName;
     int activeField = 0;
+
+    Widget* renderScaleChrome = nullptr;
+    TextElement* renderScaleField = nullptr;
+    Widget* newSaveNameChrome = nullptr;
+    TextElement* newSaveNameField = nullptr;
 };

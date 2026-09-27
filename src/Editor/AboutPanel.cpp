@@ -1,9 +1,8 @@
 #include "AboutPanel.h"
 #include "Core/EmbeddedAssets.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
-#include "raygui.h"
 #include <string>
 
 AboutPanel& AboutPanel::Get() {
@@ -22,6 +21,7 @@ void AboutPanel::Open() {
 
 void AboutPanel::Close() {
     open = false;
+    WidgetInput::PopModal(this, WidgetInput::kEditorDevice);
 }
 
 void AboutPanel::Render() {
@@ -35,8 +35,11 @@ void AboutPanel::Render() {
     float boxH = 280.0f;
     Rectangle box = { screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH };
 
+    WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
+
     DrawRectangle(0, 0, (int)screenW, (int)screenH, {0, 0, 0, 140});
-    UIWidget::Panel(box);
+    DrawRectangleRec(box, theme.panelBg);
+    DrawRectangleLinesEx(box, 1, theme.panelBorder);
 
     float y = box.y + 16;
     float cx = box.x + boxW * 0.5f;
@@ -83,7 +86,13 @@ void AboutPanel::Render() {
     y += 30;
 
     Rectangle closeBtn = { box.x + boxW - 70, box.y + boxH - 32, 50, 22 };
-    if (UIWidget::Button(closeBtn, "Close")) {
+    bool closeHov = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, closeBtn);
+    DrawRectangleRec(closeBtn, closeHov ? theme.buttonHover : theme.buttonBg);
+    DrawRectangleLinesEx(closeBtn, 1, theme.buttonBorder);
+    int closeTextW = MeasureText("Close", 11);
+    DrawText("Close", (int)(closeBtn.x + (closeBtn.width - closeTextW) / 2.0f),
+             (int)(closeBtn.y + (closeBtn.height - 11) / 2.0f), 11, theme.textPrimary);
+    if (closeHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         Close();
     }
 

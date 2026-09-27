@@ -1,8 +1,6 @@
 #include "DockArea.h"
 #include "raylib.h"
-#include "raygui.h"
 #include "UITheme.h"
-#include "UIWidgets.h"
 #include "Core/SafeParse.h"
 #include "Core/Widgets/WidgetInput.h"
 #include <algorithm>
@@ -10,6 +8,17 @@
 
 static const float FLOAT_HEADER_H = 22.0f;
 static const float DRAG_THRESHOLD = 6.0f;
+
+static bool DockAreaCloseButton(Rectangle r, bool& outHovered) {
+    Vector2 mp = GetMousePosition();
+    const UIPalette& theme = UITheme::Get();
+    outHovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, r);
+    if (outHovered) DrawRectangleRec(r, theme.danger);
+    Color textColor = outHovered ? theme.buttonText : theme.textSecondary;
+    int textW = MeasureText("x", 10);
+    DrawText("x", (int)(r.x + (r.width - textW) / 2.0f), (int)(r.y + (r.height - 10) / 2.0f), 10, textColor);
+    return outHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
 
 // Setup
 
@@ -137,7 +146,8 @@ void DockArea::Render(Rectangle area) {
             const UIPalette& theme = UITheme::Get();
             Rectangle bar = { area.x, area.y, area.width, DOCK_TAB_HEIGHT };
             DrawRectangleRec(bar, theme.tabBar);
-            DrawText(p->GetName(), (int)bar.x + 10, (int)bar.y + 5, 11, theme.textPrimary);
+            std::string maxLabel = p->IsDirty() ? (std::string(p->GetName()) + " *") : p->GetName();
+            DrawText(maxLabel.c_str(), (int)bar.x + 10, (int)bar.y + 5, 11, theme.textPrimary);
 
             Rectangle content = area;
             content.y      += DOCK_TAB_HEIGHT;
@@ -174,14 +184,16 @@ void DockArea::RenderOverlays() {
         Rectangle content = { full.x, full.y + FLOAT_HEADER_H,
                                full.width, full.height - FLOAT_HEADER_H };
 
-        UIWidget::Panel(full);
+        DrawRectangleRec(full, theme.panelBg);
+        DrawRectangleLinesEx(full, 1, theme.panelBorder);
         DrawRectangleRec(header, theme.buttonBg);
-        DrawText(p->GetName(), (int)header.x + 8,
+        std::string headerLabel = p->IsDirty() ? (std::string(p->GetName()) + " *") : p->GetName();
+        DrawText(headerLabel.c_str(), (int)header.x + 8,
                  (int)(header.y + (header.height - 11) / 2.0f), 11, theme.tabText);
 
         Rectangle closeRect = { full.x + full.width - 20, full.y + 3, 16, 16 };
-        bool closeHov = CheckCollisionPointRec(mouse, closeRect);
-        if (UIWidget::IconButton(closeRect, "x"))
+        bool closeHov = false;
+        if (DockAreaCloseButton(closeRect, closeHov))
             p->SetVisible(false);
 
         if (!dragging && !pendingDrag) {
@@ -293,22 +305,24 @@ void DockArea::RenderTabBar(DockNode* node) {
 
     for (int i = 0; i < (int)node->panelNames.size(); i++) {
         const std::string& pname = node->panelNames[i];
-        float textW = (float)MeasureText(pname.c_str(), 11);
+        Panel* tabPanel = GetPanel(pname);
+        std::string label = (tabPanel && tabPanel->IsDirty()) ? (pname + " *") : pname;
+        float textW = (float)MeasureText(label.c_str(), 11);
         float tabW  = textW + tabPad * 2 + closeW + 4;
 
         Rectangle tabRect = { tabX, bar.y, tabW, bar.height };
         bool hovered = CheckCollisionPointRec(mouse, tabRect);
         bool active  = (i == node->activeTab);
 
-        DrawRectangleRec(tabRect, UIWidget::SelectableBg(hovered, active, theme.tabBar));
+        DrawRectangleRec(tabRect, active ? theme.surfaceSelected : (hovered ? theme.surfaceHover : theme.tabBar));
         DrawRectangle((int)tabRect.x, (int)(tabRect.y + tabRect.height - 1), (int)tabRect.width, 1,
                       active ? theme.accent : Color{ 55, 55, 60, 255 });
-        DrawText(pname.c_str(), (int)(tabX + tabPad),
+        DrawText(label.c_str(), (int)(tabX + tabPad),
                  (int)(bar.y + (bar.height - 11) / 2.0f), 11, theme.tabText);
 
         Rectangle closeRect = { tabX + tabW - closeW - 3, bar.y + (bar.height - closeW) / 2.0f, closeW, closeW };
-        bool closeHov = CheckCollisionPointRec(mouse, closeRect);
-        bool closeClicked = UIWidget::IconButton(closeRect, "x");
+        bool closeHov = false;
+        bool closeClicked = DockAreaCloseButton(closeRect, closeHov);
 
         if (closeClicked) {
             SetPanelVisible(pname, false);

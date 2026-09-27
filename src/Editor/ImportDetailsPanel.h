@@ -1,9 +1,12 @@
 #pragma once
 #include "raylib.h"
 #include "AssetPickerPopup.h"
+#include "PropertyPanel.h"
 #include "Core/StarAsset.h"
 #include <string>
 #include <vector>
+
+class Widget;
 
 class ImportDetailsPanel {
 public:
@@ -22,19 +25,19 @@ public:
 private:
     void LoadFromAsset();
     void SaveToAsset();
-    void RenderBody(Rectangle box, float boxWidth, bool modal);
+    std::vector<PropertyRow> BuildRows(bool modal);
+    void EnsureChrome();
+    void ApplyPanelTheme();
+    void ApplyImportOrSave();
 
     bool open = false;
     bool inlinePanel = false;
     std::string assetPath;
     std::string assetType;
 
-    char posBuf[3][32] = {};
-    char rotBuf[3][32] = {};
-    char scaleBuf[3][32] = {};
-    int activeField = 0;
-    int lastActiveField = 0;
-    bool pendingSave = false;
+    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
+    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
 
     std::vector<MaterialSlot> materialSlots;
     int materialSlotPickerIndex = -1;
@@ -53,4 +56,7 @@ private:
     bool animationOnly = false;
     std::string animationOnlyTargetMesh;
     std::vector<std::string> compatibleMeshPaths;
+
+    PropertyPanel* panel = nullptr;
+    Widget* chrome = nullptr;
 };

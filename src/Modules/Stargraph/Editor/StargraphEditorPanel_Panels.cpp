@@ -4,14 +4,12 @@
 #include "Core/NamedListRegistry.h"
 #include "Core/SaveFileRegistry.h"
 #include "Editor/UITheme.h"
-#include "Editor/UIWidgets.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/TreeListElement.h"
 #include "Core/Widgets/VerticalBoxElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/ButtonElement.h"
-#include "raygui.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -272,7 +270,8 @@ void StargraphEditorPanel::RemoveFunctionAt(int index) {
 
 void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
     const UIPalette& theme = UITheme::Get();
-    UIWidget::Panel(panel);
+    DrawRectangleRec(panel, theme.panelBg);
+    DrawRectangleLinesEx(panel, 1, theme.panelBorder);
     leftPanelBounds = panel;
 
     if (!leftChrome) BuildLeftPanelChrome();
@@ -362,7 +361,10 @@ void StargraphEditorPanel::RenderLeftPanel(Rectangle panel) {
 }
 
 void StargraphEditorPanel::RenderKeyPickerPopup() {
-    const UIPalette& theme = UITheme::Get();
+    if (!keyPickerOpen) {
+        searchableKeyPicker.Close();
+        return;
+    }
 
     Pin* targetPin = nullptr;
     for (Node& node : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
@@ -371,7 +373,12 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         }
         if (targetPin) break;
     }
-    if (!targetPin) { keyPickerOpen = false; keyPickerPinId = 0; return; }
+    if (!targetPin) {
+        keyPickerOpen = false;
+        keyPickerPinId = 0;
+        searchableKeyPicker.Close();
+        return;
+    }
 
     std::vector<std::string> allKeys;
     switch (keyPickerKind) {
@@ -381,98 +388,36 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         default:                           allKeys = GetInputKeyNames(); break;
     }
 
-    std::vector<int> filtered;
-    std::string searchLower = keyPickerSearch;
-    for (char& c : searchLower) c = (char)tolower(c);
-    for (size_t i = 0; i < allKeys.size(); i++) {
-        std::string display;
-        for (char c : allKeys[i]) {
-            display += (c == '_') ? ' ' : (char)tolower(c);
-        }
-        if (searchLower.empty() || display.find(searchLower) != std::string::npos) {
-            filtered.push_back((int)i);
-        }
+    std::vector<SearchableListPopup::Entry> entries;
+    for (const std::string& key : allKeys) {
+        std::string label = key;
+        for (char& c : label) if (c == '_') c = ' ';
+        SearchableListPopup::Entry e;
+        e.category = "";
+        e.id = key;
+        e.label = label;
+        entries.push_back(e);
     }
-
-    float menuW = keyPickerWidth;
-    float itemH = 20.0f;
-    float searchH = 26.0f;
-    float maxVisibleH = 220.0f;
-    float listH = std::min((float)filtered.size() * itemH + 4.0f, maxVisibleH);
-    float menuH = searchH + listH;
-
-    float popupX = keyPickerPos.x;
-    float popupY = keyPickerPos.y;
-    if (popupX + menuW > graphArea.x + graphArea.width) popupX = graphArea.x + graphArea.width - menuW;
-    if (popupY + menuH > graphArea.y + graphArea.height) popupY = graphArea.y + graphArea.height - menuH;
-    if (popupX < graphArea.x) popupX = graphArea.x;
-    if (popupY < graphArea.y) popupY = graphArea.y;
-
-    Rectangle popup = {popupX, popupY, menuW, menuH};
-    Vector2 mp = GetMousePosition();
 
     if (keyPickerJustOpened) {
         keyPickerJustOpened = false;
-    } else {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, popup)) {
-            keyPickerOpen = false;
-            keyPickerPinId = 0;
-            return;
-        }
-        if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
-            keyPickerOpen = false;
-            keyPickerPinId = 0;
-            return;
-        }
+        searchableKeyPicker.Open(keyPickerPos, keyPickerWidth, 220.0f);
     }
 
-    UIWidget::Panel(popup);
-
-    Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
-    GuiTextBox(searchRect, keyPickerSearch, sizeof(keyPickerSearch), true);
-
-    Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
-    if (CheckCollisionPointRec(mp, listArea)) {
-        float wheel = GetMouseWheelMove();
-        keyPickerScroll -= wheel * itemH * 2;
+    std::string picked = searchableKeyPicker.Render(entries, graphArea);
+    if (!picked.empty()) {
+        targetPin->defaultValue = picked;
+        isDirty = true;
+        keyPickerOpen = false;
+        keyPickerPinId = 0;
+        return;
     }
-    float maxScroll = (float)filtered.size() * itemH + 4.0f - listH;
-    if (maxScroll < 0) maxScroll = 0;
-    if (keyPickerScroll < 0) keyPickerScroll = 0;
-    if (keyPickerScroll > maxScroll) keyPickerScroll = maxScroll;
-
-    float y = popup.y + searchH + 4 - keyPickerScroll;
-    BeginScissorMode((int)listArea.x, (int)listArea.y, (int)listArea.width, (int)listArea.height);
-    for (int idx : filtered) {
-        Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        bool hover = CheckCollisionPointRec(mp, btn);
-        if (hover) DrawRectangleRec(btn, theme.surfaceHover);
-
-        std::string display;
-        for (char c : allKeys[idx]) {
-            if (c == '_') display += ' ';
-            else display += c;
-        }
-        DrawText(display.c_str(), (int)btn.x + 6, (int)btn.y + 4, 11, theme.textPrimary);
-
-        if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            targetPin->defaultValue = allKeys[idx];
-            isDirty = true;
-            keyPickerOpen = false;
-            keyPickerPinId = 0;
-            break;
-        }
-        y += itemH;
-    }
-    EndScissorMode();
-
-    if ((float)filtered.size() * itemH + 4.0f > listH) {
-        float scrollRatio = (maxScroll > 0) ? keyPickerScroll / maxScroll : 0;
-        float barH = (listH / ((float)filtered.size() * itemH + 4.0f)) * listH;
-        float barY = listArea.y + scrollRatio * (listH - barH);
-        DrawRectangleRec({listArea.x + listArea.width - 4, barY, 3, barH}, {100, 100, 120, 200});
+    if (!searchableKeyPicker.IsOpen()) {
+        keyPickerOpen = false;
+        keyPickerPinId = 0;
     }
 }
+
 void StargraphEditorPanel::RenderLeftPanelPopups() {
     if (!leftContextMenu.IsOpen()) return;
 

@@ -22,7 +22,6 @@
 #include "Modules/Stargraph/Nodes_Collision.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "raylib.h"
-#include "raygui.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdarg>

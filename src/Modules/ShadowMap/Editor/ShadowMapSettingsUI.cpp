@@ -2,17 +2,21 @@
 #include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "Editor/UITheme.h"
 #include "Editor/ChoicePopup.h"
-#include "Editor/PropertyFields.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/CheckBoxElement.h"
+#include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
-#include "raygui.h"
 #include <cstdio>
 
 namespace {
     ChoicePopup resolutionPopup;
     ChoicePopup aaMethodPopup;
-    char sunCoverageBuf[16] = "";
-    char shadowStrengthBuf[16] = "";
-    bool buffersInitialized = false;
+    Widget* fieldsChrome = nullptr;
+    TextElement* sunCoverageField = nullptr;
+    TextElement* shadowStrengthField = nullptr;
+    CheckBoxElement* debugVisualizeBox = nullptr;
 }
 
 namespace ShadowMapSettingsUI {
@@ -23,10 +27,40 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
     ShadowMapSettings& settings = ShadowMapSettings::Get();
     bool localAnyOpen = otherPopupOpen || resolutionPopup.IsOpen() || aaMethodPopup.IsOpen();
 
-    if (!buffersInitialized) {
-        snprintf(sunCoverageBuf, sizeof(sunCoverageBuf), "%.0f", settings.GetSunCoverageHalfSize());
-        snprintf(shadowStrengthBuf, sizeof(shadowStrengthBuf), "%.2f", settings.GetShadowStrength());
-        buffersInitialized = true;
+    if (!fieldsChrome) {
+        fieldsChrome = new Widget();
+        auto* root = new WidgetElement();
+        fieldsChrome->SetRoot(root);
+
+        sunCoverageField = new TextElement();
+        sunCoverageField->editable = true;
+        sunCoverageField->numericOnly = true;
+        sunCoverageField->fontSize = 12.0f;
+        sunCoverageField->backgroundColor = theme.fieldBg;
+        sunCoverageField->borderColor = theme.fieldBorder;
+        sunCoverageField->editingBorderColor = theme.accent;
+        sunCoverageField->onTextCommitted = [](const std::string& text) {
+            ShadowMapSettings::Get().SetSunCoverageHalfSize((float)atof(text.c_str()));
+        };
+        root->AddChild(sunCoverageField);
+
+        shadowStrengthField = new TextElement();
+        shadowStrengthField->editable = true;
+        shadowStrengthField->numericOnly = true;
+        shadowStrengthField->fontSize = 12.0f;
+        shadowStrengthField->backgroundColor = theme.fieldBg;
+        shadowStrengthField->borderColor = theme.fieldBorder;
+        shadowStrengthField->editingBorderColor = theme.accent;
+        shadowStrengthField->onTextCommitted = [](const std::string& text) {
+            ShadowMapSettings::Get().SetShadowStrength((float)atof(text.c_str()));
+        };
+        root->AddChild(shadowStrengthField);
+
+        debugVisualizeBox = new CheckBoxElement();
+        debugVisualizeBox->onToggled = [](bool checked) {
+            ShadowMapSettings::Get().SetDebugVisualize(checked);
+        };
+        root->AddChild(debugVisualizeBox);
     }
 
     DrawText("Shadow Map Resolution", (int)x, (int)y, 11, theme.textSecondary);
@@ -55,10 +89,13 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
     DrawText("Sun Shadow Coverage", (int)x, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle coverageRow = {x, y, 120.0f, 20};
-    float coverageValue = settings.GetSunCoverageHalfSize();
-    float prevCoverage = coverageValue;
-    PropertyField::FloatBox(coverageRow, sunCoverageBuf, sizeof(sunCoverageBuf), 2001, activeField, coverageValue);
-    if (coverageValue != prevCoverage) settings.SetSunCoverageHalfSize(coverageValue);
+    if (!sunCoverageField->isEditing) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.0f", settings.GetSunCoverageHalfSize());
+        sunCoverageField->text = buf;
+    }
+    sunCoverageField->size = { coverageRow.width, coverageRow.height };
+    sunCoverageField->offset = { coverageRow.x, coverageRow.y };
     y += 20;
     DrawText("Half-width, in world units, of the area around the camera the sun shadow covers. Larger covers more ground but looks blockier.",
               (int)x, (int)y, 10, theme.textSecondary);
@@ -67,10 +104,13 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
     DrawText("Shadow Strength", (int)x, (int)y, 11, theme.textSecondary);
     y += 14;
     Rectangle strengthRow = {x, y, 120.0f, 20};
-    float strengthValue = settings.GetShadowStrength();
-    float prevStrength = strengthValue;
-    PropertyField::FloatBox(strengthRow, shadowStrengthBuf, sizeof(shadowStrengthBuf), 2002, activeField, strengthValue);
-    if (strengthValue != prevStrength) settings.SetShadowStrength(strengthValue);
+    if (!shadowStrengthField->isEditing) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.2f", settings.GetShadowStrength());
+        shadowStrengthField->text = buf;
+    }
+    shadowStrengthField->size = { strengthRow.width, strengthRow.height };
+    shadowStrengthField->offset = { strengthRow.x, strengthRow.y };
     y += 20;
     DrawText("How dark shadowed areas are, from 0 (no shadow) to 1 (fully black).",
               (int)x, (int)y, 10, theme.textSecondary);
@@ -100,14 +140,20 @@ ModuleSettingsResult Render(float x, float y, float width, int& activeField, boo
         settings.SetShadowAAMethod(methods[aaChoice]);
     }
 
-    bool debugVisualize = settings.GetDebugVisualize();
-    if (GuiCheckBox({x, y, 18, 18}, "Debug: visualize raw shadow map depth", &debugVisualize)) {
-        settings.SetDebugVisualize(debugVisualize);
-    }
+    debugVisualizeBox->checked = settings.GetDebugVisualize();
+    debugVisualizeBox->size = { 18, 18 };
+    debugVisualizeBox->offset = { x, y };
+    DrawText("Debug: visualize raw shadow map depth", (int)x + 24, (int)y + 3, 11, theme.textPrimary);
     y += 22;
     DrawText("Paints the raw shadow-map values. Magenta = No Active Lights. Green = Outside of shadow map's coverage area. Grayscale = Depth Value read from the shadow map.",
               (int)x, (int)y, 10, theme.textSecondary);
     y += 24;
+
+    Rectangle fieldsBounds = { 0.0f, 0.0f, (float)GetScreenWidth(), (float)GetScreenHeight() };
+    float dt = GetFrameTime();
+    fieldsChrome->Tick(dt, fieldsBounds, 1.0f);
+    WidgetInput::ProcessInput(fieldsChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    fieldsChrome->Draw(fieldsBounds, 1.0f);
 
     ModuleSettingsResult result;
     result.nextY = y;

@@ -8,6 +8,9 @@
 #include <vector>
 #include <unordered_map>
 
+class Widget;
+class TextElement;
+
 class LogPanel;
 
 class ModuleBrowserPanel : public Panel {
@@ -20,7 +23,6 @@ public:
 private:
     enum class InputMode { None, RepositoryEntry, CatalogList };
 
-    void RenderRow(const ModuleEntry& entry, float y, float rowHeight);
     void RenderImportBar();
     void RenderRepositoryEntry(Rectangle area);
     void RenderCatalogList(Rectangle area);
@@ -36,12 +38,9 @@ private:
 
     LogPanel* logPanel = nullptr;
     std::string statusMessage;
-    float scrollOffset = 0.0f;
 
     ChoicePopup importMenu;
     InputMode inputMode = InputMode::None;
-    char repoInputBuffer[256] = {0};
-    bool repoInputEditing = false;
 
     std::vector<CatalogEntry> catalogEntries;
     std::string catalogError;
@@ -54,4 +53,16 @@ private:
 
     AsyncTask rebuildTask;
     bool rebuildRunning = false;
+
+    Widget* listChrome = nullptr;
+    size_t builtListCount = (size_t)-1;
+
+    Widget* controlsChrome = nullptr;
+
+    Widget* repoChrome = nullptr;
+    TextElement* repoTextField = nullptr;
+
+    void EnsureListChrome();
+    void EnsureControlsChrome();
+    void EnsureRepoChrome();
 };

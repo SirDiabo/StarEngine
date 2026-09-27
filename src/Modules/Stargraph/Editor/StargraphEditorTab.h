@@ -25,6 +25,7 @@ public:
     void RenderOverlays() override;
     void BuildMenus(MenuBar* menuBar) override;
     bool IsOpen() const override;
+    bool IsDirty() const override;
 
     std::string GetAssetPath() const override { return assetPath; }
 

@@ -3,13 +3,13 @@
 #include "Core/InputKeyNames.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/ObjectKindRegistry.h"
-#include "Editor/PropertyFields.h"
 #include "Editor/UITheme.h"
-#include "Editor/UIWidgets.h"
 #include "Editor/BasicActorDefs.h"
 #include "Core/Widgets/DragDropController.h"
 #include "Core/Widgets/WidgetInput.h"
-#include "raygui.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "Core/Widgets/TextElement.h"
 #include "raymath.h"
 #include <algorithm>
 #include <cfloat>
@@ -688,9 +688,9 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             int labelW = MeasureText(graph.assetName.c_str(), crumbFontSize);
             Rectangle crumbRect = {cursorX, bar.y + 2, (float)labelW, 18};
             Color crumbColor = theme.textPrimary;
-            UIWidget::Interaction crumbIntr = UIWidget::Interact(crumbRect, true);
-            if (crumbIntr.hovered) crumbColor = theme.accent;
-            if (crumbIntr.clicked) CloseFunctionGraph();
+            bool crumbHovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), crumbRect);
+            if (crumbHovered) crumbColor = theme.accent;
+            if (crumbHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) CloseFunctionGraph();
             DrawText(graph.assetName.c_str(), (int)cursorX, (int)bar.y + 4, crumbFontSize, crumbColor);
             cursorX += (float)labelW;
         }
@@ -1004,8 +1004,16 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
                 if (pin.type == PinType::Boolean) {
                     bool bval = (pin.defaultValue == "true" || pin.defaultValue == "1");
-                    if (PropertyField::BoolBox({fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2}, bval)) {
-                        pin.defaultValue = bval ? "true" : "false";
+                    Rectangle boolRect = {fieldRect.x, fieldRect.y + 1, fieldRect.height - 2, fieldRect.height - 2};
+                    bool boolHovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mousePos, boolRect);
+                    DrawRectangleRec(boolRect, boolHovered ? Color{55,55,60,255} : Color{40,40,45,255});
+                    DrawRectangleLinesEx(boolRect, 1, {90,90,95,255});
+                    if (bval) {
+                        float pad = boolRect.width * 0.22f;
+                        DrawRectangleRec({boolRect.x+pad, boolRect.y+pad, boolRect.width-pad*2, boolRect.height-pad*2}, {90,140,220,255});
+                    }
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && boolHovered) {
+                        pin.defaultValue = !bval ? "true" : "false";
                         isDirty = true;
                     }
                 } else if ((node.type == "Input_Key" && pin.name == "Key") ||
@@ -1039,8 +1047,6 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                             keyPickerPinId = pin.id;
                             keyPickerPos = {textRect.x, textRect.y + textRect.height};
                             keyPickerWidth = fieldRect.width;
-                            snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
-                            keyPickerScroll = 0;
                             keyPickerJustOpened = true;
                             keyPickerOpen = true;
                             editingPinId = 0;
@@ -1059,8 +1065,6 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
                         keyPickerWidth = fieldRect.width;
-                        snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
-                        keyPickerScroll = 0;
                         keyPickerJustOpened = true;
                         keyPickerOpen = true;
                         editingPinId = 0;
@@ -1080,8 +1084,6 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
                         keyPickerWidth = fieldRect.width;
-                        snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
-                        keyPickerScroll = 0;
                         keyPickerJustOpened = true;
                         keyPickerOpen = true;
                         editingPinId = 0;
@@ -1129,8 +1131,6 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         keyPickerPinId = pin.id;
                         keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
                         keyPickerWidth = fieldRect.width;
-                        snprintf(keyPickerSearch, sizeof(keyPickerSearch), "%s", pin.defaultValue.c_str());
-                        keyPickerScroll = 0;
                         keyPickerJustOpened = true;
                         keyPickerOpen = true;
                         editingPinId = 0;
@@ -1143,10 +1143,46 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
                         if (tmpl && (tmpl->category == "Actor" || tmpl->category == "Timers")) targetPlaceholder = "self";
                     }
-                    if (PropertyField::StringBox(fieldRect, editBuffer, sizeof(editBuffer), pin.id, editingPinId,
-                                                  pin.defaultValue, allowActivate, targetPlaceholder,
-                                                  pin.defaultValue.c_str())) {
-                        isDirty = true;
+
+                    if (!pinEditChrome) {
+                        pinEditChrome = new Widget();
+                        auto* root = new WidgetElement();
+                        pinEditChrome->SetRoot(root);
+                        pinEditField = new TextElement();
+                        pinEditField->editable = true;
+                        pinEditField->fontSize = 11.0f;
+                        pinEditField->backgroundColor = {35, 35, 40, 255};
+                        pinEditField->borderColor = {60, 60, 70, 255};
+                        pinEditField->editingBorderColor = UITheme::Get().accent;
+                        pinEditField->onTextCommitted = [this](const std::string& text) {
+                            Pin* p = ActiveGraph().FindPin(editingPinId);
+                            if (p) { p->defaultValue = text; isDirty = true; }
+                            editingPinId = 0;
+                        };
+                        root->AddChild(pinEditField);
+                    }
+
+                    if (allowActivate && editingPinId == pin.id) {
+                        pinEditField->size = { fieldRect.width, fieldRect.height };
+                        pinEditField->offset = { fieldRect.x, fieldRect.y };
+                        pinEditField->placeholder = targetPlaceholder ? targetPlaceholder : "";
+                        pinEditActiveThisFrame = true;
+                        if (!pinEditField->isEditing) {
+                            pinEditField->text = pin.defaultValue;
+                            pinEditField->StartEditing();
+                        }
+                    } else {
+                        std::string display = (pin.defaultValue.empty() && targetPlaceholder) ? targetPlaceholder : pin.defaultValue;
+                        DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                        DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                        DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11,
+                                 pin.defaultValue.empty() ? Color{140,140,150,255} : WHITE);
+                        if (allowActivate && pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                            editingPinId = pin.id;
+                            keyPickerOpen = false;
+                            keyPickerPinId = 0;
+                            listeningForKeyPinId = 0;
+                        }
                     }
                 }
                 inputY += scaledPinHeight;
@@ -1296,7 +1332,8 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 nodeMenuJustOpened = true;
                 nodeMenuPos = mousePos;
                 nodeMenuScrollOffset = 0;
-                nodeMenuSearch[0] = '\0';
+                nodeMenuSearch.clear();
+                nodeMenuHighlighted = 0;
             }
             CancelLink();
         }
@@ -1493,9 +1530,24 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         nodeMenuJustOpened = true;
         nodeMenuPos = mousePos;
         nodeMenuScrollOffset = 0;
-        nodeMenuSearch[0] = '\0';
+        nodeMenuSearch.clear();
+        nodeMenuHighlighted = 0;
         }
     }
+
+    if (pinEditChrome) {
+        if (!pinEditActiveThisFrame && pinEditField->isEditing) {
+            pinEditField->OnDeselected();
+        }
+        Rectangle pinEditBounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+        float pinEditDt = GetFrameTime();
+        pinEditChrome->Tick(pinEditDt, pinEditBounds, 1.0f);
+        if (pinEditActiveThisFrame) {
+            WidgetInput::ProcessInput(pinEditChrome, WidgetInput::kEditorDevice, pinEditDt, GetMousePosition(), 1.0f);
+            pinEditChrome->Draw(pinEditBounds, 1.0f);
+        }
+    }
+    pinEditActiveThisFrame = false;
 
     const bool graphKeys = WidgetInput::ScopeHasKeyboard();
 
@@ -1512,8 +1564,195 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     }
 }
 
+void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, const std::string& sourceKind) {
+    std::string nodeTypeId = nodeTypeIdIn;
+    std::string nodeType = nodeTypeId;
+    std::string eventName;
+    std::string functionName;
+    std::string mappingName;
+    std::string externalVarName;
+    std::string externalCompName;
+    bool isExternalSet = false;
+    if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
+        eventName = nodeType.substr(18);
+        nodeType = "Call_Custom_Event";
+    } else if (nodeType.rfind("Call_Function:", 0) == 0) {
+        functionName = nodeType.substr(14);
+        nodeType = "Call_Function";
+    } else if (nodeType.rfind("Input_Mapping:", 0) == 0) {
+        mappingName = nodeType.substr(14);
+        nodeType = "Input_Mapping";
+    } else if (nodeType.rfind("Get_External_Var:", 0) == 0) {
+        externalVarName = nodeType.substr(17);
+        nodeType = "Get_Variable";
+    } else if (nodeType.rfind("Set_External_Var:", 0) == 0) {
+        externalVarName = nodeType.substr(17);
+        nodeType = "Set_Variable";
+        isExternalSet = true;
+    } else if (nodeType.rfind("Get_External_Component:", 0) == 0) {
+        externalCompName = nodeType.substr(23);
+        nodeType = "Get_Component";
+    }
+    Node* node = ActiveGraph().CreateNode(nodeType);
+    if (!mappingName.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Mapping") { p.defaultValue = mappingName; break; }
+        }
+    }
+    if (!eventName.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Event Name") {
+                p.defaultValue = eventName;
+                break;
+            }
+        }
+        Node* targetEvent = graph.FindCustomEventByName(eventName);
+        if (!targetEvent && !sourceKind.empty()) {
+            if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
+                targetEvent = const_cast<Stargraph*>(ext)->FindCustomEventByName(eventName);
+            }
+        }
+        if (targetEvent) {
+            std::vector<std::string> keep = {"Target", "Event Name"};
+            for (const Pin& srcPin : targetEvent->outputs) {
+                if (srcPin.type == PinType::Exec) continue;
+                ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
+                keep.push_back(srcPin.name);
+            }
+            std::vector<std::string> toRemove;
+            for (Pin& p : node->inputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemove.push_back(p.name);
+            }
+            for (const std::string& n : toRemove) ActiveGraph().RemoveDynamicPin(*node, false, n);
+        }
+    }
+    if (!functionName.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Function Name") {
+                p.defaultValue = functionName;
+                break;
+            }
+        }
+        if (FunctionDef* targetFn = graph.FindFunction(functionName)) {
+            Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
+            Node* returnNode = targetFn->graph.FindNodeByType("Return");
+
+            std::vector<std::string> keepInputs = {"Function Name"};
+            if (entryNode) {
+                for (const Pin& srcPin : entryNode->outputs) {
+                    if (srcPin.type == PinType::Exec) continue;
+                    ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
+                    keepInputs.push_back(srcPin.name);
+                }
+            }
+            std::vector<std::string> toRemoveIn;
+            for (Pin& p : node->inputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keepInputs) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemoveIn.push_back(p.name);
+            }
+            for (const std::string& n : toRemoveIn) ActiveGraph().RemoveDynamicPin(*node, false, n);
+
+            std::vector<std::string> keepOutputs;
+            if (returnNode) {
+                for (const Pin& srcPin : returnNode->inputs) {
+                    if (srcPin.type == PinType::Exec) continue;
+                    ActiveGraph().AddDynamicPin(*node, true, srcPin.name, srcPin.type);
+                    keepOutputs.push_back(srcPin.name);
+                }
+            }
+            std::vector<std::string> toRemoveOut;
+            for (Pin& p : node->outputs) {
+                if (p.type == PinType::Exec) continue;
+                bool keepIt = false;
+                for (const std::string& k : keepOutputs) if (k == p.name) { keepIt = true; break; }
+                if (!keepIt) toRemoveOut.push_back(p.name);
+            }
+            for (const std::string& n : toRemoveOut) ActiveGraph().RemoveDynamicPin(*node, true, n);
+        }
+    }
+    if (!externalVarName.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Variable_Name") { p.defaultValue = externalVarName; break; }
+        }
+        if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
+            for (const Variable& var : ext->GetVariables()) {
+                if (var.name != externalVarName) continue;
+                if (isExternalSet) {
+                    for (Pin& p : node->inputs) if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; break; }
+                } else {
+                    for (Pin& p : node->outputs) if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; break; }
+                }
+                break;
+            }
+        }
+        node->title = (isExternalSet ? "Set: " : "Get: ") + externalVarName;
+    }
+    if (!externalCompName.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Component_Name") { p.defaultValue = externalCompName; break; }
+        }
+        if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
+            for (const ComponentDecl& comp : ext->GetComponents()) {
+                if (comp.name != externalCompName) continue;
+                node->componentClass = comp.componentType;
+                break;
+            }
+        }
+        node->title = "Get: " + externalCompName;
+    }
+    Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, nodeMenuPos));
+    node->posX = snapped.x;
+    node->posY = snapped.y;
+
+    if (filterCompatibleWithPin != -1) {
+        const Pin* fromPin = nullptr;
+        bool fromIsOutput = false;
+        const Node* fromNode = nullptr;
+        for (const Node& n : ActiveGraph().GetNodes()) {
+            for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; fromNode = &n; }
+            for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; fromNode = &n; }
+        }
+        if (fromPin) {
+            std::string sourceKind = EffectivePinObjectKind(fromNode, *fromPin);
+            if (fromIsOutput) {
+                for (const Pin& p : node->inputs) {
+                    if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({filterCompatibleWithPin, p.id}); break; }
+                    if (p.type != fromPin->type) continue;
+                    if (p.type == PinType::Object) {
+                        if (!ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) continue;
+                    }
+                    ActiveGraph().AddLink({filterCompatibleWithPin, p.id});
+                    break;
+                }
+            } else {
+                for (const Pin& p : node->outputs) {
+                    if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({p.id, filterCompatibleWithPin}); break; }
+                    if (p.type != fromPin->type) continue;
+                    if (p.type == PinType::Object) {
+                        if (!ObjectKindRegistry::Get().IsCompatible(p.objectKind, sourceKind)) continue;
+                    }
+                    ActiveGraph().AddLink({p.id, filterCompatibleWithPin});
+                    break;
+                }
+            }
+            RefreshWildcardPins(node);
+            RefreshWildcardPins(ActiveGraph().FindNodeByPinId(filterCompatibleWithPin));
+        }
+    }
+
+    isDirty = true;
+    nodeMenuOpen = false;
+    filterCompatibleWithPin = -1;
+}
+
 void StargraphEditorPanel::RenderNodeContextMenu() {
     if (!nodeMenuOpen) return;
+    bool nodeMenuWasJustOpened = nodeMenuJustOpened;
 
     const auto& templates = NodeRegistry::Get().GetFilteredTemplates(filterCompatibleWithPin != -1);
     std::string searchLower = nodeMenuSearch;
@@ -1724,7 +1963,40 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
     DrawRectangleLinesEx(popup, 1, UITheme::Get().panelBorder);
 
     Rectangle searchRect = {popup.x + 4, popup.y + 4, popup.width - 8, searchH - 6};
-    GuiTextBox(searchRect, nodeMenuSearch, sizeof(nodeMenuSearch), true);
+    if (!nodeMenuChrome) {
+        nodeMenuChrome = new Widget();
+        auto* root = new WidgetElement();
+        nodeMenuChrome->SetRoot(root);
+        nodeMenuSearchField = new TextElement();
+        nodeMenuSearchField->editable = true;
+        nodeMenuSearchField->fontSize = 12.0f;
+        nodeMenuSearchField->backgroundColor = UITheme::Get().fieldBg;
+        nodeMenuSearchField->borderColor = UITheme::Get().fieldBorder;
+        nodeMenuSearchField->editingBorderColor = UITheme::Get().accent;
+        nodeMenuSearchField->onTextChanged = [this](const std::string& text) {
+            nodeMenuSearch = text;
+            nodeMenuHighlighted = 0;
+        };
+        root->AddChild(nodeMenuSearchField);
+    }
+    if (nodeMenuWasJustOpened) {
+        nodeMenuSearchField->text.clear();
+        nodeMenuHighlighted = 0;
+    }
+    nodeMenuSearchField->size = { searchRect.width, searchRect.height };
+    nodeMenuSearchField->offset = { searchRect.x, searchRect.y };
+    float nodeMenuDt = GetFrameTime();
+    nodeMenuChrome->Tick(nodeMenuDt, { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() }, 1.0f);
+    if (!nodeMenuSearchField->isEditing) nodeMenuSearchField->StartEditing();
+    WidgetInput::ProcessInput(nodeMenuChrome, WidgetInput::kEditorDevice, nodeMenuDt, GetMousePosition(), 1.0f);
+    nodeMenuChrome->Draw({ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() }, 1.0f);
+
+    if (IsKeyPressed(KEY_DOWN) && nodeMenuHighlighted + 1 < (int)entries.size()) nodeMenuHighlighted++;
+    if (IsKeyPressed(KEY_UP) && nodeMenuHighlighted > 0) nodeMenuHighlighted--;
+    if (nodeMenuHighlighted >= (int)entries.size()) nodeMenuHighlighted = (int)entries.size() - 1;
+    if ((IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) && nodeMenuHighlighted >= 0 && nodeMenuHighlighted < (int)entries.size()) {
+        SpawnNodeFromMenu(entries[nodeMenuHighlighted].second, sourceKind);
+    }
 
     Rectangle listArea = {popup.x, popup.y + searchH, popup.width, listH};
     if (CheckCollisionPointRec(mp, listArea)) {
@@ -1752,191 +2024,14 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         }
 
         Rectangle btn = {popup.x + 4, y, popup.width - 8, itemH - 2};
-        if (CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea)) {
+        int entryIndex = (int)(&entry - &entries[0]);
+        bool isHighlighted = (entryIndex == nodeMenuHighlighted);
+        bool isHovered = CheckCollisionPointRec(mp, btn) && CheckCollisionPointRec(mp, listArea);
+        if (isHovered || isHighlighted) {
             DrawRectangleRec(btn, theme.surfaceHover);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                std::string nodeType = entry.second;
-                std::string eventName;
-                std::string functionName;
-                std::string mappingName;
-                std::string externalVarName;
-                std::string externalCompName;
-                bool isExternalSet = false;
-                if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
-                    eventName = nodeType.substr(18);
-                    nodeType = "Call_Custom_Event";
-                } else if (nodeType.rfind("Call_Function:", 0) == 0) {
-                    functionName = nodeType.substr(14);
-                    nodeType = "Call_Function";
-                } else if (nodeType.rfind("Input_Mapping:", 0) == 0) {
-                    mappingName = nodeType.substr(14);
-                    nodeType = "Input_Mapping";
-                } else if (nodeType.rfind("Get_External_Var:", 0) == 0) {
-                    externalVarName = nodeType.substr(17);
-                    nodeType = "Get_Variable";
-                } else if (nodeType.rfind("Set_External_Var:", 0) == 0) {
-                    externalVarName = nodeType.substr(17);
-                    nodeType = "Set_Variable";
-                    isExternalSet = true;
-                } else if (nodeType.rfind("Get_External_Component:", 0) == 0) {
-                    externalCompName = nodeType.substr(23);
-                    nodeType = "Get_Component";
-                }
-                Node* node = ActiveGraph().CreateNode(nodeType);
-                if (!mappingName.empty()) {
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Mapping") { p.defaultValue = mappingName; break; }
-                    }
-                }
-                if (!eventName.empty()) {
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Event Name") {
-                            p.defaultValue = eventName;
-                            break;
-                        }
-                    }
-                    Node* targetEvent = graph.FindCustomEventByName(eventName);
-                    if (!targetEvent && !sourceKind.empty()) {
-                        if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
-                            targetEvent = const_cast<Stargraph*>(ext)->FindCustomEventByName(eventName);
-                        }
-                    }
-                    if (targetEvent) {
-                        std::vector<std::string> keep = {"Target", "Event Name"};
-                        for (const Pin& srcPin : targetEvent->outputs) {
-                            if (srcPin.type == PinType::Exec) continue;
-                            ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
-                            keep.push_back(srcPin.name);
-                        }
-                        std::vector<std::string> toRemove;
-                        for (Pin& p : node->inputs) {
-                            if (p.type == PinType::Exec) continue;
-                            bool keepIt = false;
-                            for (const std::string& k : keep) if (k == p.name) { keepIt = true; break; }
-                            if (!keepIt) toRemove.push_back(p.name);
-                        }
-                        for (const std::string& n : toRemove) ActiveGraph().RemoveDynamicPin(*node, false, n);
-                    }
-                }
-                if (!functionName.empty()) {
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Function Name") {
-                            p.defaultValue = functionName;
-                            break;
-                        }
-                    }
-                    if (FunctionDef* targetFn = graph.FindFunction(functionName)) {
-                        Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
-                        Node* returnNode = targetFn->graph.FindNodeByType("Return");
-
-                        std::vector<std::string> keepInputs = {"Function Name"};
-                        if (entryNode) {
-                            for (const Pin& srcPin : entryNode->outputs) {
-                                if (srcPin.type == PinType::Exec) continue;
-                                ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
-                                keepInputs.push_back(srcPin.name);
-                            }
-                        }
-                        std::vector<std::string> toRemoveIn;
-                        for (Pin& p : node->inputs) {
-                            if (p.type == PinType::Exec) continue;
-                            bool keepIt = false;
-                            for (const std::string& k : keepInputs) if (k == p.name) { keepIt = true; break; }
-                            if (!keepIt) toRemoveIn.push_back(p.name);
-                        }
-                        for (const std::string& n : toRemoveIn) ActiveGraph().RemoveDynamicPin(*node, false, n);
-
-                        std::vector<std::string> keepOutputs;
-                        if (returnNode) {
-                            for (const Pin& srcPin : returnNode->inputs) {
-                                if (srcPin.type == PinType::Exec) continue;
-                                ActiveGraph().AddDynamicPin(*node, true, srcPin.name, srcPin.type);
-                                keepOutputs.push_back(srcPin.name);
-                            }
-                        }
-                        std::vector<std::string> toRemoveOut;
-                        for (Pin& p : node->outputs) {
-                            if (p.type == PinType::Exec) continue;
-                            bool keepIt = false;
-                            for (const std::string& k : keepOutputs) if (k == p.name) { keepIt = true; break; }
-                            if (!keepIt) toRemoveOut.push_back(p.name);
-                        }
-                        for (const std::string& n : toRemoveOut) ActiveGraph().RemoveDynamicPin(*node, true, n);
-                    }
-                }
-                if (!externalVarName.empty()) {
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Variable_Name") { p.defaultValue = externalVarName; break; }
-                    }
-                    if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
-                        for (const Variable& var : ext->GetVariables()) {
-                            if (var.name != externalVarName) continue;
-                            if (isExternalSet) {
-                                for (Pin& p : node->inputs) if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; break; }
-                            } else {
-                                for (Pin& p : node->outputs) if (p.name == "Value") { p.type = var.type; p.objectKind = var.objectKind; break; }
-                            }
-                            break;
-                        }
-                    }
-                    node->title = (isExternalSet ? "Set: " : "Get: ") + externalVarName;
-                }
-                if (!externalCompName.empty()) {
-                    for (Pin& p : node->inputs) {
-                        if (p.name == "Component_Name") { p.defaultValue = externalCompName; break; }
-                    }
-                    if (const Stargraph* ext = StargraphAssetCache::Get().GetOrLoad(sourceKind)) {
-                        for (const ComponentDecl& comp : ext->GetComponents()) {
-                            if (comp.name != externalCompName) continue;
-                            node->componentClass = comp.componentType;
-                            break;
-                        }
-                    }
-                    node->title = "Get: " + externalCompName;
-                }
-                Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, nodeMenuPos));
-                node->posX = snapped.x;
-                node->posY = snapped.y;
-
-                if (filterCompatibleWithPin != -1) {
-                    const Pin* fromPin = nullptr;
-                    bool fromIsOutput = false;
-                    const Node* fromNode = nullptr;
-                    for (const Node& n : ActiveGraph().GetNodes()) {
-                        for (const Pin& pin : n.outputs) if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = true; fromNode = &n; }
-                        for (const Pin& pin : n.inputs)  if (pin.id == filterCompatibleWithPin) { fromPin = &pin; fromIsOutput = false; fromNode = &n; }
-                    }
-                    if (fromPin) {
-                        std::string sourceKind = EffectivePinObjectKind(fromNode, *fromPin);
-                        if (fromIsOutput) {
-                            for (const Pin& p : node->inputs) {
-                                if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({filterCompatibleWithPin, p.id}); break; }
-                                if (p.type != fromPin->type) continue;
-                                if (p.type == PinType::Object) {
-                                    if (!ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) continue;
-                                }
-                                ActiveGraph().AddLink({filterCompatibleWithPin, p.id});
-                                break;
-                            }
-                        } else {
-                            for (const Pin& p : node->outputs) {
-                                if (p.type == PinType::Wildcard) { ActiveGraph().AddLink({p.id, filterCompatibleWithPin}); break; }
-                                if (p.type != fromPin->type) continue;
-                                if (p.type == PinType::Object) {
-                                    if (!ObjectKindRegistry::Get().IsCompatible(p.objectKind, sourceKind)) continue;
-                                }
-                                ActiveGraph().AddLink({p.id, filterCompatibleWithPin});
-                                break;
-                            }
-                        }
-                        RefreshWildcardPins(node);
-                        RefreshWildcardPins(ActiveGraph().FindNodeByPinId(filterCompatibleWithPin));
-                    }
-                }
-
-                isDirty = true;
-                nodeMenuOpen = false;
-                filterCompatibleWithPin = -1;
+            if (isHovered) nodeMenuHighlighted = entryIndex;
+            if (isHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                SpawnNodeFromMenu(entry.second, sourceKind);
             }
         }
         std::string entryDisplay = NodeMenuDisplayLabel(entry.second);
