@@ -5,6 +5,8 @@
 
 class Widget;
 class TextElement;
+class VerticalBoxElement;
+class HorizontalBoxElement;
 
 struct ProjectInfo {
     std::string name;
@@ -49,5 +51,8 @@ private:
 
     Widget* chrome = nullptr;
     TextElement* nameField = nullptr;
+    VerticalBoxElement* listScroll = nullptr;
+    HorizontalBoxElement* topRow = nullptr;
+    HorizontalBoxElement* bottomRow = nullptr;
     void EnsureChrome();
 };

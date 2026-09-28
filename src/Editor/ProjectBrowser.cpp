@@ -7,6 +7,9 @@
 #include "Core/Widgets/ButtonElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
+#include "Core/Widgets/VerticalBoxElement.h"
+#include "Core/Widgets/HorizontalBoxElement.h"
+#include "Core/Widgets/SpacerElement.h"
 #include "raylib.h"
 #include <filesystem>
 #include <cstring>
@@ -68,20 +71,22 @@ void ProjectBrowser::LoadLogoIfNeeded() {
 void ProjectBrowser::EnsureChrome() {
     if (chrome) return;
     chrome = new Widget();
-    auto* root = new WidgetElement();
+    auto* root = new VerticalBoxElement();
+    root->childSpacing = 5.0f;
     chrome->SetRoot(root);
 
-    const UIPalette& theme = UITheme::Get();
-    nameField = new TextElement();
-    nameField->editable = true;
-    nameField->fontSize = 13.0f;
-    nameField->backgroundColor = theme.fieldBg;
-    nameField->borderColor = theme.fieldBorder;
-    nameField->editingBorderColor = theme.accent;
-    nameField->onTextChanged = [this](const std::string& text) {
-        strncpy(newProjectName, text.c_str(), sizeof(newProjectName) - 1);
-        newProjectName[sizeof(newProjectName) - 1] = '\0';
-    };
+    topRow = new HorizontalBoxElement();
+    topRow->size = { 0.0f, 25.0f };
+    root->AddChild(topRow);
+
+    listScroll = new VerticalBoxElement();
+    listScroll->scrollEnabled = true;
+    listScroll->size = { 0.0f, 190.0f };
+    root->AddChild(listScroll);
+
+    bottomRow = new HorizontalBoxElement();
+    bottomRow->size = { 0.0f, 25.0f };
+    root->AddChild(bottomRow);
 }
 
 void ProjectBrowser::Render() {
@@ -108,13 +113,15 @@ void ProjectBrowser::Render() {
     }
     DrawText("Project Browser", (int)titleX, (int)modal.y + 10, 20, WHITE);
 
-    WidgetElement* root = chrome->rootElement;
-    root->ClearChildren();
+    Rectangle inner = { modal.x + 10, modal.y + 40, modal.width - 20, modal.height - 50 };
 
-    Rectangle newBtn = { (float)(int)modal.x + 10, (float)(int)modal.y + 40, 120, 25 };
+    VerticalBoxElement* root = static_cast<VerticalBoxElement*>(chrome->rootElement);
+    topRow->ClearChildren();
+    listScroll->ClearChildren();
+    bottomRow->ClearChildren();
+
     auto* newBtnEl = new ButtonElement();
-    newBtnEl->size = { newBtn.width, newBtn.height };
-    newBtnEl->offset = { newBtn.x, newBtn.y };
+    newBtnEl->size = { 120.0f, 25.0f };
     newBtnEl->defaultColor = theme.buttonBg;
     newBtnEl->hoveredColor = theme.buttonHover;
     newBtnEl->onActivated = [this]() { wantsCreate = true; };
@@ -124,24 +131,34 @@ void ProjectBrowser::Render() {
     newBtnLbl->anchor = { 0.5f, 0.5f };
     newBtnLbl->pivot = { 0.5f, 0.5f };
     newBtnEl->AddChild(newBtnLbl);
-    root->AddChild(newBtnEl);
+    topRow->AddChild(newBtnEl);
 
-    Rectangle txtBox = { (float)(int)modal.x + 140, (float)(int)modal.y + 40, 250, 25 };
     if (wantsCreate) {
-        nameField->size = { txtBox.width, txtBox.height };
-        nameField->offset = { txtBox.x, txtBox.y };
-        root->AddChild(nameField);
+        auto* spacer1 = new SpacerElement();
+        spacer1->size = { 10.0f, 0.0f };
+        topRow->AddChild(spacer1);
+
+        nameField = new TextElement();
+        nameField->editable = true;
+        nameField->fontSize = 13.0f;
+        nameField->backgroundColor = theme.fieldBg;
+        nameField->borderColor = theme.fieldBorder;
+        nameField->editingBorderColor = theme.accent;
+        nameField->size = { 250.0f, 25.0f };
+        nameField->text = newProjectName;
+        nameField->onTextChanged = [this](const std::string& text) {
+            strncpy(newProjectName, text.c_str(), sizeof(newProjectName) - 1);
+            newProjectName[sizeof(newProjectName) - 1] = '\0';
+        };
+        topRow->AddChild(nameField);
         if (!nameField->isEditing) nameField->StartEditing();
     }
 
-    float y = (float)(int)modal.y + 80;
-    for (size_t i = 0; i < projects.size() && y < (int)modal.y + 260; i++) {
-        Rectangle btn = { (float)(int)modal.x + 10, y, 380, 25 };
+    for (size_t i = 0; i < projects.size(); i++) {
         std::string label = projects[i].name + (projects[i].exists ? "" : " (missing .starproject)");
 
         auto* rowBtn = new ButtonElement();
-        rowBtn->size = { btn.width, btn.height };
-        rowBtn->offset = { btn.x, btn.y };
+        rowBtn->size = { 0.0f, 25.0f };
         rowBtn->defaultColor = theme.buttonBg;
         rowBtn->hoveredColor = theme.buttonHover;
         bool exists = projects[i].exists;
@@ -159,16 +176,20 @@ void ProjectBrowser::Render() {
         rowLbl->pivot = { 0.0f, 0.5f };
         rowLbl->offset = { 8.0f, 0.0f };
         rowBtn->AddChild(rowLbl);
-        root->AddChild(rowBtn);
 
-        y += 30;
+        auto* rowVBox = new VerticalBoxElement();
+        rowVBox->AddChild(rowBtn);
+
+        auto* spacer = new SpacerElement();
+        spacer->size = { 0.0f, 2.0f };
+        rowVBox->AddChild(spacer);
+
+        listScroll->AddChild(rowVBox);
     }
 
     if (showCancel) {
-        Rectangle cancelBtn = { (float)(int)modal.x + 10, (float)(int)modal.y + 270, 100, 25 };
         auto* cancelBtnEl = new ButtonElement();
-        cancelBtnEl->size = { cancelBtn.width, cancelBtn.height };
-        cancelBtnEl->offset = { cancelBtn.x, cancelBtn.y };
+        cancelBtnEl->size = { 100.0f, 25.0f };
         cancelBtnEl->defaultColor = theme.buttonBg;
         cancelBtnEl->hoveredColor = theme.buttonHover;
         cancelBtnEl->onActivated = [this]() {
@@ -182,16 +203,14 @@ void ProjectBrowser::Render() {
         cancelLbl->anchor = { 0.5f, 0.5f };
         cancelLbl->pivot = { 0.5f, 0.5f };
         cancelBtnEl->AddChild(cancelLbl);
-        root->AddChild(cancelBtnEl);
+        bottomRow->AddChild(cancelBtnEl);
     }
 
     bool hasName = strlen(newProjectName) > 0;
     bool nameIsUnique = hasName && IsNameUnique(std::string(newProjectName));
     if (nameIsUnique) {
-        Rectangle createBtn = { (float)(int)modal.x + 290, (float)(int)modal.y + 270, 100, 25 };
         auto* createBtnEl = new ButtonElement();
-        createBtnEl->size = { createBtn.width, createBtn.height };
-        createBtnEl->offset = { createBtn.x, createBtn.y };
+        createBtnEl->size = { 100.0f, 25.0f };
         createBtnEl->defaultColor = theme.buttonBg;
         createBtnEl->hoveredColor = theme.buttonHover;
         createBtnEl->onActivated = [this]() {
@@ -204,13 +223,13 @@ void ProjectBrowser::Render() {
         createLbl->anchor = { 0.5f, 0.5f };
         createLbl->pivot = { 0.5f, 0.5f };
         createBtnEl->AddChild(createLbl);
-        root->AddChild(createBtnEl);
+        bottomRow->AddChild(createBtnEl);
     }
 
     WidgetInput::SetInputScope(this);
     float dt = GetFrameTime();
-    chrome->Tick(dt, modal, 1.0f);
+    chrome->Tick(dt, inner, 1.0f);
     WidgetInput::ProcessInput(chrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
-    chrome->Draw(modal, 1.0f);
+    chrome->Draw(inner, 1.0f);
     WidgetInput::SetInputScope(nullptr);
 }
