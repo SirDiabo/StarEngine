@@ -5,6 +5,9 @@
 #include "Editor/UITheme.h"
 #include "Runtime/Actor.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/DebugDraw.h"
+#include "Runtime/CollisionTrace.h"
+#include "Runtime/Components/CollisionComponent.h"
 #include "Core/StarAsset.h"
 #include "Core/EmbeddedAssets.h"
 #include "Core/SafeParse.h"
@@ -185,6 +188,7 @@ void StargraphEditorPanel::UpdatePreviewCamera(Rectangle client) {
 
 void StargraphEditorPanel::RenderPreviewScene() {
     rlSetClipPlanes(0.1, 500000.0);
+    DebugDraw::viewportHeight = (float)previewRenderTargetHeight;
     BeginMode3D(previewCamera);
 
     DrawGrid(20, 50.0f);
@@ -221,6 +225,11 @@ void StargraphEditorPanel::RenderPreviewScene() {
             } else {
                 Texture2D tex = GetOrLoadPreviewIcon("icon_actor_mesh.png");
                 if (tex.id != 0) DrawBillboardRec(previewCamera, tex, {0, 0, (float)tex.width, (float)tex.height}, pos, {40, 40}, WHITE);
+            }
+        } else if (comp.componentType == "CollisionComponent" && CollisionComponent::DeclVisibleInEditor(comp)) {
+            CollisionTrace::Shape shape;
+            if (CollisionComponent::BuildShapeFromDecl(comp, pos, rot, scl, shape)) {
+                CollisionTrace::DrawDebugShape(shape, selected ? Color{255, 200, 50, 255} : Color{90, 200, 255, 230});
             }
         } else if (comp.componentType == "BillboardComponent") {
             std::string billboardTexturePath = comp.Get("BillboardTexture");

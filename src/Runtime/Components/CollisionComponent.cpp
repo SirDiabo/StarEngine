@@ -66,6 +66,23 @@ void CollisionComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Radius", &radius);
     outProperties.AddFloat("Height", &height);
     outProperties.AddVector3("Box Extents", &boxExtents.x);
+    outProperties.AddBool("Visibility", &visible);
+    outProperties.AddBool("Hidden In Game", &hiddenInGame);
+}
+
+bool CollisionComponent::DeclVisibleInEditor(const ComponentDecl& decl) {
+    return decl.Get("CollisionVisibility", "true") == "true";
+}
+
+bool CollisionComponent::BuildShapeFromDecl(const ComponentDecl& decl, const Vector3& pos, const Vector3& rot, const Vector3& scl,
+                                            CollisionTrace::Shape& outShape) {
+    std::string shape = decl.Get("CollisionShape", "Box");
+    int type = shape == "Sphere" ? Sphere : (shape == "Capsule" ? Capsule : Box);
+    float radius = SafeParse::ToFloat(decl.Get("CollisionRadius", "50"));
+    float height = SafeParse::ToFloat(decl.Get("CollisionHeight", "100"));
+    Vector3 extents = { SafeParse::ToFloat(decl.Get("BoxWidth", "100")), SafeParse::ToFloat(decl.Get("BoxHeight", "100")),
+                        SafeParse::ToFloat(decl.Get("BoxDepth", "100")) };
+    return CollisionTrace::MakeComponentShape(type, radius, height, extents, pos, rot, scl, outShape);
 }
 
 void CollisionComponent::Update(float deltaTime) {
@@ -103,6 +120,12 @@ ComponentRegistrar registrar_CollisionComponent({
         []{ auto f = ComponentField::Flt("BoxDepth", "Box Depth", 100.0f,
                 [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.z = SafeParse::ToFloat(d.Get("BoxDepth", "100")); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
+            return f; }(),
+        ComponentField::Bln("CollisionVisibility", "Visibility", true,
+            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).visible = d.Get("CollisionVisibility", "true") == "true"; }),
+        []{ auto f = ComponentField::Bln("CollisionHiddenInGame", "Hidden In Game", true,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).hiddenInGame = d.Get("CollisionHiddenInGame", "true") == "true"; });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionVisibility", "true") == "true"; };
             return f; }(),
     }
 });

@@ -356,30 +356,34 @@ CollisionTrace::Shape CollisionTrace::MakeBox(const Vector3& center, const Vecto
     return s;
 }
 
-bool CollisionTrace::GetComponentShape(const Actor* actor, const CollisionComponent* cc, Shape& outShape) {
-    if (!actor || !cc) return false;
-    Vector3 pos, rot, scl;
-    actor->GetComponentWorldTransform(const_cast<CollisionComponent*>(cc), pos, rot, scl);
+bool CollisionTrace::MakeComponentShape(int shapeType, float radius, float height, const Vector3& boxExtents,
+                                         const Vector3& pos, const Vector3& rot, const Vector3& scl, Shape& outShape) {
     float ax = fabsf(scl.x);
     float ay = fabsf(scl.y);
     float az = fabsf(scl.z);
-    switch (cc->shapeType) {
+    switch (shapeType) {
         case CollisionComponent::Sphere:
-            outShape = MakeSphere(pos, fabsf(cc->radius) * fmaxf(ax, fmaxf(ay, az)));
+            outShape = MakeSphere(pos, fabsf(radius) * fmaxf(ax, fmaxf(ay, az)));
             return true;
         case CollisionComponent::Capsule: {
             Matrix m = MatrixRotateXYZ({ DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z });
             Vector3 up{ m.m4, m.m5, m.m6 };
-            float halfLen = fabsf(cc->height) * 0.5f * ay;
-            outShape = MakeCapsule(Sub(pos, Mul(up, halfLen)), Add(pos, Mul(up, halfLen)),
-                                   fabsf(cc->radius) * fmaxf(ax, az));
+            float halfLen = fabsf(height) * 0.5f * ay;
+            outShape = MakeCapsule(Sub(pos, Mul(up, halfLen)), Add(pos, Mul(up, halfLen)), fabsf(radius) * fmaxf(ax, az));
             return true;
         }
         default:
-            outShape = MakeBox(pos, rot, { fabsf(cc->boxExtents.x) * ax * 0.5f, fabsf(cc->boxExtents.y) * ay * 0.5f,
-                                           fabsf(cc->boxExtents.z) * az * 0.5f });
+            outShape = MakeBox(pos, rot, { fabsf(boxExtents.x) * ax * 0.5f, fabsf(boxExtents.y) * ay * 0.5f,
+                                           fabsf(boxExtents.z) * az * 0.5f });
             return true;
     }
+}
+
+bool CollisionTrace::GetComponentShape(const Actor* actor, const CollisionComponent* cc, Shape& outShape) {
+    if (!actor || !cc) return false;
+    Vector3 pos, rot, scl;
+    actor->GetComponentWorldTransform(const_cast<CollisionComponent*>(cc), pos, rot, scl);
+    return MakeComponentShape((int)cc->shapeType, cc->radius, cc->height, cc->boxExtents, pos, rot, scl, outShape);
 }
 
 void CollisionTrace::BeginBatch() {
@@ -626,30 +630,33 @@ bool CollisionTrace::SweepBox(const Vector3& center, const Vector3& rotationDegr
     return SweepShape(MakeBox(center, rotationDegrees, halfExtents), delta, params, outHit);
 }
 
-void CollisionTrace::DrawDebugShapes() {
-    if (!World::Get().IsPlaying()) return;
-    const Color color = { 90, 200, 255, 230 };
+void CollisionTrace::DrawDebugShape(const Shape& s, Color color) {
     const DebugDraw::View view = DebugDraw::CaptureView();
     const float width = DebugDraw::collisionShapeLineWidth;
+    switch (s.type) {
+        case Shape::Sphere:
+            DebugDraw::Sphere(view, s.center, s.radius, width, color);
+            break;
+        case Shape::Capsule:
+            DebugDraw::Capsule(view, s.a, s.b, s.radius, width, color);
+            break;
+        default:
+            DebugDraw::OrientedBox(view, s.center, s.axis, s.half, width, color);
+            break;
+    }
+}
+
+void CollisionTrace::DrawDebugShapes() {
+    const Color color = { 90, 200, 255, 230 };
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;
         for (Component* comp : actor->GetComponents()) {
             CollisionComponent* cc = dynamic_cast<CollisionComponent*>(comp);
-            if (!cc) continue;
+            if (!cc || !cc->visible || cc->hiddenInGame) continue;
             Shape s;
             if (!GetComponentShape(actor, cc, s)) continue;
-            switch (s.type) {
-                case Shape::Sphere:
-                    DebugDraw::Sphere(view, s.center, s.radius, width, color);
-                    break;
-                case Shape::Capsule:
-                    DebugDraw::Capsule(view, s.a, s.b, s.radius, width, color);
-                    break;
-                default:
-                    DebugDraw::OrientedBox(view, s.center, s.axis, s.half, width, color);
-                    break;
-            }
+            DrawDebugShape(s, color);
         }
     }
 }

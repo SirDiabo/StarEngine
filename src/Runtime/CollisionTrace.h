@@ -40,6 +40,9 @@ namespace CollisionTrace {
     Shape MakeCapsule(const Vector3& a, const Vector3& b, float radius);
     Shape MakeBox(const Vector3& center, const Vector3& rotationDegrees, const Vector3& halfExtents);
     bool GetComponentShape(const Actor* actor, const CollisionComponent* component, Shape& outShape);
+    bool MakeComponentShape(int shapeType, float radius, float height, const Vector3& boxExtents,
+                             const Vector3& pos, const Vector3& rot, const Vector3& scl, Shape& outShape);
+    void DrawDebugShape(const Shape& shape, Color color);
 
     bool TraceAgainstMeshes(const Vector3& start, const Vector3& end, Actor* exclude,
                              Actor*& outActor, Vector3& outLocation, Vector3& outNormal, float& outDistance);

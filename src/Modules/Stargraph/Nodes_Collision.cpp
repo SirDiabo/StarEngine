@@ -32,7 +32,6 @@ void DrawAndClearCollisionDebug(float viewportHeight) {
         for (const auto& sphere : g_DebugSpheres) {
             DebugDraw::Sphere(view, sphere.center, sphere.radius, width, sphere.color);
         }
-        CollisionTrace::DrawDebugShapes();
     }
     g_DebugLines.clear();
     g_DebugSpheres.clear();

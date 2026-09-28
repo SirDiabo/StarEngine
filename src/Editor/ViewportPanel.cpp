@@ -3,6 +3,9 @@
 #include "Runtime/Actor.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/DebugDraw.h"
+#include "Runtime/CollisionTrace.h"
+#include "Runtime/Components/CollisionComponent.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
@@ -421,6 +424,7 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 
 void ViewportPanel::RenderScene() {
     rlSetClipPlanes(0.1, 5000000.0);
+    DebugDraw::viewportHeight = (float)renderTargetHeight;
     BeginMode3D(camera);
 
     float gridStep = (gridStepSize > 0.001f) ? gridStepSize : 100.0f;
@@ -461,6 +465,11 @@ void ViewportPanel::RenderScene() {
                         DrawInstanceOrMesh(comp.Get("Mesh"), materialIt != comp.arrayFields.end() ? materialIt->second : emptyMaterials,
                                             compPos, compRot, compScale, selected, fallbackColor);
                         drewAnyMesh = true;
+                    } else if (comp.componentType == "CollisionComponent" && CollisionComponent::DeclVisibleInEditor(comp)) {
+                        CollisionTrace::Shape shape;
+                        if (CollisionComponent::BuildShapeFromDecl(comp, compPos, compRot, compScale, shape)) {
+                            CollisionTrace::DrawDebugShape(shape, selected ? Color{255, 200, 50, 255} : Color{90, 200, 255, 230});
+                        }
                     } else if (comp.componentType == "BillboardComponent") {
                         std::string billboardTexturePath = comp.Get("BillboardTexture");
                         Texture2D* tex = billboardTexturePath.empty() ? nullptr

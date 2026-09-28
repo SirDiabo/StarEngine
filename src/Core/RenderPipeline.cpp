@@ -5,11 +5,14 @@
 #include "RenderSettings.h"
 #include "ShadingModel.h"
 #include "Widgets/WidgetRenderer.h"
+#include "Runtime/DebugDraw.h"
 
 namespace RenderPipeline {
 
 void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
+
+    DebugDraw::viewportHeight = (float)target.texture.height;
 
     WidgetRenderer::PrepareWorldSpaceWidgets();
 
