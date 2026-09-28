@@ -3,6 +3,7 @@
 #include "Actor.h"
 #include "World.h"
 #include "AssetCache.h"
+#include "DebugDraw.h"
 #include "Components/MeshComponent.h"
 #include "Components/CollisionComponent.h"
 #include "Core/StarAsset.h"
@@ -215,6 +216,9 @@ void Scene::Refresh() {
                     k[kc++] = (float)cc->shapeType;
                     k[kc++] = cc->radius;
                     k[kc++] = cc->height;
+                    k[kc++] = cc->boxExtents.x;
+                    k[kc++] = cc->boxExtents.y;
+                    k[kc++] = cc->boxExtents.z;
                 }
                 bool dirty = kc < 0 || kc != rec.keyCount || std::memcmp(k, rec.key, sizeof(float) * (size_t)kc) != 0;
                 if (dirty) {
@@ -372,7 +376,8 @@ bool CollisionTrace::GetComponentShape(const Actor* actor, const CollisionCompon
             return true;
         }
         default:
-            outShape = MakeBox(pos, rot, { ax * 0.5f, ay * 0.5f, az * 0.5f });
+            outShape = MakeBox(pos, rot, { fabsf(cc->boxExtents.x) * ax * 0.5f, fabsf(cc->boxExtents.y) * ay * 0.5f,
+                                           fabsf(cc->boxExtents.z) * az * 0.5f });
             return true;
     }
 }
@@ -623,7 +628,9 @@ bool CollisionTrace::SweepBox(const Vector3& center, const Vector3& rotationDegr
 
 void CollisionTrace::DrawDebugShapes() {
     if (!World::Get().IsPlaying()) return;
-    const Color color = { 90, 200, 255, 220 };
+    const Color color = { 90, 200, 255, 230 };
+    const DebugDraw::View view = DebugDraw::CaptureView();
+    const float width = DebugDraw::collisionShapeLineWidth;
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;
@@ -634,28 +641,14 @@ void CollisionTrace::DrawDebugShapes() {
             if (!GetComponentShape(actor, cc, s)) continue;
             switch (s.type) {
                 case Shape::Sphere:
-                    DrawSphereWires(s.center, s.radius, 8, 12, color);
+                    DebugDraw::Sphere(view, s.center, s.radius, width, color);
                     break;
                 case Shape::Capsule:
-                    DrawCapsuleWires(s.a, s.b, s.radius, 12, 6, color);
+                    DebugDraw::Capsule(view, s.a, s.b, s.radius, width, color);
                     break;
-                default: {
-                    Vector3 c[8];
-                    for (int i = 0; i < 8; i++) {
-                        float sx = (i & 1) ? 1.0f : -1.0f;
-                        float sy = (i & 2) ? 1.0f : -1.0f;
-                        float sz = (i & 4) ? 1.0f : -1.0f;
-                        c[i] = Add(s.center, Add(Add(Mul(s.axis[0], s.half.x * sx), Mul(s.axis[1], s.half.y * sy)),
-                                                 Mul(s.axis[2], s.half.z * sz)));
-                    }
-                    for (int i = 0; i < 8; i++) {
-                        for (int bit = 1; bit < 8; bit <<= 1) {
-                            int j = i ^ bit;
-                            if (j > i) DrawLine3D(c[i], c[j], color);
-                        }
-                    }
+                default:
+                    DebugDraw::OrientedBox(view, s.center, s.axis, s.half, width, color);
                     break;
-                }
             }
         }
     }

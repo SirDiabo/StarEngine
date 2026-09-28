@@ -495,7 +495,7 @@ void ViewportPanel::RenderScene() {
 
     if (haveSelected) GizmoRenderer::Render(camera, renderTargetWidth, renderTargetHeight, gizmoMode, gizmoSpace, selectedPos, selectedRot, gizmoDragState);
 
-    DrawAndClearCollisionDebug();
+    DrawAndClearCollisionDebug((float)renderTargetHeight);
 
     EndMode3D();
 }
@@ -744,7 +744,7 @@ void ViewportPanel::Render() {
             DrawTexturePro(pieRenderTarget.texture, pieSource, pieDest, {0, 0}, 0.0f, WHITE);
             WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)clientWidth, (float)clientHeight}, true);
             BeginMode3D(camera);
-            DrawAndClearCollisionDebug();
+            DrawAndClearCollisionDebug((float)renderTargetHeight);
             EndMode3D();
             PrintMessageLog::Get().Draw();
             EndTextureMode();

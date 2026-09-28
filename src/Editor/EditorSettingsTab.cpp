@@ -3,10 +3,12 @@
 #include "UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "NativeFileDialog.h"
+#include "Runtime/DebugDraw.h"
 #include "raylib.h"
 #include <string>
 #include <filesystem>
 #include <cstdlib>
+#include <cstdio>
 
 static bool ThemeOptionButton(Rectangle r, const char* label, bool active) {
     const UIPalette& theme = UITheme::Get();
@@ -54,7 +56,7 @@ static std::string StarEngineDir() {
 void EditorSettingsTab::Initialize() {
     title     = "Editor Settings";
     permanent = false;
-    switcher.SetCategories({ "Style" });
+    switcher.SetCategories({ "Style", "Debug" });
 }
 
 void EditorSettingsTab::Render(float x, float y, float width, float height) {
@@ -62,6 +64,7 @@ void EditorSettingsTab::Render(float x, float y, float width, float height) {
 
     switch (switcher.Selected()) {
         case 0: RenderStyleCategory(content); break;
+        case 1: RenderDebugCategory(content); break;
         default: break;
     }
 }
@@ -184,6 +187,59 @@ void EditorSettingsTab::RenderStyleCategory(Rectangle area) {
     } else {
         editingColorField = -1;
     }
+}
+
+static bool LineWidthRow(float x, float y, float rowWidth, const char* label, float& value) {
+    const UIPalette& theme = UITheme::Get();
+    DrawText(label, (int)x, (int)(y + 6), 11, theme.textSecondary);
+
+    const float btnW = 24.0f;
+    const float btnH = 22.0f;
+    float right = x + rowWidth;
+    Rectangle plus = {right - btnW, y, btnW, btnH};
+    Rectangle valueBox = {plus.x - 56.0f - 4.0f, y, 56.0f, btnH};
+    Rectangle minus = {valueBox.x - btnW - 4.0f, y, btnW, btnH};
+
+    bool changed = false;
+    if (StyledButton(minus, "-")) {
+        float next = DebugDraw::ClampWidth(value - 1.0f);
+        changed = next != value;
+        value = next;
+    }
+
+    DrawRectangleRec(valueBox, theme.fieldBg);
+    DrawRectangleLinesEx(valueBox, 1, theme.fieldBorder);
+    char text[24];
+    snprintf(text, sizeof(text), "%.0f px", value);
+    int tw = MeasureText(text, 11);
+    DrawText(text, (int)(valueBox.x + (valueBox.width - tw) / 2.0f), (int)(valueBox.y + (valueBox.height - 11) / 2.0f), 11, theme.textPrimary);
+
+    if (StyledButton(plus, "+")) {
+        float next = DebugDraw::ClampWidth(value + 1.0f);
+        changed = changed || next != value;
+        value = next;
+    }
+    return changed;
+}
+
+void EditorSettingsTab::RenderDebugCategory(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float rowWidth = area.width - 32 > 480.0f ? 480.0f : area.width - 32;
+
+    DrawText("Debug Lines", (int)fx, (int)fy, 14, theme.accent);
+    fy += 22;
+    DrawText("Thickness in screen pixels for debug drawing in the viewport.", (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 24;
+
+    bool changed = false;
+    changed |= LineWidthRow(fx, fy, rowWidth, "Collision Shape Line Width", DebugDraw::collisionShapeLineWidth);
+    fy += 30;
+    changed |= LineWidthRow(fx, fy, rowWidth, "Line Trace Line Width", DebugDraw::lineTraceLineWidth);
+
+    if (changed) DebugDraw::SaveSettings();
 }
 
 void EditorSettingsTab::BuildMenus(MenuBar* menuBar) {

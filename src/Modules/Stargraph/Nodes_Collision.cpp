@@ -6,6 +6,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Components/MeshComponent.h"
 #include "Runtime/CollisionTrace.h"
+#include "Runtime/DebugDraw.h"
 #include "raymath.h"
 #include <cstdio>
 #include <vector>
@@ -20,13 +21,16 @@ static bool s_CollisionDebugEnabled = false;
 void SetCollisionDebugEnabled(bool enabled) { s_CollisionDebugEnabled = enabled; }
 bool IsCollisionDebugEnabled() { return s_CollisionDebugEnabled; }
 
-void DrawAndClearCollisionDebug() {
+void DrawAndClearCollisionDebug(float viewportHeight) {
+    if (viewportHeight > 1.0f) DebugDraw::viewportHeight = viewportHeight;
     if (s_CollisionDebugEnabled) {
+        const DebugDraw::View view = DebugDraw::CaptureView();
+        const float width = DebugDraw::lineTraceLineWidth;
         for (const auto& line : g_DebugLines) {
-            DrawLine3D(line.start, line.end, line.color);
+            DebugDraw::Line(view, line.start, line.end, width, line.color);
         }
         for (const auto& sphere : g_DebugSpheres) {
-            DrawSphereWires(sphere.center, sphere.radius, 8, 8, sphere.color);
+            DebugDraw::Sphere(view, sphere.center, sphere.radius, width, sphere.color);
         }
         CollisionTrace::DrawDebugShapes();
     }

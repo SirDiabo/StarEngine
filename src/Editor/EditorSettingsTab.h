@@ -13,6 +13,7 @@ public:
 
 private:
     void RenderStyleCategory(Rectangle area);
+    void RenderDebugCategory(Rectangle area);
 
     SettingsSwitcher switcher;
     float colorListScroll = 0.0f;

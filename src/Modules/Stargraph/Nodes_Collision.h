@@ -2,6 +2,6 @@
 
 void RegisterCollisionNodes();
 
-void DrawAndClearCollisionDebug();
+void DrawAndClearCollisionDebug(float viewportHeight = 0.0f);
 void SetCollisionDebugEnabled(bool enabled);
 bool IsCollisionDebugEnabled();

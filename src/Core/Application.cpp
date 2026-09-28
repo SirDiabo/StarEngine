@@ -18,6 +18,7 @@
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/DebugDraw.h"
 #include "Runtime/Components/CameraComponent.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
@@ -171,6 +172,7 @@ bool Application::Initialize(int argc, char* argv[]) {
     ModuleManager::Get().InitializeAll();
 
     SetCollisionDebugEnabled(true);
+    DebugDraw::LoadSettings();
 
     editor->RestoreState();
 

@@ -65,6 +65,7 @@ void CollisionComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddFloat("Radius", &radius);
     outProperties.AddFloat("Height", &height);
+    outProperties.AddVector3("Box Extents", &boxExtents.x);
 }
 
 void CollisionComponent::Update(float deltaTime) {
@@ -83,10 +84,26 @@ ComponentRegistrar registrar_CollisionComponent({
                                                                 : shape == "Capsule" ? CollisionComponent::Capsule
                                                                                      : CollisionComponent::Box;
             }),
-        ComponentField::Flt("CollisionRadius", "Radius", 50.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).radius = SafeParse::ToFloat(d.Get("CollisionRadius", "50")); }),
-        ComponentField::Flt("CollisionHeight", "Height", 100.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).height = SafeParse::ToFloat(d.Get("CollisionHeight", "100")); }),
+        []{ auto f = ComponentField::Flt("CollisionRadius", "Radius", 50.0f,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).radius = SafeParse::ToFloat(d.Get("CollisionRadius", "50")); });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") != "Box"; };
+            return f; }(),
+        []{ auto f = ComponentField::Flt("CollisionHeight", "Height", 100.0f,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).height = SafeParse::ToFloat(d.Get("CollisionHeight", "100")); });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Capsule"; };
+            return f; }(),
+        []{ auto f = ComponentField::Flt("BoxWidth", "Box Width", 100.0f,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.x = SafeParse::ToFloat(d.Get("BoxWidth", "100")); });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
+            return f; }(),
+        []{ auto f = ComponentField::Flt("BoxHeight", "Box Height", 100.0f,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.y = SafeParse::ToFloat(d.Get("BoxHeight", "100")); });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
+            return f; }(),
+        []{ auto f = ComponentField::Flt("BoxDepth", "Box Depth", 100.0f,
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.z = SafeParse::ToFloat(d.Get("BoxDepth", "100")); });
+            f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
+            return f; }(),
     }
 });
 }

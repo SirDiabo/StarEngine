@@ -7,6 +7,7 @@ public:
     ShapeType shapeType = Box;
     float radius = 50.0f;
     float height = 100.0f;
+    Vector3 boxExtents = {100.0f, 100.0f, 100.0f};
 
     const char* GetClassName() const override { return "CollisionComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
