@@ -386,6 +386,28 @@ bool CollisionTrace::GetComponentShape(const Actor* actor, const CollisionCompon
     return MakeComponentShape((int)cc->shapeType, cc->radius, cc->height, cc->boxExtents, pos, rot, scl, outShape);
 }
 
+bool CollisionTrace::MoveActorSwept(Actor* actor, const Vector3& desiredPosition, float skin, HitResult& outHit) {
+    Vector3 delta = Sub(desiredPosition, actor->position);
+    CollisionComponent* body = actor->GetCollisionComponent();
+    Shape shape;
+    if (!body || !GetComponentShape(actor, body, shape)) {
+        actor->position = desiredPosition;
+        return false;
+    }
+    QueryParams params;
+    params.ignoreActor = actor;
+    if (!SweepShape(shape, delta, params, outHit)) {
+        actor->position = desiredPosition;
+        return false;
+    }
+    if (outHit.startPenetrating) return true;
+    float len = Len(delta);
+    float move = outHit.distance - skin;
+    if (move < 0.0f) move = 0.0f;
+    if (len > 1e-6f) actor->position = Add(actor->position, Mul(delta, move / len));
+    return true;
+}
+
 void CollisionTrace::BeginBatch() {
     Scene& sc = Scene::Get();
     if (++sc.batchDepth == 1) sc.frozen = false;
@@ -597,7 +619,7 @@ bool CollisionTrace::SweepShape(const Shape& shape, const Vector3& delta, const 
 
     float lo = (float)(hitIndex - 1) / (float)n;
     float hi = (float)hitIndex / (float)n;
-    for (int k = 0; k < 10; k++) {
+    for (int k = 0; k < 12 && (hi - lo) * len > 0.05f; k++) {
         float mid = (lo + hi) * 0.5f;
         Contact tc;
         const Record* tr = nullptr;

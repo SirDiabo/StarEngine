@@ -38,6 +38,14 @@ namespace CollisionTrace {
 
     Shape MakeSphere(const Vector3& center, float radius);
     Shape MakeCapsule(const Vector3& a, const Vector3& b, float radius);
+    inline Shape ShapeTranslated(const Shape& s, const Vector3& d) {
+        Shape o = s;
+        o.center = Vector3{ s.center.x + d.x, s.center.y + d.y, s.center.z + d.z };
+        o.a = Vector3{ s.a.x + d.x, s.a.y + d.y, s.a.z + d.z };
+        o.b = Vector3{ s.b.x + d.x, s.b.y + d.y, s.b.z + d.z };
+        return o;
+    }
+
     Shape MakeBox(const Vector3& center, const Vector3& rotationDegrees, const Vector3& halfExtents);
     bool GetComponentShape(const Actor* actor, const CollisionComponent* component, Shape& outShape);
     bool MakeComponentShape(int shapeType, float radius, float height, const Vector3& boxExtents,
@@ -62,6 +70,8 @@ namespace CollisionTrace {
                        const QueryParams& params, HitResult& outHit);
     bool SweepBox(const Vector3& center, const Vector3& rotationDegrees, const Vector3& halfExtents, const Vector3& delta,
                    const QueryParams& params, HitResult& outHit);
+
+    bool MoveActorSwept(Actor* actor, const Vector3& desiredPosition, float skin, HitResult& outHit);
 
     void BeginBatch();
     void EndBatch();

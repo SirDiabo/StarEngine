@@ -4,6 +4,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/Networking/NetworkBackend.h"
+#include "Runtime/CollisionTrace.h"
 #include "StargraphBehavior.h"
 #include "Core/CookedFile.h"
 #include "Core/ObjectKindRegistry.h"
@@ -45,7 +46,10 @@ void RegisterActorNodes() {
         node->inputs.push_back({"In",       PinType::Exec, true,  false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
         node->inputs.push_back({"Location", PinType::Vec3, true,  false, 0, "0,0,0"});
+        node->inputs.push_back({"Sweep",    PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Out",     PinType::Exec, false, true});
+        node->outputs.push_back({"Blocked", PinType::Boolean, false, true});
+        node->outputs.push_back({"Hit Normal", PinType::Vec3, false, true});
     };
     setActorLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
@@ -57,11 +61,26 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
+        Vector3 desired = target->position;
+        bool sweep = false;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Location") {
-                ReadVec3(p, target->position.x, target->position.y, target->position.z);
-                break;
-            }
+            if (p.name == "Location") ReadVec3(p, desired.x, desired.y, desired.z);
+            else if (p.name == "Sweep") sweep = ReadBool(p);
+        }
+        bool blocked = false;
+        Vector3 hitNormal{ 0, 0, 0 };
+        if (sweep) {
+            CollisionTrace::HitResult hit;
+            blocked = CollisionTrace::MoveActorSwept(target, desired, 0.5f, hit);
+            if (blocked) hitNormal = hit.normal;
+        } else {
+            target->position = desired;
+        }
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", hitNormal.x, hitNormal.y, hitNormal.z);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Blocked") p.defaultValue = blocked ? "true" : "false";
+            else if (p.name == "Hit Normal") p.defaultValue = buf;
         }
     };
     NodeRegistry::Get().RegisterNode(setActorLocation);

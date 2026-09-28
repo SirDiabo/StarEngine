@@ -8,6 +8,7 @@
 #include "Runtime/Components/CollisionComponent.h"
 #include "Runtime/Components/AudioComponent.h"
 #include "Runtime/Components/InputComponent.h"
+#include "Runtime/Components/PhysicsComponent.h"
 #include "Stargraph.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Nodes_Events.h"
@@ -53,6 +54,7 @@ bool StargraphModule::Initialize() {
     RegisterCameraComponentNodes();
     RegisterMeshComponentNodes();
     RegisterCollisionComponentNodes();
+    RegisterPhysicsComponentNodes();
     RegisterCollisionNodes();
     RegisterAudioComponentNodes();
     RegisterInputComponentNodes();

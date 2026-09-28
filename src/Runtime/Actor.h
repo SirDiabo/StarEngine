@@ -6,6 +6,7 @@
 #include "Components/AudioComponent.h"
 #include "Components/CameraComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/PhysicsComponent.h"
 #include "raylib.h"
 #include <vector>
 #include <cstdint>
@@ -76,6 +77,7 @@ public:
     AudioComponent* GetAudioComponent() const { return FindComponentOfType<AudioComponent>(); }
     CameraComponent* GetCameraComponent() const { return FindComponentOfType<CameraComponent>(); }
     InputComponent* GetInputComponent() const { return FindComponentOfType<InputComponent>(); }
+    PhysicsComponent* GetPhysicsComponent() const { return FindComponentOfType<PhysicsComponent>(); }
 
 protected:
     virtual void OnBeginPlay() {}
