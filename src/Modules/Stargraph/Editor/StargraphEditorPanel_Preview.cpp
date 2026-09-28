@@ -222,29 +222,6 @@ void StargraphEditorPanel::RenderPreviewScene() {
                 Texture2D tex = GetOrLoadPreviewIcon("icon_actor_mesh.png");
                 if (tex.id != 0) DrawBillboardRec(previewCamera, tex, {0, 0, (float)tex.width, (float)tex.height}, pos, {40, 40}, WHITE);
             }
-        } else if (comp.componentType == "CollisionComponent") {
-            if (selected) {
-                rlPushMatrix();
-                rlTranslatef(pos.x, pos.y, pos.z);
-                rlRotatef(rot.y, 0, 1, 0);
-                rlRotatef(rot.x, 1, 0, 0);
-                rlRotatef(rot.z, 0, 0, 1);
-                Color c = {90, 200, 255, 200};
-                std::string collisionShape = comp.Get("CollisionShape", "Box");
-                float collisionRadius = SafeParse::ToFloat(comp.Get("CollisionRadius", "50"));
-                float collisionHeight = SafeParse::ToFloat(comp.Get("CollisionHeight", "100"));
-                if (collisionShape == "Sphere") {
-                    DrawSphereWires({0, 0, 0}, collisionRadius, 8, 12, c);
-                } else if (collisionShape == "Capsule") {
-                    float half = collisionHeight * 0.5f;
-                    DrawCylinderWires({0, -half, 0}, collisionRadius, collisionRadius, collisionHeight, 12, c);
-                    DrawSphereWires({0, half, 0}, collisionRadius, 8, 12, c);
-                    DrawSphereWires({0, -half, 0}, collisionRadius, 8, 12, c);
-                } else {
-                    DrawCubeWiresV({0, 0, 0}, {comp.scaleX, comp.scaleY, comp.scaleZ}, c);
-                }
-                rlPopMatrix();
-            }
         } else if (comp.componentType == "BillboardComponent") {
             std::string billboardTexturePath = comp.Get("BillboardTexture");
             Texture2D* tex = billboardTexturePath.empty() ? nullptr : AssetCache::Get().GetOrLoadTexture(billboardTexturePath);

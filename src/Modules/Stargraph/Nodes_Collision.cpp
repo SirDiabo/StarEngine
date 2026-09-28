@@ -28,6 +28,7 @@ void DrawAndClearCollisionDebug() {
         for (const auto& sphere : g_DebugSpheres) {
             DrawSphereWires(sphere.center, sphere.radius, 8, 8, sphere.color);
         }
+        CollisionTrace::DrawDebugShapes();
     }
     g_DebugLines.clear();
     g_DebugSpheres.clear();
@@ -65,7 +66,17 @@ void RegisterCollisionNodes() {
         Actor* hitActor = nullptr;
         Vector3 hitLoc = end, hitNormal = {0, 1, 0};
         float hitDist = Vector3Distance(start, end);
-        bool hit = CollisionTrace::TraceAgainstMeshes(start, end, exclude, hitActor, hitLoc, hitNormal, hitDist);
+        CollisionTrace::QueryParams queryParams;
+        queryParams.ignoreActor = exclude;
+        queryParams.shapes = false;
+        CollisionTrace::HitResult traceHit;
+        bool hit = CollisionTrace::Raycast(start, end, queryParams, traceHit);
+        if (hit) {
+            hitActor = traceHit.actor;
+            hitLoc = traceHit.point;
+            hitNormal = traceHit.normal;
+            hitDist = traceHit.distance;
+        }
 
         for (Pin& p : node.outputs) {
             if (p.name == "Did Overlap") p.defaultValue = hit ? "true" : "false";
@@ -97,4 +108,4 @@ void RegisterCollisionNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(lineTraceForMesh);
-}
+}

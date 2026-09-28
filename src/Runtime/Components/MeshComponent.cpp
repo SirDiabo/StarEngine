@@ -294,6 +294,11 @@ ComponentRegistrar registrar_MeshComponent({
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).SetMeshPath(d.Get("Mesh")); }),
         ComponentField::Bln("MeshCastsShadow", "Casts Shadow", true,
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.Get("MeshCastsShadow", "true") == "true"; }),
+        ComponentField::Enm("MeshCollision", "Collision", {"Mesh", "None"}, "Mesh",
+            [](Component& c, const ComponentDecl& d) {
+                static_cast<MeshComponent&>(c).collisionMode = d.Get("MeshCollision", "Mesh") == "None"
+                    ? MeshComponent::CollisionNone : MeshComponent::CollisionMesh;
+            }),
         ComponentField::Asset("DefaultAnim", "Default Anim", ".staranim",
             [](Component& c, const ComponentDecl& d) {
                 auto& mc = static_cast<MeshComponent&>(c);

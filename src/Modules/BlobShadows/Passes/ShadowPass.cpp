@@ -134,6 +134,8 @@ void Run() {
     std::vector<ShadowLight> lights;
     GatherShadowLights(lights);
 
+    CollisionTrace::ScopedBatch collisionBatch;
+
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;

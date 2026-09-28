@@ -1,9 +1,12 @@
 #pragma once
 #include "raylib.h"
 #include "Core/StarMaterial.h"
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace CollisionPrivate { struct ModelBVH; }
 
 class AssetCache {
 public:
@@ -15,6 +18,8 @@ public:
     const StarMaterial* GetOrLoadMaterial(const std::string& materialAssetPath);
     ModelAnimation* GetOrLoadAnimation(const std::string& animAssetPath);
     BoundingBox GetOrComputeModelBounds(Model* model);
+    std::shared_ptr<const CollisionPrivate::ModelBVH> GetOrBuildModelBVH(const std::string& sourceMeshPath);
+    unsigned GetCollisionGeneration() const { return collisionGeneration; }
     void ReloadModel(const std::string& sourceMeshPath);
     void ReloadTexture(const std::string& textureAssetPath);
     void ReloadMaterial(const std::string& materialAssetPath);
@@ -33,6 +38,8 @@ private:
     std::unordered_map<std::string, Texture2D> textureCache;
     std::unordered_map<std::string, StarMaterial> materialCache;
     std::unordered_map<Model*, BoundingBox> modelBoundsCache;
+    std::unordered_map<std::string, std::shared_ptr<const CollisionPrivate::ModelBVH>> bvhCache;
+    unsigned collisionGeneration = 0;
     std::unordered_map<std::string, LoadedAnimationSet> animationSourceCache;
     std::unordered_map<std::string, ModelAnimation*> animationCache;
 };

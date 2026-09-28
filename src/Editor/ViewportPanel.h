@@ -53,7 +53,6 @@ private:
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
                              Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
-    void DrawCollisionShape(const ComponentDecl& comp, Vector3 pos, Vector3 rot, Color color);
     void DrawActorBillboard(const std::string& iconFile, Vector3 pos, Color tint);
     Texture2D GetOrLoadEditorIcon(const std::string& iconFile);
     bool ToolbarIconToggle(Rectangle r, const std::string& iconFile, bool active);

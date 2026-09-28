@@ -3,6 +3,7 @@
 #include "Core/StarMaterial.h"
 #include "Core/CookedFile.h"
 #include "Core/ShadingModel.h"
+#include "CollisionPrivate.h"
 #include <cmath>
 
 AssetCache& AssetCache::Get() {
@@ -155,6 +156,21 @@ BoundingBox AssetCache::GetOrComputeModelBounds(Model* model) {
     return merged;
 }
 
+std::shared_ptr<const CollisionPrivate::ModelBVH> AssetCache::GetOrBuildModelBVH(const std::string& sourceMeshPath) {
+    std::string normalized = CookedFile::Open(sourceMeshPath);
+    if (normalized.empty()) normalized = sourceMeshPath;
+
+    auto it = bvhCache.find(normalized);
+    if (it != bvhCache.end()) return it->second;
+
+    Model* model = GetOrLoadModel(sourceMeshPath);
+    if (!model) return nullptr;
+
+    std::shared_ptr<const CollisionPrivate::ModelBVH> bvh = CollisionPrivate::BuildModelBVH(*model);
+    bvhCache.emplace(normalized, bvh);
+    return bvh;
+}
+
 void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>& materialPaths) {
     if (!model) return;
 
@@ -182,6 +198,9 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
     std::string normalized = CookedFile::Open(sourceMeshPath);
     if (normalized.empty()) normalized = sourceMeshPath;
 
+    bvhCache.erase(normalized);
+    ++collisionGeneration;
+
     auto it = meshCache.find(normalized);
     if (it == meshCache.end()) return;
     modelBoundsCache.erase(&it->second);
@@ -192,6 +211,8 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
 void AssetCache::Clear() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
     modelBoundsCache.clear();
+    bvhCache.clear();
+    ++collisionGeneration;
     meshCache.clear();
     for (auto& kv : textureCache) UnloadTexture(kv.second);
     textureCache.clear();

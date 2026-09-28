@@ -10,6 +10,9 @@ public:
     std::vector<std::string> materialPaths; // parallel to the mesh asset's material slots
     bool castsShadow = true;
 
+    enum CollisionMode { CollisionMesh, CollisionNone };
+    CollisionMode collisionMode = CollisionMesh;
+
     std::string currentAnimPath;
     bool animPlaying = false;
     bool animLooping = false;
