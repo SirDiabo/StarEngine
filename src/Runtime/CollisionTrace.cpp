@@ -392,20 +392,57 @@ bool CollisionTrace::MoveActorSwept(Actor* actor, const Vector3& desiredPosition
     Shape shape;
     if (!body || !GetComponentShape(actor, body, shape)) {
         actor->position = desiredPosition;
+        outHit = HitResult();
         return false;
     }
+
+    float maxSlopeAngle = 45.0f;
+    if (PhysicsComponent* phys = actor->GetPhysicsComponent()) maxSlopeAngle = phys->maxSlopeAngle;
+    float cosSlope = cosf(maxSlopeAngle * DEG2RAD);
+
     QueryParams params;
     params.ignoreActor = actor;
-    if (!SweepShape(shape, delta, params, outHit)) {
-        actor->position = desiredPosition;
-        return false;
+
+    Vector3 remaining = delta;
+    bool blocked = false;
+    outHit = HitResult();
+
+    for (int bump = 0; bump < 4; bump++) {
+        float len = Len(remaining);
+        if (len < 1e-4f) break;
+
+        HitResult hit;
+        if (!SweepShape(shape, remaining, params, hit)) {
+            actor->position = Add(actor->position, remaining);
+            remaining = Vector3{ 0.0f, 0.0f, 0.0f };
+            break;
+        }
+
+        if (hit.startPenetrating) {
+            actor->position = Add(actor->position, remaining);
+            remaining = Vector3{ 0.0f, 0.0f, 0.0f };
+            break;
+        }
+
+        float moveDist = hit.distance - skin;
+        if (moveDist < 0.0f) moveDist = 0.0f;
+        Vector3 step = Mul(remaining, moveDist / len);
+        actor->position = Add(actor->position, step);
+        shape = TranslateShape(shape, step);
+        remaining = Sub(remaining, step);
+
+        if (hit.normal.y >= cosSlope) {
+            float d = Dot(remaining, hit.normal);
+            if (d < 0.0f) remaining = Sub(remaining, Mul(hit.normal, d));
+            continue;
+        }
+
+        blocked = true;
+        outHit = hit;
+        break;
     }
-    if (outHit.startPenetrating) return true;
-    float len = Len(delta);
-    float move = outHit.distance - skin;
-    if (move < 0.0f) move = 0.0f;
-    if (len > 1e-6f) actor->position = Add(actor->position, Mul(delta, move / len));
-    return true;
+
+    return blocked;
 }
 
 void CollisionTrace::BeginBatch() {

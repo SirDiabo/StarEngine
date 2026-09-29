@@ -211,13 +211,9 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        float yr = target->rotation.y * DEG2RAD;
-        float pr = target->rotation.x * DEG2RAD;
+        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            sinf(yr) * cosf(pr),
-            -sinf(pr),
-            cosf(yr) * cosf(pr));
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", m.m8, m.m9, m.m10);
         for (Pin& p : node.outputs) if (p.name == "Forward") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorForward);
@@ -240,12 +236,9 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        float yr = target->rotation.y * DEG2RAD;
+        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            -cosf(yr),
-            0.0f,
-            sinf(yr));
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", -m.m0, -m.m1, -m.m2);
         for (Pin& p : node.outputs) if (p.name == "Right") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorRight);
@@ -268,13 +261,9 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        float yr = target->rotation.y * DEG2RAD;
-        float pr = target->rotation.x * DEG2RAD;
+        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f",
-            sinf(yr) * sinf(pr),
-            cosf(pr),
-            cosf(yr) * sinf(pr));
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", m.m4, m.m5, m.m6);
         for (Pin& p : node.outputs) if (p.name == "Up") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getActorUp);

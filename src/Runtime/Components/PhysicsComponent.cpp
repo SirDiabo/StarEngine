@@ -254,6 +254,7 @@ void RegisterPhysicsComponentNodes() {
     setVelocity.type = "Set_Velocity";
     setVelocity.category = "Physics";
     setVelocity.moduleName = "Stargraph";
+    setVelocity.hideFromContextMenu = true;
     setVelocity.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
@@ -277,6 +278,7 @@ void RegisterPhysicsComponentNodes() {
     addImpulse.type = "Add_Impulse";
     addImpulse.category = "Physics";
     addImpulse.moduleName = "Stargraph";
+    addImpulse.hideFromContextMenu = true;
     addImpulse.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
@@ -300,6 +302,7 @@ void RegisterPhysicsComponentNodes() {
     setSimulate.type = "Set_Simulate_Physics";
     setSimulate.category = "Physics";
     setSimulate.moduleName = "Stargraph";
+    setSimulate.hideFromContextMenu = true;
     setSimulate.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
@@ -319,6 +322,7 @@ void RegisterPhysicsComponentNodes() {
     getVelocity.type = "Get_Velocity";
     getVelocity.category = "Physics";
     getVelocity.moduleName = "Stargraph";
+    getVelocity.hideFromContextMenu = true;
     getVelocity.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
         node->outputs.push_back({"Velocity", PinType::Vec3, false, true});
@@ -333,6 +337,7 @@ void RegisterPhysicsComponentNodes() {
     isGrounded.type = "Is_Grounded";
     isGrounded.category = "Physics";
     isGrounded.moduleName = "Stargraph";
+    isGrounded.hideFromContextMenu = true;
     isGrounded.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
         node->outputs.push_back({"Grounded", PinType::Boolean, false, true});
@@ -347,6 +352,7 @@ void RegisterPhysicsComponentNodes() {
     getGroundNormal.type = "Get_Ground_Normal";
     getGroundNormal.category = "Physics";
     getGroundNormal.moduleName = "Stargraph";
+    getGroundNormal.hideFromContextMenu = true;
     getGroundNormal.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
         node->outputs.push_back({"Normal", PinType::Vec3, false, true});
