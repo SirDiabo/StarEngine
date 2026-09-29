@@ -245,6 +245,12 @@ void StargraphEditorPanel::TryCompleteLink(int pinId, bool onInput) {
     CancelLink();
 }
 
+void StargraphEditorPanel::CloseNodeMenu() {
+    nodeMenuOpen = false;
+    filterCompatibleWithPin = -1;
+    if (nodeMenuSearchField && nodeMenuSearchField->isEditing) nodeMenuSearchField->OnDeselected();
+}
+
 void StargraphEditorPanel::CancelLink() {
     linkFromPin = -1;
     linkFromIsOutput = false;
@@ -1746,8 +1752,7 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
     }
 
     isDirty = true;
-    nodeMenuOpen = false;
-    filterCompatibleWithPin = -1;
+    CloseNodeMenu();
 }
 
 void StargraphEditorPanel::RenderNodeContextMenu() {
@@ -1922,7 +1927,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
 
     std::sort(entries.begin(), entries.end());
 
-    if (entries.empty() && searchLower.empty()) { nodeMenuOpen = false; filterCompatibleWithPin = -1; return; }
+    if (entries.empty() && searchLower.empty()) { CloseNodeMenu(); return; }
 
     float menuW   = 200;
     float itemH   = 22;
@@ -1952,10 +1957,10 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         nodeMenuJustOpened = false;
     } else {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, popup)) {
-            nodeMenuOpen = false; filterCompatibleWithPin = -1; return;
+            CloseNodeMenu(); return;
         }
         if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
-            nodeMenuOpen = false; filterCompatibleWithPin = -1; return;
+            CloseNodeMenu(); return;
         }
     }
 

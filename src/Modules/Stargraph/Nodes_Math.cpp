@@ -1090,9 +1090,17 @@ void RegisterMathNodes() {
         float m8v = mat.m8;
         if (m8v > 1.0f) m8v = 1.0f;
         if (m8v < -1.0f) m8v = -1.0f;
-        float yawRad = asinf(m8v);
-        float pitchRad = atan2f(-mat.m9, mat.m10);
-        float rollRad = atan2f(-mat.m4, mat.m0);
+        float yawPrincipal = asinf(m8v);
+        float yawRad, pitchRad, rollRad;
+        if (mat.m10 >= 0.0f) {
+            yawRad = yawPrincipal;
+            pitchRad = atan2f(-mat.m9, mat.m10);
+            rollRad = atan2f(-mat.m4, mat.m0);
+        } else {
+            yawRad = (yawPrincipal >= 0.0f) ? (PI - yawPrincipal) : (-PI - yawPrincipal);
+            pitchRad = atan2f(mat.m9, -mat.m10);
+            rollRad = atan2f(mat.m4, -mat.m0);
+        }
 
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", pitchRad * RAD2DEG, yawRad * RAD2DEG, rollRad * RAD2DEG);

@@ -73,6 +73,7 @@ public:
     void OnDetailAssetPicked(const std::string& fullRowId, const std::string& pickedPath);
     void RenderDetailPickers(Rectangle area);
     void RenderNodeContextMenu();
+    void CloseNodeMenu();
     void SpawnNodeFromMenu(const std::string& nodeTypeIdIn, const std::string& sourceKind);
 
     void RenderPreviewViewport(Rectangle area);
