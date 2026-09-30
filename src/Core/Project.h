@@ -12,7 +12,8 @@ GameRenderer GameRendererFromName(const std::string& name);
 
 struct ProjectSettings {
     std::string name;
-    std::string defaultMapPath;
+    std::string editorDefaultMapPath;
+    std::string gameDefaultMapPath;
     GameRenderer renderer = GameRenderer::Hardware;
     std::vector<std::string> disabledModules;
     std::string saveEncryptionKey;

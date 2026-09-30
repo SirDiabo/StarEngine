@@ -27,6 +27,7 @@ private:
     SettingsSwitcher switcher;
 
     AssetPickerPopup mapPicker;
+    AssetPickerPopup gameMapPicker;
     ChoicePopup rendererPopup;
     ChoicePopup shadingTypePopup;
     bool moduleSettingsPopupOpen = false;

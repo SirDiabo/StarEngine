@@ -89,7 +89,9 @@ bool Project::Load(const std::string& path) {
         if (!value.empty() && value.back() == '\r') value.pop_back();
 
         if (key == "name") settings.name = value;
-        else if (key == "defaultMap") settings.defaultMapPath = value;
+        else if (key == "editorDefaultMap") settings.editorDefaultMapPath = value;
+        else if (key == "gameDefaultMap") settings.gameDefaultMapPath = value;
+        else if (key == "defaultMap") settings.editorDefaultMapPath = value;
         else if (key == "renderer") settings.renderer = GameRendererFromName(value);
         else if (key == "saveEncryptionKey") settings.saveEncryptionKey = value;
         else if (key == "disabledModules") {
@@ -101,6 +103,8 @@ bool Project::Load(const std::string& path) {
             }
         }
     }
+
+    if (settings.gameDefaultMapPath.empty()) settings.gameDefaultMapPath = settings.editorDefaultMapPath;
 
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
     NamedListRegistry::Get().Load(rootPath);
@@ -139,7 +143,8 @@ void Project::Save() {
     if (!out.is_open()) return;
 
     out << "name=" << settings.name << "\n";
-    out << "defaultMap=" << settings.defaultMapPath << "\n";
+    out << "editorDefaultMap=" << settings.editorDefaultMapPath << "\n";
+    out << "gameDefaultMap=" << settings.gameDefaultMapPath << "\n";
     out << "renderer=" << GameRendererName(settings.renderer) << "\n";
     out << "saveEncryptionKey=" << settings.saveEncryptionKey << "\n";
 

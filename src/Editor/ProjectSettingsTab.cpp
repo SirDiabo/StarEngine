@@ -101,7 +101,7 @@ void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
     ProjectSettings& settings = Project::Get().GetSettings();
     Vector2 mp = GetMousePosition();
-    const bool anyPopupOpen = mapPicker.IsOpen();
+    const bool anyPopupOpen = mapPicker.IsOpen() || gameMapPicker.IsOpen();
 
     float fx = area.x + 16;
     float fy = area.y + 16;
@@ -110,21 +110,37 @@ void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {
     DrawText("Maps", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 24;
 
-    DrawText("Default Map", (int)fx, (int)fy, 11, theme.textSecondary);
+    DrawText("Editor Default Map", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle mapRow = {fx, fy, fw, 20};
     DrawRectangleRec(mapRow, theme.fieldBg);
     DrawRectangleLinesEx(mapRow, 1, theme.fieldBorder);
-    DrawText(MapDisplayName(settings.defaultMapPath).c_str(), (int)mapRow.x + 6, (int)mapRow.y + 4, 12, theme.textPrimary);
+    DrawText(MapDisplayName(settings.editorDefaultMapPath).c_str(), (int)mapRow.x + 6, (int)mapRow.y + 4, 12, theme.textPrimary);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, mapRow) && !anyPopupOpen) {
         mapPicker.Open({mapRow.x, mapRow.y + mapRow.height}, ".starmap");
     }
     fy += 20;
-    DrawText("Map loaded on project open and used as the packaged game's startup map.",
+    DrawText("Map loaded automatically when the project is opened in the editor.",
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
     std::string pickedMap;
-    if (mapPicker.Render(pickedMap)) settings.defaultMapPath = pickedMap;
+    if (mapPicker.Render(pickedMap)) settings.editorDefaultMapPath = pickedMap;
+
+    DrawText("Game Default Map", (int)fx, (int)fy, 11, theme.textSecondary);
+    fy += 14;
+    Rectangle gameMapRow = {fx, fy, fw, 20};
+    DrawRectangleRec(gameMapRow, theme.fieldBg);
+    DrawRectangleLinesEx(gameMapRow, 1, theme.fieldBorder);
+    DrawText(MapDisplayName(settings.gameDefaultMapPath).c_str(), (int)gameMapRow.x + 6, (int)gameMapRow.y + 4, 12, theme.textPrimary);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, gameMapRow) && !anyPopupOpen) {
+        gameMapPicker.Open({gameMapRow.x, gameMapRow.y + gameMapRow.height}, ".starmap");
+    }
+    fy += 20;
+    DrawText("Startup map used by packaged builds of the game.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 24;
+    std::string pickedGameMap;
+    if (gameMapPicker.Render(pickedGameMap)) settings.gameDefaultMapPath = pickedGameMap;
 }
 
 void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {

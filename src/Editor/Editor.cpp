@@ -378,7 +378,7 @@ void Editor::HandlePackageMenuAction(const std::string& item) {
 }
 
 void Editor::OpenDefaultMapIfSet() {
-    const std::string& mapPath = Project::Get().GetSettings().defaultMapPath;
+    const std::string& mapPath = Project::Get().GetSettings().editorDefaultMapPath;
     if (mapPath.empty()) return;
     std::string resolvedPath = ContentPathResolver::Resolve(mapPath);
     if (!fs::exists(resolvedPath)) return;

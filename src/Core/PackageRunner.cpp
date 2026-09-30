@@ -275,7 +275,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
         bootConfig.shadingType = RenderSettings::Get().GetShadingType();
         bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
-        bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
+        bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
         bootConfig.renderer = rendererKey;
         bootConfig.cipher = CookCipherName(options.cipher);
         bootConfig.cipherKey = cipherKey;
@@ -384,7 +384,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
     bootConfig.shadingType = RenderSettings::Get().GetShadingType();
     bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
-    bootConfig.defaultMap = RewriteToContentRelative(settings.defaultMapPath, contentRoot);
+    bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
     bootConfig.renderer = rendererKey;
     bootConfig.cipher = CookCipherName(options.cipher);
     bootConfig.cipherKey = cipherKey;
