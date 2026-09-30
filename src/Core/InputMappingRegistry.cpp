@@ -27,7 +27,8 @@ std::string EncodeMapping(const InputMapping& mapping) {
     for (size_t i = 0; i < mapping.bindings.size(); i++) {
         if (i > 0) out += ",";
         const InputMappingBinding& b = mapping.bindings[i];
-        out += b.key + ":" + std::to_string(b.scale) + ":" + std::to_string(b.axis);
+        int mods = (b.requireCtrl ? 1 : 0) | (b.requireAlt ? 2 : 0) | (b.requireShift ? 4 : 0);
+        out += b.key + ":" + std::to_string(b.scale) + ":" + std::to_string(b.axis) + ":" + std::to_string(mods);
     }
     return out;
 }
@@ -47,11 +48,20 @@ InputMapping DecodeMapping(const std::string& raw) {
         if (c1 == std::string::npos) continue;
         size_t c2 = entry.find(':', c1 + 1);
         if (c2 == std::string::npos) continue;
+        size_t c3 = entry.find(':', c2 + 1);
 
         InputMappingBinding binding;
         binding.key   = entry.substr(0, c1);
         binding.scale = SafeParse::ToFloat(entry.substr(c1 + 1, c2 - c1 - 1));
-        binding.axis  = SafeParse::ToInt(entry.substr(c2 + 1));
+        binding.axis  = c3 == std::string::npos
+            ? SafeParse::ToInt(entry.substr(c2 + 1))
+            : SafeParse::ToInt(entry.substr(c2 + 1, c3 - c2 - 1));
+        if (c3 != std::string::npos) {
+            int mods = SafeParse::ToInt(entry.substr(c3 + 1));
+            binding.requireCtrl  = (mods & 1) != 0;
+            binding.requireAlt   = (mods & 2) != 0;
+            binding.requireShift = (mods & 4) != 0;
+        }
         mapping.bindings.push_back(binding);
     }
     return mapping;

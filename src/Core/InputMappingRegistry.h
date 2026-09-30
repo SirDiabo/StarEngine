@@ -9,6 +9,9 @@ struct InputMappingBinding {
     std::string key;
     float scale = 1.0f;
     int axis = 0; // Axis2D only: 0 = X, 1 = Y
+    bool requireCtrl = false;
+    bool requireAlt = false;
+    bool requireShift = false;
 };
 
 struct InputMapping {

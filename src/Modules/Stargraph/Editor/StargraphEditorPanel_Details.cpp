@@ -654,9 +654,21 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
             for (size_t bi = 0; bi < mapping.bindings.size(); bi++) {
                 int bIndex = (int)bi;
                 const InputMappingBinding& binding = mapping.bindings[bi];
-                std::string display = binding.key;
-                for (char& c : display) if (c == '_') c = ' ';
+                std::string display;
+                if (binding.requireCtrl) display += "Ctrl + ";
+                if (binding.requireAlt) display += "Alt + ";
+                if (binding.requireShift) display += "Shift + ";
+                for (char c : binding.key) display += (c == '_') ? ' ' : c;
                 bool listening = (listeningForInputBindingMappingIndex == mIndex && listeningForInputBindingIndex == bIndex);
+
+                auto toggleModifier = [this, idx, mIndex, bIndex, mappingNameAt, loadMapping](bool InputMappingBinding::* field) {
+                    std::string name = mappingNameAt(idx, mIndex);
+                    if (name.empty()) return;
+                    InputMapping m = loadMapping(name);
+                    if (bIndex < 0 || bIndex >= (int)m.bindings.size()) return;
+                    m.bindings[bIndex].*field = !(m.bindings[bIndex].*field);
+                    InputMappingRegistry::Get().SetMapping(name, m);
+                };
 
                 std::vector<PropertyCell> cells;
                 cells.push_back(ButtonCell(display, 0.0f, [this, mIndex, bIndex](Rectangle r) {
@@ -664,6 +676,15 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
                     inputKeyPickerBindingIndex = bIndex;
                     inputKeyPicker.Open({ r.x, r.y + r.height });
                 }));
+                cells.push_back(ButtonCell("Ctrl", 34.0f, [toggleModifier](Rectangle) {
+                    toggleModifier(&InputMappingBinding::requireCtrl);
+                }, binding.requireCtrl ? theme.successBg : Color{ 0, 0, 0, 0 }));
+                cells.push_back(ButtonCell("Alt", 30.0f, [toggleModifier](Rectangle) {
+                    toggleModifier(&InputMappingBinding::requireAlt);
+                }, binding.requireAlt ? theme.successBg : Color{ 0, 0, 0, 0 }));
+                cells.push_back(ButtonCell("Shift", 38.0f, [toggleModifier](Rectangle) {
+                    toggleModifier(&InputMappingBinding::requireShift);
+                }, binding.requireShift ? theme.successBg : Color{ 0, 0, 0, 0 }));
                 if (mapping.type != InputMappingType::Bool) {
                     cells.push_back(NumberCell(binding.scale, false, 40.0f, [this, idx, mIndex, bIndex, mappingNameAt, loadMapping](float v) {
                         std::string name = mappingNameAt(idx, mIndex);
@@ -770,6 +791,7 @@ void StargraphEditorPanel::RenderDetailPickers(Rectangle panel) {
                     listeningForInputBindingIndex = -1;
                 } else {
                     int keyCode = GetKeyPressed();
+                    while (keyCode != 0 && InputKeyCodeIsModifier(keyCode)) keyCode = GetKeyPressed();
                     if (keyCode != 0) {
                         std::string keyName = InputKeyCodeToName(keyCode);
                         if (!keyName.empty() && listeningForInputBindingMappingIndex < (int)mappingNames.size()) {
@@ -778,6 +800,9 @@ void StargraphEditorPanel::RenderDetailPickers(Rectangle panel) {
                             if (const InputMapping* existing = InputMappingRegistry::Get().Find(mappingName)) mapping = *existing;
                             if (listeningForInputBindingIndex >= 0 && listeningForInputBindingIndex < (int)mapping.bindings.size()) {
                                 mapping.bindings[listeningForInputBindingIndex].key = keyName;
+                                mapping.bindings[listeningForInputBindingIndex].requireCtrl = IsCtrlKeyDown();
+                                mapping.bindings[listeningForInputBindingIndex].requireAlt = IsAltKeyDown();
+                                mapping.bindings[listeningForInputBindingIndex].requireShift = IsShiftKeyDown();
                                 InputMappingRegistry::Get().SetMapping(mappingName, mapping);
                             }
                         }

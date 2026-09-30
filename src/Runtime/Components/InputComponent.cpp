@@ -74,6 +74,10 @@ void RegisterInputComponentNodes() {
                 int gamepadIndex = 0;
                 if (!InputKeyBelongsToDevice(binding.key, target->device, gamepadIndex)) continue;
 
+                if (binding.requireCtrl && !IsCtrlKeyDown()) continue;
+                if (binding.requireAlt && !IsAltKeyDown()) continue;
+                if (binding.requireShift && !IsShiftKeyDown()) continue;
+
                 float raw = 0.0f;
                 if (!PollInputKey(binding.key, raw, gamepadIndex)) continue;
 

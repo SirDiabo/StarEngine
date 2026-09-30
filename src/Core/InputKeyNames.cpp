@@ -159,6 +159,24 @@ bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) 
     return held;
 }
 
+bool IsCtrlKeyDown() {
+    return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+}
+
+bool IsAltKeyDown() {
+    return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+}
+
+bool IsShiftKeyDown() {
+    return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+}
+
+bool InputKeyCodeIsModifier(int keyCode) {
+    return keyCode == KEY_LEFT_CONTROL || keyCode == KEY_RIGHT_CONTROL ||
+           keyCode == KEY_LEFT_ALT || keyCode == KEY_RIGHT_ALT ||
+           keyCode == KEY_LEFT_SHIFT || keyCode == KEY_RIGHT_SHIFT;
+}
+
 bool InputKeyBelongsToDevice(const std::string& keyName, const std::string& device, int& outGamepadIndex) {
     bool isGamepadKey = keyName.rfind("GAMEPAD_", 0) == 0;
 
