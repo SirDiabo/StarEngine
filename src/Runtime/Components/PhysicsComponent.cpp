@@ -49,6 +49,7 @@ void PhysicsComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Max Slope Angle", &maxSlopeAngle);
     outProperties.AddFloat("Ground Snap Distance", &groundSnapDistance);
     outProperties.AddFloat("Skin Width", &skinWidth);
+    outProperties.AddFloat("Ground Snap Smoothing", &groundSnapSmoothing);
     outProperties.AddFloat("Bounciness", &bounciness);
     outProperties.AddVector3("Velocity", &velocity.x);
     outProperties.AddBool("Grounded", &grounded, true);
@@ -63,8 +64,9 @@ void PhysicsComponent::AddImpulse(const Vector3& impulse) {
     velocity = Plus(velocity, Times(impulse, 1.0f / m));
 }
 
-Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params) {
+Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate) {
     Vector3 moved{ 0.0f, 0.0f, 0.0f };
+    float smoothT = 1.0f - powf(1.0f - groundSnapSmoothing, dtForDepenetrate * 60.0f);
     for (int iter = 0; iter < 4; iter++) {
         int count = CollisionTrace::OverlapShapeAll(shape, params, scratchHits);
         if (count == 0) break;
@@ -74,7 +76,10 @@ Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const Collis
         }
         if (deepest->penetration <= 1e-3f) break;
         Vector3 n = deepest->normal;
-        Vector3 push = Times(n, deepest->penetration + 0.01f);
+        float pushAmount = deepest->penetration <= skinWidth * 2.0f
+            ? deepest->penetration * smoothT + 0.01f
+            : deepest->penetration + 0.01f;
+        Vector3 push = Times(n, pushAmount);
         shape = CollisionTrace::ShapeTranslated(shape, push);
         moved = Plus(moved, push);
         float vn = Dot3(velocity, n);
@@ -124,7 +129,7 @@ Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vecto
     return applied;
 }
 
-Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded) {
+Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround) {
     grounded = false;
     groundNormal = Vector3{ 0.0f, 1.0f, 0.0f };
     Vector3 applied{ 0.0f, 0.0f, 0.0f };
@@ -143,7 +148,9 @@ Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const Colli
     if (wasGrounded && !hit.startPenetrating) {
         float drop = hit.distance - skinWidth;
         if (drop > 0.0f) {
-            applied = Vector3{ 0.0f, -drop, 0.0f };
+            float smoothT = 1.0f - powf(1.0f - groundSnapSmoothing, dtForGround * 60.0f);
+            float applyDrop = drop <= groundSnapDistance * 0.25f ? drop * smoothT : drop;
+            applied = Vector3{ 0.0f, -applyDrop, 0.0f };
             shape = CollisionTrace::ShapeTranslated(shape, applied);
         }
     }
@@ -187,9 +194,9 @@ void PhysicsComponent::Update(float deltaTime) {
     CollisionTrace::ScopedBatch batch;
     const bool wasGrounded = grounded;
 
-    Vector3 total = Depenetrate(shape, params);
+    Vector3 total = Depenetrate(shape, params, dt);
     total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
-    total = Plus(total, UpdateGround(shape, params, wasGrounded));
+    total = Plus(total, UpdateGround(shape, params, wasGrounded, dt));
 
     actor->position = Plus(actor->position, total);
 }
@@ -243,6 +250,7 @@ ComponentRegistrar registrar_PhysicsComponent({
         FloatField("MaxSlopeAngle", "Max Slope Angle", 50.0f, &PhysicsComponent::maxSlopeAngle),
         FloatField("GroundSnapDistance", "Ground Snap Distance", 20.0f, &PhysicsComponent::groundSnapDistance),
         FloatField("SkinWidth", "Skin Width", 0.5f, &PhysicsComponent::skinWidth),
+        FloatField("GroundSnapSmoothing", "Ground Snap Smoothing", 0.4f, &PhysicsComponent::groundSnapSmoothing),
         FloatField("Bounciness", "Bounciness", 0.0f, &PhysicsComponent::bounciness),
     }
 });

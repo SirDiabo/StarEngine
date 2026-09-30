@@ -16,6 +16,7 @@ public:
     float maxSlopeAngle = 50.0f;
     float groundSnapDistance = 20.0f;
     float skinWidth = 0.5f;
+    float groundSnapSmoothing = 0.4f;
     float bounciness = 0.0f;
 
     Vector3 velocity = {0.0f, 0.0f, 0.0f};
@@ -30,9 +31,9 @@ public:
     void AddImpulse(const Vector3& impulse);
 
 private:
-    Vector3 Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params);
+    Vector3 Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate);
     Vector3 MoveAndSlide(CollisionTrace::Shape& shape, const Vector3& delta, const CollisionTrace::QueryParams& params);
-    Vector3 UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded);
+    Vector3 UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround);
 
     std::vector<CollisionTrace::HitResult> scratchHits;
 };
