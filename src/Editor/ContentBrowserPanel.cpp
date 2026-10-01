@@ -1,5 +1,6 @@
 #include "ContentBrowserPanel.h"
 #include "Core/Project.h"
+#include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/RenderSettings.h"
 #include "Core/ShadingModel.h"
@@ -361,6 +362,31 @@ void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     } else {
         importStatus = "Import failed: unrecognized file type " + ext;
     }
+}
+
+void ContentBrowserPanel::ReimportFromFilePrompt(const std::string& starAssetPath, const std::string& displayName) {
+    StarAsset asset;
+    std::string description = "All Files";
+    std::string filter = "*.*";
+    if (StarAsset::LoadFromFile(starAssetPath, asset)) {
+        if (asset.assetType == "StaticMesh" || asset.assetType == "Animation") {
+            description = "Mesh (obj, gltf, glb, iqm)";
+            filter = "*.obj;*.gltf;*.glb;*.iqm";
+        } else if (asset.assetType == "Texture") {
+            description = "Image (png, jpg, bmp)";
+            filter = "*.png;*.jpg;*.jpeg;*.bmp";
+        } else if (asset.assetType == "Sound") {
+            description = "Sound (wav)";
+            filter = "*.wav";
+        }
+    }
+
+    std::string path = NativeFileDialog::OpenFile("Reimport From File", "", description, filter);
+    if (path.empty()) return;
+
+    std::string result = AssetImporter::ReimportFromFile(starAssetPath, path);
+    importStatus = result.empty() ? "Reimport failed" : "Reimported " + displayName;
+    tilesDirty = true;
 }
 
 void ContentBrowserPanel::ImportAssetAuto() {
@@ -859,6 +885,7 @@ void ContentBrowserPanel::OpenItemContextMenu(Vector2 pos) {
     if (showPaste) add("Paste", "Paste");
     add("Copy Path", "CopyPath");
     if (showReimport) add("Reimport", "Reimport");
+    if (showReimport) add("Reimport from File...", "ReimportFromFile");
     add("View in Explorer", "Reveal");
     add("Delete", "Delete");
 
@@ -1095,8 +1122,14 @@ void ContentBrowserPanel::Render() {
                 SetClipboardText(virtualPath.c_str());
                 importStatus = "Copied path to clipboard";
             } else if (action == "Reimport") {
-                std::string result = AssetImporter::Reimport(contextTargetPath);
-                importStatus = result.empty() ? "Reimport failed" : "Reimported " + contextTargetDisplayName;
+                if (AssetImporter::NeedsReimportFromFile(contextTargetPath)) {
+                    ReimportFromFilePrompt(contextTargetPath, contextTargetDisplayName);
+                } else {
+                    std::string result = AssetImporter::Reimport(contextTargetPath);
+                    importStatus = result.empty() ? "Reimport failed" : "Reimported " + contextTargetDisplayName;
+                }
+            } else if (action == "ReimportFromFile") {
+                ReimportFromFilePrompt(contextTargetPath, contextTargetDisplayName);
             } else if (action == "Reveal") {
                 RevealInExplorer(contextTargetPath, contextTargetIsFolder);
             } else if (action == "Delete") {
@@ -1120,6 +1153,21 @@ void ContentBrowserPanel::Render() {
     bool deleteConfirmed = false;
     if (deleteConfirm.Render(deleteConfirmed)) {
         if (deleteConfirmed) {
+            if (!pendingDeleteIsFolder) {
+                std::string deleteExt = fs::path(pendingDeletePath).extension().string();
+                if (deleteExt == ".starasset" || deleteExt == ".startex" || deleteExt == ".staranim") {
+                    StarAsset deletedAsset;
+                    if (StarAsset::LoadFromFile(pendingDeletePath, deletedAsset) && !deletedAsset.vendoredSourcePath.empty()) {
+                        fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+                        fs::path vendorDir = (contentRoot / deletedAsset.vendoredSourcePath).parent_path();
+                        std::error_code vendorEc;
+                        if (fs::exists(vendorDir, vendorEc)) {
+                            std::string vendorTrashError;
+                            OSTrash::MoveToTrash(vendorDir.string(), vendorTrashError);
+                        }
+                    }
+                }
+            }
             std::string trashError;
             if (OSTrash::MoveToTrash(pendingDeletePath, trashError)) {
                 importStatus = pendingDeleteIsFolder ? "Moved folder to trash" : "Moved to trash";

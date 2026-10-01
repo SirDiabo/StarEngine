@@ -22,4 +22,8 @@ std::string CookAnimationsOnly(const std::string& srcPath, const std::string& ta
 
 std::string Reimport(const std::string& starAssetPath);
 
+std::string ReimportFromFile(const std::string& starAssetPath, const std::string& newSourcePath);
+
+bool NeedsReimportFromFile(const std::string& starAssetPath);
+
 }

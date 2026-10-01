@@ -53,6 +53,7 @@ private:
     void BeginMeshImport(const std::string& srcPath);
     void ImportAssetAuto();
     void ImportPathAuto(const std::string& path);
+    void ReimportFromFilePrompt(const std::string& starAssetPath, const std::string& displayName);
     void HandleFileDrop();
 
     void OpenEntry(const ContentEntry& entry);

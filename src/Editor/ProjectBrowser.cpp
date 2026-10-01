@@ -158,7 +158,7 @@ void ProjectBrowser::Render() {
         std::string label = projects[i].name + (projects[i].exists ? "" : " (missing .starproject)");
 
         auto* rowBtn = new ButtonElement();
-        rowBtn->size = { 0.0f, 25.0f };
+        rowBtn->size = { 380.0f, 25.0f };
         rowBtn->defaultColor = theme.buttonBg;
         rowBtn->hoveredColor = theme.buttonHover;
         bool exists = projects[i].exists;

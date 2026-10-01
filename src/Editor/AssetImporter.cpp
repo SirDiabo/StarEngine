@@ -477,6 +477,106 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
     return "";
 }
 
+StarAsset RebuildFromSource(const StarAsset& original, const fs::path& absoluteSrc, const fs::path& folder,
+                             const fs::path& contentRoot, const std::string& starAssetPath, bool forceRevendor) {
+    StarAsset rebuilt;
+    if (original.assetType == "StaticMesh") {
+        rebuilt = BuildMeshAsset(absoluteSrc, folder, contentRoot, original.materialSlots);
+        ExtractAnimations(absoluteSrc, folder, contentRoot);
+    } else if (original.assetType == "Animation") {
+        int animCount = 0;
+        ModelAnimation* anims = LoadModelAnimations(absoluteSrc.string().c_str(), &animCount);
+        rebuilt.assetType = "Animation";
+        rebuilt.sourcePath = absoluteSrc.string();
+        rebuilt.vendoredSourcePath = forceRevendor
+            ? SourceVendoring::Vendor(contentRoot.string(), rebuilt.sourcePath,
+                                       absoluteSrc.stem().string() + "_" + SanitizeFileNameComponent(original.animName))
+            : original.vendoredSourcePath;
+        rebuilt.animName = original.animName;
+        std::string srcExt = absoluteSrc.extension().string();
+        for (char& c : srcExt) c = (char)tolower(c);
+        rebuilt.animFramesPerSecond = (srcExt == ".gltf" || srcExt == ".glb") ? 60.0f : 30.0f;
+        bool matched = false;
+        if (anims != nullptr) {
+            for (int i = 0; i < animCount; i++) {
+                if (original.animName == anims[i].name) {
+                    rebuilt.animSourceIndex = i;
+                    rebuilt.animFrameCount = anims[i].keyframeCount;
+                    rebuilt.animBoneCount = anims[i].boneCount;
+                    matched = true;
+                    break;
+                }
+            }
+            UnloadModelAnimations(anims, animCount);
+        }
+        if (!matched) {
+            rebuilt.animSourceIndex = original.animSourceIndex;
+            rebuilt.animFrameCount = original.animFrameCount;
+            rebuilt.animBoneCount = original.animBoneCount;
+        }
+    } else {
+        rebuilt.assetType = original.assetType;
+        rebuilt.sourcePath = absoluteSrc.string();
+        rebuilt.vendoredSourcePath =
+            SourceVendoring::Vendor(contentRoot.string(), rebuilt.sourcePath, fs::path(starAssetPath).stem().string());
+    }
+
+    rebuilt.importPosX = original.importPosX;
+    rebuilt.importPosY = original.importPosY;
+    rebuilt.importPosZ = original.importPosZ;
+    rebuilt.importRotX = original.importRotX;
+    rebuilt.importRotY = original.importRotY;
+    rebuilt.importRotZ = original.importRotZ;
+    rebuilt.importScaleX = original.importScaleX;
+    rebuilt.importScaleY = original.importScaleY;
+    rebuilt.importScaleZ = original.importScaleZ;
+
+    if (!rebuilt.materialSlots.empty() && !original.materialSlots.empty()) {
+        for (size_t i = 0; i < rebuilt.materialSlots.size(); i++) {
+            for (const MaterialSlot& old : original.materialSlots) {
+                if (rebuilt.materialSlots[i].usemtlName == old.usemtlName) {
+                    rebuilt.materialSlots[i].materialPath = old.materialPath;
+                    break;
+                }
+            }
+        }
+    } else {
+        rebuilt.materialSlots = original.materialSlots;
+    }
+
+    return rebuilt;
+}
+
+bool SaveAndRefresh(const StarAsset& rebuilt, const std::string& starAssetPath) {
+    if (!rebuilt.SaveToFile(starAssetPath)) return false;
+    if (rebuilt.assetType == "StaticMesh") {
+        AssetCache::Get().ReloadModel(rebuilt.ResolveSourcePath());
+    } else if (rebuilt.assetType == "Texture") {
+        AssetCache::Get().ReloadTexture(starAssetPath);
+    } else if (rebuilt.assetType == "Animation") {
+        AssetCache::Get().ReloadAnimation(starAssetPath);
+    }
+    return true;
+}
+
+}
+
+namespace AssetImporter {
+
+bool NeedsReimportFromFile(const std::string& starAssetPath) {
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(starAssetPath, asset)) return false;
+    if (asset.sourcePath.empty()) return false;
+
+    std::error_code ec;
+    if (fs::exists(asset.sourcePath, ec)) return false;
+
+    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+    if (!asset.vendoredSourcePath.empty() && fs::exists(contentRoot / asset.vendoredSourcePath, ec)) return false;
+
+    return true;
+}
+
 std::string Reimport(const std::string& starAssetPath) {
     StarAsset asset;
     if (!StarAsset::LoadFromFile(starAssetPath, asset)) return "";
@@ -493,80 +593,30 @@ std::string Reimport(const std::string& starAssetPath) {
         src = vendored;
     }
 
-    StarAsset rebuilt;
-    if (asset.assetType == "StaticMesh") {
-        rebuilt = BuildMeshAsset(fs::absolute(src, ec), folder, contentRoot, asset.materialSlots);
-        ExtractAnimations(fs::absolute(src, ec), folder, contentRoot);
-    } else if (asset.assetType == "Animation") {
-        int animCount = 0;
-        ModelAnimation* anims = LoadModelAnimations(src.string().c_str(), &animCount);
-        rebuilt.assetType = "Animation";
-        rebuilt.sourcePath = fs::absolute(src, ec).string();
-        rebuilt.vendoredSourcePath = asset.vendoredSourcePath;
-        rebuilt.animName = asset.animName;
-        std::string srcExt = src.extension().string();
-        for (char& c : srcExt) c = (char)tolower(c);
-        rebuilt.animFramesPerSecond = (srcExt == ".gltf" || srcExt == ".glb") ? 60.0f : 30.0f;
-        bool matched = false;
-        if (anims != nullptr) {
-            for (int i = 0; i < animCount; i++) {
-                if (asset.animName == anims[i].name) {
-                    rebuilt.animSourceIndex = i;
-                    rebuilt.animFrameCount = anims[i].keyframeCount;
-                    rebuilt.animBoneCount = anims[i].boneCount;
-                    matched = true;
-                    break;
-                }
-            }
-            UnloadModelAnimations(anims, animCount);
-        }
-        if (!matched) {
-            rebuilt.animSourceIndex = asset.animSourceIndex;
-            rebuilt.animFrameCount = asset.animFrameCount;
-            rebuilt.animBoneCount = asset.animBoneCount;
-        }
-    } else {
-        rebuilt.assetType = asset.assetType;
-        rebuilt.sourcePath = fs::absolute(src, ec).string();
-        rebuilt.vendoredSourcePath =
-            SourceVendoring::Vendor(contentRoot.string(), rebuilt.sourcePath, fs::path(starAssetPath).stem().string());
+    StarAsset rebuilt = RebuildFromSource(asset, fs::absolute(src, ec), folder, contentRoot, starAssetPath, false);
+    return SaveAndRefresh(rebuilt, starAssetPath) ? starAssetPath : "";
+}
+
+std::string ReimportFromFile(const std::string& starAssetPath, const std::string& newSourcePath) {
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(starAssetPath, asset)) return "";
+
+    fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+    fs::path folder = fs::path(starAssetPath).parent_path();
+
+    std::error_code ec;
+    fs::path absoluteSrc = fs::absolute(fs::path(newSourcePath), ec);
+    if (ec) absoluteSrc = fs::path(newSourcePath);
+    if (!fs::exists(absoluteSrc, ec)) return "";
+
+    if (!asset.vendoredSourcePath.empty()) {
+        fs::path oldVendorDir = (contentRoot / asset.vendoredSourcePath).parent_path();
+        std::error_code rmEc;
+        fs::remove_all(oldVendorDir, rmEc);
     }
 
-    // Preserve user-edited import transform and any material reassignments by name.
-    rebuilt.importPosX = asset.importPosX;
-    rebuilt.importPosY = asset.importPosY;
-    rebuilt.importPosZ = asset.importPosZ;
-    rebuilt.importRotX = asset.importRotX;
-    rebuilt.importRotY = asset.importRotY;
-    rebuilt.importRotZ = asset.importRotZ;
-    rebuilt.importScaleX = asset.importScaleX;
-    rebuilt.importScaleY = asset.importScaleY;
-    rebuilt.importScaleZ = asset.importScaleZ;
-
-    if (!rebuilt.materialSlots.empty() && !asset.materialSlots.empty()) {
-        for (size_t i = 0; i < rebuilt.materialSlots.size(); i++) {
-            for (const MaterialSlot& old : asset.materialSlots) {
-                if (rebuilt.materialSlots[i].usemtlName == old.usemtlName) {
-                    rebuilt.materialSlots[i].materialPath = old.materialPath;
-                    break;
-                }
-            }
-        }
-    } else {
-        rebuilt.materialSlots = asset.materialSlots;
-    }
-
-    if (rebuilt.SaveToFile(starAssetPath)) {
-        if (rebuilt.assetType == "StaticMesh") {
-            AssetCache::Get().ReloadModel(rebuilt.ResolveSourcePath());
-        } else if (rebuilt.assetType == "Texture") {
-            AssetCache::Get().ReloadTexture(starAssetPath);
-        } else if (rebuilt.assetType == "Animation") {
-            AssetCache::Get().ReloadAnimation(starAssetPath);
-        }
-        return starAssetPath;
-    }
-    return "";
+    StarAsset rebuilt = RebuildFromSource(asset, absoluteSrc, folder, contentRoot, starAssetPath, true);
+    return SaveAndRefresh(rebuilt, starAssetPath) ? starAssetPath : "";
 }
 
 }
