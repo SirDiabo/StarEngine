@@ -150,6 +150,45 @@ void Actor::GetComponentWorldTransform(Component* comp, Vector3& outPos, Vector3
     }
 }
 
+Vector3 Actor::GetComponentWorldScale(Component* comp) const {
+    Vector3 pos, rot, scl;
+    GetComponentWorldTransform(comp, pos, rot, scl);
+    return scl;
+}
+
+void Actor::SetComponentWorldPosition(Component* comp, Vector3 worldPos) {
+    if (!comp) return;
+    Vector3 pPos, pRot, pScale;
+    GetComponentWorldTransform(comp->parent, pPos, pRot, pScale);
+    Vector3 rotatedLocalPos = Vector3Subtract(worldPos, pPos);
+    Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * pRot.x, DEG2RAD * pRot.y, DEG2RAD * pRot.z });
+    Matrix invRot = MatrixInvert(rotationMatrix);
+    Vector3 scaledLocalPos = Vector3Transform(rotatedLocalPos, invRot);
+    comp->position = {
+        pScale.x != 0.0f ? scaledLocalPos.x / pScale.x : 0.0f,
+        pScale.y != 0.0f ? scaledLocalPos.y / pScale.y : 0.0f,
+        pScale.z != 0.0f ? scaledLocalPos.z / pScale.z : 0.0f
+    };
+}
+
+void Actor::SetComponentWorldRotation(Component* comp, Vector3 worldRot) {
+    if (!comp) return;
+    Vector3 pPos, pRot, pScale;
+    GetComponentWorldTransform(comp->parent, pPos, pRot, pScale);
+    comp->rotation = Vector3Subtract(worldRot, pRot);
+}
+
+void Actor::SetComponentWorldScale(Component* comp, Vector3 worldScale) {
+    if (!comp) return;
+    Vector3 pPos, pRot, pScale;
+    GetComponentWorldTransform(comp->parent, pPos, pRot, pScale);
+    comp->scale = {
+        pScale.x != 0.0f ? worldScale.x / pScale.x : 0.0f,
+        pScale.y != 0.0f ? worldScale.y / pScale.y : 0.0f,
+        pScale.z != 0.0f ? worldScale.z / pScale.z : 0.0f
+    };
+}
+
 Vector3 Actor::GetComponentWorldPosition(Component* comp) const {
     Vector3 pos, rot, scl;
     GetComponentWorldTransform(comp, pos, rot, scl);
@@ -211,4 +250,4 @@ void Actor::AddMovementInput(Vector3 worldDirection, float scaleValue) {
     float len = Vector3Length(worldDirection);
     if (len > 0.0001f) worldDirection = Vector3Scale(worldDirection, 1.0f / len);
     pendingMovementInput = Vector3Add(pendingMovementInput, Vector3Scale(worldDirection, scaleValue));
-}
+}

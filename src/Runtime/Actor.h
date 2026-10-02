@@ -41,6 +41,11 @@ public:
     static Vector3 ComputeWorldRotation(Vector3 localRot, Vector3 parentRot);
     static Vector3 ComputeWorldScale(Vector3 localScale, Vector3 parentScale);
 
+    Vector3 GetComponentWorldScale(Component* comp) const;
+    void SetComponentWorldPosition(Component* comp, Vector3 worldPos);
+    void SetComponentWorldRotation(Component* comp, Vector3 worldRot);
+    void SetComponentWorldScale(Component* comp, Vector3 worldScale);
+
     void GetComponentWorldTransform(Component* comp, Vector3& outPos, Vector3& outRot, Vector3& outScale) const;
     Vector3 GetComponentWorldPosition(Component* comp) const;
     Vector3 GetComponentWorldRotation(Component* comp) const;

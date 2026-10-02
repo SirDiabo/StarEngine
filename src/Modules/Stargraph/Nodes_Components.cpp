@@ -205,4 +205,132 @@ void RegisterComponentNodes() {
         for (Pin& p : node.outputs) if (p.name == "Location") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getCompWorldLocation);
+
+    NodeTemplate getCompWorldRotation;
+    getCompWorldRotation.type = "Get_World_Rotation";
+    getCompWorldRotation.category = "Components";
+    getCompWorldRotation.moduleName = "Stargraph";
+    getCompWorldRotation.hideFromContextMenu = true;
+    getCompWorldRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
+    };
+    getCompWorldRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
+            }
+        }
+        if (!target) return;
+        Vector3 worldRot = ctx.actor->GetComponentWorldRotation(target);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", worldRot.x, worldRot.y, worldRot.z);
+        for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompWorldRotation);
+
+    NodeTemplate getCompWorldScale;
+    getCompWorldScale.type = "Get_World_Scale";
+    getCompWorldScale.category = "Components";
+    getCompWorldScale.moduleName = "Stargraph";
+    getCompWorldScale.hideFromContextMenu = true;
+    getCompWorldScale.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
+        node->outputs.push_back({"Scale", PinType::Vec3, false, true});
+    };
+    getCompWorldScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
+            }
+        }
+        if (!target) return;
+        Vector3 worldScale = ctx.actor->GetComponentWorldScale(target);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", worldScale.x, worldScale.y, worldScale.z);
+        for (Pin& p : node.outputs) if (p.name == "Scale") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getCompWorldScale);
+
+    NodeTemplate setCompWorldLocation;
+    setCompWorldLocation.type = "Set_World_Location";
+    setCompWorldLocation.category = "Components";
+    setCompWorldLocation.moduleName = "Stargraph";
+    setCompWorldLocation.hideFromContextMenu = true;
+    setCompWorldLocation.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
+        node->inputs.push_back({"Location", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setCompWorldLocation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        Vector3 loc = {0, 0, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
+            }
+            if (p.name == "Location") ReadVec3(p, loc.x, loc.y, loc.z);
+        }
+        if (!target) return;
+        ctx.actor->SetComponentWorldPosition(target, loc);
+    };
+    NodeRegistry::Get().RegisterNode(setCompWorldLocation);
+
+    NodeTemplate setCompWorldRotation;
+    setCompWorldRotation.type = "Set_World_Rotation";
+    setCompWorldRotation.category = "Components";
+    setCompWorldRotation.moduleName = "Stargraph";
+    setCompWorldRotation.hideFromContextMenu = true;
+    setCompWorldRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
+        node->inputs.push_back({"Rotation", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setCompWorldRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        Vector3 rot = {0, 0, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
+            }
+            if (p.name == "Rotation") ReadVec3(p, rot.x, rot.y, rot.z);
+        }
+        if (!target) return;
+        ctx.actor->SetComponentWorldRotation(target, rot);
+    };
+    NodeRegistry::Get().RegisterNode(setCompWorldRotation);
+
+    NodeTemplate setCompWorldScale;
+    setCompWorldScale.type = "Set_World_Scale";
+    setCompWorldScale.category = "Components";
+    setCompWorldScale.moduleName = "Stargraph";
+    setCompWorldScale.hideFromContextMenu = true;
+    setCompWorldScale.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Component"});
+        node->inputs.push_back({"Scale", PinType::Vec3, true, false, 0, "1,1,1"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setCompWorldScale.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (!ctx.actor) return;
+        Component* target = nullptr;
+        Vector3 scl = {1, 1, 1};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "Component", ctx);
+            }
+            if (p.name == "Scale") ReadVec3(p, scl.x, scl.y, scl.z);
+        }
+        if (!target) return;
+        ctx.actor->SetComponentWorldScale(target, scl);
+    };
+    NodeRegistry::Get().RegisterNode(setCompWorldScale);
 }
