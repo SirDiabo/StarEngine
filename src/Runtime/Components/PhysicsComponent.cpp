@@ -149,7 +149,7 @@ Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const Colli
         float drop = hit.distance - skinWidth;
         if (drop > 0.0f) {
             float smoothT = 1.0f - powf(1.0f - groundSnapSmoothing, dtForGround * 60.0f);
-            float applyDrop = drop <= groundSnapDistance * 0.25f ? drop * smoothT : drop;
+            float applyDrop = drop <= skinWidth * 2.0f ? drop * smoothT : drop;
             applied = Vector3{ 0.0f, -applyDrop, 0.0f };
             shape = CollisionTrace::ShapeTranslated(shape, applied);
         }
