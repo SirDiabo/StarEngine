@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "AssetPreviewViewport.h"
 #include "Runtime/AssetCache.h"
 #include "Core/StarMaterial.h"
@@ -162,7 +163,7 @@ void AssetPreviewViewport::RenderScene() {
 
     if (model) {
         Matrix scaleMatrix = MatrixScale(scl.x, scl.y, scl.z);
-        Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+        Matrix rotationMatrix = ComposeRotationDegrees(rot);
         Matrix savedTransform = model->transform;
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 

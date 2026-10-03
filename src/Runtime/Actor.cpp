@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "Actor.h"
 #include "Components/Component.h"
 #include "Components/SceneComponent.h"
@@ -106,7 +107,7 @@ void Actor::EndPlay() {
 
 Matrix Actor::GetWorldMatrix() const {
     Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
-    Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * rotation.x, DEG2RAD * rotation.y, DEG2RAD * rotation.z });
+    Matrix rotationMatrix = ComposeRotationDegrees(rotation);
     Matrix translationMatrix = MatrixTranslate(position.x, position.y, position.z);
     return MatrixMultiply(MatrixMultiply(scaleMatrix, rotationMatrix), translationMatrix);
 }
@@ -117,7 +118,7 @@ Vector3 Actor::ComputeWorldPosition(Vector3 localPos, Vector3 parentPos, Vector3
         localPos.y * parentScale.y,
         localPos.z * parentScale.z
     };
-    Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * parentRot.x, DEG2RAD * parentRot.y, DEG2RAD * parentRot.z });
+    Matrix rotationMatrix = ComposeRotationDegrees(parentRot);
     Vector3 rotatedLocalPos = Vector3Transform(scaledLocalPos, rotationMatrix);
     return Vector3Add(parentPos, rotatedLocalPos);
 }

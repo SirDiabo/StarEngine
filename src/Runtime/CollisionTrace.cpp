@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "CollisionTrace.h"
 #include "CollisionPrivate.h"
 #include "Actor.h"
@@ -79,7 +80,7 @@ using CollisionTrace::QueryParams;
 
 Matrix ComposeWorld(const Vector3& pos, const Vector3& rot, const Vector3& scl) {
     Matrix scaleM = MatrixScale(scl.x, scl.y, scl.z);
-    Matrix rotM = MatrixRotateXYZ({ DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z });
+    Matrix rotM = ComposeRotationDegrees(rot);
     Matrix transM = MatrixTranslate(pos.x, pos.y, pos.z);
     return MatrixMultiply(MatrixMultiply(scaleM, rotM), transM);
 }
@@ -343,7 +344,7 @@ CollisionTrace::Shape CollisionTrace::MakeCapsule(const Vector3& a, const Vector
 }
 
 CollisionTrace::Shape CollisionTrace::MakeBox(const Vector3& center, const Vector3& rotationDegrees, const Vector3& halfExtents) {
-    Matrix m = MatrixRotateXYZ({ DEG2RAD * rotationDegrees.x, DEG2RAD * rotationDegrees.y, DEG2RAD * rotationDegrees.z });
+    Matrix m = ComposeRotationDegrees(rotationDegrees);
     Shape s;
     s.type = Shape::Box;
     s.center = center;
@@ -366,7 +367,7 @@ bool CollisionTrace::MakeComponentShape(int shapeType, float radius, float heigh
             outShape = MakeSphere(pos, fabsf(radius) * fmaxf(ax, fmaxf(ay, az)));
             return true;
         case CollisionComponent::Capsule: {
-            Matrix m = MatrixRotateXYZ({ DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z });
+            Matrix m = ComposeRotationDegrees(rot);
             Vector3 up{ m.m4, m.m5, m.m6 };
             float halfLen = fabsf(height) * 0.5f * ay;
             outShape = MakeCapsule(Sub(pos, Mul(up, halfLen)), Add(pos, Mul(up, halfLen)), fabsf(radius) * fmaxf(ax, az));

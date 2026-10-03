@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "SceneRenderer.h"
 #include "World.h"
 #include "Actor.h"
@@ -13,7 +14,7 @@ static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, Vector3 rot, Vecto
     if (!model) return;
 
     Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
-    Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+    Matrix rotationMatrix = ComposeRotationDegrees(rot);
     Matrix localTransform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
     Matrix savedTransform = model->transform;

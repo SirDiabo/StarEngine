@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "StargraphEditorPanel.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -215,7 +216,7 @@ void StargraphEditorPanel::RenderPreviewScene() {
             }
             if (model) {
                 Matrix scaleMatrix = MatrixScale(scl.x, scl.y, scl.z);
-                Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+                Matrix rotationMatrix = ComposeRotationDegrees(rot);
                 model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
                 auto materialIt = comp.arrayFields.find("Material");
                 static const std::vector<std::string> emptyMaterials;

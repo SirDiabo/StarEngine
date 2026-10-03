@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "ShadowMapPrePass.h"
 #include "Core/ShadingModel.h"
 #include "Core/RenderSettings.h"
@@ -219,7 +220,7 @@ void DrawShadowCasters(Actor* excludeActor) {
             actor->GetComponentWorldTransform(comp, pos, rot, scl);
 
             Matrix scaleMatrix = MatrixScale(scl.x, scl.y, scl.z);
-            Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+            Matrix rotationMatrix = ComposeRotationDegrees(rot);
             Matrix localTransform = MatrixMultiply(scaleMatrix, rotationMatrix);
             Matrix worldTransform = MatrixMultiply(localTransform, MatrixTranslate(pos.x, pos.y, pos.z));
 

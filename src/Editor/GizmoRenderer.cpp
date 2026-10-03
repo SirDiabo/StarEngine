@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "GizmoRenderer.h"
 #include "UITheme.h"
 #include "raymath.h"
@@ -68,7 +69,7 @@ void GetGizmoAxes(GizmoSpace space, Vector3 rot, Vector3& axisX, Vector3& axisY,
         return;
     }
 
-    Matrix rotMat = MatrixRotateXYZ({rot.x * DEG2RAD, rot.y * DEG2RAD, rot.z * DEG2RAD});
+    Matrix rotMat = ComposeRotationDegrees(rot);
     axisX = Vector3Transform({1, 0, 0}, rotMat);
     axisY = Vector3Transform({0, 1, 0}, rotMat);
     axisZ = Vector3Transform({0, 0, 1}, rotMat);

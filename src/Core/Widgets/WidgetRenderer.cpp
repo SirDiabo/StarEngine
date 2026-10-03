@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "WidgetRenderer.h"
 #include "Widget.h"
 #include "WidgetInput.h"
@@ -94,7 +95,7 @@ void DrawWorldSpaceWidgets(Camera3D camera) {
 
                 Matrix baseRotation = MatrixRotateX(DEG2RAD * kWorldPlaneBaseRotationDeg);
                 Matrix scaleMatrix = MatrixScale(scl.x, scl.y, 1.0f);
-                Matrix rotationMatrix = MatrixRotateXYZ({ DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z });
+                Matrix rotationMatrix = ComposeRotationDegrees(rot);
 
                 Matrix savedTransform = plane.transform;
                 plane.transform = MatrixMultiply(MatrixMultiply(scaleMatrix, baseRotation), rotationMatrix);

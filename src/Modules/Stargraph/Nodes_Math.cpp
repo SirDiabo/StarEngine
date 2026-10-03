@@ -1087,19 +1087,19 @@ void RegisterMathNodes() {
         mat.m8 = newForward.x; mat.m9 = newForward.y; mat.m10 = newForward.z; mat.m11 = 0.0f;
         mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
 
-        float m8v = mat.m8;
-        if (m8v > 1.0f) m8v = 1.0f;
-        if (m8v < -1.0f) m8v = -1.0f;
-        float yawPrincipal = asinf(m8v);
+        float m9v = mat.m9;
+        if (m9v > 1.0f) m9v = 1.0f;
+        if (m9v < -1.0f) m9v = -1.0f;
+        float pitchPrincipal = asinf(-m9v);
         float yawRad, pitchRad, rollRad;
-        if (mat.m10 >= 0.0f) {
-            yawRad = yawPrincipal;
-            pitchRad = atan2f(-mat.m9, mat.m10);
-            rollRad = atan2f(-mat.m4, mat.m0);
+        if (mat.m5 >= 0.0f) {
+            pitchRad = pitchPrincipal;
+            yawRad = atan2f(mat.m8, mat.m10);
+            rollRad = atan2f(mat.m1, mat.m5);
         } else {
-            yawRad = (yawPrincipal >= 0.0f) ? (PI - yawPrincipal) : (-PI - yawPrincipal);
-            pitchRad = atan2f(mat.m9, -mat.m10);
-            rollRad = atan2f(mat.m4, -mat.m0);
+            pitchRad = (pitchPrincipal >= 0.0f) ? (PI - pitchPrincipal) : (-PI - pitchPrincipal);
+            yawRad = atan2f(-mat.m8, -mat.m10);
+            rollRad = atan2f(-mat.m1, -mat.m5);
         }
 
         char buf[64];

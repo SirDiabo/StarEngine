@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "Nodes_Actor.h"
 #include "NodeRegistry.h"
 #include "GraphExecutor.h"
@@ -211,7 +212,7 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
+        Matrix m = ComposeRotationDegrees(target->rotation);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", m.m8, m.m9, m.m10);
         for (Pin& p : node.outputs) if (p.name == "Forward") p.defaultValue = buf;
@@ -236,7 +237,7 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
+        Matrix m = ComposeRotationDegrees(target->rotation);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", -m.m0, -m.m1, -m.m2);
         for (Pin& p : node.outputs) if (p.name == "Right") p.defaultValue = buf;
@@ -261,7 +262,7 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        Matrix m = MatrixRotateXYZ({DEG2RAD * target->rotation.x, DEG2RAD * target->rotation.y, DEG2RAD * target->rotation.z});
+        Matrix m = ComposeRotationDegrees(target->rotation);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", m.m4, m.m5, m.m6);
         for (Pin& p : node.outputs) if (p.name == "Up") p.defaultValue = buf;

@@ -1,3 +1,4 @@
+#include "Core/RotationMath.h"
 #include "ViewportPanel.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -82,7 +83,7 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
 
     if (model) {
         Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
-        Matrix rotationMatrix = MatrixRotateXYZ({DEG2RAD * rot.x, DEG2RAD * rot.y, DEG2RAD * rot.z});
+        Matrix rotationMatrix = ComposeRotationDegrees(rot);
         model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
         AssetCache::ApplyMaterialSlots(model, materialAssetPaths);
