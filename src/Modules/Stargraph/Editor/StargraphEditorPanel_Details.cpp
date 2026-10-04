@@ -1310,8 +1310,16 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
         if (pin.type == PinType::Exec) continue;
         if (pin.name == "Variable_Name" || pin.name == "Component_Name") continue;
         std::string value = pin.defaultValue.c_str();
+        bool isInterpNode = node->type == "Float_Interp_To" || node->type == "Int_Interp_To" ||
+                             node->type == "Vec3_Interp_To" || node->type == "Rotator_Interp_To";
         if ((node->type == "Play_Sound" || node->type == "Load_Music") && pin.name == "Path") {
             rows.push_back(AssetRow("audio:" + std::to_string(pin.id), pin.name, ".starsound", StemOrNone(value)));
+        } else if (isInterpNode && pin.name == "Method") {
+            int pinId = pin.id;
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,
+                {"Exponential", "Linear"}, [this, pinId](const std::string& v) {
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v; isDirty = true; }
+                }));
         } else {
             rows.push_back(ReadOnlyRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("(empty)") : value));
         }
