@@ -11,6 +11,38 @@ static float GetScalarValue(const Pin& p) {
     return p.defaultValue.AsFloat();
 }
 
+static float InterpStep(float value, float target, float delta, float speed, const std::string& method) {
+    float diff = target - value;
+    if (method == "Linear") {
+        float step = fabsf(speed) * delta;
+        if (fabsf(diff) <= step) return target;
+        return value + (diff > 0.0f ? step : -step);
+    }
+    float t = 1.0f - expf(-fabsf(speed) * delta);
+    if (t > 1.0f) t = 1.0f;
+    if (t < 0.0f) t = 0.0f;
+    return value + diff * t;
+}
+
+static float WrapAngleDeg(float deg) {
+    while (deg > 180.0f) deg -= 360.0f;
+    while (deg <= -180.0f) deg += 360.0f;
+    return deg;
+}
+
+static float InterpAngleStep(float value, float target, float delta, float speed, const std::string& method) {
+    float diff = WrapAngleDeg(target - value);
+    if (method == "Linear") {
+        float step = fabsf(speed) * delta;
+        if (fabsf(diff) <= step) return value + diff;
+        return value + (diff > 0.0f ? step : -step);
+    }
+    float t = 1.0f - expf(-fabsf(speed) * delta);
+    if (t > 1.0f) t = 1.0f;
+    if (t < 0.0f) t = 0.0f;
+    return value + diff * t;
+}
+
 void RegisterMathNodes() {
     auto RegisterWildcardMath = [](const std::string& nodeType, char op) {
         NodeTemplate t;
@@ -787,6 +819,138 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(floatLerp);
+
+    NodeTemplate floatInterp;
+    floatInterp.type = "Float_Interp_To";
+    floatInterp.category = "Math";
+    floatInterp.moduleName = "Stargraph";
+    floatInterp.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Target", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Delta", PinType::Float, true, false, 0, ""});
+        node->inputs.push_back({"Speed", PinType::Float, true, false, 0, "5.0"});
+        node->inputs.push_back({"Method", PinType::String, true, false, 0, "Exponential"});
+        node->outputs.push_back({"Result", PinType::Float, false, true});
+    };
+    floatInterp.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float value = 0, target = 0, speed = 5.0f;
+        float delta = ctx.deltaTime;
+        std::string method = "Exponential";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Value") value = GetScalarValue(p);
+            else if (p.name == "Target") target = GetScalarValue(p);
+            else if (p.name == "Delta" && !p.defaultValue.empty()) delta = GetScalarValue(p);
+            else if (p.name == "Speed") speed = GetScalarValue(p);
+            else if (p.name == "Method" && !p.defaultValue.empty()) method = (const std::string&)p.defaultValue;
+        }
+        float result = InterpStep(value, target, delta, speed, method);
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(floatInterp);
+
+    NodeTemplate intInterp;
+    intInterp.type = "Int_Interp_To";
+    intInterp.category = "Math";
+    intInterp.moduleName = "Stargraph";
+    intInterp.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
+        node->inputs.push_back({"Target", PinType::Integer, true, false, 0, "0"});
+        node->inputs.push_back({"Delta", PinType::Float, true, false, 0, ""});
+        node->inputs.push_back({"Speed", PinType::Float, true, false, 0, "5.0"});
+        node->inputs.push_back({"Method", PinType::String, true, false, 0, "Exponential"});
+        node->outputs.push_back({"Result", PinType::Integer, false, true});
+    };
+    intInterp.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float value = 0, target = 0, speed = 5.0f;
+        float delta = ctx.deltaTime;
+        std::string method = "Exponential";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Value") value = GetScalarValue(p);
+            else if (p.name == "Target") target = GetScalarValue(p);
+            else if (p.name == "Delta" && !p.defaultValue.empty()) delta = GetScalarValue(p);
+            else if (p.name == "Speed") speed = GetScalarValue(p);
+            else if (p.name == "Method" && !p.defaultValue.empty()) method = (const std::string&)p.defaultValue;
+        }
+        float result = InterpStep(value, target, delta, speed, method);
+        int rounded = (int)lroundf(result);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(rounded);
+    };
+    NodeRegistry::Get().RegisterNode(intInterp);
+
+    NodeTemplate vec3Interp;
+    vec3Interp.type = "Vec3_Interp_To";
+    vec3Interp.category = "Math";
+    vec3Interp.moduleName = "Stargraph";
+    vec3Interp.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Target", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Delta", PinType::Float, true, false, 0, ""});
+        node->inputs.push_back({"Speed", PinType::Float, true, false, 0, "5.0"});
+        node->inputs.push_back({"Method", PinType::String, true, false, 0, "Exponential"});
+        node->outputs.push_back({"Result", PinType::Vec3, false, true});
+    };
+    vec3Interp.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 value{0,0,0}, target{0,0,0};
+        float speed = 5.0f;
+        float delta = ctx.deltaTime;
+        std::string method = "Exponential";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Value") ReadVec3(p, value.x, value.y, value.z);
+            else if (p.name == "Target") ReadVec3(p, target.x, target.y, target.z);
+            else if (p.name == "Delta" && !p.defaultValue.empty()) delta = GetScalarValue(p);
+            else if (p.name == "Speed") speed = GetScalarValue(p);
+            else if (p.name == "Method" && !p.defaultValue.empty()) method = (const std::string&)p.defaultValue;
+        }
+        if (method == "Linear") {
+            Vector3 diff = Vector3Subtract(target, value);
+            float dist = Vector3Length(diff);
+            float step = fabsf(speed) * delta;
+            Vector3 result = (dist <= step || dist < 1e-6f) ? target
+                : Vector3Add(value, Vector3Scale(diff, step / dist));
+            char buf[64]; snprintf(buf, sizeof(buf), "%g,%g,%g", result.x, result.y, result.z);
+            for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+        } else {
+            float x = InterpStep(value.x, target.x, delta, speed, method);
+            float y = InterpStep(value.y, target.y, delta, speed, method);
+            float z = InterpStep(value.z, target.z, delta, speed, method);
+            char buf[64]; snprintf(buf, sizeof(buf), "%g,%g,%g", x, y, z);
+            for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(vec3Interp);
+
+    NodeTemplate rotatorInterp;
+    rotatorInterp.type = "Rotator_Interp_To";
+    rotatorInterp.category = "Math";
+    rotatorInterp.moduleName = "Stargraph";
+    rotatorInterp.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Target", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Delta", PinType::Float, true, false, 0, ""});
+        node->inputs.push_back({"Speed", PinType::Float, true, false, 0, "5.0"});
+        node->inputs.push_back({"Method", PinType::String, true, false, 0, "Exponential"});
+        node->outputs.push_back({"Result", PinType::Rotator, false, true});
+    };
+    rotatorInterp.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 value{0,0,0}, target{0,0,0};
+        float speed = 5.0f;
+        float delta = ctx.deltaTime;
+        std::string method = "Exponential";
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Value") ReadVec3(p, value.x, value.y, value.z);
+            else if (p.name == "Target") ReadVec3(p, target.x, target.y, target.z);
+            else if (p.name == "Delta" && !p.defaultValue.empty()) delta = GetScalarValue(p);
+            else if (p.name == "Speed") speed = GetScalarValue(p);
+            else if (p.name == "Method" && !p.defaultValue.empty()) method = (const std::string&)p.defaultValue;
+        }
+        float x = InterpAngleStep(value.x, target.x, delta, speed, method);
+        float y = InterpAngleStep(value.y, target.y, delta, speed, method);
+        float z = InterpAngleStep(value.z, target.z, delta, speed, method);
+        char buf[64]; snprintf(buf, sizeof(buf), "%g,%g,%g", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(rotatorInterp);
 
     NodeTemplate intModulo;
     intModulo.type = "Int_Modulo";
