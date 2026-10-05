@@ -27,7 +27,9 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
     }
 
     auto inserted = meshCache.emplace(normalized, model);
-    return &inserted.first->second;
+    Model* cached = &inserted.first->second;
+    CaptureDefaultMaterials(cached);
+    return cached;
 }
 
 Model AssetCache::LoadPrivateModel(const std::string& sourceMeshPath) {
@@ -171,11 +173,32 @@ std::shared_ptr<const CollisionPrivate::ModelBVH> AssetCache::GetOrBuildModelBVH
     return bvh;
 }
 
+void AssetCache::CaptureDefaultMaterials(Model* model) {
+    if (!model || modelDefaultColors.count(model)) return;
+    std::vector<Color> colors;
+    std::vector<Texture2D> textures;
+    colors.reserve(model->materialCount);
+    textures.reserve(model->materialCount);
+    for (int i = 0; i < model->materialCount; i++) {
+        colors.push_back(model->materials[i].maps[MATERIAL_MAP_DIFFUSE].color);
+        textures.push_back(model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture);
+    }
+    modelDefaultColors.emplace(model, std::move(colors));
+    modelDefaultTextures.emplace(model, std::move(textures));
+}
+
 void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>& materialPaths) {
     if (!model) return;
+    AssetCache::Get().CaptureDefaultMaterials(model);
+
+    auto defaultColors = AssetCache::Get().modelDefaultColors.find(model);
+    auto defaultTextures = AssetCache::Get().modelDefaultTextures.find(model);
+    bool hasDefaults = defaultColors != AssetCache::Get().modelDefaultColors.end() &&
+                        defaultTextures != AssetCache::Get().modelDefaultTextures.end();
 
     for (int i = 0; i < model->materialCount; i++) {
-        Color color = WHITE;
+        Color color = hasDefaults && (size_t)i < defaultColors->second.size() ? defaultColors->second[i] : WHITE;
+        Texture2D texture = hasDefaults && (size_t)i < defaultTextures->second.size() ? defaultTextures->second[i] : Texture2D{0};
         bool lit = false;
         if ((size_t)i < materialPaths.size() && !materialPaths[i].empty()) {
             if (const StarMaterial* material = AssetCache::Get().GetOrLoadMaterial(materialPaths[i])) {
@@ -183,12 +206,13 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
                 lit = material->lit;
                 if (!material->textureAssetPath.empty()) {
                     if (Texture2D* tex = AssetCache::Get().GetOrLoadTexture(material->textureAssetPath)) {
-                        model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = *tex;
+                        texture = *tex;
                     }
                 }
             }
         }
         model->materials[i].maps[MATERIAL_MAP_DIFFUSE].color = color;
+        model->materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
         model->materials[i].shader = (lit && ShadingModel::ShouldUseLitShading())
             ? ShadingModel::GetLitShader() : ShadingModel::GetDefaultShader();
     }
@@ -204,6 +228,8 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
     auto it = meshCache.find(normalized);
     if (it == meshCache.end()) return;
     modelBoundsCache.erase(&it->second);
+    modelDefaultColors.erase(&it->second);
+    modelDefaultTextures.erase(&it->second);
     UnloadModel(it->second);
     meshCache.erase(it);
 }
@@ -211,6 +237,8 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
 void AssetCache::Clear() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
     modelBoundsCache.clear();
+    modelDefaultColors.clear();
+    modelDefaultTextures.clear();
     bvhCache.clear();
     ++collisionGeneration;
     meshCache.clear();

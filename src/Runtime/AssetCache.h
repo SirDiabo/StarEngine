@@ -27,6 +27,7 @@ public:
     void Clear();
 
     static void ApplyMaterialSlots(Model* model, const std::vector<std::string>& materialPaths);
+    void CaptureDefaultMaterials(Model* model);
 
 private:
     struct LoadedAnimationSet {
@@ -38,6 +39,8 @@ private:
     std::unordered_map<std::string, Texture2D> textureCache;
     std::unordered_map<std::string, StarMaterial> materialCache;
     std::unordered_map<Model*, BoundingBox> modelBoundsCache;
+    std::unordered_map<Model*, std::vector<Color>> modelDefaultColors;
+    std::unordered_map<Model*, std::vector<Texture2D>> modelDefaultTextures;
     std::unordered_map<std::string, std::shared_ptr<const CollisionPrivate::ModelBVH>> bvhCache;
     unsigned collisionGeneration = 0;
     std::unordered_map<std::string, LoadedAnimationSet> animationSourceCache;
