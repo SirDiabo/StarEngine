@@ -67,6 +67,7 @@ private:
     int pieRenderTargetHeight = 0;
 
     StarMap starMap;
+    StarMap playMap;
     std::string mapPath;
     bool mapLoaded = false;
     bool mapDirty = false;

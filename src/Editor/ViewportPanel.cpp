@@ -673,8 +673,8 @@ void ViewportPanel::RenderToolbar() {
             StarMap newMap;
             if (newMap.LoadFromFile(requestedLevelPath)) {
                 GameSession::EndSession();
-                starMap = newMap;
-                GameSession::BeginSession(starMap);
+                playMap = std::move(newMap);
+                GameSession::BeginSession(playMap);
             }
         }
 
