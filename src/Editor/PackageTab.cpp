@@ -100,7 +100,7 @@ void PackageTab::Initialize() {
     }
 
     renderer = Project::Get().GetSettings().renderer;
-    outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged").string();
+    outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
 }
 
 static Rectangle SelectRow(float x, float y, float w, float h) {
@@ -262,7 +262,10 @@ void PackageTab::Render(float x, float y, float width, float height) {
     }
 
     int platformChoice = 0;
-    if (platformPopup.Render(platformChoice)) selectedPlatformIndex = platformChoice;
+    if (platformPopup.Render(platformChoice)) {
+        selectedPlatformIndex = platformChoice;
+        outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
+    }
 
     int rendererChoice = 0;
     if (rendererPopup.Render(rendererChoice)) {
