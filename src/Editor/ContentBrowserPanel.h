@@ -85,7 +85,7 @@ private:
 
     ChoicePopup gridContextMenu;
     ChoicePopup itemContextMenu;
-    std::vector<const AssetTypeInfo*> gridMenuTypes;
+    std::vector<std::string> gridMenuExtensions;
     std::vector<std::string> itemMenuActions;
 
     struct TileRef {

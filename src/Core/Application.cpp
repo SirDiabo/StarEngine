@@ -4,7 +4,6 @@
 #include "Core/Project.h"
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
-#include "Core/AssetRegistry.h"
 #include "Core/StarMaterial.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
@@ -218,7 +217,6 @@ void Application::Run() {
                 editor->CloseAllAssetEditorTabs();
                 AssetCache::Get().Clear();
                 StargraphAssetCache::Get().Clear();
-                AssetRegistry::Get().Clear();
                 Project::Get().Load(path);
                 ModuleManager::Get().ShutdownAll();
                 ModuleManager::Get().InitializeAll();

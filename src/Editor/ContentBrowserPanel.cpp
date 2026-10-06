@@ -32,8 +32,37 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <set>
 
 namespace fs = std::filesystem;
+
+namespace {
+
+void CollectVendorDirForAsset(const fs::path& assetFile, const fs::path& contentRoot, std::set<fs::path>& outDirs) {
+    std::string ext = assetFile.extension().string();
+    if (ext != ".starasset" && ext != ".startex" && ext != ".staranim") return;
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(assetFile.string(), asset) || asset.vendoredSourcePath.empty()) return;
+
+    fs::path vendorDir = (contentRoot / asset.vendoredSourcePath).parent_path().lexically_normal();
+    fs::path vendorRoot = (contentRoot / "_Source").lexically_normal();
+    fs::path rel = vendorDir.lexically_relative(vendorRoot);
+    if (rel.empty() || rel == "." || *rel.begin() == "..") return;
+
+    outDirs.insert(vendorDir);
+}
+
+void TrashVendorDirs(const std::set<fs::path>& dirs) {
+    for (const fs::path& dir : dirs) {
+        std::error_code ec;
+        if (!fs::exists(dir, ec)) continue;
+        std::string trashError;
+        OSTrash::MoveToTrash(dir.string(), trashError);
+    }
+}
+
+}
 
 void ContentBrowserPanel::LoadIcons() {
     auto load = [&](const std::string& key, const std::string& file) {
@@ -299,17 +328,22 @@ void ContentBrowserPanel::ConfirmPendingCreate() {
         ? (folder / typedName)
         : (folder / (typedName + pendingExtension));
 
-    if (fs::exists(target)) return;
+    if (fs::exists(target)) {
+        importStatus = "Create failed: " + target.filename().string() + " already exists";
+        return;
+    }
 
     bool success = false;
     if (isCreatingFolder) {
-        success = fs::create_directory(target);
+        std::error_code ec;
+        success = fs::create_directory(target, ec);
     } else {
         const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(pendingExtension);
         if (info && info->createAsset) success = info->createAsset(target.string(), typedName);
     }
 
     if (success) isCreatingNewItem = false;
+    else importStatus = "Create failed: could not create " + target.filename().string();
 }
 
 void ContentBrowserPanel::CancelPendingCreate() {
@@ -893,15 +927,15 @@ void ContentBrowserPanel::OpenItemContextMenu(Vector2 pos) {
 }
 
 void ContentBrowserPanel::OpenGridContextMenu(Vector2 pos) {
-    gridMenuTypes.clear();
+    gridMenuExtensions.clear();
     std::vector<ChoiceOption> options;
     options.push_back({ "New Folder" });
-    gridMenuTypes.push_back(nullptr);
+    gridMenuExtensions.push_back(std::string());
 
     for (const AssetTypeInfo& info : AssetTypeRegistry::Get().GetFilteredTypes()) {
         if (!info.createAsset) continue;
         options.push_back({ "New " + info.typeName });
-        gridMenuTypes.push_back(&info);
+        gridMenuExtensions.push_back(info.extension);
     }
 
     gridContextMenu.Open(pos, 150.0f, options);
@@ -1083,9 +1117,13 @@ void ContentBrowserPanel::Render() {
 
     int gridChoice = -1;
     if (gridContextMenu.Render(gridChoice)) {
-        if (gridChoice >= 0 && gridChoice < (int)gridMenuTypes.size()) {
-            if (gridMenuTypes[gridChoice] == nullptr) BeginCreateFolder();
-            else BeginCreateAsset(*gridMenuTypes[gridChoice]);
+        if (gridChoice >= 0 && gridChoice < (int)gridMenuExtensions.size()) {
+            const std::string& chosenExtension = gridMenuExtensions[gridChoice];
+            if (chosenExtension.empty()) {
+                BeginCreateFolder();
+            } else if (const AssetTypeInfo* chosenInfo = AssetTypeRegistry::Get().FindByExtension(chosenExtension)) {
+                BeginCreateAsset(*chosenInfo);
+            }
         }
     }
 
@@ -1153,21 +1191,19 @@ void ContentBrowserPanel::Render() {
     bool deleteConfirmed = false;
     if (deleteConfirm.Render(deleteConfirmed)) {
         if (deleteConfirmed) {
-            if (!pendingDeleteIsFolder) {
-                std::string deleteExt = fs::path(pendingDeletePath).extension().string();
-                if (deleteExt == ".starasset" || deleteExt == ".startex" || deleteExt == ".staranim") {
-                    StarAsset deletedAsset;
-                    if (StarAsset::LoadFromFile(pendingDeletePath, deletedAsset) && !deletedAsset.vendoredSourcePath.empty()) {
-                        fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
-                        fs::path vendorDir = (contentRoot / deletedAsset.vendoredSourcePath).parent_path();
-                        std::error_code vendorEc;
-                        if (fs::exists(vendorDir, vendorEc)) {
-                            std::string vendorTrashError;
-                            OSTrash::MoveToTrash(vendorDir.string(), vendorTrashError);
-                        }
-                    }
+            fs::path deleteContentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
+            std::set<fs::path> vendorDirsToTrash;
+            if (pendingDeleteIsFolder) {
+                std::error_code walkEc;
+                for (fs::recursive_directory_iterator it(pendingDeletePath, fs::directory_options::skip_permission_denied, walkEc), end;
+                     !walkEc && it != end; it.increment(walkEc)) {
+                    std::error_code fileEc;
+                    if (it->is_regular_file(fileEc)) CollectVendorDirForAsset(it->path(), deleteContentRoot, vendorDirsToTrash);
                 }
+            } else {
+                CollectVendorDirForAsset(fs::path(pendingDeletePath), deleteContentRoot, vendorDirsToTrash);
             }
+            TrashVendorDirs(vendorDirsToTrash);
             std::string trashError;
             if (OSTrash::MoveToTrash(pendingDeletePath, trashError)) {
                 importStatus = pendingDeleteIsFolder ? "Moved folder to trash" : "Moved to trash";

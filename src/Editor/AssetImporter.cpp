@@ -1,6 +1,5 @@
 #include "AssetImporter.h"
 #include "Core/Project.h"
-#include "Core/AssetRegistry.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/SourceVendoring.h"
@@ -211,9 +210,7 @@ void ExtractAnimations(const fs::path& absoluteSrc, const fs::path& folder, cons
             target = UniqueTargetPath(folder, absoluteSrc.stem().string() + "_" + safeClipName, ".staranim");
         }
 
-        if (animAsset.SaveToFile(target.string())) {
-            AssetRegistry::Get().RegisterAsset(target.string(), animAsset.sourcePath, target.string());
-        } else {
+        if (!animAsset.SaveToFile(target.string())) {
             TraceLog(LOG_WARNING, "IMPORT: Failed to write animation asset \"%s\" to %s",
                      clipName.c_str(), target.string().c_str());
         }
@@ -276,7 +273,6 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                         texAsset.vendoredSourcePath =
                             SourceVendoring::Vendor(contentRoot.string(), texAsset.sourcePath, texTarget.stem().string());
                         if (texAsset.SaveToFile(texTarget.string())) {
-                            AssetRegistry::Get().RegisterAsset(texTarget.string(), texAsset.sourcePath, texTarget.string());
                             starMat.textureAssetPath = fs::relative(texTarget, contentRoot, ec).generic_string();
                         }
                     }
@@ -332,7 +328,6 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                             texAsset.vendoredSourcePath =
                                 SourceVendoring::Vendor(contentRoot.string(), texAsset.sourcePath, texTarget.stem().string());
                             if (texAsset.SaveToFile(texTarget.string())) {
-                                AssetRegistry::Get().RegisterAsset(texTarget.string(), texAsset.sourcePath, texTarget.string());
                                 starMat.textureAssetPath = fs::relative(texTarget, contentRoot, ec).generic_string();
                             }
                         }
@@ -471,7 +466,6 @@ std::string Cook(const std::string& srcPath, const std::string& assetType, const
     }
 
     if (asset.SaveToFile(target.string())) {
-        AssetRegistry::Get().RegisterAsset(target.string(), asset.sourcePath, target.string());
         return target.string();
     }
     return "";
