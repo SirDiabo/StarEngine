@@ -36,6 +36,7 @@ public:
     bool hadKeyboardFocus = false;
     std::string pendingSelectionKey;
     WidgetElement* pressOrigin = nullptr;
+    WidgetElement* lastHoveredElement = nullptr;
 
     WidgetComponent* owningComponent = nullptr;
 

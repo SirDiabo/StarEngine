@@ -159,6 +159,6 @@ void WidgetElement::OnDeselected() {
 }
 
 void WidgetElement::OnConfirmed() {
-    if (owningWidget) owningWidget->FireElementEvent(this, "Clicked");
+    if (owningWidget && !RaisesPointerEvents()) owningWidget->FireElementEvent(this, "Clicked");
     if (onActivated) onActivated();
 }

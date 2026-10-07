@@ -163,6 +163,16 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         ctx.content = session->GetData().behaviorContent;
         ctx.sharedLogPanel = logPanel;
         ctx.sharedViewportPanel = viewportPanel;
+        ctx.listElements = [this]() {
+            std::vector<std::pair<std::string, std::string>> elements;
+            std::function<void(WidgetElement*)> walk = [&](WidgetElement* element) {
+                if (!element) return;
+                elements.emplace_back(element->elementId, element->GetClassName());
+                for (WidgetElement* child : element->GetChildren()) walk(child);
+            };
+            walk(session->GetData().rootElement);
+            return elements;
+        };
 
         ProgrammingInterfacePanelSet panelSet = provider->buildWidgetEditorPanels(ctx);
         graphPanels = panelSet.panels;

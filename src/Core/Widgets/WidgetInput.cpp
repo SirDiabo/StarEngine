@@ -3,6 +3,7 @@
 #include "Widget.h"
 #include "WidgetElement.h"
 #include "BoxElement.h"
+#include "PointerEvents.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/InputKeyNames.h"
 #include <vector>
@@ -11,6 +12,15 @@
 #include <unordered_map>
 
 namespace {
+
+bool TreeContainsElement(const WidgetElement* root, const WidgetElement* target) {
+    if (!root || !target) return false;
+    if (root == target) return true;
+    for (const WidgetElement* child : root->GetChildren()) {
+        if (TreeContainsElement(child, target)) return true;
+    }
+    return false;
+}
 
 struct FocusState {
     const void* owner = nullptr;
@@ -492,8 +502,23 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
     if (editingText && !editingText->isEditing) editingText = nullptr;
     const bool editingNav = focused && !justFocused && editingText != nullptr;
     const int edgeRequest = editingNav ? editingText->ConsumeEdgeNavRequest() : 0;
-    if (mouseActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) widget->pressOrigin = hovered;
+    WidgetElement* previousPressOrigin = widget->pressOrigin;
+    WidgetElement* previousHovered = widget->lastHoveredElement;
+    const bool pressedThisFrame = mouseActive && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (pressedThisFrame) widget->pressOrigin = hovered;
     if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) widget->pressOrigin = nullptr;
+    widget->lastHoveredElement = hovered;
+
+    {
+        std::vector<PointerEvents::Event<WidgetElement>> pointerEvents;
+        PointerEvents::Compute<WidgetElement>(previousHovered, previousPressOrigin, hovered, pressedThisFrame,
+                                              IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+                                              [widget](WidgetElement* e) { return TreeContainsElement(widget->rootElement, e); },
+                                              pointerEvents);
+        for (const PointerEvents::Event<WidgetElement>& ev : pointerEvents) {
+            if (ev.element->RaisesPointerEvents()) widget->FireElementEvent(ev.element, ev.name);
+        }
+    }
     bool mouseHeld = hovered && widget->pressOrigin == hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
     if (mouseActive && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -556,8 +581,16 @@ void ProcessInput(Widget* widget, const std::string& device, float deltaTime, Ve
 
     if (keyActive && confirmRaw && !widget->confirmWasHeld && widget->currentSelection) {
         WidgetElement* target = widget->currentSelection;
-        if (target->onKeyActivated) target->onKeyActivated();
-        else target->OnConfirmed();
+        if (target->onKeyActivated) {
+            target->onKeyActivated();
+        } else {
+            target->OnConfirmed();
+            if (target->RaisesPointerEvents()) {
+                widget->FireElementEvent(target, "Pressed");
+                widget->FireElementEvent(target, "Released");
+                widget->FireElementEvent(target, "Clicked");
+            }
+        }
     }
     widget->confirmWasHeld = confirmRaw;
     widget->cancelWasHeld = cancelRaw;

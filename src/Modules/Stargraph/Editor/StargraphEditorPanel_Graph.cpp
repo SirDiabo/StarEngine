@@ -1,5 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/NodeRegistry.h"
+#include "Modules/Stargraph/ObjectEvents.h"
 #include "Core/InputKeyNames.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/ObjectKindRegistry.h"
@@ -30,7 +31,28 @@ static bool IsTimerFunctionNameNode(const std::string& type) {
            type == "Resume_Timer_By_Function_Name" || type == "Clear_Timer_By_Function_Name";
 }
 
+static const std::string kBoundElementEventPrefix = "Bound_Element_Event:";
+
 static std::string NodeMenuDisplayLabel(const std::string& rawType) {
+    if (rawType.rfind(kBoundElementEventPrefix, 0) == 0) {
+        std::string rest = rawType.substr(kBoundElementEventPrefix.size());
+        size_t separator = rest.find(':');
+        if (separator != std::string::npos) {
+            std::string classLabel = "Element";
+            if (const NodeTemplate* boundTemplate = NodeRegistry::Get().GetTemplate(rest.substr(0, separator))) {
+                classLabel = boundTemplate->boundElementClass;
+                const std::string suffix = "Element";
+                if (classLabel.size() > suffix.size() &&
+                    classLabel.compare(classLabel.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                    classLabel.resize(classLabel.size() - suffix.size());
+                }
+            }
+            return classLabel + " Event " + rest.substr(separator + 1);
+        }
+    }
+    if (const NodeTemplate* labelTemplate = NodeRegistry::Get().GetTemplate(rawType)) {
+        if (!labelTemplate->menuLabel.empty()) return labelTemplate->menuLabel;
+    }
     std::string display = rawType;
     if (display.rfind("Call_Custom_Event:", 0) == 0) {
         display = "Event " + display.substr(18);
@@ -1578,8 +1600,16 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
     std::string mappingName;
     std::string externalVarName;
     std::string externalCompName;
+    std::string boundElementId;
     bool isExternalSet = false;
-    if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
+    if (nodeType.rfind(kBoundElementEventPrefix, 0) == 0) {
+        std::string rest = nodeType.substr(kBoundElementEventPrefix.size());
+        size_t separator = rest.find(':');
+        if (separator != std::string::npos) {
+            boundElementId = rest.substr(separator + 1);
+            nodeType = rest.substr(0, separator);
+        }
+    } else if (nodeType.rfind("Call_Custom_Event:", 0) == 0) {
         eventName = nodeType.substr(18);
         nodeType = "Call_Custom_Event";
     } else if (nodeType.rfind("Call_Function:", 0) == 0) {
@@ -1600,6 +1630,14 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
         nodeType = "Get_Component";
     }
     Node* node = ActiveGraph().CreateNode(nodeType);
+    if (!boundElementId.empty()) {
+        for (Pin& p : node->inputs) {
+            if (p.name == "Element") { p.defaultValue = boundElementId; break; }
+        }
+        node->title = NodeMenuDisplayLabel(nodeTypeId);
+    } else if (const NodeTemplate* spawnedTemplate = NodeRegistry::Get().GetTemplate(nodeType)) {
+        if (!spawnedTemplate->menuLabel.empty()) node->title = spawnedTemplate->menuLabel;
+    }
     if (!mappingName.empty()) {
         for (Pin& p : node->inputs) {
             if (p.name == "Mapping") { p.defaultValue = mappingName; break; }
@@ -1787,6 +1825,15 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (t.type == "Input_Mapping") continue;
         if (t.type == "Function_Entry") continue;
         if (t.type == "Return") continue;
+        if (!t.boundElementClass.empty()) continue;
+        if (t.type == "Get_Parent_Actor_From_Widget" && !listWidgetElements) continue;
+        if (!t.boundComponentType.empty()) {
+            bool graphHasComponent = false;
+            for (const ComponentDecl& comp : graph.GetComponents()) {
+                if (comp.componentType == t.boundComponentType) { graphHasComponent = true; break; }
+            }
+            if (!graphHasComponent) continue;
+        }
 
         if (!searchLower.empty()) {
             std::string typeLower = NodeMenuDisplayLabel(t.type);
@@ -1877,6 +1924,21 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             if (alreadyListed) continue;
 
             entries.push_back({"Input", nodeId});
+        }
+    }
+
+    if (listWidgetElements && filterCompatibleWithPin == -1) {
+        for (const auto& element : listWidgetElements()) {
+            if (!ObjectEvents::GetWidgetElementEvents(element.second)) continue;
+
+            std::string nodeId = kBoundElementEventPrefix + ObjectEvents::WidgetElementEventNodeType(element.second) + ":" + element.first;
+            std::string typeLower = NodeMenuDisplayLabel(nodeId);
+            for (char& c : typeLower) c = (char)tolower(c);
+            if (!searchLower.empty() && typeLower.find(searchLower) == std::string::npos) continue;
+
+            bool alreadyListed = false;
+            for (const auto& e : entries) if (e.second == nodeId) { alreadyListed = true; break; }
+            if (!alreadyListed) entries.push_back({"Widget Events", nodeId});
         }
     }
 

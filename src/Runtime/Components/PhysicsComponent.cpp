@@ -4,10 +4,12 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/ExecutionContext.h"
 #include "Modules/Stargraph/ObjectPinRef.h"
+#include "Modules/Stargraph/ObjectEvents.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 #include "raymath.h"
 #include <cmath>
+#include <cstdio>
 #include <string>
 
 namespace {
@@ -193,12 +195,19 @@ void PhysicsComponent::Update(float deltaTime) {
     params.ignoreActor = actor;
     CollisionTrace::ScopedBatch batch;
     const bool wasGrounded = grounded;
+    const float preMoveFallSpeed = velocity.y < 0.0f ? -velocity.y : 0.0f;
 
     Vector3 total = Depenetrate(shape, params, dt);
     total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
     total = Plus(total, UpdateGround(shape, params, wasGrounded, dt));
 
     actor->position = Plus(actor->position, total);
+
+    if (!wasGrounded && grounded) {
+        char fallSpeedBuf[32];
+        snprintf(fallSpeedBuf, sizeof(fallSpeedBuf), "%g", preMoveFallSpeed);
+        ObjectEvents::RaiseComponentEvent(this, "Landed", { { "Fall Speed", fallSpeedBuf } });
+    }
 }
 
 namespace {
@@ -258,6 +267,8 @@ ComponentRegistrar registrar_PhysicsComponent({
 }
 
 void RegisterPhysicsComponentNodes() {
+    ObjectEvents::RegisterComponentEvent("PhysicsComponent", { "Landed", { { "Fall Speed", PinType::Float } } });
+
     NodeTemplate setVelocity;
     setVelocity.type = "Set_Velocity";
     setVelocity.category = "Physics";

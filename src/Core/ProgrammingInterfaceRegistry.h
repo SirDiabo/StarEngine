@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <utility>
 
 class Panel;
 struct DockNode;
@@ -22,6 +23,7 @@ struct ProgrammingInterfaceContext {
     IBehaviorContent* content = nullptr;
     LogPanel* sharedLogPanel = nullptr;
     ViewportPanel* sharedViewportPanel = nullptr;
+    std::function<std::vector<std::pair<std::string, std::string>>()> listElements;
     std::function<void()> onContentDirtied;
     std::function<void()> onSaveRequested;
 };

@@ -62,6 +62,8 @@ public:
 
     virtual WidgetElement* GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const { return nullptr; }
 
+    virtual bool RaisesPointerEvents() const { return false; }
+
     virtual void OnSelected();
     virtual void OnDeselected();
     virtual void OnConfirmed();

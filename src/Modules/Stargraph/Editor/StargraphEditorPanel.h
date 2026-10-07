@@ -52,6 +52,7 @@ public:
     const std::string& GetFilePath() const { return filePath; }
     Stargraph& GetGraph() { return graph; }
     void SetViewportPanel(ViewportPanel* viewport) { viewportPanel = viewport; }
+    void SetWidgetElementLister(std::function<std::vector<std::pair<std::string, std::string>>()> lister) { listWidgetElements = std::move(lister); }
     void BeginElementDrag(const std::string& elementName, const std::string& elementClass) {
         elementDragName = elementName;
         elementDragClass = elementClass;
@@ -243,6 +244,7 @@ private:
     AssetPickerPopup actorClassPicker;
     int actorClassPickerPinId = 0;
     ViewportPanel* viewportPanel = nullptr;
+    std::function<std::vector<std::pair<std::string, std::string>>()> listWidgetElements;
     std::string activeDeviceFieldKey;
     std::string lastDetailsSelectionKey;
 

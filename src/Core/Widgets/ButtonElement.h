@@ -6,6 +6,7 @@ public:
     ButtonElement() { selectable = true; }
 
     const char* GetClassName() const override { return "ButtonElement"; }
+    bool RaisesPointerEvents() const override { return true; }
     std::string GetObjectKind() const override { return "ButtonElement"; }
 
     Color defaultColor{ 70, 70, 75, 255 };

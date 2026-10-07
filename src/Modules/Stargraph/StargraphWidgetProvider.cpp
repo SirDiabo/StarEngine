@@ -42,6 +42,7 @@ void RegisterStargraphWidgetProvider() {
         auto* session = new StargraphEditorPanel();
         session->Initialize();
         session->SetViewportPanel(ctx.sharedViewportPanel);
+        session->SetWidgetElementLister(ctx.listElements);
         session->OpenEmbedded(content->graph, ctx.assetKind);
 
         auto* stargraphPanel = new StargraphPanel();

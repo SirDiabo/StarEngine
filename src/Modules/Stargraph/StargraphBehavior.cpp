@@ -1,5 +1,9 @@
 #include "StargraphBehavior.h"
 #include "GraphExecutor.h"
+#include "NodeRegistry.h"
+#include "ObjectEvents.h"
+#include "Runtime/Actor.h"
+#include "Runtime/Components/Component.h"
 #include "TimerManager.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetElement.h"
@@ -83,11 +87,41 @@ void StargraphBehavior::OnElementEvent(Widget* owner, WidgetElement* target, con
     ExecutionContext ctx;
     ctx.widget = owner;
     ctx.deltaTime = 0.0f;
+    ctx.rootGraph = &graph;
+    const std::string className = target->GetClassName();
+    const std::string& objectName = target->GetName();
+    const bool hasObjectName = !objectName.empty() && objectName != "Object";
     for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
-        if (node.type != "Widget_Element_Event") continue;
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+        if (!tmpl) continue;
+        const bool isLegacy = node.type == "Widget_Element_Event";
+        if (!isLegacy && tmpl->boundElementClass != className) continue;
         std::string elementName;
         for (const Pin& p : node.inputs) if (p.name == "Element") elementName = p.defaultValue;
-        if (elementName != target->GetName()) continue;
+        if (elementName.empty()) continue;
+        if (elementName != target->elementId && !(hasObjectName && elementName == objectName)) continue;
         GraphExecutor::RunFromPin(graph, &node, ctx, eventName);
+    }
+}
+
+void StargraphBehavior::OnComponentEvent(Actor* owner, Component* component, const std::string& eventName,
+                                          const std::vector<std::pair<std::string, std::string>>& params) {
+    if (!owner || !component) return;
+    ExecutionContext ctx;
+    ctx.actor = owner;
+    ctx.deltaTime = 0.0f;
+    ctx.rootGraph = &graph;
+    const std::string componentType = component->GetClassName();
+    for (Node& node : const_cast<std::deque<Node>&>(graph.GetNodes())) {
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+        if (!tmpl || tmpl->boundComponentEvent != eventName || tmpl->boundComponentType != componentType) continue;
+        GraphExecutor::PropagateDataPins(graph, &node, ctx);
+        if (!ObjectEvents::NodeTargetsComponent(node, owner, component, componentType, ctx)) continue;
+        for (const auto& param : params) {
+            for (Pin& p : node.outputs) {
+                if (p.name == param.first) { p.defaultValue = param.second; break; }
+            }
+        }
+        GraphExecutor::RunFromPin(graph, &node, ctx, "Out");
     }
 }

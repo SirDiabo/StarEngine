@@ -1,6 +1,7 @@
 #include "Nodes_Widgets.h"
 #include "NodeRegistry.h"
 #include "ObjectPinRef.h"
+#include "ObjectEvents.h"
 #include "ExecutionContext.h"
 #include "Stargraph.h"
 #include "Core/Widgets/WidgetElement.h"
@@ -94,7 +95,7 @@ void RegisterWidgetNodes() {
     getParentActor.type = "Get_Parent_Actor_From_Widget";
     getParentActor.category = "Widgets";
     getParentActor.moduleName = "Stargraph";
-    getParentActor.hideFromContextMenu = true;
+    getParentActor.menuLabel = "Get Parent Actor";
     getParentActor.createPins = [](Node* node) {
         node->outputs.push_back({"Actor", PinType::Object, false, true, 0, "", false, "Actor"});
     };
@@ -113,6 +114,7 @@ void RegisterWidgetNodes() {
     elementEvent.category = "Widgets";
     elementEvent.moduleName = "Stargraph";
     elementEvent.isEvent = true;
+    elementEvent.hideFromContextMenu = true;
     elementEvent.createPins = [](Node* node) {
         node->inputs.push_back({"Element", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Clicked", PinType::Exec, false, true});
@@ -152,4 +154,41 @@ void RegisterWidgetNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     NodeRegistry::Get().RegisterNode(widgetDestruct);
+
+    ObjectEvents::RegisterWidgetElementEvents("ButtonElement",
+        { "Clicked", "Pressed", "Released", "Hovered", "Unhovered", "Selected", "Deselected" });
+
+    NodeTemplate setWidget;
+    setWidget.type = "Set_Widget";
+    setWidget.category = "Widgets";
+    setWidget.moduleName = "Stargraph";
+    setWidget.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, "WidgetComponent"});
+        node->inputs.push_back({"Widget Asset", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setWidget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string componentRef;
+        std::string assetPath;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Component") componentRef = p.defaultValue;
+            else if (p.name == "Widget Asset") assetPath = p.defaultValue;
+        }
+
+        WidgetComponent* target = nullptr;
+        if (!componentRef.empty()) {
+            target = ObjectPinRef::ResolveAs<WidgetComponent>(node, componentRef, "WidgetComponent", ctx);
+            if (!target && ctx.actor) target = dynamic_cast<WidgetComponent*>(ctx.actor->FindComponentByName(componentRef));
+        }
+        if (!target && ctx.actor) {
+            const std::vector<Component*>& all = ctx.actor->GetComponents();
+            for (auto it = all.rbegin(); it != all.rend() && !target; ++it) {
+                target = dynamic_cast<WidgetComponent*>(*it);
+            }
+        }
+        if (!target) return;
+        target->widgetAssetPath = assetPath;
+    };
+    NodeRegistry::Get().RegisterNode(setWidget);
 }

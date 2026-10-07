@@ -10,6 +10,10 @@ struct NodeTemplate {
     std::string moduleName;
     bool isEvent = false;
     bool hideFromContextMenu = false;
+    std::string menuLabel;
+    std::string boundComponentType;
+    std::string boundComponentEvent;
+    std::string boundElementClass;
     std::function<void(Node*)> createPins;
     std::function<void(Node&, Stargraph&, ExecutionContext&)> execute;
 };
