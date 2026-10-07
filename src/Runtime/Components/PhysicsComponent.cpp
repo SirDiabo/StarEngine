@@ -143,7 +143,7 @@ Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const Colli
 
     float cosSlope = cosf(maxSlopeAngle * DEG2RAD);
     if (hit.normal.y < cosSlope) return applied;
-    if (Dot3(velocity, hit.normal) > 1.0f) return applied;
+    if (velocity.y > 1.0f && Dot3(velocity, hit.normal) > 1.0f) return applied;
 
     grounded = true;
     groundNormal = hit.normal;
@@ -196,6 +196,7 @@ void PhysicsComponent::Update(float deltaTime) {
     CollisionTrace::ScopedBatch batch;
     const bool wasGrounded = grounded;
     const float preMoveFallSpeed = velocity.y < 0.0f ? -velocity.y : 0.0f;
+    const Vector3 preMoveVelocity = velocity;
 
     Vector3 total = Depenetrate(shape, params, dt);
     total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
@@ -204,6 +205,7 @@ void PhysicsComponent::Update(float deltaTime) {
     actor->position = Plus(actor->position, total);
 
     if (!wasGrounded && grounded) {
+        velocity = Vector3{ preMoveVelocity.x, 0.0f, preMoveVelocity.z };
         char fallSpeedBuf[32];
         snprintf(fallSpeedBuf, sizeof(fallSpeedBuf), "%g", preMoveFallSpeed);
         ObjectEvents::RaiseComponentEvent(this, "Landed", { { "Fall Speed", fallSpeedBuf } });
