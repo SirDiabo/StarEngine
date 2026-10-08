@@ -138,7 +138,10 @@ void ProfilerPanel::Render() {
         return;
     }
 
-    DrawToolbar({ inner.x, inner.y, inner.width, kToolbarHeight });
+    {
+        PROFILE_SCOPE("Toolbar");
+        DrawToolbar({ inner.x, inner.y, inner.width, kToolbarHeight });
+    }
 
     const Profiler::Frame* frame = DisplayFrame();
     DrawStats({ inner.x, inner.y + kToolbarHeight + 3.0f, inner.width, kStatsHeight }, frame);
@@ -156,7 +159,10 @@ void ProfilerPanel::Render() {
     ProfilerModel::BuildOptions options;
     options.laneFilter = laneFilter;
     options.expanded = &expanded;
-    ProfilerModel::BuildRows(*frame, options, rows);
+    {
+        PROFILE_SCOPE("Build Rows");
+        ProfilerModel::BuildRows(*frame, options, rows);
+    }
 
     float graphH = std::max(90.0f, bodyH * 0.40f);
     if (graphH > bodyH - 60.0f) graphH = std::max(40.0f, bodyH - 60.0f);
@@ -164,9 +170,18 @@ void ProfilerPanel::Render() {
     Rectangle tableArea = { inner.x, bodyY + graphH + 6.0f, inner.width, bodyH - graphH - 6.0f };
 
     Tooltip tooltip;
-    DrawGraph(graphArea, rows, tooltip);
-    DrawTable(tableArea, rows);
-    DrawTooltip(tooltip);
+    {
+        PROFILE_SCOPE("Graph");
+        DrawGraph(graphArea, rows, tooltip);
+    }
+    {
+        PROFILE_SCOPE("Table");
+        DrawTable(tableArea, rows);
+    }
+    {
+        PROFILE_SCOPE("Tooltip");
+        DrawTooltip(tooltip);
+    }
 }
 
 void ProfilerPanel::DrawToolbar(Rectangle area) {
@@ -321,19 +336,20 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
     }
 
     const float step = plot.width / (float)(window - 1);
-    BeginScissorMode((int)plot.x, (int)plot.y - 2, (int)plot.width + 1, (int)plot.height + 4);
+    linePoints.resize(window);
     for (size_t li = 0; li < lineKeys.size(); li++) {
         Color color = LineColor(lineKeys[li]);
-        float thickness = lineKeys[li] == ProfilerModel::kKeyWork ? 2.0f : 1.5f;
-        Vector2 previous = { 0, 0 };
         for (size_t i = 0; i < window; i++) {
             float x = plot.x + step * (float)i;
             float y = plot.y + plot.height - std::min(1.0f, series[li][i] / yMax) * plot.height;
-            if (i > 0) DrawLineEx(previous, { x, y }, thickness, color);
-            previous = { x, y };
+            linePoints[i] = { x, y };
+        }
+        DrawLineStrip(linePoints.data(), (int)window, color);
+        if (lineKeys[li] == ProfilerModel::kKeyWork) {
+            for (Vector2& point : linePoints) point.y += 1.0f;
+            DrawLineStrip(linePoints.data(), (int)window, color);
         }
     }
-    EndScissorMode();
 
     if (frozen) {
         for (size_t age = 0; age < window; age++) {
@@ -510,10 +526,7 @@ void ProfilerPanel::DrawTable(Rectangle area, const std::vector<ProfilerModel::R
 
         Color textColor = (row.isWait || row.key == ProfilerModel::kKeyUnaccounted) ? theme.textSecondary : theme.textPrimary;
         if (row.synthetic && !row.isWait && row.key != ProfilerModel::kKeyUnaccounted) textColor = theme.accent;
-        BeginScissorMode((int)body.x, (int)body.y, (int)std::max(1.0f, nameRight - body.x), (int)body.height);
-        DrawText(row.name.c_str(), (int)nameX, (int)(y + 3), 10, textColor);
-        EndScissorMode();
-        BeginScissorMode((int)body.x, (int)body.y, (int)body.width, (int)body.height);
+        DrawText(ClipText(row.name, nameRight - nameX).c_str(), (int)nameX, (int)(y + 3), 10, textColor);
 
         DrawRightAligned(Duration(row.totalNs), colSelf - 4.0f, y + 3, textColor);
         DrawRightAligned(row.synthetic ? std::string("-") : Duration(row.selfNs), colPct - 4.0f, y + 3, theme.textSecondary);

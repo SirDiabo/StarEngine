@@ -55,6 +55,8 @@ private:
     bool initializedExpansion = false;
     ProfilerModel::ColorAllocator colors{ 12 };
 
+    std::vector<Vector2> linePoints;
+
     Widget* chrome = nullptr;
     TextElement* lineCountField = nullptr;
 };
