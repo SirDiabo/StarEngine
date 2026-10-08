@@ -1,0 +1,314 @@
+#include "Profiler.h"
+#include <chrono>
+#include <cstdio>
+#include <mutex>
+#include <thread>
+
+namespace Profiler {
+
+namespace Internal {
+bool enabled = false;
+int detail = DetailStandard;
+}
+
+namespace {
+
+struct OpenScope {
+    uint64_t key;
+    int32_t node;
+    int64_t start;
+    int64_t childNs;
+};
+
+constexpr size_t kRingSize = kHistoryFrames + 1;
+
+std::mutex g_internMutex;
+std::unordered_map<std::string, uint32_t> g_internIds;
+std::vector<std::string> g_internNames = { std::string() };
+
+std::vector<Frame> g_ring;
+size_t g_head = 0;
+size_t g_count = 0;
+Frame* g_current = nullptr;
+std::vector<OpenScope> g_stack;
+std::unordered_map<uint64_t, int32_t> g_nodeIndex;
+std::unordered_map<uint64_t, Track> g_tracks;
+
+std::thread::id g_mainThread;
+bool g_mainThreadSet = false;
+uint64_t g_frameCounter = 0;
+uint64_t g_lastRequestFrame = 0;
+bool g_requested = false;
+bool g_forced = false;
+int64_t g_frameStartNs = 0;
+double g_overheadNs = -1.0;
+
+uint64_t Mix(uint64_t x) {
+    x ^= x >> 30;
+    x *= 0xBF58476D1CE4E5B9ull;
+    x ^= x >> 27;
+    x *= 0x94D049BB133111EBull;
+    x ^= x >> 31;
+    return x;
+}
+
+void EnsureRing() {
+    if (g_ring.empty()) g_ring.resize(kRingSize);
+}
+
+void FinalizeFrame(int64_t nowNs) {
+    Frame& frame = *g_current;
+    frame.wallNs = nowNs - g_frameStartNs;
+
+    int64_t waitNs = 0;
+    uint64_t calls = 0;
+    for (const Node& node : frame.nodes) {
+        calls += node.calls;
+        if (node.parent < 0 && (node.flags & FlagWait)) waitNs += node.totalNs;
+    }
+    frame.waitNs = waitNs;
+    frame.workNs = frame.wallNs - waitNs;
+    frame.totalCalls = calls;
+
+    const size_t slot = (size_t)(frame.index % kHistoryFrames);
+    for (const Node& node : frame.nodes) {
+        auto it = g_tracks.find(node.key);
+        if (it == g_tracks.end()) {
+            Track track;
+            track.key = node.key;
+            track.nameId = node.nameId;
+            track.lane = node.lane;
+            track.flags = node.flags;
+            track.totalUs.assign(kHistoryFrames, 0.0f);
+            track.selfUs.assign(kHistoryFrames, 0.0f);
+            track.stamp.assign(kHistoryFrames, 0u);
+            it = g_tracks.emplace(node.key, std::move(track)).first;
+        }
+        Track& track = it->second;
+        if (node.parent >= 0) {
+            const Node& parentNode = frame.nodes[(size_t)node.parent];
+            track.parentKey = parentNode.key;
+            auto parentIt = g_tracks.find(parentNode.key);
+            track.depth = parentIt != g_tracks.end() ? parentIt->second.depth + 1 : 1;
+        } else {
+            track.parentKey = 0;
+            track.depth = 0;
+        }
+        track.totalUs[slot] = (float)((double)node.totalNs / 1000.0);
+        track.selfUs[slot] = (float)((double)node.selfNs / 1000.0);
+        track.stamp[slot] = (uint32_t)frame.index;
+        track.lastSeenFrame = frame.index;
+    }
+
+    g_head = (g_head + 1) % kRingSize;
+    if (g_count < kHistoryFrames) g_count++;
+
+    if (frame.index % 120 == 0) {
+        for (auto it = g_tracks.begin(); it != g_tracks.end();) {
+            if (it->second.lastSeenFrame + kHistoryFrames < frame.index) it = g_tracks.erase(it);
+            else ++it;
+        }
+    }
+
+    g_current = nullptr;
+}
+
+void Calibrate() {
+    const uint32_t id = Intern("Profiler Calibration");
+    Frame scratch;
+    Frame* savedCurrent = g_current;
+    g_current = &scratch;
+    g_stack.clear();
+    g_nodeIndex.clear();
+    const int kIterations = 4000;
+    const int64_t start = NowNs();
+    for (int i = 0; i < kIterations; i++) {
+        Internal::Begin(id, Lane::CPU, FlagNone);
+        Internal::End();
+    }
+    const int64_t elapsed = NowNs() - start;
+    g_overheadNs = (double)elapsed / (double)kIterations;
+    g_stack.clear();
+    g_nodeIndex.clear();
+    g_current = savedCurrent;
+}
+
+}
+
+bool Track::Sample(uint64_t frameIndex, float& outTotalUs, float& outSelfUs) const {
+    const size_t slot = (size_t)(frameIndex % kHistoryFrames);
+    if (stamp.empty() || stamp[slot] != (uint32_t)frameIndex) {
+        outTotalUs = 0.0f;
+        outSelfUs = 0.0f;
+        return false;
+    }
+    outTotalUs = totalUs[slot];
+    outSelfUs = selfUs[slot];
+    return true;
+}
+
+int64_t NowNs() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+uint32_t Intern(const std::string& name) {
+    std::lock_guard<std::mutex> lock(g_internMutex);
+    auto it = g_internIds.find(name);
+    if (it != g_internIds.end()) return it->second;
+    uint32_t id = (uint32_t)g_internNames.size();
+    g_internNames.push_back(name);
+    g_internIds.emplace(name, id);
+    return id;
+}
+
+uint32_t Intern(const char* name) {
+    return Intern(std::string(name ? name : ""));
+}
+
+const std::string& NameOf(uint32_t id) {
+    std::lock_guard<std::mutex> lock(g_internMutex);
+    static const std::string unknown = "?";
+    if (id >= g_internNames.size()) return unknown;
+    return g_internNames[id];
+}
+
+uint64_t ChildKey(uint64_t parentKey, uint32_t nameId, Lane lane) {
+    return Mix(parentKey ^ (Mix((uint64_t)nameId) + ((uint64_t)lane << 40) + 0x9E3779B97F4A7C15ull));
+}
+
+namespace Internal {
+
+bool Begin(uint32_t nameId, Lane lane, uint8_t flags) {
+    if (!g_current) return false;
+    if (std::this_thread::get_id() != g_mainThread) return false;
+
+    const uint64_t parentKey = g_stack.empty() ? kRootKey : g_stack.back().key;
+    const uint64_t key = ChildKey(parentKey, nameId, lane);
+
+    int32_t nodeIndex;
+    auto it = g_nodeIndex.find(key);
+    if (it == g_nodeIndex.end()) {
+        Node node;
+        node.key = key;
+        node.nameId = nameId;
+        node.parent = g_stack.empty() ? -1 : g_stack.back().node;
+        node.lane = lane;
+        node.flags = flags;
+        nodeIndex = (int32_t)g_current->nodes.size();
+        g_current->nodes.push_back(node);
+        g_nodeIndex.emplace(key, nodeIndex);
+    } else {
+        nodeIndex = it->second;
+    }
+
+    g_stack.push_back({ key, nodeIndex, 0, 0 });
+    g_stack.back().start = NowNs();
+    return true;
+}
+
+void End() {
+    const int64_t end = NowNs();
+    if (g_stack.empty() || !g_current) return;
+    OpenScope open = g_stack.back();
+    g_stack.pop_back();
+    const int64_t elapsed = end - open.start;
+
+    Node& node = g_current->nodes[(size_t)open.node];
+    node.totalNs += elapsed;
+    node.selfNs += elapsed - open.childNs;
+    node.calls++;
+
+    if (!g_stack.empty()) g_stack.back().childNs += elapsed;
+}
+
+}
+
+void RequestRecording() {
+    g_requested = true;
+    g_lastRequestFrame = g_frameCounter;
+}
+
+void SetForcedRecording(bool forced) { g_forced = forced; }
+bool IsForcedRecording() { return g_forced; }
+void SetDetail(int level) { Internal::detail = level < 0 ? 0 : (level > DetailVerbose ? DetailVerbose : level); }
+int GetDetail() { return Internal::detail; }
+
+void BeginFrame() {
+    EnsureRing();
+    const int64_t now = NowNs();
+    if (!g_mainThreadSet) {
+        g_mainThread = std::this_thread::get_id();
+        g_mainThreadSet = true;
+    }
+
+    if (g_current) {
+        g_stack.clear();
+        FinalizeFrame(now);
+    }
+
+    g_frameCounter++;
+    const bool shouldRecord = g_forced || (g_requested && g_frameCounter - g_lastRequestFrame <= 2);
+    Internal::enabled = shouldRecord;
+    if (!shouldRecord) return;
+
+    if (g_overheadNs < 0.0) Calibrate();
+
+    g_current = &g_ring[g_head];
+    g_current->nodes.clear();
+    g_current->index = g_frameCounter;
+    g_current->wallNs = 0;
+    g_current->workNs = 0;
+    g_current->waitNs = 0;
+    g_current->totalCalls = 0;
+    g_stack.clear();
+    g_nodeIndex.clear();
+    g_frameStartNs = NowNs();
+}
+
+void Clear() {
+    g_current = nullptr;
+    g_stack.clear();
+    g_nodeIndex.clear();
+    g_tracks.clear();
+    g_head = 0;
+    g_count = 0;
+}
+
+size_t FrameCount() { return g_count; }
+
+const Frame* FrameAt(size_t ageFromNewest) {
+    if (ageFromNewest >= g_count || g_ring.empty()) return nullptr;
+    return &g_ring[(g_head + kRingSize - 1 - ageFromNewest) % kRingSize];
+}
+
+const Track* FindTrack(uint64_t key) {
+    auto it = g_tracks.find(key);
+    return it != g_tracks.end() ? &it->second : nullptr;
+}
+
+const std::unordered_map<uint64_t, Track>& Tracks() { return g_tracks; }
+
+double OverheadNsPerScope() { return g_overheadNs < 0.0 ? 0.0 : g_overheadNs; }
+
+std::string FormatDuration(int64_t ns) {
+    if (ns < 0) return "-" + FormatDuration(-ns);
+    char buf[48];
+    if (ns < 1000) {
+        snprintf(buf, sizeof(buf), "%lldns", (long long)ns);
+    } else if (ns < 999500) {
+        double us = (double)ns / 1000.0;
+        if (us >= 100.0) snprintf(buf, sizeof(buf), "%.0f\xC2\xB5s", us);
+        else if (us >= 10.0) snprintf(buf, sizeof(buf), "%.1f\xC2\xB5s", us);
+        else snprintf(buf, sizeof(buf), "%.2f\xC2\xB5s", us);
+    } else if (ns < 1000000000) {
+        double ms = (double)ns / 1000000.0;
+        if (ms >= 99.995) snprintf(buf, sizeof(buf), "%.1fms", ms);
+        else snprintf(buf, sizeof(buf), "%.2fms", ms);
+    } else {
+        snprintf(buf, sizeof(buf), "%.2fs", (double)ns / 1000000000.0);
+    }
+    return buf;
+}
+
+}

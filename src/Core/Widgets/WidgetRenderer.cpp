@@ -5,6 +5,8 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/WidgetComponent.h"
+#include "Runtime/ProfilerLabels.h"
+#include "Core/Profiler.h"
 #include "raymath.h"
 
 namespace WidgetRenderer {
@@ -17,7 +19,9 @@ void DrawScreenSpaceWidgets(Rectangle targetRect, bool nativeResolutionOnly, flo
             if (widgetComponent->renderSpace != WidgetRenderSpace::Screen) continue;
             if (widgetComponent->forceNativeResolution != nativeResolutionOnly) continue;
             Widget* widget = widgetComponent->GetWidget();
-            if (widget) widget->Draw(targetRect, bufferScale);
+            if (!widget) continue;
+            PROFILE_SCOPE_DYN("Draw: " + ProfilerLabels::ForActor(*actor) + " / " + ProfilerLabels::ForComponent(*widgetComponent));
+            widget->Draw(targetRect, bufferScale);
         }
     }
 }
@@ -31,6 +35,7 @@ void TickScreenSpaceWidgets(float deltaTime, Rectangle targetRect, Vector2 local
             if (widgetComponent->forceNativeResolution != nativeResolutionOnly) continue;
             Widget* widget = widgetComponent->GetWidget();
             if (!widget) continue;
+            PROFILE_SCOPE_DYN("Tick: " + ProfilerLabels::ForActor(*actor) + " / " + ProfilerLabels::ForComponent(*widgetComponent));
             widget->Tick(deltaTime, targetRect, bufferScale);
             WidgetInput::ProcessInput(widget, widgetComponent->inputDevice, deltaTime, localMousePos, bufferScale);
         }
@@ -59,6 +64,7 @@ void PrepareWorldSpaceWidgets() {
 
             RenderTexture2D& rt = widgetComponent->GetOrCreateWorldTexture(kWorldTextureSize, kWorldTextureSize);
 
+            PROFILE_SCOPE_DYN("Render To Texture: " + ProfilerLabels::ForActor(*actor) + " / " + ProfilerLabels::ForComponent(*widgetComponent));
             BeginTextureMode(rt);
             ClearBackground(BLANK);
             widget->Tick(GetFrameTime(), {0, 0, (float)kWorldTextureSize, (float)kWorldTextureSize}, 1.0f);

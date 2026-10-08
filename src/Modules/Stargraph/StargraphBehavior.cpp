@@ -2,6 +2,7 @@
 #include "GraphExecutor.h"
 #include "NodeRegistry.h"
 #include "ObjectEvents.h"
+#include "Core/Profiler.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/Component.h"
 #include "TimerManager.h"
@@ -100,6 +101,7 @@ void StargraphBehavior::OnElementEvent(Widget* owner, WidgetElement* target, con
         for (const Pin& p : node.inputs) if (p.name == "Element") elementName = p.defaultValue;
         if (elementName.empty()) continue;
         if (elementName != target->elementId && !(hasObjectName && elementName == objectName)) continue;
+        PROFILE_SCOPE_DYN("Widget Event: " + target->elementId + " " + eventName);
         GraphExecutor::RunFromPin(graph, &node, ctx, eventName);
     }
 }
@@ -122,6 +124,7 @@ void StargraphBehavior::OnComponentEvent(Actor* owner, Component* component, con
                 if (p.name == param.first) { p.defaultValue = param.second; break; }
             }
         }
+        PROFILE_SCOPE_DYN("Component Event: " + componentType + " " + eventName);
         GraphExecutor::RunFromPin(graph, &node, ctx, "Out");
     }
 }

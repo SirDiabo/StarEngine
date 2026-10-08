@@ -5,6 +5,7 @@
 #include "Modules/Stargraph/ExecutionContext.h"
 #include "Modules/Stargraph/ObjectPinRef.h"
 #include "Modules/Stargraph/ObjectEvents.h"
+#include "Core/Profiler.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 #include "raymath.h"
@@ -198,9 +199,19 @@ void PhysicsComponent::Update(float deltaTime) {
     const float preMoveFallSpeed = velocity.y < 0.0f ? -velocity.y : 0.0f;
     const Vector3 preMoveVelocity = velocity;
 
-    Vector3 total = Depenetrate(shape, params, dt);
-    total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
-    total = Plus(total, UpdateGround(shape, params, wasGrounded, dt));
+    Vector3 total;
+    {
+        PROFILE_SCOPE("Depenetrate");
+        total = Depenetrate(shape, params, dt);
+    }
+    {
+        PROFILE_SCOPE("Move And Slide");
+        total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
+    }
+    {
+        PROFILE_SCOPE("Update Ground");
+        total = Plus(total, UpdateGround(shape, params, wasGrounded, dt));
+    }
 
     actor->position = Plus(actor->position, total);
 

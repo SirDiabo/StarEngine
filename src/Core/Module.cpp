@@ -1,4 +1,5 @@
 #include "Module.h"
+#include "Profiler.h"
 #include "Project.h"
 #include "EngineRoot.h"
 #include <filesystem>
@@ -33,7 +34,10 @@ void ModuleManager::ShutdownAll() {
 
 void ModuleManager::UpdateAll(float deltaTime) {
     for (auto* module : modules) {
-        if (module->IsEnabled()) module->Update(deltaTime);
+        if (module->IsEnabled()) {
+            PROFILE_SCOPE_DYN("Module: " + module->GetName());
+            module->Update(deltaTime);
+        }
     }
 }
 

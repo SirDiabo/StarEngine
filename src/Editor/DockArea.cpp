@@ -1,6 +1,7 @@
 #include "DockArea.h"
 #include "raylib.h"
 #include "UITheme.h"
+#include "Core/Profiler.h"
 #include "Core/SafeParse.h"
 #include "Core/Widgets/WidgetInput.h"
 #include <algorithm>
@@ -66,7 +67,10 @@ void DockArea::LayoutNode(DockNode* node, Rectangle area) {
 void DockArea::RenderPanel(Panel* panel) {
     const void* previousScope = WidgetInput::GetInputScope();
     WidgetInput::SetInputScope(panel);
-    panel->Render();
+    {
+        PROFILE_SCOPE_DYN(std::string("Panel: ") + panel->GetName());
+        panel->Render();
+    }
     WidgetInput::SetInputScope(previousScope);
 }
 
@@ -667,6 +671,9 @@ void DockArea::LoadLayout(const std::unordered_map<std::string, std::string>& in
     floating.clear();
     auto loaded = LoadNode(in, prefix);
     if (loaded) root = std::move(loaded);
+    for (Panel* panel : panels) {
+        if (!FindNodeContaining(panel->GetName())) panel->SetVisible(false);
+    }
 }
 
 void DockArea::SaveLayoutTree(const DockNode* node,

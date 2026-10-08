@@ -10,6 +10,7 @@ class OutlinerPanel;
 class ContentBrowserPanel;
 class LogPanel;
 class ModuleBrowserPanel;
+class ProfilerPanel;
 class PlaceActorsPanel;
 class MenuBar;
 
@@ -52,5 +53,6 @@ private:
     ContentBrowserPanel* contentPanel   = nullptr;
     LogPanel*            logPanel       = nullptr;
     ModuleBrowserPanel*  modulePanel    = nullptr;
+    ProfilerPanel*       profilerPanel  = nullptr;
     PlaceActorsPanel*    placeActorsPanel = nullptr;
 };

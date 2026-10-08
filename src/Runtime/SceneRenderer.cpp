@@ -1,4 +1,6 @@
 #include "Core/RotationMath.h"
+#include "Core/Profiler.h"
+#include "ProfilerLabels.h"
 #include "SceneRenderer.h"
 #include "World.h"
 #include "Actor.h"
@@ -38,10 +40,12 @@ void SceneRenderer::DrawWorldActors(Camera3D camera) {
     for (const auto& actor : World::Get().GetActors()) {
         for (Component* comp : actor->GetComponents()) {
             if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
+                PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
                 Vector3 pos, rot, scl;
                 actor->GetComponentWorldTransform(comp, pos, rot, scl);
                 DrawMeshComponent(mc, pos, rot, scl);
             } else if (BillboardComponent* bc = dynamic_cast<BillboardComponent*>(comp)) {
+                PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
                 Vector3 pos, rot, scl;
                 actor->GetComponentWorldTransform(comp, pos, rot, scl);
                 DrawBillboardComponent(bc, pos, camera);

@@ -1,4 +1,6 @@
 #include "World.h"
+#include "ProfilerLabels.h"
+#include "Core/Profiler.h"
 #include "Actor.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
@@ -88,35 +90,61 @@ void World::BeginPlay() {
 
 void World::Tick(float deltaTime) {
     if (!playing) return;
+    PROFILE_SCOPE("World Tick");
 
-    ReplicationManager::PreTick();
-
-    TimerManager::Get().Tick(deltaTime);
-    PrintMessageLog::Get().Tick(deltaTime);
-
-    for (size_t i = 0; i < actors.size(); i++) {
-        actors[i]->Tick(deltaTime);
+    {
+        PROFILE_SCOPE("Replication Pre-Tick");
+        ReplicationManager::PreTick();
     }
 
-    ReplicationManager::PostTick();
+    {
+        PROFILE_SCOPE("Timers");
+        TimerManager::Get().Tick(deltaTime);
+    }
+    {
+        PROFILE_SCOPE("Print Message Log");
+        PrintMessageLog::Get().Tick(deltaTime);
+    }
 
-    AudioCore::Get().TickMusicStreams();
-
-    bool shouldLockMouse = false;
-    for (const auto& actor : actors) {
-        if (!actor->showMouseCursor) {
-            shouldLockMouse = true;
-            break;
+    {
+        PROFILE_SCOPE("Actors");
+        for (size_t i = 0; i < actors.size(); i++) {
+            PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actors[i]));
+            actors[i]->Tick(deltaTime);
         }
     }
-    if (shouldLockMouse) {
-        HideCursor();
-        SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
-    } else {
-        ShowCursor();
+
+    {
+        PROFILE_SCOPE("Replication Post-Tick");
+        ReplicationManager::PostTick();
     }
 
-    FlushDestroyQueue();
+    {
+        PROFILE_SCOPE("Audio Music Streams");
+        AudioCore::Get().TickMusicStreams();
+    }
+
+    {
+        PROFILE_SCOPE("Mouse Cursor");
+        bool shouldLockMouse = false;
+        for (const auto& actor : actors) {
+            if (!actor->showMouseCursor) {
+                shouldLockMouse = true;
+                break;
+            }
+        }
+        if (shouldLockMouse) {
+            HideCursor();
+            SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
+        } else {
+            ShowCursor();
+        }
+    }
+
+    {
+        PROFILE_SCOPE("Destroy Queue");
+        FlushDestroyQueue();
+    }
 }
 
 void World::EndPlay() {

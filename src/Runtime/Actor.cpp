@@ -1,5 +1,7 @@
 #include "Core/RotationMath.h"
 #include "Actor.h"
+#include "ProfilerLabels.h"
+#include "Core/Profiler.h"
 #include "Components/Component.h"
 #include "Components/SceneComponent.h"
 #include "Core/ObjectKindRegistry.h"
@@ -76,7 +78,10 @@ void Actor::BeginPlay() {
 }
 
 void Actor::Tick(float deltaTime) {
-    OnTick(deltaTime);
+    {
+        PROFILE_SCOPE("Native OnTick");
+        OnTick(deltaTime);
+    }
     if (graphBehavior) graphBehavior->OnTick(this, deltaTime);
 
     if (useControlYaw)   rotation.y = controlRotation.y;
@@ -96,7 +101,11 @@ void Actor::Tick(float deltaTime) {
     position = Vector3Add(position, Vector3Scale(pendingMovementInput * MovementSpeed, deltaTime));
     pendingMovementInput = { 0, 0, 0 };
 
-    for (Component* c : components) c->Update(deltaTime);
+    PROFILE_SCOPE("Components");
+    for (Component* c : components) {
+        PROFILE_SCOPE_DYN(ProfilerLabels::ForComponent(*c));
+        c->Update(deltaTime);
+    }
 }
 
 void Actor::EndPlay() {

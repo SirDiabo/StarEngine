@@ -3,9 +3,23 @@
 #include "NodeRegistry.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Runtime/World.h"
+#include "Core/Profiler.h"
 #include "raylib.h"
 #include <cstdlib>
+#include <string>
 #include <vector>
+
+static std::string NodeProfileLabel(const Node& node) {
+    std::string label = node.title.empty() ? node.type : node.title;
+    for (char& c : label) if (c == '_') c = ' ';
+    return label + " #" + node.id;
+}
+
+static std::string ProfileLabel(const char* prefix, const std::string& text) {
+    std::string label = text;
+    for (char& c : label) if (c == '_') c = ' ';
+    return prefix + label;
+}
 
 static bool NodeHasExecPin(const Node& node) {
     for (const Pin& pin : node.inputs)  if (pin.type == PinType::Exec) return true;
@@ -69,6 +83,7 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, Exec
     if (!fromNode) return;
 
     visiting.push_back(inputPin.id);
+    PROFILE_SCOPE_DYN_L(Profiler::DetailNodes, NodeProfileLabel(*fromNode));
 
     ResolveWildcardPins(graph, fromNode);
     ResolveWildcardPins(graph, toNode);
@@ -116,6 +131,7 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
     int limit = 1000;
     while (current && limit-- > 0) {
         ctx.enteredExecPin = enteredPin;
+        PROFILE_SCOPE_DYN_L(Profiler::DetailNodes, NodeProfileLabel(*current));
         GraphExecutor::PropagateDataPins(graph, current, ctx);
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(current->type);
         if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
@@ -201,6 +217,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
     if (!ctx.rootGraph) ctx.rootGraph = &graph;
 
     if (eventType == "Event_Tick") {
+        PROFILE_SCOPE("Input Event Polling");
         for (Node* node : graph.GetNodesOfType("Input_Key")) {
             ProcessHeldEventNode(*node, graph, ctx);
         }
@@ -211,6 +228,7 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
 
     Node* current = graph.FindNodeByType(eventType);
     if (!current) return;
+    PROFILE_SCOPE_DYN(ProfileLabel("", eventType));
 
     if (eventType == "Event_Tick") {
         for (Pin& p : current->outputs) {
@@ -234,6 +252,7 @@ void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, Execution
         if (!next) break;
 
         ctx.enteredExecPin = nextPinId;
+        PROFILE_SCOPE_DYN_L(Profiler::DetailNodes, NodeProfileLabel(*next));
         PropagateDataPins(graph, next, ctx);
 
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(next->type);
@@ -251,6 +270,7 @@ void GraphExecutor::RunCustomEvent(Stargraph& graph, const std::string& eventNam
 
     Node* eventNode = graph.FindCustomEventByName(eventName);
     if (!eventNode) return;
+    PROFILE_SCOPE_DYN(ProfileLabel("Custom Event: ", eventName));
 
     for (const auto& param : params) {
         for (Pin& p : eventNode->outputs) {
@@ -279,6 +299,7 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
 
     Node* entry = fn->graph.FindNodeByType("Function_Entry");
     if (!entry) return false;
+    PROFILE_SCOPE_DYN(ProfileLabel("Function: ", functionName));
 
     for (Variable& localVar : fn->graph.GetVariables()) {
         localVar.value = localVar.defaultValue;
