@@ -1,4 +1,5 @@
 #include "Widget.h"
+#include "Core/Profiler.h"
 #include "WidgetElement.h"
 #include "Runtime/WidgetBehavior.h"
 #include "WidgetInput.h"
@@ -48,12 +49,17 @@ void Widget::Draw(Rectangle screenRect, float bufferScale) {
         TraceLog(LOG_INFO, "Widget::Draw uiScale=%.3f bufferScale=%.3f scale=%.3f", uiScale, bufferScale, scale);
         lastLoggedScale = scale;
     }
+    PROFILE_SCOPE("Element Draw");
     rootElement->Draw(screenRect, scale);
 }
 
 void Widget::Tick(float deltaTime, Rectangle screenRect, float bufferScale) {
-    if (behavior) behavior->OnTick(this, deltaTime);
+    if (behavior) {
+        PROFILE_SCOPE("Widget Graph Tick");
+        behavior->OnTick(this, deltaTime);
+    }
     if (!rootElement || !rootElement->visible) return;
     float scale = uiScale * bufferScale;
+    PROFILE_SCOPE("Element Tick");
     rootElement->Tick(deltaTime, screenRect, scale);
 }

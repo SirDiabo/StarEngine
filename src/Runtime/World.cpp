@@ -81,6 +81,7 @@ bool World::ConsumeQuitRequest() {
 
 void World::BeginPlay() {
     playing = true;
+    Profiler::NotifyPlayState(true);
     ReplicationManager::Reset();
     ResetNetIds();
     for (size_t i = 0; i < actors.size(); i++) {
@@ -158,6 +159,7 @@ void World::EndPlay() {
     }
     FlushDestroyQueue();
     playing = false;
+    Profiler::NotifyPlayState(false);
     viewTarget = nullptr;
     ShowCursor();
     AudioCore::Get().StopAndClearMusic();

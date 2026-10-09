@@ -1,5 +1,5 @@
 #include "Core/RotationMath.h"
-#include "Core/Profiler.h"
+#include "Core/ProfilerRender.h"
 #include "ProfilerLabels.h"
 #include "SceneRenderer.h"
 #include "World.h"
@@ -41,11 +41,13 @@ void SceneRenderer::DrawWorldActors(Camera3D camera) {
         for (Component* comp : actor->GetComponents()) {
             if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
                 PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
+                PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, ProfilerLabels::ForActor(*actor));
                 Vector3 pos, rot, scl;
                 actor->GetComponentWorldTransform(comp, pos, rot, scl);
                 DrawMeshComponent(mc, pos, rot, scl);
             } else if (BillboardComponent* bc = dynamic_cast<BillboardComponent*>(comp)) {
                 PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
+                PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, ProfilerLabels::ForActor(*actor));
                 Vector3 pos, rot, scl;
                 actor->GetComponentWorldTransform(comp, pos, rot, scl);
                 DrawBillboardComponent(bc, pos, camera);

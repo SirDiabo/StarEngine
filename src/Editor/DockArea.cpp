@@ -1,7 +1,7 @@
 #include "DockArea.h"
 #include "raylib.h"
 #include "UITheme.h"
-#include "Core/Profiler.h"
+#include "Core/ProfilerRender.h"
 #include "Core/SafeParse.h"
 #include "Core/Widgets/WidgetInput.h"
 #include <algorithm>
@@ -68,7 +68,7 @@ void DockArea::RenderPanel(Panel* panel) {
     const void* previousScope = WidgetInput::GetInputScope();
     WidgetInput::SetInputScope(panel);
     {
-        PROFILE_SCOPE_DYN(std::string("Panel: ") + panel->GetName());
+        PROFILE_RENDER_SCOPE_DYN(std::string("Panel: ") + panel->GetName());
         panel->Render();
     }
     WidgetInput::SetInputScope(previousScope);

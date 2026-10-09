@@ -13,7 +13,7 @@ void Run(Camera3D camera) {
         ShadingModel::UpdateLightUniforms();
     }
     {
-        PROFILE_SCOPE("Scene Actors");
+        PROFILE_RENDER_SCOPE("Scene Actors");
         SceneRenderer::DrawWorldActors(camera);
     }
     {

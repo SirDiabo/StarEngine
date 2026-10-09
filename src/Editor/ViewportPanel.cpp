@@ -1,5 +1,6 @@
 #include "Core/RotationMath.h"
 #include "ViewportPanel.h"
+#include "Core/ProfilerRender.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Modules/Stargraph/Nodes_Collision.h"
@@ -34,6 +35,12 @@
 #include "Core/SafeParse.h"
 
 namespace fs = std::filesystem;
+
+static std::string InstanceProfileLabel(const ActorInstance& inst) {
+    std::string label = inst.name.empty() ? std::string("Instance") : inst.name;
+    if (!inst.className.empty() && inst.className != label) label += " [" + inst.className + "]";
+    return label;
+}
 
 const float ViewportPanel::toolbarHeight = 28.0f;
 
@@ -76,19 +83,31 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
     Model* model = nullptr;
     if (!meshAssetPath.empty()) {
         StarAsset asset;
-        if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
+        bool assetLoaded;
+        {
+            PROFILE_SCOPE("Load Mesh Asset (file read)");
+            assetLoaded = StarAsset::LoadFromFile(meshAssetPath, asset);
+        }
+        if (assetLoaded && asset.assetType == "StaticMesh") {
+            PROFILE_SCOPE("Get Model (cache)");
             model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
         }
     }
 
     if (model) {
-        Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
-        Matrix rotationMatrix = ComposeRotationDegrees(rot);
-        model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
+        {
+            PROFILE_SCOPE("Apply Transform And Materials");
+            Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
+            Matrix rotationMatrix = ComposeRotationDegrees(rot);
+            model->transform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
-        AssetCache::ApplyMaterialSlots(model, materialAssetPaths);
-        DrawModel(*model, pos, 1.0f, WHITE);
-        if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
+            AssetCache::ApplyMaterialSlots(model, materialAssetPaths);
+        }
+        {
+            PROFILE_SCOPE("Draw Model");
+            DrawModel(*model, pos, 1.0f, WHITE);
+            if (selected) DrawModelWires(*model, pos, 1.0f, {255, 200, 50, 255});
+        }
     } else if (!meshAssetPath.empty()) {
         // A mesh is referenced but couldn't be resolved.
         DrawCube(pos, scale.x, scale.y, scale.z, fallbackColor);
@@ -431,81 +450,100 @@ void ViewportPanel::RenderScene() {
     float gridStep = (gridStepSize > 0.001f) ? gridStepSize : 100.0f;
     float snappedGridX = floorf(camera.position.x / gridStep) * gridStep;
     float snappedGridZ = floorf(camera.position.z / gridStep) * gridStep;
-    rlPushMatrix();
-    rlTranslatef(snappedGridX, 0.0f, snappedGridZ);
-    DrawGrid(40, gridStep);
-    rlPopMatrix();
+    {
+        PROFILE_RENDER_SCOPE("Grid");
+        rlPushMatrix();
+        rlTranslatef(snappedGridX, 0.0f, snappedGridZ);
+        DrawGrid(40, gridStep);
+        rlPopMatrix();
+    }
 
     const auto& instances = starMap.GetInstances();
     Vector3 selectedPos{0, 0, 0};
     Vector3 selectedRot{0, 0, 0};
     bool haveSelected = false;
 
-    for (size_t i = 0; i < instances.size(); i++) {
-        const ActorInstance& inst = instances[i];
-        Vector3 pos = {inst.posX, inst.posY, inst.posZ};
-        Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
-        Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
-        bool selected = (selectedActorIndex == (int)i);
-        Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
+    {
+        PROFILE_RENDER_SCOPE("Instances");
+        for (size_t i = 0; i < instances.size(); i++) {
+            const ActorInstance& inst = instances[i];
+            PROFILE_SCOPE_DYN(InstanceProfileLabel(inst));
+            PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, InstanceProfileLabel(inst));
+            Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+            Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
+            Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
+            bool selected = (selectedActorIndex == (int)i);
+            Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
 
-        if (!inst.graphAssetPath.empty()) {
-            const Stargraph* classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
-            bool drewAnyMesh = false;
-            bool drewBillboard = false;
+            if (!inst.graphAssetPath.empty()) {
+                const Stargraph* classGraph = nullptr;
+                {
+                    PROFILE_SCOPE("Class Graph Lookup");
+                    classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
+                }
+                bool drewAnyMesh = false;
+                bool drewBillboard = false;
 
-            if (classGraph) {
-                for (const ComponentDecl& comp : classGraph->GetComponents()) {
-                    Vector3 compPos, compRot, compScale;
-                    ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
-                                               compPos, compRot, compScale);
+                if (classGraph) {
+                    for (const ComponentDecl& comp : classGraph->GetComponents()) {
+                        Vector3 compPos, compRot, compScale;
+                        ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
+                                                   compPos, compRot, compScale);
 
-                    if (comp.componentType == "MeshComponent") {
-                        auto materialIt = comp.arrayFields.find("Material");
-                        static const std::vector<std::string> emptyMaterials;
-                        DrawInstanceOrMesh(comp.Get("Mesh"), materialIt != comp.arrayFields.end() ? materialIt->second : emptyMaterials,
-                                            compPos, compRot, compScale, selected, fallbackColor);
-                        drewAnyMesh = true;
-                    } else if (comp.componentType == "CollisionComponent" && CollisionComponent::DeclVisibleInEditor(comp)) {
-                        CollisionTrace::Shape shape;
-                        if (CollisionComponent::BuildShapeFromDecl(comp, compPos, compRot, compScale, shape)) {
-                            CollisionTrace::DrawDebugShape(shape, selected ? Color{255, 200, 50, 255} : Color{90, 200, 255, 230});
-                        }
-                    } else if (comp.componentType == "BillboardComponent") {
-                        std::string billboardTexturePath = comp.Get("BillboardTexture");
-                        Texture2D* tex = billboardTexturePath.empty() ? nullptr
-                                        : AssetCache::Get().GetOrLoadTexture(billboardTexturePath);
-                        if (tex) {
-                            float billboardWidth = SafeParse::ToFloat(comp.Get("BillboardWidth", "50"));
-                            float billboardHeight = SafeParse::ToFloat(comp.Get("BillboardHeight", "50"));
-                            DrawBillboardRec(camera, *tex, {0, 0, (float)tex->width, (float)tex->height},
-                                              compPos, {billboardWidth, billboardHeight}, WHITE);
-                            drewBillboard = true;
+                        if (comp.componentType == "MeshComponent") {
+                            auto materialIt = comp.arrayFields.find("Material");
+                            static const std::vector<std::string> emptyMaterials;
+                            DrawInstanceOrMesh(comp.Get("Mesh"), materialIt != comp.arrayFields.end() ? materialIt->second : emptyMaterials,
+                                                compPos, compRot, compScale, selected, fallbackColor);
+                            drewAnyMesh = true;
+                        } else if (comp.componentType == "CollisionComponent" && CollisionComponent::DeclVisibleInEditor(comp)) {
+                            PROFILE_SCOPE("Collision Debug Shape");
+                            CollisionTrace::Shape shape;
+                            if (CollisionComponent::BuildShapeFromDecl(comp, compPos, compRot, compScale, shape)) {
+                                CollisionTrace::DrawDebugShape(shape, selected ? Color{255, 200, 50, 255} : Color{90, 200, 255, 230});
+                            }
+                        } else if (comp.componentType == "BillboardComponent") {
+                            std::string billboardTexturePath = comp.Get("BillboardTexture");
+                            Texture2D* tex = billboardTexturePath.empty() ? nullptr
+                                            : AssetCache::Get().GetOrLoadTexture(billboardTexturePath);
+                            if (tex) {
+                                float billboardWidth = SafeParse::ToFloat(comp.Get("BillboardWidth", "50"));
+                                float billboardHeight = SafeParse::ToFloat(comp.Get("BillboardHeight", "50"));
+                                DrawBillboardRec(camera, *tex, {0, 0, (float)tex->width, (float)tex->height},
+                                                  compPos, {billboardWidth, billboardHeight}, WHITE);
+                                drewBillboard = true;
+                            }
                         }
                     }
                 }
+
+                if (!drewAnyMesh && !drewBillboard) {
+                    DrawActorBillboard("icon_actor.png", pos, WHITE);
+                }
+            } else if (inst.hasComponent) {
+                DrawActorBillboard(IconForActorKind(inst.actorKind), pos, WHITE);
+            } else {
+                DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
             }
 
-            if (!drewAnyMesh && !drewBillboard) {
-                DrawActorBillboard("icon_actor.png", pos, WHITE);
+            if (selected) {
+                DrawCircle3D(pos, 30.0f, {1, 0, 0}, 90.0f, {255, 200, 50, 255});
+                selectedPos = pos;
+                selectedRot = rot;
+                haveSelected = true;
             }
-        } else if (inst.hasComponent) {
-            DrawActorBillboard(IconForActorKind(inst.actorKind), pos, WHITE);
-        } else {
-            DrawInstanceOrMesh(inst.meshAssetPath, inst.materialAssetPaths, pos, rot, scl, selected, fallbackColor);
-        }
-
-        if (selected) {
-            DrawCircle3D(pos, 30.0f, {1, 0, 0}, 90.0f, {255, 200, 50, 255});
-            selectedPos = pos;
-            selectedRot = rot;
-            haveSelected = true;
         }
     }
 
-    if (haveSelected) GizmoRenderer::Render(camera, renderTargetWidth, renderTargetHeight, gizmoMode, gizmoSpace, selectedPos, selectedRot, gizmoDragState);
+    if (haveSelected) {
+        PROFILE_RENDER_SCOPE("Gizmo");
+        GizmoRenderer::Render(camera, renderTargetWidth, renderTargetHeight, gizmoMode, gizmoSpace, selectedPos, selectedRot, gizmoDragState);
+    }
 
-    DrawAndClearCollisionDebug((float)renderTargetHeight);
+    {
+        PROFILE_RENDER_SCOPE("Collision Debug Overlay");
+        DrawAndClearCollisionDebug((float)renderTargetHeight);
+    }
 
     EndMode3D();
 }
@@ -727,9 +765,18 @@ void ViewportPanel::Render() {
     int clientHeight  = (int)client.height;
 
     if (clientWidth > 0 && clientHeight > 0) {
-        EnsureRenderTarget(clientWidth, clientHeight);
-        UpdateCamera(client);
-        HandleMapInteraction(client);
+        {
+            PROFILE_SCOPE("Ensure Render Target");
+            EnsureRenderTarget(clientWidth, clientHeight);
+        }
+        {
+            PROFILE_SCOPE("Update Camera");
+            UpdateCamera(client);
+        }
+        {
+            PROFILE_SCOPE("Handle Interaction");
+            HandleMapInteraction(client);
+        }
 
         Color clearColor = {28, 28, 30, 255};
 
@@ -739,26 +786,36 @@ void ViewportPanel::Render() {
             int pieHeight = (int)(clientHeight * scale);
             if (pieWidth < 1) pieWidth = 1;
             if (pieHeight < 1) pieHeight = 1;
-            EnsurePieRenderTarget(pieWidth, pieHeight);
+            {
+                PROFILE_SCOPE("Ensure PIE Render Target");
+                EnsurePieRenderTarget(pieWidth, pieHeight);
+            }
 
             Vector2 panelMouse = {GetMousePosition().x - client.x, GetMousePosition().y - client.y};
             Vector2 lowResMouse = {panelMouse.x * ((float)pieWidth / (float)clientWidth), panelMouse.y * ((float)pieHeight / (float)clientHeight)};
-            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)pieRenderTarget.texture.width, (float)pieRenderTarget.texture.height}, lowResMouse, false, scale);
-            WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)clientWidth, (float)clientHeight}, panelMouse, true);
+            {
+                PROFILE_SCOPE("Widget Tick (Screen Space)");
+                WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)pieRenderTarget.texture.width, (float)pieRenderTarget.texture.height}, lowResMouse, false, scale);
+                WidgetRenderer::TickScreenSpaceWidgets(GetFrameTime(), {0, 0, (float)clientWidth, (float)clientHeight}, panelMouse, true);
+            }
 
             RenderPipeline::Render(camera, pieRenderTarget, clearColor);
 
-            BeginTextureMode(renderTarget);
-            Rectangle pieSource = {0, 0, (float)pieRenderTarget.texture.width, -(float)pieRenderTarget.texture.height};
-            Rectangle pieDest = {0, 0, (float)clientWidth, (float)clientHeight};
-            DrawTexturePro(pieRenderTarget.texture, pieSource, pieDest, {0, 0}, 0.0f, WHITE);
-            WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)clientWidth, (float)clientHeight}, true);
-            BeginMode3D(camera);
-            DrawAndClearCollisionDebug((float)renderTargetHeight);
-            EndMode3D();
-            PrintMessageLog::Get().Draw();
-            EndTextureMode();
+            {
+                PROFILE_RENDER_SCOPE("PIE Composite");
+                BeginTextureMode(renderTarget);
+                Rectangle pieSource = {0, 0, (float)pieRenderTarget.texture.width, -(float)pieRenderTarget.texture.height};
+                Rectangle pieDest = {0, 0, (float)clientWidth, (float)clientHeight};
+                DrawTexturePro(pieRenderTarget.texture, pieSource, pieDest, {0, 0}, 0.0f, WHITE);
+                WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)clientWidth, (float)clientHeight}, true);
+                BeginMode3D(camera);
+                DrawAndClearCollisionDebug((float)renderTargetHeight);
+                EndMode3D();
+                PrintMessageLog::Get().Draw();
+                EndTextureMode();
+            }
         } else {
+            PROFILE_RENDER_SCOPE("Editor Scene");
             BeginTextureMode(renderTarget);
             ClearBackground(clearColor);
             RenderScene();
@@ -766,6 +823,7 @@ void ViewportPanel::Render() {
         }
 
         Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
+        PROFILE_RENDER_SCOPE("Blit Viewport");
         DrawTextureRec(renderTarget.texture, source, {client.x, client.y}, WHITE);
     }
 
@@ -775,7 +833,10 @@ void ViewportPanel::Render() {
     if (playing) {
         DrawRectangleLinesEx(client, 3, theme.success);
     }
-    RenderToolbar();
+    {
+        PROFILE_SCOPE("Toolbar");
+        RenderToolbar();
+    }
 
     if (!playing && mapLoaded && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];

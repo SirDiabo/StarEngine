@@ -38,8 +38,11 @@ private:
     void FreezeFrameAtAge(size_t age);
     void ReturnToLive();
     Color LineColor(uint64_t key);
+    std::string LineName(uint64_t key);
 
     bool recording = true;
+    bool autoPie = false;
+    bool wasPlayRecording = false;
     bool frozen = false;
     Profiler::Frame frozenFrame;
     int detailLevel = Profiler::DetailStandard;

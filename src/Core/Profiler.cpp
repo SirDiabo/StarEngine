@@ -40,6 +40,10 @@ uint64_t g_frameCounter = 0;
 uint64_t g_lastRequestFrame = 0;
 bool g_requested = false;
 bool g_forced = false;
+bool g_autoPlay = false;
+bool g_playing = false;
+bool g_playRecording = false;
+bool g_gpuAvailable = false;
 int64_t g_frameStartNs = 0;
 double g_overheadNs = -1.0;
 
@@ -54,6 +58,36 @@ uint64_t Mix(uint64_t x) {
 
 void EnsureRing() {
     if (g_ring.empty()) g_ring.resize(kRingSize);
+}
+
+void UpdateTrack(const Frame& frame, size_t nodeIndex, size_t slot) {
+    const Node& node = frame.nodes[nodeIndex];
+    auto it = g_tracks.find(node.key);
+    if (it == g_tracks.end()) {
+        Track track;
+        track.key = node.key;
+        track.nameId = node.nameId;
+        track.lane = node.lane;
+        track.flags = node.flags;
+        track.totalUs.assign(kHistoryFrames, 0.0f);
+        track.selfUs.assign(kHistoryFrames, 0.0f);
+        track.stamp.assign(kHistoryFrames, 0u);
+        it = g_tracks.emplace(node.key, std::move(track)).first;
+    }
+    Track& track = it->second;
+    if (node.parent >= 0) {
+        const Node& parentNode = frame.nodes[(size_t)node.parent];
+        track.parentKey = parentNode.key;
+        auto parentIt = g_tracks.find(parentNode.key);
+        track.depth = parentIt != g_tracks.end() ? parentIt->second.depth + 1 : 1;
+    } else {
+        track.parentKey = 0;
+        track.depth = 0;
+    }
+    track.totalUs[slot] = (float)((double)node.totalNs / 1000.0);
+    track.selfUs[slot] = (float)((double)node.selfNs / 1000.0);
+    track.stamp[slot] = (uint32_t)frame.index;
+    track.lastSeenFrame = frame.index;
 }
 
 void FinalizeFrame(int64_t nowNs) {
@@ -71,34 +105,7 @@ void FinalizeFrame(int64_t nowNs) {
     frame.totalCalls = calls;
 
     const size_t slot = (size_t)(frame.index % kHistoryFrames);
-    for (const Node& node : frame.nodes) {
-        auto it = g_tracks.find(node.key);
-        if (it == g_tracks.end()) {
-            Track track;
-            track.key = node.key;
-            track.nameId = node.nameId;
-            track.lane = node.lane;
-            track.flags = node.flags;
-            track.totalUs.assign(kHistoryFrames, 0.0f);
-            track.selfUs.assign(kHistoryFrames, 0.0f);
-            track.stamp.assign(kHistoryFrames, 0u);
-            it = g_tracks.emplace(node.key, std::move(track)).first;
-        }
-        Track& track = it->second;
-        if (node.parent >= 0) {
-            const Node& parentNode = frame.nodes[(size_t)node.parent];
-            track.parentKey = parentNode.key;
-            auto parentIt = g_tracks.find(parentNode.key);
-            track.depth = parentIt != g_tracks.end() ? parentIt->second.depth + 1 : 1;
-        } else {
-            track.parentKey = 0;
-            track.depth = 0;
-        }
-        track.totalUs[slot] = (float)((double)node.totalNs / 1000.0);
-        track.selfUs[slot] = (float)((double)node.selfNs / 1000.0);
-        track.stamp[slot] = (uint32_t)frame.index;
-        track.lastSeenFrame = frame.index;
-    }
+    for (size_t i = 0; i < frame.nodes.size(); i++) UpdateTrack(frame, i, slot);
 
     g_head = (g_head + 1) % kRingSize;
     if (g_count < kHistoryFrames) g_count++;
@@ -231,6 +238,10 @@ void RequestRecording() {
 
 void SetForcedRecording(bool forced) { g_forced = forced; }
 bool IsForcedRecording() { return g_forced; }
+void SetAutoRecordOnPlay(bool enabled) { g_autoPlay = enabled; }
+bool IsAutoRecordOnPlay() { return g_autoPlay; }
+void NotifyPlayState(bool playing) { g_playing = playing; }
+bool IsPlayRecordingActive() { return g_playRecording; }
 void SetDetail(int level) { Internal::detail = level < 0 ? 0 : (level > DetailVerbose ? DetailVerbose : level); }
 int GetDetail() { return Internal::detail; }
 
@@ -248,7 +259,20 @@ void BeginFrame() {
     }
 
     g_frameCounter++;
-    const bool shouldRecord = g_forced || (g_requested && g_frameCounter - g_lastRequestFrame <= 2);
+
+    if (g_autoPlay) {
+        if (g_playing && !g_playRecording) {
+            Clear();
+            g_playRecording = true;
+        } else if (!g_playing && g_playRecording) {
+            g_playRecording = false;
+        }
+    } else {
+        g_playRecording = false;
+    }
+
+    const bool requestActive = !g_autoPlay && g_requested && g_frameCounter - g_lastRequestFrame <= 2;
+    const bool shouldRecord = g_forced || g_playRecording || requestActive;
     Internal::enabled = shouldRecord;
     if (!shouldRecord) return;
 
@@ -260,6 +284,8 @@ void BeginFrame() {
     g_current->wallNs = 0;
     g_current->workNs = 0;
     g_current->waitNs = 0;
+    g_current->gpuSpanNs = 0;
+    g_current->gpuResolved = false;
     g_current->totalCalls = 0;
     g_stack.clear();
     g_nodeIndex.clear();
@@ -273,6 +299,74 @@ void Clear() {
     g_tracks.clear();
     g_head = 0;
     g_count = 0;
+}
+
+uint64_t CurrentFrameIndex() { return g_frameCounter; }
+void SetGpuAvailable(bool available) { g_gpuAvailable = available; }
+bool IsGpuAvailable() { return g_gpuAvailable; }
+
+bool ResolveGpuFrame(uint64_t frameIndex, int64_t spanNs, const std::vector<GpuScopeResult>& scopes) {
+    Frame* frame = nullptr;
+    for (size_t age = 0; age < g_count; age++) {
+        Frame* candidate = &g_ring[(g_head + kRingSize - 1 - age) % kRingSize];
+        if (candidate->index == frameIndex) { frame = candidate; break; }
+        if (candidate->index < frameIndex) break;
+    }
+    if (!frame || frame->gpuResolved) return false;
+
+    const size_t firstGpuNode = frame->nodes.size();
+    std::vector<int32_t> nodeOfScope(scopes.size(), -1);
+    std::unordered_map<uint64_t, int32_t> localIndex;
+    for (size_t i = 0; i < scopes.size(); i++) {
+        const GpuScopeResult& result = scopes[i];
+        const int32_t parentNode = (result.parent >= 0 && (size_t)result.parent < i) ? nodeOfScope[(size_t)result.parent] : -1;
+        const uint64_t parentKey = parentNode >= 0 ? frame->nodes[(size_t)parentNode].key : kRootKey;
+        const uint64_t key = ChildKey(parentKey, result.nameId, Lane::GPU);
+        int32_t nodeIndex;
+        auto it = localIndex.find(key);
+        if (it == localIndex.end()) {
+            Node node;
+            node.key = key;
+            node.nameId = result.nameId;
+            node.parent = parentNode;
+            node.lane = Lane::GPU;
+            nodeIndex = (int32_t)frame->nodes.size();
+            frame->nodes.push_back(node);
+            localIndex.emplace(key, nodeIndex);
+        } else {
+            nodeIndex = it->second;
+        }
+        Node& node = frame->nodes[(size_t)nodeIndex];
+        node.totalNs += result.ns < 0 ? 0 : result.ns;
+        node.calls++;
+        nodeOfScope[i] = nodeIndex;
+    }
+
+    for (size_t i = firstGpuNode; i < frame->nodes.size(); i++) frame->nodes[i].selfNs = frame->nodes[i].totalNs;
+    for (size_t i = firstGpuNode; i < frame->nodes.size(); i++) {
+        const int32_t parent = frame->nodes[i].parent;
+        if (parent >= 0) {
+            Node& parentNode = frame->nodes[(size_t)parent];
+            parentNode.selfNs -= frame->nodes[i].totalNs;
+            if (parentNode.selfNs < 0) parentNode.selfNs = 0;
+        }
+    }
+
+    frame->gpuSpanNs = spanNs < 0 ? 0 : spanNs;
+    frame->gpuResolved = true;
+    const size_t slot = (size_t)(frame->index % kHistoryFrames);
+    for (size_t i = firstGpuNode; i < frame->nodes.size(); i++) UpdateTrack(*frame, i, slot);
+    return true;
+}
+
+size_t DisplayAge() {
+    if (!g_gpuAvailable) return 0;
+    const size_t limit = g_count < 16 ? g_count : 16;
+    for (size_t age = 0; age < limit; age++) {
+        const Frame* frame = FrameAt(age);
+        if (frame && frame->gpuResolved) return age;
+    }
+    return 0;
 }
 
 size_t FrameCount() { return g_count; }

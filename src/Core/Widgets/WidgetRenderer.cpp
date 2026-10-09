@@ -6,7 +6,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/Components/WidgetComponent.h"
 #include "Runtime/ProfilerLabels.h"
-#include "Core/Profiler.h"
+#include "Core/ProfilerRender.h"
 #include "raymath.h"
 
 namespace WidgetRenderer {
@@ -64,7 +64,7 @@ void PrepareWorldSpaceWidgets() {
 
             RenderTexture2D& rt = widgetComponent->GetOrCreateWorldTexture(kWorldTextureSize, kWorldTextureSize);
 
-            PROFILE_SCOPE_DYN("Render To Texture: " + ProfilerLabels::ForActor(*actor) + " / " + ProfilerLabels::ForComponent(*widgetComponent));
+            PROFILE_RENDER_SCOPE_DYN("Render To Texture: " + ProfilerLabels::ForActor(*actor) + " / " + ProfilerLabels::ForComponent(*widgetComponent));
             BeginTextureMode(rt);
             ClearBackground(BLANK);
             widget->Tick(GetFrameTime(), {0, 0, (float)kWorldTextureSize, (float)kWorldTextureSize}, 1.0f);

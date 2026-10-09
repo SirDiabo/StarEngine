@@ -1,7 +1,5 @@
 #include "Application.h"
-#include "Profiler.h"
-#include "raylib.h"
-#include "rlgl.h"
+#include "ProfilerRender.h"
 #include "Editor/Editor.h"
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
@@ -196,6 +194,7 @@ bool Application::Initialize(int argc, char* argv[]) {
 void Application::Run() {
     while (!WindowShouldClose() && running) {
         Profiler::BeginFrame();
+        ProfilerGpu::Pump();
 
         if (pendingRelaunch) {
             projectPath = Project::Get().GetProjectFilePath();
@@ -252,12 +251,13 @@ void Application::Run() {
         }
         World::Get().Tick(deltaTime);
         {
-            PROFILE_SCOPE("Editor UI");
+            PROFILE_RENDER_SCOPE("Editor UI");
             editor->Render();
         }
         if (Profiler::IsEnabled()) {
             PROFILE_SCOPE("Flush Render Batch");
             rlDrawRenderBatchActive();
+            ProfilerGpu::FrameEnd();
         }
         {
             PROFILE_WAIT_SCOPE("EndDrawing (swap, frame limiter, input)");

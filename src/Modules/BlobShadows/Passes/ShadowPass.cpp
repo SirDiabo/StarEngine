@@ -1,4 +1,5 @@
 #include "ShadowPass.h"
+#include "Core/ProfilerRender.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/MeshComponent.h"
@@ -132,29 +133,41 @@ void Run() {
     EnsureShadowTextureLoaded();
 
     std::vector<ShadowLight> lights;
-    GatherShadowLights(lights);
+    {
+        PROFILE_SCOPE("Gather Shadow Lights");
+        GatherShadowLights(lights);
+    }
 
     CollisionTrace::ScopedBatch collisionBatch;
 
-    for (const auto& actorPtr : World::Get().GetActors()) {
-        Actor* actor = actorPtr.get();
-        if (!actor) continue;
-        for (Component* comp : actor->GetComponents()) {
-            MeshComponent* mc = dynamic_cast<MeshComponent*>(comp);
-            if (!mc || !mc->castsShadow) continue;
+    {
+        PROFILE_RENDER_SCOPE("Blob Shadow Decals");
+        for (const auto& actorPtr : World::Get().GetActors()) {
+            Actor* actor = actorPtr.get();
+            if (!actor) continue;
+            for (Component* comp : actor->GetComponents()) {
+                MeshComponent* mc = dynamic_cast<MeshComponent*>(comp);
+                if (!mc || !mc->castsShadow) continue;
 
-            Vector3 casterPos = actor->GetComponentWorldPosition(mc);
-            Vector3 start = Vector3Add(casterPos, {0, kCastStartLift, 0});
-            Vector3 end = Vector3Add(casterPos, {0, -kMaxCastDistance, 0});
+                Vector3 casterPos = actor->GetComponentWorldPosition(mc);
+                Vector3 start = Vector3Add(casterPos, {0, kCastStartLift, 0});
+                Vector3 end = Vector3Add(casterPos, {0, -kMaxCastDistance, 0});
 
-            Actor* hitActor = nullptr;
-            Vector3 hitPoint, hitNormal;
-            float hitDist = 0.0f;
-            if (!CollisionTrace::TraceAgainstMeshes(start, end, actor, hitActor, hitPoint, hitNormal, hitDist)) continue;
+                Actor* hitActor = nullptr;
+                Vector3 hitPoint, hitNormal;
+                float hitDist = 0.0f;
+                bool traced;
+                {
+                    PROFILE_SCOPE("Trace Against Meshes");
+                    traced = CollisionTrace::TraceAgainstMeshes(start, end, actor, hitActor, hitPoint, hitNormal, hitDist);
+                }
+                if (!traced) continue;
 
-            Vector3 lightDir;
-            bool haveLight = FindShadowDirection(lights, casterPos, lightDir);
-            DrawShadowDecal(hitPoint, hitNormal, lightDir, haveLight);
+                Vector3 lightDir;
+                bool haveLight = FindShadowDirection(lights, casterPos, lightDir);
+                PROFILE_SCOPE("Draw Decal");
+                DrawShadowDecal(hitPoint, hitNormal, lightDir, haveLight);
+            }
         }
     }
 }

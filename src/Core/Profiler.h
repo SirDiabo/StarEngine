@@ -32,8 +32,16 @@ struct Frame {
     int64_t wallNs = 0;
     int64_t workNs = 0;
     int64_t waitNs = 0;
+    int64_t gpuSpanNs = 0;
+    bool gpuResolved = false;
     uint64_t totalCalls = 0;
     std::vector<Node> nodes;
+};
+
+struct GpuScopeResult {
+    uint32_t nameId = 0;
+    int32_t parent = -1;
+    int64_t ns = 0;
 };
 
 struct Track {
@@ -69,10 +77,19 @@ uint64_t ChildKey(uint64_t parentKey, uint32_t nameId, Lane lane);
 void RequestRecording();
 void SetForcedRecording(bool forced);
 bool IsForcedRecording();
+void SetAutoRecordOnPlay(bool enabled);
+bool IsAutoRecordOnPlay();
+void NotifyPlayState(bool playing);
+bool IsPlayRecordingActive();
 void SetDetail(int level);
 int GetDetail();
 void BeginFrame();
 void Clear();
+uint64_t CurrentFrameIndex();
+void SetGpuAvailable(bool available);
+bool IsGpuAvailable();
+bool ResolveGpuFrame(uint64_t frameIndex, int64_t spanNs, const std::vector<GpuScopeResult>& scopes);
+size_t DisplayAge();
 
 size_t FrameCount();
 const Frame* FrameAt(size_t ageFromNewest);

@@ -1,5 +1,6 @@
 #include "Core/RotationMath.h"
 #include "ShadowMapPrePass.h"
+#include "Core/ProfilerRender.h"
 #include "Core/ShadingModel.h"
 #include "Core/RenderSettings.h"
 #include "Modules/ShadowMap/ShadowMapSettings.h"
@@ -232,6 +233,7 @@ void DrawShadowCasters(Actor* excludeActor) {
 }
 
 void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor, float shadowStrength, int aaMethod) {
+    PROFILE_RENDER_SCOPE("Shadow Depth Pass");
     BeginTextureMode(shadowTarget);
     ClearBackground(BLANK);
     BeginMode3D(lightCamera);
@@ -239,22 +241,28 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* exclu
     Matrix lightView = rlGetMatrixModelview();
     Matrix lightProj = rlGetMatrixProjection();
 
-    DrawShadowCasters(excludeActor);
+    {
+        PROFILE_SCOPE("Draw Shadow Casters");
+        DrawShadowCasters(excludeActor);
+    }
 
     EndMode3D();
     EndTextureMode();
 
     Matrix lightViewProj = MatrixMultiply(lightView, lightProj);
+    PROFILE_SCOPE("Set Shadow Source");
     ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, shadowTargetSize, shadowStrength, aaMethod);
 }
 
 void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength, int aaMethod) {
+    PROFILE_RENDER_SCOPE("Shadow Cube Pass");
     EnsureCubeFacesLoaded();
 
     unsigned int faceTextureIds[6];
     Matrix faceViewProj[6];
 
     for (int face = 0; face < 6; face++) {
+        PROFILE_RENDER_SCOPE_DYN("Face " + std::to_string(face));
         Camera3D faceCamera{};
         BuildCubeFaceCamera(lightPos, face, faceCamera);
 
@@ -265,7 +273,10 @@ void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength, in
         Matrix faceView = rlGetMatrixModelview();
         Matrix faceProj = rlGetMatrixProjection();
 
-        DrawShadowCasters(excludeActor);
+        {
+            PROFILE_SCOPE("Draw Shadow Casters");
+            DrawShadowCasters(excludeActor);
+        }
 
         EndMode3D();
         EndTextureMode();
@@ -290,7 +301,12 @@ void Run(Camera3D camera) {
     }
 
     ShadowCasterLight caster;
-    if (!FindShadowCasterLight(camera.position, caster)) return;
+    bool foundCaster;
+    {
+        PROFILE_SCOPE("Find Shadow Caster Light");
+        foundCaster = FindShadowCasterLight(camera.position, caster);
+    }
+    if (!foundCaster) return;
 
     double savedNear = rlGetCullDistanceNear();
     double savedFar = rlGetCullDistanceFar();

@@ -13,7 +13,7 @@ namespace RenderPipeline {
 void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
 
-    PROFILE_SCOPE("Render Pipeline");
+    PROFILE_RENDER_SCOPE("Render Pipeline");
 
     DebugDraw::viewportHeight = (float)target.texture.height;
 

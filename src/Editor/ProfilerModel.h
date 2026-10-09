@@ -14,6 +14,8 @@ constexpr uint64_t kKeyFrame = 1;
 constexpr uint64_t kKeyWork = 2;
 constexpr uint64_t kKeyWait = 3;
 constexpr uint64_t kKeyUnaccounted = 4;
+constexpr uint64_t kKeyGpu = 5;
+constexpr uint64_t kKeyGpuIdle = 6;
 constexpr float kBudgetUs60Fps = 1000000.0f / 60.0f;
 
 struct Row {

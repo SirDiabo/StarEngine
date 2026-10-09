@@ -1,5 +1,5 @@
 #include "Editor.h"
-#include "Core/Profiler.h"
+#include "Core/ProfilerRender.h"
 #include "EditorTab.h"
 #include "LevelEditorTab.h"
 #include "AssetPreviewTab.h"
@@ -115,7 +115,7 @@ void Editor::Render() {
     // Layer 3: active editor tab panel content.
     if (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) {
         EditorTab* tab = editorTabs[activeEditorTab].get();
-        PROFILE_SCOPE_DYN("Tab: " + tab->GetTitle());
+        PROFILE_RENDER_SCOPE_DYN("Tab: " + tab->GetTitle());
         tab->Render(0, contentY, (float)w, contentH);
 
         if (!tab->IsOpen() && !tab->IsPermanent()) {

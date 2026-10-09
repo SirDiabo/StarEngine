@@ -4,6 +4,7 @@
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
+#include "Core/ProfilerGpu.h"
 #include "raylib.h"
 #include "rlgl.h"
 #include <algorithm>
@@ -99,7 +100,7 @@ void ProfilerPanel::EnsureWidgets() {
 
 const Profiler::Frame* ProfilerPanel::DisplayFrame() const {
     if (frozen) return &frozenFrame;
-    return Profiler::FrameAt(0);
+    return Profiler::FrameAt(Profiler::DisplayAge());
 }
 
 void ProfilerPanel::FreezeFrameAtAge(size_t age) {
@@ -115,17 +116,34 @@ void ProfilerPanel::ReturnToLive() {
 
 Color ProfilerPanel::LineColor(uint64_t key) {
     if (key == ProfilerModel::kKeyWork) return UITheme::Get().textPrimary;
+    if (key == ProfilerModel::kKeyGpu) return { 120, 255, 200, 255 };
     return kPalette[colors.Get(key) % 12];
+}
+
+std::string ProfilerPanel::LineName(uint64_t key) {
+    if (key == ProfilerModel::kKeyWork) return "Work";
+    if (key == ProfilerModel::kKeyGpu) return "GPU span";
+    const Profiler::Track* track = Profiler::FindTrack(key);
+    if (!track) return std::string();
+    std::string name = Profiler::NameOf(track->nameId);
+    if (track->lane == Profiler::Lane::GPU) name += " (GPU)";
+    return name;
 }
 
 void ProfilerPanel::Render() {
     EnsureWidgets();
-    if (recording) Profiler::RequestRecording();
+    Profiler::SetAutoRecordOnPlay(autoPie);
+    if (!autoPie && recording) Profiler::RequestRecording();
     Profiler::SetDetail(detailLevel);
+
+    const bool playRecording = Profiler::IsPlayRecordingActive();
+    if (playRecording && !wasPlayRecording) ReturnToLive();
+    wasPlayRecording = playRecording;
 
     if (!initializedExpansion) {
         expanded.insert(ProfilerModel::kKeyFrame);
         expanded.insert(ProfilerModel::kKeyWork);
+        expanded.insert(ProfilerModel::kKeyGpu);
         initializedExpansion = true;
     }
 
@@ -150,8 +168,9 @@ void ProfilerPanel::Render() {
     float bodyH = inner.y + inner.height - bodyY;
 
     if (!frame) {
-        DrawText(recording ? "Waiting for frames..." : "Recording is paused. Press Record to capture frames.",
-                  (int)inner.x, (int)bodyY + 6, 11, theme.textSecondary);
+        const char* waitingText = autoPie ? "Auto: PIE is on. Press Play to start capturing."
+                                          : (recording ? "Waiting for frames..." : "Recording is paused. Press Record to capture frames.");
+        DrawText(waitingText, (int)inner.x, (int)bodyY + 6, 11, theme.textSecondary);
         return;
     }
 
@@ -190,10 +209,20 @@ void ProfilerPanel::DrawToolbar(Rectangle area) {
     float y = area.y;
     float h = area.height;
 
+    const bool playRecording = Profiler::IsPlayRecordingActive();
     const char* recordLabel = recording ? "Recording" : "Paused";
-    float w = ButtonWidth(recordLabel) + 10.0f;
-    if (Button({ x, y, w, h }, recordLabel, recording)) recording = !recording;
-    DrawCircle((int)(x + 9), (int)(y + h / 2), 3.0f, recording ? theme.danger : theme.textSecondary);
+    bool lit = recording;
+    if (autoPie) {
+        recordLabel = playRecording ? "PIE: Recording" : (Profiler::FrameCount() > 0 ? "PIE: Stopped" : "PIE: Waiting");
+        lit = playRecording;
+    }
+    float w = ButtonWidth("PIE: Recording") + 10.0f;
+    if (Button({ x, y, w, h }, recordLabel, lit) && !autoPie) recording = !recording;
+    DrawCircle((int)(x + 9), (int)(y + h / 2), 3.0f, lit ? theme.danger : theme.textSecondary);
+    x += w + 4.0f;
+
+    w = ButtonWidth("Auto: PIE");
+    if (Button({ x, y, w, h }, "Auto: PIE", autoPie)) autoPie = !autoPie;
     x += w + 4.0f;
 
     w = ButtonWidth("Clear");
@@ -225,10 +254,12 @@ void ProfilerPanel::DrawToolbar(Rectangle area) {
     chrome->Draw(chromeRect, 1.0f);
     x += fieldRect.width + 10.0f;
 
-    const char* detailLabel = detailLevel == Profiler::DetailNodes ? "Detail: Nodes" : "Detail: Standard";
+    const char* detailLabel = "Detail: Standard";
+    if (detailLevel == Profiler::DetailNodes) detailLabel = "Detail: Nodes";
+    else if (detailLevel == Profiler::DetailVerbose) detailLabel = "Detail: Verbose";
     w = ButtonWidth("Detail: Standard");
     if (Button({ x, y, w, h }, detailLabel, detailLevel != Profiler::DetailStandard)) {
-        detailLevel = detailLevel == Profiler::DetailStandard ? Profiler::DetailNodes : Profiler::DetailStandard;
+        detailLevel = (detailLevel + 1) % 3;
     }
     x += w + 10.0f;
 
@@ -277,12 +308,14 @@ void ProfilerPanel::DrawStats(Rectangle area, const Profiler::Frame* frame) {
                "   Wall " + Duration(frame->wallNs) + " (" + buf + ")" +
                "   Work " + Duration(frame->workNs) +
                "   Wait " + Duration(frame->waitNs) +
+               (frame->gpuResolved ? "   GPU " + Duration(frame->gpuSpanNs) : std::string()) +
                "   Scopes " + std::to_string(frame->totalCalls) +
                " (~" + Duration((int64_t)overheadNs) + " profiler overhead)";
         if (frozen) color = theme.accent;
     }
     const bool software = rlGetVersion() == RL_OPENGL_SOFTWARE;
-    std::string renderer = software ? "Renderer: Software (CPU rasterizer)" : "Renderer: OpenGL";
+    std::string renderer = software ? "Renderer: Software (CPU rasterizer)"
+                                    : (ProfilerGpu::Available() ? "Renderer: OpenGL (GPU timing on)" : "Renderer: OpenGL (GPU timing unavailable)");
     DrawText(text.c_str(), (int)area.x, (int)area.y + 2, 10, color);
     DrawRightAligned(renderer, area.x + area.width, area.y + 2, theme.textSecondary);
 }
@@ -301,6 +334,7 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
 
     std::vector<uint64_t> lineKeys;
     lineKeys.push_back(ProfilerModel::kKeyWork);
+    if (Profiler::IsGpuAvailable()) lineKeys.push_back(ProfilerModel::kKeyGpu);
     for (uint64_t key : ProfilerModel::SelectLineKeys(rows, (size_t)std::max(0, lineCount), pinned, hidden)) {
         lineKeys.push_back(key);
     }
@@ -310,8 +344,10 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
     float dataMax = 0.0f;
     for (size_t i = 0; i < lineKeys.size(); i++) {
         ProfilerModel::FillSeries(lineKeys[i], window, series[i]);
-        if (lineKeys[i] != ProfilerModel::kKeyWork) drawnLines.insert(lineKeys[i]);
-        for (float v : series[i]) dataMax = std::max(dataMax, v);
+        if (lineKeys[i] != ProfilerModel::kKeyWork && lineKeys[i] != ProfilerModel::kKeyGpu) drawnLines.insert(lineKeys[i]);
+        for (float v : series[i]) {
+            if (!std::isnan(v)) dataMax = std::max(dataMax, v);
+        }
     }
 
     float rangeMax = dataMax * 1.08f;
@@ -339,15 +375,19 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
     linePoints.resize(window);
     for (size_t li = 0; li < lineKeys.size(); li++) {
         Color color = LineColor(lineKeys[li]);
-        for (size_t i = 0; i < window; i++) {
+        size_t validCount = window;
+        while (validCount > 0 && std::isnan(series[li][validCount - 1])) validCount--;
+        if (validCount < 2) continue;
+        for (size_t i = 0; i < validCount; i++) {
+            float value = std::isnan(series[li][i]) ? 0.0f : series[li][i];
             float x = plot.x + step * (float)i;
-            float y = plot.y + plot.height - std::min(1.0f, series[li][i] / yMax) * plot.height;
+            float y = plot.y + plot.height - std::min(1.0f, value / yMax) * plot.height;
             linePoints[i] = { x, y };
         }
-        DrawLineStrip(linePoints.data(), (int)window, color);
-        if (lineKeys[li] == ProfilerModel::kKeyWork) {
-            for (Vector2& point : linePoints) point.y += 1.0f;
-            DrawLineStrip(linePoints.data(), (int)window, color);
+        DrawLineStrip(linePoints.data(), (int)validCount, color);
+        if (lineKeys[li] == ProfilerModel::kKeyWork || lineKeys[li] == ProfilerModel::kKeyGpu) {
+            for (size_t i = 0; i < validCount; i++) linePoints[i].y += 1.0f;
+            DrawLineStrip(linePoints.data(), (int)validCount, color);
         }
     }
 
@@ -364,10 +404,8 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
 
     float legendX = plot.x;
     for (size_t li = 0; li < lineKeys.size(); li++) {
-        std::string name;
-        if (lineKeys[li] == ProfilerModel::kKeyWork) name = "Work";
-        else if (const Profiler::Track* track = Profiler::FindTrack(lineKeys[li])) name = Profiler::NameOf(track->nameId);
-        else continue;
+        std::string name = LineName(lineKeys[li]);
+        if (name.empty()) continue;
         name = ClipText(name, 130.0f);
         float itemW = (float)MeasureText(name.c_str(), 10) + 18.0f;
         if (legendX + itemW > plot.x + plot.width) break;
@@ -397,13 +435,17 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
                 if (lineKeys[li] == ProfilerModel::kKeyWork) {
                     line.name = "Work";
                     line.value = Duration(hoverFrame->workNs);
+                } else if (lineKeys[li] == ProfilerModel::kKeyGpu) {
+                    line.name = "GPU span";
+                    line.value = hoverFrame->gpuResolved ? Duration(hoverFrame->gpuSpanNs) : std::string("pending");
                 } else {
                     const Profiler::Track* track = Profiler::FindTrack(lineKeys[li]);
                     if (!track) continue;
                     float total = 0.0f, self = 0.0f;
                     track->Sample(hoverFrame->index, total, self);
-                    line.name = Profiler::NameOf(track->nameId);
-                    line.value = DurationUs(total);
+                    line.name = LineName(lineKeys[li]);
+                    const bool pending = track->lane == Profiler::Lane::GPU && !hoverFrame->gpuResolved;
+                    line.value = pending ? std::string("pending") : DurationUs(total);
                 }
                 tooltip.lines.push_back(line);
             }
@@ -446,12 +488,20 @@ void ProfilerPanel::DrawTable(Rectangle area, const std::vector<ProfilerModel::R
     DrawRectangleRec(area, ColorBrightness(theme.panelBg, -0.06f));
     DrawRectangleLinesEx(area, 1, theme.panelBorder);
 
-    if (laneFilter == ProfilerModel::LaneFilter::GPU) {
+    if (laneFilter == ProfilerModel::LaneFilter::GPU && rows.empty()) {
         const bool software = rlGetVersion() == RL_OPENGL_SOFTWARE;
-        const char* line1 = software ? "Software renderer active: rasterization runs on the CPU."
-                                     : "GPU timing is not recorded yet.";
-        const char* line2 = software ? "See Work > Render Pipeline under the CPU / All view."
-                                     : "Render passes are shown under Work > Render Pipeline (CPU submit time).";
+        const char* line1;
+        const char* line2;
+        if (software) {
+            line1 = "Software renderer active: rasterization runs on the CPU.";
+            line2 = "See Work > Render Pipeline under the CPU / All view.";
+        } else if (!Profiler::IsGpuAvailable()) {
+            line1 = "GPU timestamp queries are unavailable on this driver or context.";
+            line2 = "Render passes are still shown under Work > Render Pipeline (CPU submit time).";
+        } else {
+            line1 = "Waiting for GPU timing results...";
+            line2 = "Results arrive a few frames after the frame is submitted.";
+        }
         DrawText(line1, (int)area.x + 10, (int)area.y + 10, 11, theme.textPrimary);
         DrawText(line2, (int)area.x + 10, (int)area.y + 26, 10, theme.textSecondary);
         return;
@@ -472,7 +522,7 @@ void ProfilerPanel::DrawTable(Rectangle area, const std::vector<ProfilerModel::R
     DrawText("Name", (int)area.x + 8, (int)area.y + 3, 10, theme.textSecondary);
     DrawRightAligned("Total", colSelf - 4.0f, area.y + 3, theme.textSecondary);
     DrawRightAligned("Self", colPct - 4.0f, area.y + 3, theme.textSecondary);
-    DrawRightAligned("% Work", colAvg - 4.0f, area.y + 3, theme.textSecondary);
+    DrawRightAligned("% Lane", colAvg - 4.0f, area.y + 3, theme.textSecondary);
     DrawRightAligned("Avg", colMax - 4.0f, area.y + 3, theme.textSecondary);
     DrawRightAligned("Max", colCalls - 4.0f, area.y + 3, theme.textSecondary);
     DrawRightAligned("Calls", right - 4.0f, area.y + 3, theme.textSecondary);
@@ -524,15 +574,16 @@ void ProfilerPanel::DrawTable(Rectangle area, const std::vector<ProfilerModel::R
             nameX += 13.0f;
         }
 
-        Color textColor = (row.isWait || row.key == ProfilerModel::kKeyUnaccounted) ? theme.textSecondary : theme.textPrimary;
-        if (row.synthetic && !row.isWait && row.key != ProfilerModel::kKeyUnaccounted) textColor = theme.accent;
+        const bool unattributed = row.key == ProfilerModel::kKeyUnaccounted || row.key == ProfilerModel::kKeyGpuIdle;
+        Color textColor = (row.isWait || unattributed) ? theme.textSecondary : theme.textPrimary;
+        if (row.synthetic && !row.isWait && !unattributed) textColor = theme.accent;
         DrawText(ClipText(row.name, nameRight - nameX).c_str(), (int)nameX, (int)(y + 3), 10, textColor);
 
         DrawRightAligned(Duration(row.totalNs), colSelf - 4.0f, y + 3, textColor);
         DrawRightAligned(row.synthetic ? std::string("-") : Duration(row.selfNs), colPct - 4.0f, y + 3, theme.textSecondary);
         DrawRightAligned(Percent(row.percentOfWork), colAvg - 4.0f, y + 3, theme.textSecondary);
-        DrawRightAligned(row.key == ProfilerModel::kKeyUnaccounted ? std::string("-") : DurationUs(row.avgUs), colMax - 4.0f, y + 3, theme.textSecondary);
-        DrawRightAligned(row.key == ProfilerModel::kKeyUnaccounted ? std::string("-") : DurationUs(row.maxUs), colCalls - 4.0f, y + 3, theme.textSecondary);
+        DrawRightAligned(unattributed ? std::string("-") : DurationUs(row.avgUs), colMax - 4.0f, y + 3, theme.textSecondary);
+        DrawRightAligned(unattributed ? std::string("-") : DurationUs(row.maxUs), colCalls - 4.0f, y + 3, theme.textSecondary);
         DrawRightAligned(std::to_string(row.calls), right - 4.0f, y + 3, theme.textSecondary);
 
         if (rowHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) toggleRow = (int)i;
