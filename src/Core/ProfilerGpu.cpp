@@ -198,6 +198,18 @@ void Pump() {
     if (Profiler::IsEnabled()) OpenFrame();
 }
 
+void DiscardPending() {
+    if (!g_available) return;
+    if (g_recording) {
+        ReleaseRecord(g_current, true);
+        g_current = FrameRecord();
+        g_stack.clear();
+        g_recording = false;
+    }
+    for (FrameRecord& record : g_pending) ReleaseRecord(record, true);
+    g_pending.clear();
+}
+
 void FrameEnd() {
     if (!g_available || !g_recording || g_current.spanEndSet) return;
     g_current.spanEnd = AcquireQuery();

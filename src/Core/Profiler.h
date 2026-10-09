@@ -8,6 +8,8 @@
 namespace Profiler {
 
 constexpr size_t kHistoryFrames = 600;
+constexpr size_t kMaxHistoryFrames = 3600;
+constexpr size_t kMinHistoryFrames = 60;
 constexpr uint64_t kRootKey = 0x9E3779B97F4A7C15ull;
 
 enum class Lane : uint8_t { CPU = 0, GPU = 1 };
@@ -76,6 +78,11 @@ uint64_t ChildKey(uint64_t parentKey, uint32_t nameId, Lane lane);
 
 void RequestRecording();
 void SetForcedRecording(bool forced);
+void SetCaptureRecording(bool active);
+bool IsCaptureRecording();
+size_t HistoryFrames();
+void SetHistoryFrames(size_t frames);
+void InjectFrame(Frame&& frame);
 bool IsForcedRecording();
 void SetAutoRecordOnPlay(bool enabled);
 bool IsAutoRecordOnPlay();

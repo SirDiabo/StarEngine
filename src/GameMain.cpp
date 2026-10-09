@@ -16,6 +16,8 @@
 #include "Core/Widgets/WidgetRenderer.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
+#include "Core/ProfilerRender.h"
+#include "Core/ProfilerRuntime.h"
 #include "Core/RenderSettings.h"
 #include "Core/ShadingTechniqueRegistry.h"
 #include "Modules.modules.generated.h"
@@ -214,6 +216,7 @@ int main(int argc, char* argv[]) {
     SetExitKey(0);
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
+    ProfilerRuntime::Initialize(ProfilerRuntime::ParseArguments(argc, argv, std::getenv("STARENGINE_PROFILE")), config.name);
 
     RenderTexture2D renderTarget{};
     int renderTargetWidth = 0;
@@ -251,15 +254,20 @@ int main(int argc, char* argv[]) {
     int perfSampleCount = 0;
 
     while (!WindowShouldClose()) {
+        ProfilerRuntime::BeginFrame();
         float deltaTime = GetFrameTime();
 
         double perfTickStart = GetTime();
-        ModuleManager::Get().UpdateAll(deltaTime);
+        {
+            PROFILE_SCOPE("Module Updates");
+            ModuleManager::Get().UpdateAll(deltaTime);
+        }
         World::Get().Tick(deltaTime);
         perfTickAccum += GetTime() - perfTickStart;
 
         std::string requestedLevelPath;
         if (World::Get().ConsumePendingLevelLoad(requestedLevelPath)) {
+            PROFILE_SCOPE("Level Load");
             StarMap newMap;
             if (newMap.LoadFromFile(requestedLevelPath)) {
                 World::Get().EndPlay();
@@ -296,8 +304,11 @@ int main(int argc, char* argv[]) {
         Vector2 rawMouse = GetMousePosition();
         float renderScale = RenderSettings::Get().GetRenderScale();
         Vector2 lowResMouse = {rawMouse.x * renderScale, rawMouse.y * renderScale};
-        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight}, lowResMouse, false, renderScale);
-        WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)screenWidth, (float)screenHeight}, rawMouse, true);
+        {
+            PROFILE_SCOPE("Widget Tick (Screen Space)");
+            WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)scaledWidth, (float)scaledHeight}, lowResMouse, false, renderScale);
+            WidgetRenderer::TickScreenSpaceWidgets(deltaTime, {0, 0, (float)screenWidth, (float)screenHeight}, rawMouse, true);
+        }
 
         double perfRenderStart = GetTime();
         RenderPipeline::Render(camera, renderTarget, {20, 20, 20, 255});
@@ -306,11 +317,19 @@ int main(int argc, char* argv[]) {
         double perfPresentStart = GetTime();
         BeginDrawing();
         ClearBackground(BLACK);
-        Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
-        Rectangle dest = {0, 0, (float)screenWidth, (float)screenHeight};
-        DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
-        WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)screenWidth, (float)screenHeight}, true);
-        EndDrawing();
+        {
+            PROFILE_RENDER_SCOPE("Present Composite");
+            Rectangle source = {0, 0, (float)renderTarget.texture.width, -(float)renderTarget.texture.height};
+            Rectangle dest = {0, 0, (float)screenWidth, (float)screenHeight};
+            DrawTexturePro(renderTarget.texture, source, dest, {0, 0}, 0.0f, WHITE);
+            WidgetRenderer::DrawScreenSpaceWidgets({0, 0, (float)screenWidth, (float)screenHeight}, true);
+        }
+        ProfilerRuntime::DrawOverlay();
+        ProfilerRuntime::PreEndDrawing();
+        {
+            PROFILE_WAIT_SCOPE("EndDrawing (swap, frame limiter, input)");
+            EndDrawing();
+        }
         perfPresentAccum += GetTime() - perfPresentStart;
 
         if (++perfSampleCount >= 120) {
@@ -324,6 +343,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    ProfilerRuntime::Shutdown();
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
     GameSession::EndSession();
     AssetCache::Get().Clear();

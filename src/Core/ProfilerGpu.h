@@ -26,6 +26,7 @@ void SetBackend(const Backend* backend);
 bool Available();
 void Pump();
 void FrameEnd();
+void DiscardPending();
 uint32_t BeginScope(uint32_t nameId);
 void EndScope(uint32_t handle);
 size_t PendingFrameCount();

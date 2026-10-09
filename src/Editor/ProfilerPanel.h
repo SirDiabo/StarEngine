@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Panel.h"
 #include "Core/Profiler.h"
+#include "Core/ProfilerCapture.h"
 #include "ProfilerModel.h"
 #include <string>
 #include <unordered_set>
@@ -31,6 +32,11 @@ private:
     void EnsureWidgets();
     void DrawToolbar(Rectangle area);
     void DrawStats(Rectangle area, const Profiler::Frame* frame);
+    void DrawSourceBar(Rectangle area);
+    void OpenCapture(const std::string& path);
+    void CloseCapture();
+    void PollCapture();
+    std::string CaptureDirectory() const;
     void DrawGraph(Rectangle area, const std::vector<ProfilerModel::Row>& rows, Tooltip& tooltip);
     void DrawTable(Rectangle area, const std::vector<ProfilerModel::Row>& rows);
     void DrawTooltip(const Tooltip& tooltip);
@@ -42,6 +48,11 @@ private:
 
     bool recording = true;
     bool autoPie = false;
+    bool captureMode = false;
+    bool captureGpuApplied = false;
+    double nextCapturePoll = 0.0;
+    std::string sourceMessage;
+    ProfilerCapture::Reader captureReader;
     bool wasPlayRecording = false;
     bool frozen = false;
     Profiler::Frame frozenFrame;

@@ -20,7 +20,9 @@ struct OpenScope {
     int64_t childNs;
 };
 
-constexpr size_t kRingSize = kHistoryFrames + 1;
+size_t g_history = kHistoryFrames;
+
+size_t RingSize() { return g_history + 1; }
 
 std::mutex g_internMutex;
 std::unordered_map<std::string, uint32_t> g_internIds;
@@ -40,6 +42,7 @@ uint64_t g_frameCounter = 0;
 uint64_t g_lastRequestFrame = 0;
 bool g_requested = false;
 bool g_forced = false;
+bool g_captureRecording = false;
 bool g_autoPlay = false;
 bool g_playing = false;
 bool g_playRecording = false;
@@ -57,7 +60,7 @@ uint64_t Mix(uint64_t x) {
 }
 
 void EnsureRing() {
-    if (g_ring.empty()) g_ring.resize(kRingSize);
+    if (g_ring.size() != RingSize()) g_ring.assign(RingSize(), Frame());
 }
 
 void UpdateTrack(const Frame& frame, size_t nodeIndex, size_t slot) {
@@ -69,9 +72,9 @@ void UpdateTrack(const Frame& frame, size_t nodeIndex, size_t slot) {
         track.nameId = node.nameId;
         track.lane = node.lane;
         track.flags = node.flags;
-        track.totalUs.assign(kHistoryFrames, 0.0f);
-        track.selfUs.assign(kHistoryFrames, 0.0f);
-        track.stamp.assign(kHistoryFrames, 0u);
+        track.totalUs.assign(g_history, 0.0f);
+        track.selfUs.assign(g_history, 0.0f);
+        track.stamp.assign(g_history, 0u);
         it = g_tracks.emplace(node.key, std::move(track)).first;
     }
     Track& track = it->second;
@@ -104,15 +107,15 @@ void FinalizeFrame(int64_t nowNs) {
     frame.workNs = frame.wallNs - waitNs;
     frame.totalCalls = calls;
 
-    const size_t slot = (size_t)(frame.index % kHistoryFrames);
+    const size_t slot = (size_t)(frame.index % g_history);
     for (size_t i = 0; i < frame.nodes.size(); i++) UpdateTrack(frame, i, slot);
 
-    g_head = (g_head + 1) % kRingSize;
-    if (g_count < kHistoryFrames) g_count++;
+    g_head = (g_head + 1) % RingSize();
+    if (g_count < g_history) g_count++;
 
     if (frame.index % 120 == 0) {
         for (auto it = g_tracks.begin(); it != g_tracks.end();) {
-            if (it->second.lastSeenFrame + kHistoryFrames < frame.index) it = g_tracks.erase(it);
+            if (it->second.lastSeenFrame + g_history < frame.index) it = g_tracks.erase(it);
             else ++it;
         }
     }
@@ -143,8 +146,13 @@ void Calibrate() {
 }
 
 bool Track::Sample(uint64_t frameIndex, float& outTotalUs, float& outSelfUs) const {
-    const size_t slot = (size_t)(frameIndex % kHistoryFrames);
-    if (stamp.empty() || stamp[slot] != (uint32_t)frameIndex) {
+    if (stamp.empty()) {
+        outTotalUs = 0.0f;
+        outSelfUs = 0.0f;
+        return false;
+    }
+    const size_t slot = (size_t)(frameIndex % stamp.size());
+    if (stamp[slot] != (uint32_t)frameIndex) {
         outTotalUs = 0.0f;
         outSelfUs = 0.0f;
         return false;
@@ -237,6 +245,37 @@ void RequestRecording() {
 }
 
 void SetForcedRecording(bool forced) { g_forced = forced; }
+void SetCaptureRecording(bool active) { g_captureRecording = active; }
+bool IsCaptureRecording() { return g_captureRecording; }
+size_t HistoryFrames() { return g_history; }
+
+void SetHistoryFrames(size_t frames) {
+    if (frames < kMinHistoryFrames) frames = kMinHistoryFrames;
+    if (frames > kMaxHistoryFrames) frames = kMaxHistoryFrames;
+    Clear();
+    g_history = frames;
+    g_ring.assign(RingSize(), Frame());
+}
+
+void InjectFrame(Frame&& frame) {
+    if (g_current) return;
+    EnsureRing();
+    Frame& target = g_ring[g_head];
+    target = std::move(frame);
+    uint64_t calls = 0;
+    for (const Node& node : target.nodes) calls += node.calls;
+    target.totalCalls = calls;
+    const size_t slot = (size_t)(target.index % g_history);
+    for (size_t i = 0; i < target.nodes.size(); i++) UpdateTrack(target, i, slot);
+    g_head = (g_head + 1) % RingSize();
+    if (g_count < g_history) g_count++;
+    if (target.index % 120 == 0) {
+        for (auto it = g_tracks.begin(); it != g_tracks.end();) {
+            if (it->second.lastSeenFrame + g_history < target.index) it = g_tracks.erase(it);
+            else ++it;
+        }
+    }
+}
 bool IsForcedRecording() { return g_forced; }
 void SetAutoRecordOnPlay(bool enabled) { g_autoPlay = enabled; }
 bool IsAutoRecordOnPlay() { return g_autoPlay; }
@@ -272,7 +311,7 @@ void BeginFrame() {
     }
 
     const bool requestActive = !g_autoPlay && g_requested && g_frameCounter - g_lastRequestFrame <= 2;
-    const bool shouldRecord = g_forced || g_playRecording || requestActive;
+    const bool shouldRecord = g_forced || g_captureRecording || g_playRecording || requestActive;
     Internal::enabled = shouldRecord;
     if (!shouldRecord) return;
 
@@ -308,7 +347,7 @@ bool IsGpuAvailable() { return g_gpuAvailable; }
 bool ResolveGpuFrame(uint64_t frameIndex, int64_t spanNs, const std::vector<GpuScopeResult>& scopes) {
     Frame* frame = nullptr;
     for (size_t age = 0; age < g_count; age++) {
-        Frame* candidate = &g_ring[(g_head + kRingSize - 1 - age) % kRingSize];
+        Frame* candidate = &g_ring[(g_head + RingSize() - 1 - age) % RingSize()];
         if (candidate->index == frameIndex) { frame = candidate; break; }
         if (candidate->index < frameIndex) break;
     }
@@ -354,7 +393,7 @@ bool ResolveGpuFrame(uint64_t frameIndex, int64_t spanNs, const std::vector<GpuS
 
     frame->gpuSpanNs = spanNs < 0 ? 0 : spanNs;
     frame->gpuResolved = true;
-    const size_t slot = (size_t)(frame->index % kHistoryFrames);
+    const size_t slot = (size_t)(frame->index % g_history);
     for (size_t i = firstGpuNode; i < frame->nodes.size(); i++) UpdateTrack(*frame, i, slot);
     return true;
 }
@@ -373,7 +412,7 @@ size_t FrameCount() { return g_count; }
 
 const Frame* FrameAt(size_t ageFromNewest) {
     if (ageFromNewest >= g_count || g_ring.empty()) return nullptr;
-    return &g_ring[(g_head + kRingSize - 1 - ageFromNewest) % kRingSize];
+    return &g_ring[(g_head + RingSize() - 1 - ageFromNewest) % RingSize()];
 }
 
 const Track* FindTrack(uint64_t key) {

@@ -5,6 +5,9 @@
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/ProfilerGpu.h"
+#include "Core/Project.h"
+#include "NativeFileDialog.h"
+#include <filesystem>
 #include "raylib.h"
 #include "rlgl.h"
 #include <algorithm>
@@ -132,8 +135,12 @@ std::string ProfilerPanel::LineName(uint64_t key) {
 
 void ProfilerPanel::Render() {
     EnsureWidgets();
+    if (captureMode) {
+        autoPie = false;
+        PollCapture();
+    }
     Profiler::SetAutoRecordOnPlay(autoPie);
-    if (!autoPie && recording) Profiler::RequestRecording();
+    if (!autoPie && !captureMode && recording) Profiler::RequestRecording();
     Profiler::SetDetail(detailLevel);
 
     const bool playRecording = Profiler::IsPlayRecordingActive();
@@ -159,12 +166,13 @@ void ProfilerPanel::Render() {
     {
         PROFILE_SCOPE("Toolbar");
         DrawToolbar({ inner.x, inner.y, inner.width, kToolbarHeight });
+        DrawSourceBar({ inner.x, inner.y + kToolbarHeight + 3.0f, inner.width, kToolbarHeight });
     }
 
     const Profiler::Frame* frame = DisplayFrame();
-    DrawStats({ inner.x, inner.y + kToolbarHeight + 3.0f, inner.width, kStatsHeight }, frame);
+    DrawStats({ inner.x, inner.y + kToolbarHeight * 2.0f + 6.0f, inner.width, kStatsHeight }, frame);
 
-    float bodyY = inner.y + kToolbarHeight + kStatsHeight + 8.0f;
+    float bodyY = inner.y + kToolbarHeight * 2.0f + kStatsHeight + 11.0f;
     float bodyH = inner.y + inner.height - bodyY;
 
     if (!frame) {
@@ -216,13 +224,17 @@ void ProfilerPanel::DrawToolbar(Rectangle area) {
         recordLabel = playRecording ? "PIE: Recording" : (Profiler::FrameCount() > 0 ? "PIE: Stopped" : "PIE: Waiting");
         lit = playRecording;
     }
-    float w = ButtonWidth("PIE: Recording") + 10.0f;
-    if (Button({ x, y, w, h }, recordLabel, lit) && !autoPie) recording = !recording;
+    float w = ButtonWidth("Capture: Corrupt") + 10.0f;
+    if (captureMode) {
+        recordLabel = captureReader.Ended() ? "Capture: Ended" : (captureReader.Corrupt() ? "Capture: Corrupt" : "Capture: Tailing");
+        lit = !captureReader.Ended() && !captureReader.Corrupt();
+    }
+    if (Button({ x, y, w, h }, recordLabel, lit) && !autoPie && !captureMode) recording = !recording;
     DrawCircle((int)(x + 9), (int)(y + h / 2), 3.0f, lit ? theme.danger : theme.textSecondary);
     x += w + 4.0f;
 
     w = ButtonWidth("Auto: PIE");
-    if (Button({ x, y, w, h }, "Auto: PIE", autoPie)) autoPie = !autoPie;
+    if (Button({ x, y, w, h }, "Auto: PIE", autoPie) && !captureMode) autoPie = !autoPie;
     x += w + 4.0f;
 
     w = ButtonWidth("Clear");
@@ -295,6 +307,133 @@ void ProfilerPanel::DrawToolbar(Rectangle area) {
     }
 }
 
+std::string ProfilerPanel::CaptureDirectory() const {
+    std::filesystem::path root = Project::Get().GetRootPath();
+    return (root / "Saved" / "Profiles").string();
+}
+
+void ProfilerPanel::OpenCapture(const std::string& path) {
+    if (ProfilerCapture::IsActive()) ProfilerCapture::Stop();
+    ProfilerGpu::DiscardPending();
+    Profiler::Clear();
+    frozen = false;
+    colors.Reset();
+    tableScroll = 0.0f;
+    captureGpuApplied = false;
+    nextCapturePoll = 0.0;
+    if (!captureReader.Open(path)) {
+        sourceMessage = "Cannot open " + path;
+        captureMode = false;
+        return;
+    }
+    captureMode = true;
+    autoPie = false;
+    sourceMessage.clear();
+}
+
+void ProfilerPanel::CloseCapture() {
+    captureReader.Close();
+    captureMode = false;
+    Profiler::Clear();
+    Profiler::SetGpuAvailable(ProfilerGpu::Available());
+    frozen = false;
+    colors.Reset();
+    recording = true;
+    sourceMessage.clear();
+}
+
+void ProfilerPanel::PollCapture() {
+    if (!captureReader.IsOpen() || GetTime() < nextCapturePoll) return;
+    std::vector<Profiler::Frame> frames;
+    captureReader.Poll(frames);
+    if (captureReader.WasReset()) {
+        Profiler::Clear();
+        frozen = false;
+        captureGpuApplied = false;
+    }
+    if (captureReader.HasHeader() && !captureGpuApplied) {
+        Profiler::SetGpuAvailable(captureReader.GetHeader().gpuTiming);
+        captureGpuApplied = true;
+    }
+    for (Profiler::Frame& frame : frames) Profiler::InjectFrame(std::move(frame));
+    nextCapturePoll = GetTime() + (captureReader.MoreAvailable() ? 0.0 : 0.5);
+}
+
+void ProfilerPanel::DrawSourceBar(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+    float x = area.x;
+    const float y = area.y;
+    const float h = area.height;
+    float w;
+
+    if (captureMode) {
+        w = ButtonWidth("Close Capture");
+        if (Button({ x, y, w, h }, "Close Capture", false)) CloseCapture();
+        x += w + 8.0f;
+        std::string text = std::filesystem::path(captureReader.Path()).filename().string() + "   frames " +
+                           std::to_string(captureReader.FramesRead());
+        if (captureReader.HasHeader()) text += "   " + captureReader.GetHeader().appName + "   " + captureReader.GetHeader().renderer;
+        if (captureReader.Corrupt()) text += "   (file is corrupt or from a newer version)";
+        DrawText(ClipText(text, area.x + area.width - x).c_str(), (int)x, (int)(y + (h - 10) / 2.0f), 10, theme.textSecondary);
+        return;
+    }
+
+    w = ButtonWidth("Open Capture...");
+    if (Button({ x, y, w, h }, "Open Capture...", false)) {
+        std::string path = NativeFileDialog::OpenFile("Open Profile Capture", CaptureDirectory(), "Profile Captures", "*.starprof");
+        if (!path.empty()) OpenCapture(path);
+    }
+    x += w + 4.0f;
+
+    w = ButtonWidth("Save Snapshot");
+    if (Button({ x, y, w, h }, "Save Snapshot", false)) {
+        if (ProfilerCapture::IsActive()) {
+            sourceMessage = "Stop the file recording first";
+        } else if (Profiler::FrameCount() == 0) {
+            sourceMessage = "Nothing to save yet";
+        } else {
+            ProfilerCapture::Options options;
+            options.path = (std::filesystem::path(CaptureDirectory()) / ProfilerCapture::TimestampedName("snapshot")).string();
+            options.appName = "StarEngine Editor";
+            options.renderer = ProfilerGpu::Available() ? "OpenGL" : "Software";
+            options.gpuTiming = Profiler::IsGpuAvailable();
+            size_t written = 0;
+            sourceMessage = ProfilerCapture::SaveHistory(options, &written)
+                                ? "Saved " + std::to_string(written) + " frames to " + options.path
+                                : "Save failed: " + ProfilerCapture::LastError();
+        }
+    }
+    x += w + 4.0f;
+
+    const bool writing = ProfilerCapture::IsActive();
+    const char* recordLabel = writing ? "Stop File Recording" : "Record To File";
+    w = ButtonWidth("Stop File Recording");
+    if (Button({ x, y, w, h }, recordLabel, writing)) {
+        if (writing) {
+            ProfilerCapture::Stop();
+            sourceMessage = "Saved " + ProfilerCapture::ActivePath();
+        } else {
+            ProfilerCapture::Options options;
+            options.path = (std::filesystem::path(CaptureDirectory()) / ProfilerCapture::TimestampedName("editor")).string();
+            options.appName = "StarEngine Editor";
+            options.renderer = ProfilerGpu::Available() ? "OpenGL" : "Software";
+            options.gpuTiming = Profiler::IsGpuAvailable();
+            sourceMessage = ProfilerCapture::Start(options) ? std::string() : "Cannot record: " + ProfilerCapture::LastError();
+        }
+    }
+    x += w + 8.0f;
+
+    std::string status = sourceMessage;
+    Color color = theme.textSecondary;
+    if (writing) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.1f MB", (double)ProfilerCapture::BytesWritten() / (1024.0 * 1024.0));
+        status = "REC " + std::filesystem::path(ProfilerCapture::ActivePath()).filename().string() + "  " + buf;
+        color = theme.danger;
+    }
+    DrawText(ClipText(status, area.x + area.width - x).c_str(), (int)x, (int)(y + (h - 10) / 2.0f), 10, color);
+}
+
 void ProfilerPanel::DrawStats(Rectangle area, const Profiler::Frame* frame) {
     const UIPalette& theme = UITheme::Get();
     std::string text;
@@ -316,6 +455,9 @@ void ProfilerPanel::DrawStats(Rectangle area, const Profiler::Frame* frame) {
     const bool software = rlGetVersion() == RL_OPENGL_SOFTWARE;
     std::string renderer = software ? "Renderer: Software (CPU rasterizer)"
                                     : (ProfilerGpu::Available() ? "Renderer: OpenGL (GPU timing on)" : "Renderer: OpenGL (GPU timing unavailable)");
+    if (captureMode && captureReader.HasHeader()) {
+        renderer = "Captured on: " + captureReader.GetHeader().renderer + (captureReader.GetHeader().gpuTiming ? " (GPU timing on)" : "");
+    }
     DrawText(text.c_str(), (int)area.x, (int)area.y + 2, 10, color);
     DrawRightAligned(renderer, area.x + area.width, area.y + 2, theme.textSecondary);
 }

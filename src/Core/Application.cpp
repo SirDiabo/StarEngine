@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "ProfilerRender.h"
+#include "ProfilerCapture.h"
 #include "Editor/Editor.h"
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
@@ -195,6 +196,7 @@ void Application::Run() {
     while (!WindowShouldClose() && running) {
         Profiler::BeginFrame();
         ProfilerGpu::Pump();
+        ProfilerCapture::Pump();
 
         if (pendingRelaunch) {
             projectPath = Project::Get().GetProjectFilePath();
