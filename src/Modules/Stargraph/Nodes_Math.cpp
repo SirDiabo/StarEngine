@@ -320,6 +320,7 @@ void RegisterMathNodes() {
 
     NodeTemplate vec3Dot;
     vec3Dot.type = "Vec3_Dot";
+    vec3Dot.menuLabel = "Dot Product (.)";
     vec3Dot.category = "Math";
     vec3Dot.moduleName = "Stargraph";
     vec3Dot.createPins = [](Node* node) {
@@ -342,6 +343,7 @@ void RegisterMathNodes() {
 
     NodeTemplate vec3Cross;
     vec3Cross.type = "Vec3_Cross";
+    vec3Cross.menuLabel = "Cross Product (x)";
     vec3Cross.category = "Math";
     vec3Cross.moduleName = "Stargraph";
     vec3Cross.createPins = [](Node* node) {
@@ -969,6 +971,28 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(rotatorInterp);
+
+    NodeTemplate floatModulo;
+    floatModulo.type = "Float_Modulo";
+    floatModulo.menuLabel = "Float Modulo (%)";
+    floatModulo.category = "Math";
+    floatModulo.moduleName = "Stargraph";
+    floatModulo.createPins = [](Node* node) {
+        node->inputs.push_back({"A", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"B", PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Result", PinType::Float, false, true});
+    };
+    floatModulo.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float a = 0.0f, b = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "A") a = GetScalarValue(p);
+            if (p.name == "B") b = GetScalarValue(p);
+        }
+        float result = (b != 0.0f) ? fmodf(a, b) : 0.0f;
+        char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(floatModulo);
 
     NodeTemplate intModulo;
     intModulo.type = "Int_Modulo";

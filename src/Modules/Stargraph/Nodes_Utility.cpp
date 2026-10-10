@@ -151,6 +151,7 @@ void RegisterUtilityNodes() {
 
     NodeTemplate strConcat;
     strConcat.type = "String_Concat";
+    strConcat.menuLabel = "Append (+)";
     strConcat.category = "String";
     strConcat.moduleName = "Stargraph";
     strConcat.createPins = [](Node* node) {
