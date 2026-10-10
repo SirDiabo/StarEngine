@@ -44,9 +44,10 @@ static float InterpAngleStep(float value, float target, float delta, float speed
 }
 
 void RegisterMathNodes() {
-    auto RegisterWildcardMath = [](const std::string& nodeType, char op) {
+    auto RegisterWildcardMath = [](const std::string& nodeType, const std::string& label, char op) {
         NodeTemplate t;
         t.type = nodeType;
+        t.menuLabel = label;
         t.category = "Math";
         t.moduleName = "Stargraph";
         t.createPins = [](Node* node) {
@@ -158,13 +159,14 @@ void RegisterMathNodes() {
         NodeRegistry::Get().RegisterNode(t);
     };
 
-    RegisterWildcardMath("Add",      '+');
-    RegisterWildcardMath("Subtract", '-');
-    RegisterWildcardMath("Multiply", '*');
-    RegisterWildcardMath("Divide",   '/');
+    RegisterWildcardMath("Add",      "Add (+)",      '+');
+    RegisterWildcardMath("Subtract", "Subtract (-)", '-');
+    RegisterWildcardMath("Multiply", "Multiply (*)", '*');
+    RegisterWildcardMath("Divide",   "Divide (/)",   '/');
 
     NodeTemplate mathPower;
     mathPower.type = "Power";
+    mathPower.menuLabel = "Power (^)";
     mathPower.category = "Math";
     mathPower.moduleName = "Stargraph";
     mathPower.createPins = [](Node* node) {
@@ -970,6 +972,7 @@ void RegisterMathNodes() {
 
     NodeTemplate intModulo;
     intModulo.type = "Int_Modulo";
+    intModulo.menuLabel = "Int Modulo (%)";
     intModulo.category = "Math";
     intModulo.moduleName = "Stargraph";
     intModulo.createPins = [](Node* node) {
@@ -1090,6 +1093,7 @@ void RegisterMathNodes() {
 
     NodeTemplate boolNot;
     boolNot.type = "Bool_Not";
+    boolNot.menuLabel = "Not (!)";
     boolNot.category = "Math";
     boolNot.moduleName = "Stargraph";
     boolNot.createPins = [](Node* node) {
@@ -1105,6 +1109,7 @@ void RegisterMathNodes() {
 
     NodeTemplate boolAnd;
     boolAnd.type = "Bool_And";
+    boolAnd.menuLabel = "And (&&)";
     boolAnd.category = "Math";
     boolAnd.moduleName = "Stargraph";
     boolAnd.createPins = [](Node* node) {
@@ -1124,6 +1129,7 @@ void RegisterMathNodes() {
 
     NodeTemplate boolOr;
     boolOr.type = "Bool_Or";
+    boolOr.menuLabel = "Or (||)";
     boolOr.category = "Math";
     boolOr.moduleName = "Stargraph";
     boolOr.createPins = [](Node* node) {
@@ -1199,9 +1205,10 @@ void RegisterMathNodes() {
     RegisterWildcardEquality("Wildcard_Equals",    "Equal (==)",     false);
     RegisterWildcardEquality("Wildcard_Not_Equal", "Not Equal (!=)", true);
 
-    auto RegisterWildcardCompare = [](const std::string& nodeType, char op) {
+    auto RegisterWildcardCompare = [](const std::string& nodeType, const std::string& label, char op) {
         NodeTemplate t;
         t.type = nodeType;
+        t.menuLabel = label;
         t.category = "Comparisons";
         t.moduleName = "Stargraph";
         t.createPins = [](Node* node) {
@@ -1227,10 +1234,10 @@ void RegisterMathNodes() {
         NodeRegistry::Get().RegisterNode(t);
     };
 
-    RegisterWildcardCompare("Greater_Than (>)",         '>');
-    RegisterWildcardCompare("Less_Than (<)",            '<');
-    RegisterWildcardCompare("Greater_Or_Equal (>=)",    'g');
-    RegisterWildcardCompare("Less_Or_Equal (<=)",       'l');
+    RegisterWildcardCompare("Greater_Than",     "Greater Than (>)",      '>');
+    RegisterWildcardCompare("Less_Than",        "Less Than (<)",         '<');
+    RegisterWildcardCompare("Greater_Or_Equal", "Greater Or Equal (>=)", 'g');
+    RegisterWildcardCompare("Less_Or_Equal",    "Less Or Equal (<=)",    'l');
 
     NodeTemplate alignToGround;
     alignToGround.type = "Align_To_Ground";
