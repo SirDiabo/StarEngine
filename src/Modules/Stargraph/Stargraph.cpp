@@ -440,6 +440,7 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         out << "Type=" << node.type << "\n";
         if (node.title != node.type) out << "Title=" << node.title << "\n";
         out << "Pos=" << node.posX << "," << node.posY << "\n";
+        if (!node.componentClass.empty()) out << "ComponentClass=" << node.componentClass << "\n";
         if (node.type == "Custom_Event") {
             if (node.eventReplication != ReplicationMode::Local)
                 out << "Replication=" << ReplicationModeToString(node.eventReplication) << "\n";
@@ -653,6 +654,7 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
             }
             if (const std::string* v = FindEntry(section, "Replication")) node->eventReplication = ReplicationModeFromString(*v);
             if (const std::string* v = FindEntry(section, "Reliable")) node->eventReliable = (*v == "true");
+            if (const std::string* v = FindEntry(section, "ComponentClass")) node->componentClass = *v;
 
             auto ensurePins = [&](const std::string* namesEntry, std::vector<Pin>& pins, bool isOutput) {
                 if (!namesEntry || namesEntry->empty()) return;

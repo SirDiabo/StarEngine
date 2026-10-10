@@ -101,12 +101,14 @@ private:
     void RenderWireInProgress();
     void RenderKeyPickerPopup();
 
+    bool ConnectPins(int outputPinId, int inputPinId);
     void TryCompleteLink(int pinId, bool onInput);
     void CancelLink();
     void RemoveLinkFromPin(int pinId);
     void RemoveSpecificLink(int outputPinId, int inputPinId);
     void BeginReroute(int pinId);
     void RefreshWildcardPins(Node* node);
+    void ResolveClonedWildcards(const std::vector<Node*>& nodes);
     void DeleteSelected();
     void CopySelectedNodes();
     void PasteNodes();

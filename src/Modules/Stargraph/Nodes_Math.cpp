@@ -548,6 +548,22 @@ void RegisterMathNodes() {
     };
     NodeRegistry::Get().RegisterNode(vec3ToStr);
 
+    NodeTemplate rotatorToStr;
+    rotatorToStr.type = "Rotator_To_String";
+    rotatorToStr.category = "Conversions";
+    rotatorToStr.moduleName = "Stargraph";
+    rotatorToStr.createPins = [](Node* node) {
+        node->inputs.push_back({"Value", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    rotatorToStr.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        float x = 0, y = 0, z = 0;
+        for (const Pin& p : node.inputs) if (p.name == "Value") ReadVec3(p, x, y, z);
+        char buf[64]; snprintf(buf, sizeof(buf), "(%g, %g, %g)", x, y, z);
+        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(rotatorToStr);
+
     NodeTemplate strToVec3;
     strToVec3.type = "String_To_Vec3";
     strToVec3.category = "Conversions";
@@ -1125,56 +1141,63 @@ void RegisterMathNodes() {
     };
     NodeRegistry::Get().RegisterNode(boolOr);
 
-    NodeTemplate wildcardEquals;
-    wildcardEquals.type = "Wildcard_Equals";
-    wildcardEquals.category = "Comparisons";
-    wildcardEquals.moduleName = "Stargraph";
-    wildcardEquals.createPins = [](Node* node) {
-        node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
-        node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
-        node->outputs.push_back({"Result", PinType::Boolean, false, true});
-    };
-    wildcardEquals.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        PinType typeA = PinType::Float, typeB = PinType::Float;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "A") {
-                PinType t = graph.GetConnectedOutputType(p.id);
-                if (t != PinType::None) typeA = t;
+    auto RegisterWildcardEquality = [](const std::string& nodeType, const std::string& label, bool negate) {
+        NodeTemplate t;
+        t.type = nodeType;
+        t.category = "Comparisons";
+        t.moduleName = "Stargraph";
+        t.menuLabel = label;
+        t.createPins = [](Node* node) {
+            node->inputs.push_back({"A", PinType::Wildcard, true, false, 0, "0"});
+            node->inputs.push_back({"B", PinType::Wildcard, true, false, 0, "0"});
+            node->outputs.push_back({"Result", PinType::Boolean, false, true});
+        };
+        t.execute = [negate](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            PinType typeA = PinType::Float, typeB = PinType::Float;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "A") {
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeA = t;
+                }
+                if (p.name == "B") {
+                    PinType t = graph.GetConnectedOutputType(p.id);
+                    if (t != PinType::None) typeB = t;
+                }
             }
-            if (p.name == "B") {
-                PinType t = graph.GetConnectedOutputType(p.id);
-                if (t != PinType::None) typeB = t;
+
+            PinType cmpType = (typeA != PinType::Float) ? typeA : typeB;
+            bool result = false;
+            std::string aStr, bStr;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "A") aStr = p.defaultValue;
+                if (p.name == "B") bStr = p.defaultValue;
             }
-        }
 
-        PinType cmpType = (typeA != PinType::Float) ? typeA : typeB;
-        bool result = false;
-        std::string aStr, bStr;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "A") aStr = p.defaultValue;
-            if (p.name == "B") bStr = p.defaultValue;
-        }
+            if (cmpType == PinType::Vec3 || cmpType == PinType::Rotator) {
+                Vector3 a = {0,0,0}, b = {0,0,0};
+                sscanf(aStr.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
+                sscanf(bStr.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
+                result = fabsf(a.x-b.x) < 0.0001f && fabsf(a.y-b.y) < 0.0001f && fabsf(a.z-b.z) < 0.0001f;
+            } else if (cmpType == PinType::String || cmpType == PinType::Object) {
+                result = aStr == bStr;
+            } else if (cmpType == PinType::Boolean) {
+                bool a = (aStr == "true" || aStr == "1");
+                bool b = (bStr == "true" || bStr == "1");
+                result = a == b;
+            } else if (cmpType == PinType::Integer) {
+                result = atoi(aStr.c_str()) == atoi(bStr.c_str());
+            } else {
+                result = fabsf((float)atof(aStr.c_str()) - (float)atof(bStr.c_str())) < 0.0001f;
+            }
 
-        if (cmpType == PinType::Vec3) {
-            Vector3 a = {0,0,0}, b = {0,0,0};
-            sscanf(aStr.c_str(), "%f,%f,%f", &a.x, &a.y, &a.z);
-            sscanf(bStr.c_str(), "%f,%f,%f", &b.x, &b.y, &b.z);
-            result = fabsf(a.x-b.x) < 0.0001f && fabsf(a.y-b.y) < 0.0001f && fabsf(a.z-b.z) < 0.0001f;
-        } else if (cmpType == PinType::String || cmpType == PinType::Object) {
-            result = aStr == bStr;
-        } else if (cmpType == PinType::Boolean) {
-            bool a = (aStr == "true" || aStr == "1");
-            bool b = (bStr == "true" || bStr == "1");
-            result = a == b;
-        } else if (cmpType == PinType::Integer) {
-            result = atoi(aStr.c_str()) == atoi(bStr.c_str());
-        } else {
-            result = fabsf((float)atof(aStr.c_str()) - (float)atof(bStr.c_str())) < 0.0001f;
-        }
-
-        for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
+            if (negate) result = !result;
+            for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = result ? "true" : "false";
+        };
+        NodeRegistry::Get().RegisterNode(t);
     };
-    NodeRegistry::Get().RegisterNode(wildcardEquals);
+
+    RegisterWildcardEquality("Wildcard_Equals",    "Equal (==)",     false);
+    RegisterWildcardEquality("Wildcard_Not_Equal", "Not Equal (!=)", true);
 
     auto RegisterWildcardCompare = [](const std::string& nodeType, char op) {
         NodeTemplate t;
@@ -1204,10 +1227,10 @@ void RegisterMathNodes() {
         NodeRegistry::Get().RegisterNode(t);
     };
 
-    RegisterWildcardCompare("Greater_Than",    '>');
-    RegisterWildcardCompare("Less_Than",       '<');
-    RegisterWildcardCompare("Greater_Or_Equal", 'g');
-    RegisterWildcardCompare("Less_Or_Equal",    'l');
+    RegisterWildcardCompare("Greater_Than (>)",         '>');
+    RegisterWildcardCompare("Less_Than (<)",            '<');
+    RegisterWildcardCompare("Greater_Or_Equal (>=)",    'g');
+    RegisterWildcardCompare("Less_Or_Equal (<=)",       'l');
 
     NodeTemplate alignToGround;
     alignToGround.type = "Align_To_Ground";
