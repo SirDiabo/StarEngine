@@ -73,14 +73,14 @@ static std::string NodeMenuDisplayLabel(const std::string& rawType) {
 }
 
 static bool IsActorClassSourceNode(const std::string& nodeType) {
-    return nodeType == "Cast_To_Class" || nodeType == "Get_Actor_Of_Class" || nodeType == "For_Each_Actor_Of_Class";
+    return nodeType == "Cast_To_Class" || nodeType == "Get_Actor_Of_Class" || nodeType == "For_Each_Actor_Of_Class" || nodeType == "Spawn_Actor";
 }
 
 static std::string EffectivePinObjectKind(const Node* node, const Pin& pin) {
     if (!node) return pin.objectKind;
     if (pin.isOutput && !node->componentClass.empty()) return node->componentClass;
     if (pin.type == PinType::Object && pin.isOutput && IsActorClassSourceNode(node->type) &&
-        (pin.name == "As" || pin.name == "Out" || pin.name == "Current Actor")) {
+        (pin.name == "As" || pin.name == "Out" || pin.name == "Current Actor" || pin.name == "Spawned Actor")) {
         for (const Pin& in : node->inputs) {
             if (in.name == "Class" && !in.defaultValue.empty()) return in.defaultValue;
         }
@@ -430,6 +430,8 @@ struct ClipNode {
     std::string componentClass;
     ReplicationMode replication = ReplicationMode::Local;
     bool reliable = false;
+    bool hasExecCases = false;
+    std::vector<std::string> execCases;
     std::vector<ClipPin> pins;
 };
 
@@ -498,6 +500,11 @@ ClipNode CaptureNode(const Node& node) {
     clip.componentClass = node.componentClass;
     clip.replication = node.eventReplication;
     clip.reliable = node.eventReliable;
+    const NodeTemplate* captureTemplate = NodeRegistry::Get().GetTemplate(node.type);
+    if (captureTemplate && captureTemplate->dynamicExecOutputs) {
+        clip.hasExecCases = true;
+        clip.execCases = node.execCases;
+    }
     for (int side = 0; side < 2; side++) {
         const bool isInput = (side == 0);
         for (const Pin& pin : (isInput ? node.inputs : node.outputs)) {
@@ -525,6 +532,10 @@ Node* InstantiateNode(Stargraph& graph, const ClipNode& clip) {
     node->componentClass = clip.componentClass;
     node->eventReplication = clip.replication;
     node->eventReliable = clip.reliable;
+    if (clip.hasExecCases) {
+        node->execCases = clip.execCases;
+        graph.RebuildDynamicExecOutputs(*node);
+    }
 
     for (const ClipPin& cp : clip.pins) {
         std::vector<Pin>& pins = cp.isInput ? node->inputs : node->outputs;
@@ -601,6 +612,12 @@ std::string SerializeClipNode(const ClipNode& clip, float originX, float originY
     if (!clip.componentClass.empty()) text += "ComponentClass=" + clip.componentClass + "\n";
     if (clip.replication != ReplicationMode::Local) text += "Replication=" + ReplicationModeToString(clip.replication) + "\n";
     if (clip.reliable) text += "Reliable=true\n";
+    if (clip.hasExecCases) {
+        text += "ExecCaseCount=" + std::to_string(clip.execCases.size()) + "\n";
+        for (size_t i = 0; i < clip.execCases.size(); i++) {
+            text += "ExecCase" + std::to_string(i) + "=" + EscapeClipValue(clip.execCases[i]) + "\n";
+        }
+    }
     for (const ClipPin& cp : clip.pins) {
         if (cp.isInput) {
             text += "Pin." + cp.name + "=" + EscapeClipValue(cp.value) + "\n";
@@ -668,6 +685,14 @@ void ParseClipboardText(const std::string& text, std::vector<ClipNode>& nodes, s
             else if (key == "ComponentClass") currentNode.componentClass = value;
             else if (key == "Replication") currentNode.replication = ReplicationModeFromString(value);
             else if (key == "Reliable") currentNode.reliable = (value == "true");
+            else if (key == "ExecCaseCount") {
+                currentNode.hasExecCases = true;
+                currentNode.execCases.assign((size_t)std::max(0, std::min(SafeParse::ToInt(value, 0), 4096)), std::string());
+            }
+            else if (key.rfind("ExecCase", 0) == 0) {
+                int index = SafeParse::ToInt(key.substr(8), -1);
+                if (index >= 0 && index < (int)currentNode.execCases.size()) currentNode.execCases[index] = UnescapeClipValue(value);
+            }
             else if (key.rfind("Pin.", 0) == 0) { ClipPin& cp = pinSlot(true, key.substr(4)); cp.hasValue = true; cp.value = UnescapeClipValue(value); }
             else if (key.rfind("PinType.", 0) == 0) { ClipPin& cp = pinSlot(true, key.substr(8)); cp.hasType = true; cp.type = ClipPinTypeFromString(value); }
             else if (key.rfind("PinKind.", 0) == 0) pinSlot(true, key.substr(8)).kind = value;
@@ -1275,7 +1300,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         editingPinId = 0;
                         listeningForKeyPinId = 0;
                     }
-                } else if (pin.name == "Class" && (node.type == "Cast_To_Class" || node.type == "Get_Actor_Of_Class" || node.type == "For_Each_Actor_Of_Class")) {
+                } else if (pin.name == "Class" && (node.type == "Cast_To_Class" || node.type == "Get_Actor_Of_Class" || node.type == "For_Each_Actor_Of_Class" || node.type == "Spawn_Actor")) {
                     std::string classPath = pin.defaultValue.c_str();
                     std::string display = "None";
                     if (!classPath.empty()) {
@@ -1291,7 +1316,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
                         actorClassPicker.OpenWithExtras({fieldRect.x, fieldRect.y + fieldRect.height}, ".staractor",
-                                                         BasicActorClassPickerEntries());
+                                                         node.type == "Spawn_Actor" ? std::vector<std::pair<std::string, std::string>>() : BasicActorClassPickerEntries());
                         editingPinId = 0;
                     }
                     if (actorClassPickerPinId == pin.id) {
@@ -1299,6 +1324,33 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         if (actorClassPicker.Render(pickedClass)) {
                             pin.defaultValue = pickedClass;
                             if (!pickedClass.empty()) ObjectKindRegistry::Get().RegisterKind(pickedClass, "Actor");
+                            isDirty = true;
+                            actorClassPickerPinId = 0;
+                        }
+                    }
+                } else if (!StargraphPinAssetExtension(pin).empty()) {
+                    std::string assetPath = pin.defaultValue.c_str();
+                    std::string display = "None";
+                    if (!assetPath.empty()) {
+                        size_t slash = assetPath.find_last_of("/\\");
+                        std::string filename = (slash == std::string::npos) ? assetPath : assetPath.substr(slash + 1);
+                        size_t dot = filename.find_last_of('.');
+                        display = (dot == std::string::npos) ? filename : filename.substr(0, dot);
+                    }
+                    DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                    DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                    DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11,
+                             assetPath.empty() ? Color{140,140,150,255} : WHITE);
+
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
+                        actorClassPickerPinId = pin.id;
+                        actorClassPicker.Open({fieldRect.x, fieldRect.y + fieldRect.height}, StargraphPinAssetExtension(pin));
+                        editingPinId = 0;
+                    }
+                    if (actorClassPickerPinId == pin.id) {
+                        std::string pickedAsset;
+                        if (actorClassPicker.Render(pickedAsset)) {
+                            pin.defaultValue = pickedAsset;
                             isDirty = true;
                             actorClassPickerPinId = 0;
                         }

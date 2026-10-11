@@ -1,5 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
+#include "Modules/Stargraph/NodeRegistry.h"
 #include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/StarAsset.h"
@@ -1306,14 +1307,50 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
     if (!node) return;
     rows.push_back(HeaderRow("n.title", node->title));
     rows.push_back(ReadOnlyRow("n.type", "Type", node->type));
+
+    const NodeTemplate* nodeTemplate = NodeRegistry::Get().GetTemplate(node->type);
+    if (nodeTemplate && nodeTemplate->dynamicExecOutputs) {
+        const UIPalette& theme = UITheme::Get();
+        rows.push_back(HeaderRow("n.cases.h", nodeTemplate->dynamicExecHeader.empty() ? std::string("Outputs") : nodeTemplate->dynamicExecHeader));
+        if (!nodeTemplate->dynamicExecFixedPin.empty()) {
+            rows.push_back(ReadOnlyRow("n.cases.fixed", nodeTemplate->dynamicExecFixedPin, "Always present"));
+        }
+        for (size_t i = 0; i < node->execCases.size(); i++) {
+            int caseIndex = (int)i;
+            std::vector<PropertyCell> cells;
+            if (nodeTemplate->normalizeExecCase) {
+                cells.push_back(TextCell(node->execCases[i], 0.0f, nodeTemplate->dynamicExecPlaceholder, [this, nodeId, caseIndex](const std::string& text) {
+                    Node* n = DetailNode(nodeId);
+                    if (n && ActiveGraph().SetExecCase(*n, caseIndex, text)) isDirty = true;
+                }));
+            } else {
+                cells.push_back(LabelCell("Output " + std::to_string(caseIndex), 0.0f));
+            }
+            cells.push_back(ButtonCell("X", 22.0f, [this, nodeId, caseIndex](Rectangle) {
+                Node* n = DetailNode(nodeId);
+                if (n && ActiveGraph().RemoveExecCase(*n, caseIndex)) isDirty = true;
+            }, theme.dangerBg));
+            rows.push_back(CellsRow("n.case." + std::to_string(i), std::move(cells)));
+        }
+        rows.push_back(ButtonRow("n.cases.add", nodeTemplate->dynamicExecAddLabel.empty() ? std::string("+ Add") : nodeTemplate->dynamicExecAddLabel, [this, nodeId]() {
+            Node* n = DetailNode(nodeId);
+            if (!n) return;
+            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(n->type);
+            if (!tmpl) return;
+            std::string initial = tmpl->newExecCaseDefault ? tmpl->newExecCaseDefault(n->execCases) : std::string();
+            if (ActiveGraph().AddExecCase(*n, initial)) isDirty = true;
+        }));
+    }
+
     for (const Pin& pin : node->inputs) {
         if (pin.type == PinType::Exec) continue;
         if (pin.name == "Variable_Name" || pin.name == "Component_Name") continue;
         std::string value = pin.defaultValue.c_str();
         bool isInterpNode = node->type == "Float_Interp_To" || node->type == "Int_Interp_To" ||
                              node->type == "Vec3_Interp_To" || node->type == "Rotator_Interp_To";
-        if ((node->type == "Play_Sound" || node->type == "Load_Music") && pin.name == "Path") {
-            rows.push_back(AssetRow("audio:" + std::to_string(pin.id), pin.name, ".starsound", StemOrNone(value)));
+        std::string assetExtension = StargraphPinAssetExtension(pin);
+        if (!assetExtension.empty()) {
+            rows.push_back(AssetRow("pin:" + std::to_string(pin.id), pin.name, assetExtension, StemOrNone(value)));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,
@@ -1397,8 +1434,8 @@ void StargraphEditorPanel::OnDetailAssetPicked(const std::string& fullRowId, con
                 isDirty = true;
             }
         }
-    } else if (rowId.rfind("audio:", 0) == 0) {
-        Pin* pin = ActiveGraph().FindPin(atoi(rowId.c_str() + 6));
+    } else if (rowId.rfind("pin:", 0) == 0) {
+        Pin* pin = ActiveGraph().FindPin(atoi(rowId.c_str() + 4));
         if (pin) {
             pin->defaultValue = pickedPath;
             isDirty = true;

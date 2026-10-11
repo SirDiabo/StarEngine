@@ -4,6 +4,8 @@
 #include "GraphExecutor.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
+#include "Runtime/WorldSpawner.h"
+#include "StargraphAssetCache.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Runtime/CollisionTrace.h"
 #include "StargraphBehavior.h"
@@ -295,38 +297,49 @@ void RegisterActorNodes() {
     spawnActor.type = "Spawn_Actor";
     spawnActor.category = "Actor";
     spawnActor.moduleName = "Stargraph";
+    spawnActor.menuLabel = "Spawn Actor Of Class";
+    spawnActor.legacyInputPinAliases = {{"Graph Path", "Class"}};
     spawnActor.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Class Name", PinType::String, true, false, 0, "Actor"});
-        node->inputs.push_back({"Graph Path", PinType::String, false, false, 0, ""});
+        node->inputs.push_back({"Class", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Location", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Rotation", PinType::Rotator, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Scale", PinType::Vec3, true, false, 0, "1,1,1"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         node->outputs.push_back({"Spawned Actor", PinType::Object, false, true, 0, "", false, "Actor"});
     };
     spawnActor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        std::string className = "Actor";
-        std::string graphPath;
+        std::string classPath;
+        ActorInstance instance;
+        instance.className = "Actor";
+        instance.scaleX = instance.scaleY = instance.scaleZ = 1.0f;
         for (const Pin& p : node.inputs) {
-            if (p.name == "Class Name") { className = p.defaultValue; break; }
-            if (p.name == "Graph Path") { graphPath = p.defaultValue; }
+            if (p.name == "Class") classPath = p.defaultValue;
+            else if (p.name == "Location") ReadVec3(p, instance.posX, instance.posY, instance.posZ);
+            else if (p.name == "Rotation") ReadVec3(p, instance.rotX, instance.rotY, instance.rotZ);
+            else if (p.name == "Scale") ReadVec3(p, instance.scaleX, instance.scaleY, instance.scaleZ);
         }
-        Actor* spawned = World::Get().SpawnActor(className);
-        if (spawned) {
-            spawned->SetName(className + "_Instance");
-            if (!graphPath.empty()) {
-                spawned->SetActorClass(graphPath);
-                Stargraph loadedGraph;
-                if (loadedGraph.LoadFromFile(graphPath)) {
-                    spawned->SetGraphBehavior(new StargraphBehavior(std::move(loadedGraph)));
-                }
-            }
 
+        if (!classPath.empty() && !StargraphAssetCache::Get().GetOrLoad(classPath)) {
+            TraceLog(LOG_WARNING, "Spawn Actor: could not load class '%s'", classPath.c_str());
+        }
+
+        size_t slash = classPath.find_last_of("/\\");
+        std::string filename = (slash == std::string::npos) ? classPath : classPath.substr(slash + 1);
+        size_t dot = filename.find_last_of('.');
+        std::string stem = (dot == std::string::npos) ? filename : filename.substr(0, dot);
+        instance.name = (stem.empty() ? std::string("Actor") : stem) + "_Instance";
+        instance.graphAssetPath = classPath;
+
+        Actor* spawned = WorldSpawner::SpawnActorFromInstance(instance);
+        if (spawned) {
             NetworkBackend* backend = NetworkBackendRegistry::Get().GetActive();
             if (backend && backend->IsHost()) {
                 spawned->SetNetId(backend->AllocateNetId());
                 ReplicatedActorSpawn spawn;
                 spawn.netId = spawned->GetNetId();
-                spawn.className = className;
-                spawn.graphPath = graphPath;
+                spawn.className = instance.className;
+                spawn.graphPath = classPath;
                 spawn.posX = spawned->position.x; spawn.posY = spawned->position.y; spawn.posZ = spawned->position.z;
                 spawn.rotX = spawned->rotation.x; spawn.rotY = spawned->rotation.y; spawn.rotZ = spawned->rotation.z;
                 spawn.scaleX = spawned->scale.x; spawn.scaleY = spawned->scale.y; spawn.scaleZ = spawned->scale.z;

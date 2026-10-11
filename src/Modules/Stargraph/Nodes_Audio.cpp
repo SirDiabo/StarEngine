@@ -12,7 +12,7 @@ void RegisterAudioNodes() {
     playSound.moduleName = "Stargraph";
     playSound.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Path", PinType::String, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         node->outputs.push_back({"Sound", PinType::Object, false, true, 0, "", false, "Sound"});
     };
@@ -125,7 +125,7 @@ void RegisterAudioNodes() {
     loadMusic.moduleName = "Stargraph";
     loadMusic.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Path", PinType::String, true, false, 0, "", false, "Sound"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         node->outputs.push_back({"Music", PinType::Object, false, true, 0, "", false, "Music"});
     };

@@ -10,6 +10,8 @@ public:
     static World& Get();
 
     Actor* SpawnActor(const std::string& className, const std::string& name = "");
+    Actor* SpawnActorDeferred(const std::string& className, const std::string& name = "");
+    void FinishSpawningActor(Actor* actor);
     void DestroyActor(Actor* actor);
 
     void BeginPlay();

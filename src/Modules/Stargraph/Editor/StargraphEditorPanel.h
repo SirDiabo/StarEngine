@@ -18,6 +18,8 @@
 
 class ViewportPanel;
 
+std::string StargraphPinAssetExtension(const Pin& pin);
+
 template <typename T>
 inline void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDropPosition pos) {
     if (fromIndex < 0 || fromIndex >= (int)items.size()) return;

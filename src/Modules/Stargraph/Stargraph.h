@@ -145,6 +145,8 @@ struct Node {
     ReplicationMode eventReplication = ReplicationMode::Local;
     bool eventReliable = false;
 
+    std::vector<std::string> execCases;
+
     // Runtime-only flow control state
     bool flowState = false;
 
@@ -236,6 +238,11 @@ public:
     Pin* AddDynamicPin(Node& node, bool isOutput, const std::string& name, PinType type);
     void RemoveDynamicPin(Node& node, bool isOutput, const std::string& pinName);
     int AllocatePinId() { return nextPinId++; }
+
+    void RebuildDynamicExecOutputs(Node& node);
+    bool AddExecCase(Node& node, const std::string& input);
+    bool RemoveExecCase(Node& node, int caseIndex);
+    bool SetExecCase(Node& node, int caseIndex, const std::string& input);
 
     Variable* FindVariable(const std::string& name);
     const Variable* FindVariable(const std::string& name) const;

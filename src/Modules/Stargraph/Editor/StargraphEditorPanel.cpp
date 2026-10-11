@@ -3,6 +3,14 @@
 #include "Editor/UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
 
+std::string StargraphPinAssetExtension(const Pin& pin) {
+    if (pin.type != PinType::String) return "";
+    if (pin.objectKind == "Map") return ".starmap";
+    if (pin.objectKind == "Sound") return ".starsound";
+    if (pin.objectKind == "Widget") return ".starwidget";
+    return "";
+}
+
 const float StargraphEditorPanel::minNodeWidth   = 160.0f;
 const float StargraphEditorPanel::pinHeight      = 22.0f;
 const float StargraphEditorPanel::pinRadius      = 5.0f;

@@ -26,7 +26,7 @@ static Component* BuildComponentFromDecl(const ComponentDecl& decl) {
 }
 
 Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
-    Actor* actor = World::Get().SpawnActor(inst.className, inst.name);
+    Actor* actor = World::Get().SpawnActorDeferred(inst.className, inst.name);
     actor->position = {inst.posX, inst.posY, inst.posZ};
     actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
     actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
@@ -77,6 +77,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
         actor->AddComponent(comp);
     }
 
+    World::Get().FinishSpawningActor(actor);
     return actor;
 }
 

@@ -9,6 +9,146 @@
 #include <algorithm>
 #include <unordered_set>
 
+static Pin MakeExecOutputPin(const std::string& name, int id) {
+    Pin pin;
+    pin.name = name;
+    pin.type = PinType::Exec;
+    pin.isInput = false;
+    pin.isOutput = true;
+    pin.id = id;
+    return pin;
+}
+
+static std::string ExecCasePinName(const NodeTemplate& tmpl, const std::string& spec, int index) {
+    return tmpl.execCasePinName ? tmpl.execCasePinName(spec, index) : std::to_string(index);
+}
+
+static std::string EscapeCaseText(const std::string& text) {
+    std::string out;
+    for (char c : text) {
+        if (c == '\\') out += "\\\\";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else out += c;
+    }
+    return out;
+}
+
+static std::string UnescapeCaseText(const std::string& text) {
+    std::string out;
+    for (size_t i = 0; i < text.size(); i++) {
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            char next = text[++i];
+            if (next == 'n') out += '\n';
+            else if (next == 'r') out += '\r';
+            else out += next;
+        } else {
+            out += text[i];
+        }
+    }
+    return out;
+}
+
+static std::string ResolveInputPinAlias(const std::string& nodeType, const std::string& pinName) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(nodeType);
+    if (!tmpl) return pinName;
+    auto it = tmpl->legacyInputPinAliases.find(pinName);
+    return it != tmpl->legacyInputPinAliases.end() ? it->second : pinName;
+}
+
+static Pin* FindExecCasePin(Node& node, const NodeTemplate& tmpl, int caseIndex) {
+    int execIndex = (tmpl.dynamicExecFixedPin.empty() ? 0 : 1) + caseIndex;
+    int seen = 0;
+    for (Pin& pin : node.outputs) {
+        if (pin.type != PinType::Exec) continue;
+        if (seen == execIndex) return &pin;
+        seen++;
+    }
+    return nullptr;
+}
+
+static bool ExecOutputNameTaken(const Node& node, const std::string& name, const Pin* ignore) {
+    for (const Pin& pin : node.outputs) {
+        if (&pin == ignore || pin.type != PinType::Exec) continue;
+        if (pin.name == name) return true;
+    }
+    return false;
+}
+
+void Stargraph::RebuildDynamicExecOutputs(Node& node) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || !tmpl->dynamicExecOutputs) return;
+
+    std::vector<int> staleIds;
+    for (const Pin& pin : node.outputs) if (pin.type == PinType::Exec) staleIds.push_back(pin.id);
+    for (int id : staleIds) RemoveLink(id);
+    node.outputs.erase(std::remove_if(node.outputs.begin(), node.outputs.end(),
+        [](const Pin& pin) { return pin.type == PinType::Exec; }), node.outputs.end());
+
+    if (!tmpl->dynamicExecFixedPin.empty()) node.outputs.push_back(MakeExecOutputPin(tmpl->dynamicExecFixedPin, nextPinId++));
+    for (size_t i = 0; i < node.execCases.size(); i++) {
+        node.outputs.push_back(MakeExecOutputPin(ExecCasePinName(*tmpl, node.execCases[i], (int)i), nextPinId++));
+    }
+    InvalidateCaches();
+}
+
+bool Stargraph::AddExecCase(Node& node, const std::string& input) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || !tmpl->dynamicExecOutputs) return false;
+
+    std::string spec;
+    if (tmpl->normalizeExecCase && !tmpl->normalizeExecCase(input, spec)) return false;
+
+    int index = (int)node.execCases.size();
+    std::string name = ExecCasePinName(*tmpl, spec, index);
+    if (ExecOutputNameTaken(node, name, nullptr)) return false;
+
+    node.execCases.push_back(spec);
+    node.outputs.push_back(MakeExecOutputPin(name, nextPinId++));
+    InvalidateCaches();
+    return true;
+}
+
+bool Stargraph::RemoveExecCase(Node& node, int caseIndex) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || !tmpl->dynamicExecOutputs) return false;
+    if (caseIndex < 0 || caseIndex >= (int)node.execCases.size()) return false;
+    if ((int)node.execCases.size() <= tmpl->dynamicExecMinCases) return false;
+
+    Pin* pin = FindExecCasePin(node, *tmpl, caseIndex);
+    if (!pin) return false;
+    int pinId = pin->id;
+    RemoveLink(pinId);
+    node.outputs.erase(std::remove_if(node.outputs.begin(), node.outputs.end(),
+        [pinId](const Pin& p) { return p.id == pinId; }), node.outputs.end());
+    node.execCases.erase(node.execCases.begin() + caseIndex);
+
+    for (size_t i = 0; i < node.execCases.size(); i++) {
+        if (Pin* p = FindExecCasePin(node, *tmpl, (int)i)) p->name = ExecCasePinName(*tmpl, node.execCases[i], (int)i);
+    }
+    InvalidateCaches();
+    return true;
+}
+
+bool Stargraph::SetExecCase(Node& node, int caseIndex, const std::string& input) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || !tmpl->dynamicExecOutputs || !tmpl->normalizeExecCase) return false;
+    if (caseIndex < 0 || caseIndex >= (int)node.execCases.size()) return false;
+
+    std::string spec;
+    if (!tmpl->normalizeExecCase(input, spec)) return false;
+
+    Pin* pin = FindExecCasePin(node, *tmpl, caseIndex);
+    if (!pin) return false;
+    std::string name = ExecCasePinName(*tmpl, spec, caseIndex);
+    if (ExecOutputNameTaken(node, name, pin)) return false;
+
+    node.execCases[caseIndex] = spec;
+    pin->name = name;
+    InvalidateCaches();
+    return true;
+}
+
 Node* Stargraph::CreateNode(const std::string& type) {
     InvalidateCaches();
 
@@ -21,6 +161,14 @@ Node* Stargraph::CreateNode(const std::string& type) {
     const NodeTemplate* nodeTemplate = NodeRegistry::Get().GetTemplate(type);
     if (nodeTemplate && nodeTemplate->createPins) {
         nodeTemplate->createPins(node);
+    }
+
+    if (nodeTemplate && nodeTemplate->dynamicExecOutputs) {
+        node->execCases = nodeTemplate->dynamicExecInitialCases;
+        if (!nodeTemplate->dynamicExecFixedPin.empty()) node->outputs.push_back(MakeExecOutputPin(nodeTemplate->dynamicExecFixedPin, 0));
+        for (size_t i = 0; i < node->execCases.size(); i++) {
+            node->outputs.push_back(MakeExecOutputPin(ExecCasePinName(*nodeTemplate, node->execCases[i], (int)i), 0));
+        }
     }
 
     for (Pin& pin : node->inputs)  pin.isWildcard = (pin.type == PinType::Wildcard);
@@ -451,6 +599,12 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         templateNode.type = node.type;
         const NodeTemplate* nodeTmpl = NodeRegistry::Get().GetTemplate(node.type);
         if (nodeTmpl && nodeTmpl->createPins) nodeTmpl->createPins(&templateNode);
+        if (nodeTmpl && nodeTmpl->dynamicExecOutputs) {
+            out << "ExecCaseCount=" << node.execCases.size() << "\n";
+            for (size_t i = 0; i < node.execCases.size(); i++) {
+                out << "ExecCase" << i << "=" << EscapeCaseText(node.execCases[i]) << "\n";
+            }
+        }
 
         auto hasTemplateMatch = [](const std::vector<Pin>& templatePins, const Pin& pin) {
             for (const Pin& tp : templatePins) if (tp.name == pin.name) return true;
@@ -683,12 +837,12 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
 
             for (const auto& entry : section.entries) {
                 if (entry.first.rfind("Pin.", 0) == 0) {
-                    std::string pinName = entry.first.substr(4);
+                    std::string pinName = ResolveInputPinAlias(node->type, entry.first.substr(4));
                     for (Pin& pin : node->inputs) {
                         if (pin.name == pinName) { pin.defaultValue = entry.second; break; }
                     }
                 } else if (entry.first.rfind("PinType.", 0) == 0) {
-                    std::string pinName = entry.first.substr(8);
+                    std::string pinName = ResolveInputPinAlias(node->type, entry.first.substr(8));
                     for (Pin& pin : node->inputs) {
                         if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
                     }
@@ -698,7 +852,7 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                         if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
                     }
                 } else if (entry.first.rfind("PinKind.", 0) == 0) {
-                    std::string pinName = entry.first.substr(8);
+                    std::string pinName = ResolveInputPinAlias(node->type, entry.first.substr(8));
                     for (Pin& pin : node->inputs) {
                         if (pin.name == pinName) { pin.objectKind = entry.second; break; }
                     }
@@ -709,6 +863,21 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                         if (pin.name == pinName) { pin.objectKind = entry.second; break; }
                     }
                     RegisterActorKindIfAsset(entry.second);
+                }
+            }
+
+            if (const NodeTemplate* execTmpl = NodeRegistry::Get().GetTemplate(node->type); execTmpl && execTmpl->dynamicExecOutputs) {
+                if (const std::string* countText = FindEntry(section, "ExecCaseCount")) {
+                    int caseCount = SafeParse::ToInt(*countText);
+                    node->execCases.clear();
+                    for (int i = 0; i < caseCount; i++) {
+                        const std::string* caseText = FindEntry(section, "ExecCase" + std::to_string(i));
+                        node->execCases.push_back(caseText ? UnescapeCaseText(*caseText) : std::string());
+                    }
+                    RebuildDynamicExecOutputs(*node);
+                } else if (!execTmpl->dynamicExecLegacyCases.empty()) {
+                    node->execCases = execTmpl->dynamicExecLegacyCases;
+                    RebuildDynamicExecOutputs(*node);
                 }
             }
 
@@ -768,8 +937,9 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
             if (pin.name == *fromPinStr) { outputPinId = pin.id; break; }
         }
         int inputPinId = 0;
+        const std::string resolvedToPin = ResolveInputPinAlias(toNode->type, *toPinStr);
         for (const Pin& pin : toNode->inputs) {
-            if (pin.name == *toPinStr) { inputPinId = pin.id; break; }
+            if (pin.name == resolvedToPin) { inputPinId = pin.id; break; }
         }
 
         if (outputPinId != 0 && inputPinId != 0) {

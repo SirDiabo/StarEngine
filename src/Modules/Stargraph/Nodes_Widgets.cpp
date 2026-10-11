@@ -165,7 +165,7 @@ void RegisterWidgetNodes() {
     setWidget.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, "WidgetComponent"});
-        node->inputs.push_back({"Widget Asset", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Widget Asset", PinType::String, true, false, 0, "", false, "Widget"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setWidget.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
