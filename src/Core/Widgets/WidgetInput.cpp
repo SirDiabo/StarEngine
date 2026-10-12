@@ -69,7 +69,6 @@ void EnsureDefaultMappings() {
         InputMapping navigate;
         navigate.type = InputMappingType::Axis2D;
         navigate.bindings = {
-            {"W", 1.0f, 1}, {"S", -1.0f, 1}, {"A", -1.0f, 0}, {"D", 1.0f, 0},
             {"UP", 1.0f, 1}, {"DOWN", -1.0f, 1}, {"LEFT", -1.0f, 0}, {"RIGHT", 1.0f, 0},
             {"GAMEPAD_LEFT_STICK_X", 1.0f, 0}, {"GAMEPAD_LEFT_STICK_Y", -1.0f, 1},
             {"GAMEPAD_DPAD_UP", 1.0f, 1}, {"GAMEPAD_DPAD_DOWN", -1.0f, 1},
