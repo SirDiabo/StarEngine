@@ -25,6 +25,7 @@
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
+#include "Core/Widgets/WidgetFont.h"
 #include "GizmoRenderer.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -43,6 +44,82 @@ static std::string InstanceProfileLabel(const ActorInstance& inst) {
 }
 
 const float ViewportPanel::toolbarHeight = 28.0f;
+
+static const Color FpsWarnColor = {225, 170, 60, 255};
+
+void ViewportPanel::EnsureToolbarChrome() {
+    if (toolbarChrome) return;
+
+    const UIPalette& theme = UITheme::Get();
+    toolbarChrome = new Widget();
+    auto* root = new WidgetElement();
+    toolbarChrome->SetRoot(root);
+
+    gridStepField = new TextElement();
+    gridStepField->editable = true;
+    gridStepField->numericOnly = true;
+    gridStepField->fontSize = 12.0f;
+    gridStepField->backgroundColor = theme.fieldBg;
+    gridStepField->borderColor = theme.fieldBorder;
+    gridStepField->editingBorderColor = theme.accent;
+    gridStepField->onTextCommitted = [this](const std::string& text) {
+        float v = (float)atof(text.c_str());
+        if (v > 0.001f) gridStepSize = v;
+    };
+
+    fpsValueField = new TextElement();
+    fpsValueField->editable = false;
+    fpsValueField->fontSize = 13.0f;
+    fpsValueField->color = theme.textSecondary;
+    fpsValueField->visible = false;
+
+    fpsStatsField = new TextElement();
+    fpsStatsField->editable = false;
+    fpsStatsField->fontSize = 11.0f;
+    fpsStatsField->color = theme.textSecondary;
+    fpsStatsField->visible = false;
+
+    root->AddChild(gridStepField);
+    root->AddChild(fpsValueField);
+    root->AddChild(fpsStatsField);
+}
+
+void ViewportPanel::ResetFpsStats() {
+    fpsSampleTime = 0.0f;
+    fpsSampleFrames = 0;
+    fpsWindowFps = 0.0f;
+    fpsWindowAvgMs = 0.0f;
+    fpsSessionTime = 0.0f;
+    fpsSessionFrames = 0;
+    fpsSessionAvgFps = 0.0f;
+    fpsBestFrameMs = 0.0f;
+    fpsWorstFrameMs = 0.0f;
+    fpsSampleValid = false;
+    fpsStatsDirty = true;
+}
+
+void ViewportPanel::UpdateFpsStats(float dt) {
+    if (dt <= 0.0f) return;
+
+    float frameMs = dt * 1000.0f;
+    fpsSampleTime += dt;
+    fpsSampleFrames++;
+    fpsSessionTime += dt;
+    fpsSessionFrames++;
+    if (fpsSessionFrames == 1 || frameMs < fpsBestFrameMs) fpsBestFrameMs = frameMs;
+    if (fpsSessionFrames == 1 || frameMs > fpsWorstFrameMs) fpsWorstFrameMs = frameMs;
+    fpsSessionAvgFps = fpsSessionTime > 0.0f ? (float)fpsSessionFrames / fpsSessionTime : 0.0f;
+
+    if (fpsSampleTime >= 0.5f) {
+        float frames = (float)fpsSampleFrames;
+        fpsWindowFps = frames / fpsSampleTime;
+        fpsWindowAvgMs = (fpsSampleTime / frames) * 1000.0f;
+        fpsSampleTime = 0.0f;
+        fpsSampleFrames = 0;
+        fpsSampleValid = true;
+        fpsStatsDirty = true;
+    }
+}
 
 static void UpdateOrbitPosition(Camera3D& camera, float yaw, float pitch, float radius, Vector3 target) {
     float yr = yaw   * DEG2RAD;
@@ -67,6 +144,7 @@ ViewportPanel::~ViewportPanel() {
     WidgetInput::PopModal(static_cast<const Panel*>(this), WidgetInput::kEditorDevice);
     if (renderTarget.id != 0) UnloadRenderTexture(renderTarget);
     if (pieRenderTarget.id != 0) UnloadRenderTexture(pieRenderTarget);
+    delete toolbarChrome;
     for (auto& kv : editorIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
 }
 
@@ -621,6 +699,60 @@ void ViewportPanel::RenderToolbar() {
     DrawLine((int)toolbar.x, (int)(toolbar.y + toolbar.height),
              (int)(toolbar.x + toolbar.width), (int)(toolbar.y + toolbar.height), theme.panelBorder);
 
+    EnsureToolbarChrome();
+
+    Rectangle toolbarBounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+    float dt = GetFrameTime();
+
+    if (playing) {
+        UpdateFpsStats(dt);
+
+        float fpsRowY = toolbar.y + 3.0f;
+        float fpsAnchorY = fpsRowY + 11.0f;
+
+        gridStepField->visible = false;
+        fpsValueField->visible = true;
+        fpsValueField->offset = { bounds.x + 8.0f, fpsAnchorY };
+        fpsValueField->size = { 128.0f, 22.0f };
+        fpsValueField->pivot = { 0.0f, 0.5f };
+        fpsValueField->color = fpsSampleValid
+            ? (fpsWindowFps >= 55.0f ? theme.success : (fpsWindowFps >= 30.0f ? FpsWarnColor : theme.danger))
+            : theme.textSecondary;
+
+        if (fpsStatsDirty) {
+            char valueBuf[48];
+            char statsBuf[128];
+            if (fpsSampleValid) {
+                float minFps = fpsWorstFrameMs > 0.0f ? 1000.0f / fpsWorstFrameMs : 0.0f;
+                float maxFps = fpsBestFrameMs > 0.0f ? 1000.0f / fpsBestFrameMs : 0.0f;
+                snprintf(valueBuf, sizeof(valueBuf), "%d fps (%.2f ms)", (int)(fpsWindowFps + 0.5f), fpsWindowAvgMs);
+                snprintf(statsBuf, sizeof(statsBuf), "| min %d fps | max %d fps | avg %.0f fps",
+                         (int)(minFps + 0.5f), (int)(maxFps + 0.5f), fpsSessionAvgFps);
+            } else {
+                snprintf(valueBuf, sizeof(valueBuf), "-- fps");
+                statsBuf[0] = '\0';
+            }
+            fpsValueField->text = valueBuf;
+            fpsStatsField->text = statsBuf;
+
+            Font font = WidgetFont::Get();
+            Vector2 valueSize = MeasureTextEx(font, valueBuf, fpsValueField->fontSize, fpsValueField->fontSize / 10.0f);
+            float statsX = fpsValueField->offset.x + valueSize.x + 10.0f;
+            fpsStatsField->offset = { statsX, fpsAnchorY };
+
+            Vector2 statsSize = MeasureTextEx(font, statsBuf, fpsStatsField->fontSize, fpsStatsField->fontSize / 10.0f);
+            fpsStatsField->size = { statsSize.x + 4.0f, 22.0f };
+            fpsStatsField->pivot = { 0.0f, 0.5f };
+            fpsStatsField->visible = fpsSampleValid && statsSize.x > 0.0f &&
+                statsX + statsSize.x + 200.0f <= bounds.x + bounds.width;
+            fpsStatsDirty = false;
+        }
+        fpsStatsField->color = theme.textSecondary;
+
+        toolbarChrome->Tick(dt, toolbarBounds, 1.0f);
+        toolbarChrome->Draw(toolbarBounds, 1.0f);
+    }
+
     if (mapLoaded && !playing) {
         float bx = bounds.x + 6;
         float by = toolbar.y + 3;
@@ -644,23 +776,6 @@ void ViewportPanel::RenderToolbar() {
         bx += bs + 4;
 
         Rectangle stepFieldRect = {bx, by + 2, 56, bs - 4};
-        if (!toolbarChrome) {
-            toolbarChrome = new Widget();
-            auto* root = new WidgetElement();
-            toolbarChrome->SetRoot(root);
-            gridStepField = new TextElement();
-            gridStepField->editable = true;
-            gridStepField->numericOnly = true;
-            gridStepField->fontSize = 12.0f;
-            gridStepField->backgroundColor = theme.fieldBg;
-            gridStepField->borderColor = theme.fieldBorder;
-            gridStepField->editingBorderColor = theme.accent;
-            gridStepField->onTextCommitted = [this](const std::string& text) {
-                float v = (float)atof(text.c_str());
-                if (v > 0.001f) gridStepSize = v;
-            };
-            root->AddChild(gridStepField);
-        }
         if (!gridStepField->isEditing) {
             char buf[32];
             snprintf(buf, sizeof(buf), "%g", gridStepSize);
@@ -668,8 +783,10 @@ void ViewportPanel::RenderToolbar() {
         }
         gridStepField->size = { stepFieldRect.width, stepFieldRect.height };
         gridStepField->offset = { stepFieldRect.x, stepFieldRect.y };
-        Rectangle toolbarBounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
-        float dt = GetFrameTime();
+        gridStepField->visible = true;
+        fpsValueField->visible = false;
+        fpsStatsField->visible = false;
+
         toolbarChrome->Tick(dt, toolbarBounds, 1.0f);
         WidgetInput::ProcessInput(toolbarChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
         toolbarChrome->Draw(toolbarBounds, 1.0f);
@@ -691,6 +808,7 @@ void ViewportPanel::RenderToolbar() {
 
         if (!WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), playBtn) || IsKeyDown(KEY_LEFT_ALT) && (IsKeyDown(KEY_P)) && !playing) {
             playing = true;
+            ResetFpsStats();
             savedYaw = yaw;
             savedPitch = pitch;
             savedOrbitRadius = orbitRadius;

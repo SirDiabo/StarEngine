@@ -49,6 +49,9 @@ private:
     void UpdateCamera(Rectangle client);
     void RenderScene();
     void RenderToolbar();
+    void EnsureToolbarChrome();
+    void ResetFpsStats();
+    void UpdateFpsStats(float dt);
     void HandleMapInteraction(Rectangle client);
     const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
@@ -108,6 +111,20 @@ private:
 
     Widget* toolbarChrome = nullptr;
     TextElement* gridStepField = nullptr;
+    TextElement* fpsValueField = nullptr;
+    TextElement* fpsStatsField = nullptr;
+
+    float fpsSampleTime = 0.0f;
+    int fpsSampleFrames = 0;
+    float fpsWindowFps = 0.0f;
+    float fpsWindowAvgMs = 0.0f;
+    float fpsSessionTime = 0.0f;
+    int fpsSessionFrames = 0;
+    float fpsSessionAvgFps = 0.0f;
+    float fpsBestFrameMs = 0.0f;
+    float fpsWorstFrameMs = 0.0f;
+    bool fpsSampleValid = false;
+    bool fpsStatsDirty = true;
 
     static const float toolbarHeight;
 };
