@@ -11,6 +11,7 @@
 #include <utility>
 
 StargraphBehavior::StargraphBehavior(Stargraph graph) : graph(std::move(graph)) {
+    this->graph.SyncArrayVariables();
     this->graph.CaptureVariableDefaults();
 }
 

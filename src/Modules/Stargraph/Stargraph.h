@@ -20,6 +20,7 @@ enum class PinType {
     Vec3,
     Rotator,
     Object,
+    Array,
     Wildcard
 };
 
@@ -111,6 +112,7 @@ struct Pin {
     PinValue defaultValue;
     bool isWildcard = false;
     std::string objectKind;
+    PinType elementType = PinType::None;
 };
 
 inline std::string operator+(const std::string& lhs, const PinValue& rhs) { return lhs + (const std::string&)rhs; }
@@ -239,6 +241,9 @@ public:
     void RemoveDynamicPin(Node& node, bool isOutput, const std::string& pinName);
     int AllocatePinId() { return nextPinId++; }
 
+    void SyncArrayVariables();
+    Pin* AddDynamicWildcardInput(Node& node);
+    bool RemoveDynamicWildcardInput(Node& node, int pinId);
     void RebuildDynamicExecOutputs(Node& node);
     bool AddExecCase(Node& node, const std::string& input);
     bool RemoveExecCase(Node& node, int caseIndex);

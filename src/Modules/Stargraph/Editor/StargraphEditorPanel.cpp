@@ -186,6 +186,7 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
             varValueSnapshot.clear();
         }
         if (!canStop && CheckCollisionPointRec(mp, playBtn)) {
+            graph.SyncArrayVariables();
             varValueSnapshot.clear();
             for (const Variable& v : graph.GetVariables()) {
                 varValueSnapshot.push_back(v.value);

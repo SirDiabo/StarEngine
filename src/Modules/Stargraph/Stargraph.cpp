@@ -1,4 +1,5 @@
 #include "Stargraph.h"
+#include "StargraphArray.h"
 #include "NodeRegistry.h"
 #include "ComponentRegistry.h"
 #include "Core/CookedFile.h"
@@ -171,6 +172,17 @@ Node* Stargraph::CreateNode(const std::string& type) {
         }
     }
 
+    if (nodeTemplate && !nodeTemplate->dynamicWildcardInputPrefix.empty()) {
+        for (int i = 0; i < nodeTemplate->dynamicWildcardInputInitial; i++) {
+            Pin pin;
+            pin.name = nodeTemplate->dynamicWildcardInputPrefix + std::to_string(i);
+            pin.type = PinType::Wildcard;
+            pin.isInput = true;
+            pin.isOutput = false;
+            node->inputs.push_back(pin);
+        }
+    }
+
     for (Pin& pin : node->inputs)  pin.isWildcard = (pin.type == PinType::Wildcard);
     for (Pin& pin : node->outputs) pin.isWildcard = (pin.type == PinType::Wildcard);
 
@@ -209,14 +221,49 @@ void Stargraph::RemoveSpecificLink(int outputPinId, int inputPinId) {
 }
 
 std::string Variable::DefaultElementText() const {
-    switch (type) {
-        case PinType::Boolean: return "false";
-        case PinType::Integer: return "0";
-        case PinType::Float:   return "0.00";
-        case PinType::Vec3:    return "0.00,0.00,0.00";
-        case PinType::Rotator: return "0.00,0.00,0.00";
-        default:                return "";
+    return StarArray::DefaultElementText(type);
+}
+
+Pin* Stargraph::AddDynamicWildcardInput(Node& node) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || tmpl->dynamicWildcardInputPrefix.empty()) return nullptr;
+    const std::string& prefix = tmpl->dynamicWildcardInputPrefix;
+
+    int count = 0;
+    for (const Pin& pin : node.inputs) if (pin.name.rfind(prefix, 0) == 0) count++;
+
+    Pin* pin = AddDynamicPin(node, false, prefix + std::to_string(count), PinType::Wildcard);
+    if (pin) pin->isWildcard = true;
+    return pin;
+}
+
+bool Stargraph::RemoveDynamicWildcardInput(Node& node, int pinId) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (!tmpl || tmpl->dynamicWildcardInputPrefix.empty()) return false;
+    const std::string& prefix = tmpl->dynamicWildcardInputPrefix;
+
+    std::string name;
+    for (const Pin& pin : node.inputs) {
+        if (pin.id == pinId && pin.name.rfind(prefix, 0) == 0) { name = pin.name; break; }
     }
+    if (name.empty()) return false;
+
+    RemoveDynamicPin(node, false, name);
+
+    int index = 0;
+    for (Pin& pin : node.inputs) {
+        if (pin.name.rfind(prefix, 0) != 0) continue;
+        pin.name = prefix + std::to_string(index++);
+    }
+    InvalidateCaches();
+    return true;
+}
+
+void Stargraph::SyncArrayVariables() {
+    for (Variable& var : variables) {
+        if (var.isArray) var.value = StarArray::Encode(var.arrayValues);
+    }
+    for (FunctionDef& fn : functions) fn.graph.SyncArrayVariables();
 }
 
 void Stargraph::AddVariable(const Variable& var) {
@@ -451,6 +498,8 @@ std::string PinTypeToString(PinType type) {
         case PinType::Vec3: return "Vec3";
         case PinType::Rotator: return "Rotator";
         case PinType::Object: return "Object";
+        case PinType::Array: return "Array";
+        case PinType::Wildcard: return "Wildcard";
         default: return "None";
     }
 }
@@ -464,6 +513,8 @@ PinType PinTypeFromString(const std::string& text) {
     if (text == "Vec3") return PinType::Vec3;
     if (text == "Rotator") return PinType::Rotator;
     if (text == "Object") return PinType::Object;
+    if (text == "Array") return PinType::Array;
+    if (text == "Wildcard") return PinType::Wildcard;
     return PinType::None;
 }
 
@@ -564,7 +615,9 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
         if (var.isArray) {
             out << "ArrayCount=" << var.arrayValues.size() << "\n";
             for (size_t e = 0; e < var.arrayValues.size(); e++) {
-                out << "Element" << e << "=" << var.arrayValues[e] << "\n";
+                const std::string& element = var.arrayValues[e];
+                if (element.find_first_of("\n\r\\") != std::string::npos) out << "ElementEsc" << e << "=" << EscapeCaseText(element) << "\n";
+                else out << "Element" << e << "=" << element << "\n";
             }
         } else {
             out << "Value=" << var.value << "\n";
@@ -645,7 +698,10 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
                 out << "Pin." << pin.name << "=" << pin.defaultValue << "\n";
             if (!templatePin || templatePin->type != pin.type)
                 out << "PinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
-            if (pin.type == PinType::Object && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
+            if (pin.type == PinType::Array && (!templatePin || templatePin->elementType != pin.elementType))
+                out << "PinElem." << pin.name << "=" << PinTypeToString(pin.elementType) << "\n";
+            bool objectLike = pin.type == PinType::Object || (pin.type == PinType::Array && pin.elementType == PinType::Object);
+            if (objectLike && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
                 out << "PinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         for (const Pin& pin : node.outputs) {
@@ -654,7 +710,10 @@ void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) c
             for (const Pin& tp : templateNode.outputs) if (tp.name == pin.name) { templatePin = &tp; break; }
             if (!templatePin || templatePin->type != pin.type)
                 out << "OutPinType." << pin.name << "=" << PinTypeToString(pin.type) << "\n";
-            if (pin.type == PinType::Object && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
+            if (pin.type == PinType::Array && (!templatePin || templatePin->elementType != pin.elementType))
+                out << "OutPinElem." << pin.name << "=" << PinTypeToString(pin.elementType) << "\n";
+            bool objectLike = pin.type == PinType::Object || (pin.type == PinType::Array && pin.elementType == PinType::Object);
+            if (objectLike && !pin.objectKind.empty() && (!templatePin || templatePin->objectKind != pin.objectKind))
                 out << "OutPinKind." << pin.name << "=" << pin.objectKind << "\n";
         }
         out << "\n";
@@ -846,6 +905,16 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                     for (Pin& pin : node->inputs) {
                         if (pin.name == pinName) { pin.type = PinTypeFromString(entry.second); break; }
                     }
+                } else if (entry.first.rfind("PinElem.", 0) == 0) {
+                    std::string pinName = ResolveInputPinAlias(node->type, entry.first.substr(8));
+                    for (Pin& pin : node->inputs) {
+                        if (pin.name == pinName) { pin.elementType = PinTypeFromString(entry.second); break; }
+                    }
+                } else if (entry.first.rfind("OutPinElem.", 0) == 0) {
+                    std::string pinName = entry.first.substr(11);
+                    for (Pin& pin : node->outputs) {
+                        if (pin.name == pinName) { pin.elementType = PinTypeFromString(entry.second); break; }
+                    }
                 } else if (entry.first.rfind("OutPinType.", 0) == 0) {
                     std::string pinName = entry.first.substr(11);
                     for (Pin& pin : node->outputs) {
@@ -865,6 +934,9 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                     RegisterActorKindIfAsset(entry.second);
                 }
             }
+
+            for (Pin& pin : node->inputs)  if (pin.type == PinType::Wildcard) pin.isWildcard = true;
+            for (Pin& pin : node->outputs) if (pin.type == PinType::Wildcard) pin.isWildcard = true;
 
             if (const NodeTemplate* execTmpl = NodeRegistry::Get().GetTemplate(node->type); execTmpl && execTmpl->dynamicExecOutputs) {
                 if (const std::string* countText = FindEntry(section, "ExecCaseCount")) {
@@ -893,10 +965,11 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                 if (const std::string* v = FindEntry(section, "ArrayCount")) count = SafeParse::ToInt(*v);
                 var.arrayValues.reserve(count > 0 ? (size_t)count : 0);
                 for (int e = 0; e < count; e++) {
-                    std::string key = "Element" + std::to_string(e);
-                    if (const std::string* v = FindEntry(section, key)) var.arrayValues.push_back(*v);
+                    if (const std::string* v = FindEntry(section, "ElementEsc" + std::to_string(e))) var.arrayValues.push_back(UnescapeCaseText(*v));
+                    else if (const std::string* v = FindEntry(section, "Element" + std::to_string(e))) var.arrayValues.push_back(*v);
                     else var.arrayValues.push_back(var.DefaultElementText());
                 }
+                var.value = StarArray::Encode(var.arrayValues);
             } else if (const std::string* v = FindEntry(section, "Value")) {
                 var.value = *v;
             }

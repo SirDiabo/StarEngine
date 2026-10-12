@@ -134,8 +134,8 @@ void GraphExecutor::ExecuteLinkedNodes(Stargraph& graph, Node* startNode, Execut
         PROFILE_SCOPE_DYN_L(Profiler::DetailNodes, NodeProfileLabel(*current));
         GraphExecutor::PropagateDataPins(graph, current, ctx);
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(current->type);
-        if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
         if (NodeHasExecPin(*current)) ctx.executedNodeIds.push_back(std::stoi(current->id));
+        if (tmpl && tmpl->execute) tmpl->execute(*current, graph, ctx);
         Node* next = nullptr;
         int nextPinId = 0;
         for (const Pin& pin : current->outputs) {
@@ -257,8 +257,8 @@ void GraphExecutor::ExecuteFromNode(Stargraph& graph, Node* startNode, Execution
 
         const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(next->type);
 
-        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
         if (NodeHasExecPin(*next)) ctx.executedNodeIds.push_back(std::stoi(next->id));
+        if (tmpl && tmpl->execute) tmpl->execute(*next, graph, ctx);
         current = next;
     }
 }

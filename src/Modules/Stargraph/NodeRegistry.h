@@ -26,6 +26,8 @@ struct NodeTemplate {
     std::function<std::string(const std::string&, int)> execCasePinName;
     std::function<std::string(const std::vector<std::string>&)> newExecCaseDefault;
     std::unordered_map<std::string, std::string> legacyInputPinAliases;
+    std::string dynamicWildcardInputPrefix;
+    int dynamicWildcardInputInitial = 0;
     std::function<void(Node*)> createPins;
     std::function<void(Node&, Stargraph&, ExecutionContext&)> execute;
 };

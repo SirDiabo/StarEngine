@@ -33,12 +33,25 @@ Panel* DockArea::GetPanel(const std::string& name) const {
     return nullptr;
 }
 
+void DockArea::ResetInteraction() {
+    activeSplitter     = nullptr;
+    pendingDrag        = false;
+    pendingDragPanel.clear();
+    pendingDragNode    = nullptr;
+    dragging           = false;
+    dragPanelName.clear();
+    dragSourceNode     = nullptr;
+    dragFloatingSource = nullptr;
+}
+
 void DockArea::SetDefaultLayout(std::unique_ptr<DockNode> r) {
+    ResetInteraction();
     root = std::move(r);
     floating.clear();
 }
 
 std::unique_ptr<DockNode> DockArea::TakeLayout() {
+    ResetInteraction();
     return std::move(root);
 }
 
@@ -110,6 +123,12 @@ void DockArea::UpdateFocus() {
     double now = GetTime();
     bool resumed = (now - lastRenderTime) > 0.25;
     lastRenderTime = now;
+
+    if (resumed) {
+        pendingDrag     = false;
+        pendingDragNode = nullptr;
+        activeSplitter  = nullptr;
+    }
 
     if (WidgetInput::HasModal(device)) return;
 
@@ -215,7 +234,7 @@ void DockArea::RenderOverlays() {
                         dragPos            = mouse;
                     }
                 }
-            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !WidgetInput::IsMouseBlocked() &&
                        CheckCollisionPointRec(mouse, header) && !closeHov) {
                 fp.draggingHeader = true;
                 fp.dragOffset = { mouse.x - full.x, mouse.y - full.y };
@@ -333,7 +352,7 @@ void DockArea::RenderTabBar(DockNode* node) {
             if (node->activeTab >= (int)node->panelNames.size())
                 node->activeTab = (int)node->panelNames.size() - 1;
         } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hovered && !closeHov &&
-                   !dragging && !pendingDrag) {
+                   !dragging && !pendingDrag && !WidgetInput::IsMouseBlocked()) {
             node->activeTab   = i;
             pendingDrag       = true;
             pendingDragPanel  = pname;
@@ -367,7 +386,7 @@ void DockArea::RenderSplitter(DockNode* node) {
     if ((hovered || activeSplitter == node) && !dragging && !pendingDrag)
         SetMouseCursor(horiz ? MOUSE_CURSOR_RESIZE_EW : MOUSE_CURSOR_RESIZE_NS);
 
-    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !dragging && !pendingDrag) {
+    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !dragging && !pendingDrag && !WidgetInput::IsMouseBlocked()) {
         activeSplitter       = node;
         splitterDragStart    = mouse;
         splitterRatioAtStart = node->splitRatio;
@@ -668,6 +687,7 @@ void DockArea::SaveLayout(std::unordered_map<std::string, std::string>& out,
 
 void DockArea::LoadLayout(const std::unordered_map<std::string, std::string>& in,
                            const std::string& prefix) {
+    ResetInteraction();
     floating.clear();
     auto loaded = LoadNode(in, prefix);
     if (loaded) root = std::move(loaded);

@@ -11,6 +11,7 @@ class WidgetPalettePanel;
 class WidgetHierarchyPanel;
 class WidgetCanvasPanel;
 class DetailsPanel;
+class WidgetDetailsSwitch;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -53,6 +54,7 @@ private:
     WidgetHierarchyPanel* hierarchyPanel = nullptr;
     WidgetCanvasPanel* canvasPanel = nullptr;
     DetailsPanel* detailsPanel = nullptr;
+    WidgetDetailsSwitch* detailsSwitch = nullptr;
     LogPanel* logPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
 

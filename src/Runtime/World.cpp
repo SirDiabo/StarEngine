@@ -93,7 +93,7 @@ void World::BeginPlay() {
     ReplicationManager::Reset();
     ResetNetIds();
     for (size_t i = 0; i < actors.size(); i++) {
-        actors[i]->BeginPlay();
+        if (!actors[i]->hasBegunPlay) actors[i]->BeginPlay();
     }
 }
 

@@ -12,6 +12,7 @@ struct DockNode;
 class WidgetBehavior;
 class LogPanel;
 class ViewportPanel;
+class DetailsPanel;
 
 class IBehaviorContent {
 public:
@@ -30,6 +31,8 @@ struct ProgrammingInterfaceContext {
 
 struct ProgrammingInterfacePanelSet {
     std::vector<Panel*> panels;
+    DetailsPanel* detailsPanel = nullptr;
+    std::function<std::string()> detailsSelectionKey;
     std::unique_ptr<DockNode> layout;
     std::function<void()> syncBeforeSave;
     std::function<void()> teardown;

@@ -37,6 +37,43 @@ std::unique_ptr<DockNode> CloneDockNode(const DockNode& node) {
 
 }
 
+class WidgetDetailsSwitch : public Panel {
+public:
+    WidgetDetailsSwitch() { name = "Details"; }
+
+    DetailsPanel* elementDetails = nullptr;
+    DetailsPanel* graphDetails = nullptr;
+    std::function<std::string()> graphSelectionKey;
+    std::function<WidgetElement*()> currentElement;
+    bool graphMode = false;
+
+    void Render() override {
+        DetailsPanel* active = elementDetails;
+        if (graphMode && graphDetails) {
+            std::string graphKey = graphSelectionKey ? graphSelectionKey() : std::string();
+            WidgetElement* element = currentElement ? currentElement() : nullptr;
+            if (element != lastElement) {
+                showGraph = false;
+                lastElement = element;
+            }
+            if (graphKey != lastGraphKey) {
+                showGraph = !graphKey.empty();
+                lastGraphKey = graphKey;
+            }
+            if (showGraph && graphKey.empty()) showGraph = false;
+            if (showGraph) active = graphDetails;
+        }
+        if (!active) return;
+        active->bounds = bounds;
+        active->Render();
+    }
+
+private:
+    bool showGraph = false;
+    std::string lastGraphKey;
+    WidgetElement* lastElement = nullptr;
+};
+
 WidgetEditorTab::WidgetEditorTab(const std::string& path)
     : assetPath(path) {
     title = fs::path(path).stem().string();
@@ -49,6 +86,7 @@ WidgetEditorTab::~WidgetEditorTab() {
     delete palettePanel;
     delete hierarchyPanel;
     delete canvasPanel;
+    delete detailsSwitch;
     delete detailsPanel;
     delete topBarChrome;
     delete session;
@@ -81,7 +119,13 @@ void WidgetEditorTab::Initialize() {
         return BuildWidgetElementPropertyRows(*selected, currentElement, onEdited);
     };
 
-    std::vector<Panel*> panels = { palettePanel, hierarchyPanel, canvasPanel, detailsPanel };
+    detailsSwitch = new WidgetDetailsSwitch();
+    detailsSwitch->elementDetails = detailsPanel;
+    detailsSwitch->currentElement = [this]() -> WidgetElement* {
+        return session ? session->GetSelectedElement() : nullptr;
+    };
+
+    std::vector<Panel*> panels = { palettePanel, hierarchyPanel, canvasPanel, detailsSwitch };
     if (logPanel) panels.push_back(logPanel);
     dockArea.SetPanels(panels);
 
@@ -95,6 +139,7 @@ void WidgetEditorTab::ApplyDesignerLayout() {
         if (live) graphLayoutSnapshot = std::move(live);
     }
     inGraphMode = false;
+    if (detailsSwitch) detailsSwitch->graphMode = false;
 
     if (designerLayoutSnapshot) {
         dockArea.SetDefaultLayout(CloneDockNode(*designerLayoutSnapshot));
@@ -184,8 +229,14 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         session->beforeSave = panelSet.syncBeforeSave;
         if (hierarchyPanel) hierarchyPanel->SetElementDragCallback(graphElementDragCallback);
 
-        std::vector<Panel*> allPanels = { palettePanel, hierarchyPanel, canvasPanel, detailsPanel };
-        for (Panel* p : graphPanels) allPanels.push_back(p);
+        detailsSwitch->graphDetails = panelSet.detailsPanel;
+        detailsSwitch->graphSelectionKey = panelSet.detailsSelectionKey;
+
+        std::vector<Panel*> allPanels = { palettePanel, hierarchyPanel, canvasPanel, detailsSwitch };
+        for (Panel* p : graphPanels) {
+            if (static_cast<Panel*>(panelSet.detailsPanel) == p) continue;
+            allPanels.push_back(p);
+        }
         if (logPanel) allPanels.push_back(logPanel);
         dockArea.SetPanels(allPanels);
 
@@ -245,6 +296,7 @@ bool WidgetEditorTab::ApplyGraphLayout() {
     if (!graphLayoutSnapshot) return false;
     dockArea.SetDefaultLayout(CloneDockNode(*graphLayoutSnapshot));
     inGraphMode = true;
+    if (detailsSwitch) detailsSwitch->graphMode = true;
     return true;
 }
 

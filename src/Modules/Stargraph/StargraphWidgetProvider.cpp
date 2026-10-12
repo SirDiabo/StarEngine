@@ -57,6 +57,8 @@ void RegisterStargraphWidgetProvider() {
 
         ProgrammingInterfacePanelSet result;
         result.panels = { stargraphPanel, graphPanel, detailsPanel };
+        result.detailsPanel = detailsPanel;
+        result.detailsSelectionKey = [session]() { return session->DetailsSelectionKey(); };
 
         auto graphLeaf = std::make_unique<DockNode>();
         graphLeaf->panelNames = { "Graph" };

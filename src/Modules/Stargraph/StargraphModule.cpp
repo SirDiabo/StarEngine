@@ -42,6 +42,7 @@ bool StargraphModule::Initialize() {
     RegisterFunctionNodes();
     RegisterFlowNodes();
     RegisterMathNodes();
+    RegisterArrayNodes();
     RegisterActorNodes();
     RegisterComponentNodes();
     RegisterVariableNodes();

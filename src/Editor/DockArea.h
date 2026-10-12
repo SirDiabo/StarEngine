@@ -59,6 +59,7 @@ private:
     Panel* FindPanelAt(Vector2 pos) const;
     Panel* FindPanelByOwner(const void* owner) const;
 
+    void ResetInteraction();
     void EndDrag(Vector2 mousePos);
     void RemoveFromSource();
     void FinishReattach();

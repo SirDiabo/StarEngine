@@ -1342,8 +1342,36 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
         }));
     }
 
+    if (nodeTemplate && !nodeTemplate->dynamicWildcardInputPrefix.empty()) {
+        const UIPalette& theme = UITheme::Get();
+        const std::string prefix = nodeTemplate->dynamicWildcardInputPrefix;
+        rows.push_back(HeaderRow("n.items.h", "Items"));
+        int itemIndex = 0;
+        for (const Pin& pin : node->inputs) {
+            if (pin.name.rfind(prefix, 0) != 0) continue;
+            int pinId = pin.id;
+            std::vector<PropertyCell> cells;
+            cells.push_back(LabelCell(pin.name, 0.0f));
+            cells.push_back(ButtonCell("X", 22.0f, [this, nodeId, pinId](Rectangle) {
+                Node* n = DetailNode(nodeId);
+                if (n && ActiveGraph().RemoveDynamicWildcardInput(*n, pinId)) {
+                    RefreshWildcardPins(n);
+                    isDirty = true;
+                }
+            }, theme.dangerBg));
+            rows.push_back(CellsRow("n.item." + std::to_string(itemIndex++), std::move(cells)));
+        }
+        rows.push_back(ButtonRow("n.items.add", "+ Add Item", [this, nodeId]() {
+            Node* n = DetailNode(nodeId);
+            if (n && ActiveGraph().AddDynamicWildcardInput(*n)) {
+                RefreshWildcardPins(n);
+                isDirty = true;
+            }
+        }));
+    }
+
     for (const Pin& pin : node->inputs) {
-        if (pin.type == PinType::Exec) continue;
+        if (pin.type == PinType::Exec || pin.type == PinType::Array) continue;
         if (pin.name == "Variable_Name" || pin.name == "Component_Name") continue;
         std::string value = pin.defaultValue.c_str();
         bool isInterpNode = node->type == "Float_Interp_To" || node->type == "Int_Interp_To" ||
@@ -1361,6 +1389,28 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
             rows.push_back(ReadOnlyRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("(empty)") : value));
         }
     }
+}
+
+std::string StargraphEditorPanel::DetailsSelectionKey() {
+    if (showSelfActorDetails) return "self";
+
+    if (lastValidComponentIndex >= 0 && lastValidComponentIndex < (int)graph.GetComponents().size())
+        return "c" + std::to_string(lastValidComponentIndex);
+    if (lastValidVariableIndex >= 0 && lastValidVariableIndex < (int)graph.GetVariables().size())
+        return "v" + std::to_string(lastValidVariableIndex);
+    if (lastValidFunctionIndex >= 0 && lastValidFunctionIndex < (int)graph.GetFunctions().size())
+        return "f" + std::to_string(lastValidFunctionIndex);
+
+    if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
+        if (lastValidLocalVariableIndex >= 0 && lastValidLocalVariableIndex < (int)ActiveGraph().GetVariables().size())
+            return "l" + std::to_string(lastValidLocalVariableIndex);
+    }
+
+    if (selectedNodeId != -1) {
+        Node* selectedNode = ActiveGraph().FindNodeById(selectedNodeId);
+        if (selectedNode) return "n" + std::to_string(selectedNodeId) + ":" + selectedNode->type;
+    }
+    return "";
 }
 
 std::vector<PropertyRow> StargraphEditorPanel::BuildDetailsRows() {
@@ -1382,13 +1432,7 @@ std::vector<PropertyRow> StargraphEditorPanel::BuildDetailsRows() {
 
     Node* selectedNode = (selectedNodeId != -1) ? ActiveGraph().FindNodeById(selectedNodeId) : nullptr;
 
-    std::string key;
-    if (showSelfActorDetails) key = "self";
-    else if (lastValidComponentIndex >= 0) key = "c" + std::to_string(lastValidComponentIndex);
-    else if (lastValidVariableIndex >= 0) key = "v" + std::to_string(lastValidVariableIndex);
-    else if (lastValidFunctionIndex >= 0) key = "f" + std::to_string(lastValidFunctionIndex);
-    else if (localVariableSelected) key = "l" + std::to_string(lastValidLocalVariableIndex);
-    else if (selectedNode) key = "n" + std::to_string(selectedNodeId) + ":" + selectedNode->type;
+    std::string key = DetailsSelectionKey();
 
     if (key != lastDetailsSelectionKey) {
         ResetDetailPickers();

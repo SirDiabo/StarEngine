@@ -73,6 +73,7 @@ public:
     void RenderLeftPanelPopups();
     void RenderGraph(Rectangle area);
     std::vector<PropertyRow> BuildDetailsRows();
+    std::string DetailsSelectionKey();
     void OnDetailAssetPicked(const std::string& fullRowId, const std::string& pickedPath);
     void RenderDetailPickers(Rectangle area);
     void RenderNodeContextMenu();
@@ -119,6 +120,7 @@ private:
     bool PinsCompatible(int outputPinId, int inputPinId) const;
     Vector2 GetPinPos(const Node& node, const Pin& pin) const;
     Color GetPinColor(PinType type) const;
+    Color GetPinColor(const Pin& pin) const;
     Color GetNodeHeaderColor(const Node& node) const;
     float GetNodeHeight(const Node& node) const;
     float GetNodeWidth(const Node& node) const;
