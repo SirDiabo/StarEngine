@@ -138,6 +138,8 @@ Vector2 PollAxis2D(const char* mappingName, const std::string& device, bool arro
 
 WidgetElement* HitTestSelectable(WidgetElement* element, Vector2 point) {
     if (!element->visible) return nullptr;
+    BoxElement* clippingBox = dynamic_cast<BoxElement*>(element);
+    if (clippingBox && clippingBox->scrollEnabled && !CheckCollisionPointRec(point, element->lastResolvedRect)) return nullptr;
     for (int i = (int)element->GetChildren().size() - 1; i >= 0; i--) {
         WidgetElement* childHit = HitTestSelectable(element->GetChildren()[i], point);
         if (childHit) return childHit;
@@ -161,6 +163,8 @@ void SyncStates(WidgetElement* element, WidgetElement* current, WidgetElement* h
 
 BoxElement* HitTestScrollable(WidgetElement* element, Vector2 point) {
     if (!element->visible) return nullptr;
+    BoxElement* clippingBox = dynamic_cast<BoxElement*>(element);
+    if (clippingBox && clippingBox->scrollEnabled && !CheckCollisionPointRec(point, element->lastResolvedRect)) return nullptr;
     for (int i = (int)element->GetChildren().size() - 1; i >= 0; i--) {
         BoxElement* childHit = HitTestScrollable(element->GetChildren()[i], point);
         if (childHit) return childHit;
