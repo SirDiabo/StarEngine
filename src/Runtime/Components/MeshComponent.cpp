@@ -293,13 +293,17 @@ ComponentRegistrar registrar_MeshComponent({
     []() -> Component* { return new MeshComponent(); },
     {
         ComponentField::Asset("Mesh", "Static Mesh", ".starasset",
-            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).SetMeshPath(d.Get("Mesh")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).SetMeshPath(d.Get("Mesh")); },
+            [](const Component& c) { return static_cast<const MeshComponent&>(c).meshPath; }),
         ComponentField::Bln("MeshCastsShadow", "Casts Shadow", true,
-            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.Get("MeshCastsShadow", "true") == "true"; }),
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.Get("MeshCastsShadow", "true") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const MeshComponent&>(c).castsShadow); }),
         ComponentField::Enm("MeshCollision", "Collision", {"Mesh", "None"}, "Mesh",
             [](Component& c, const ComponentDecl& d) {
                 static_cast<MeshComponent&>(c).collisionMode = d.Get("MeshCollision", "Mesh") == "None"
                     ? MeshComponent::CollisionNone : MeshComponent::CollisionMesh;
+            },
+            [](const Component& c) -> std::string {
+                return static_cast<const MeshComponent&>(c).collisionMode == MeshComponent::CollisionNone ? "None" : "Mesh";
             }),
         ComponentField::Asset("DefaultAnim", "Default Anim", ".staranim",
             [](Component& c, const ComponentDecl& d) {
@@ -307,16 +311,21 @@ ComponentRegistrar registrar_MeshComponent({
                 std::string animPath = d.Get("DefaultAnim");
                 bool autoPlay = d.Get("DefaultAnimAutoPlay", "false") == "true";
                 bool looping = d.Get("DefaultAnimLooping", "false") == "true";
-                if (autoPlay && !animPath.empty()) mc.PlayAnimation(animPath, looping);
+                if (autoPlay && !animPath.empty() && !ComponentRegistry::IsEditorApply()) mc.PlayAnimation(animPath, looping);
                 else mc.currentAnimPath = animPath;
-            }),
+            },
+            [](const Component& c) { return static_cast<const MeshComponent&>(c).currentAnimPath; }),
         ComponentField::Bln("DefaultAnimLooping", "Default Anim Looping", false,
-            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).animLooping = d.Get("DefaultAnimLooping", "false") == "true"; }),
-        ComponentField::Bln("DefaultAnimAutoPlay", "Default Anim Auto Play", false, nullptr),
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).animLooping = d.Get("DefaultAnimLooping", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const MeshComponent&>(c).animLooping); }),
+        ComponentField::Bln("DefaultAnimAutoPlay", "Default Anim Auto Play", false,
+            [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).defaultAnimAutoPlay = d.Get("DefaultAnimAutoPlay", "false") == "true"; },
+            [](const Component& c) { return ComponentField::BoolStr(static_cast<const MeshComponent&>(c).defaultAnimAutoPlay); }),
     },
     [](Component& c, const ComponentDecl& d) {
         auto it = d.arrayFields.find("Material");
         if (it != d.arrayFields.end()) static_cast<MeshComponent&>(c).SetMaterialPaths(it->second);
-    }
+    },
+    [](const Component& c, ComponentDecl& d) { d.arrayFields["Material"] = static_cast<const MeshComponent&>(c).materialPaths; },
+    { "Material" }
 });
 }

@@ -248,13 +248,13 @@ void SetOutput(Node& node, const char* name, const std::string& value) {
 ComponentFieldDesc FloatField(const std::string& key, const std::string& label, float def, float PhysicsComponent::* member) {
     return ComponentField::Flt(key, label, def, [key, def, member](Component& c, const ComponentDecl& d) {
         static_cast<PhysicsComponent&>(c).*member = SafeParse::ToFloat(d.Get(key, std::to_string(def)));
-    });
+    }, [member](const Component& c) { return ComponentField::FloatStr(static_cast<const PhysicsComponent&>(c).*member); });
 }
 
 ComponentFieldDesc BoolField(const std::string& key, const std::string& label, bool def, bool PhysicsComponent::* member) {
     return ComponentField::Bln(key, label, def, [key, def, member](Component& c, const ComponentDecl& d) {
         static_cast<PhysicsComponent&>(c).*member = d.Get(key, def ? "true" : "false") == "true";
-    });
+    }, [member](const Component& c) { return ComponentField::BoolStr(static_cast<const PhysicsComponent&>(c).*member); });
 }
 
 ComponentRegistrar registrar_PhysicsComponent({

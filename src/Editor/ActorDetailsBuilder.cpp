@@ -1,4 +1,5 @@
 #include "ActorDetailsBuilder.h"
+#include "Modules/Stargraph/ComponentEditing.h"
 #include "Core/StarAsset.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Core/SafeParse.h"
@@ -73,6 +74,11 @@ static void BuildStaticMeshRows(ActorInstance& inst, std::vector<PropertyRow>& r
     }
 }
 
+static LiveComponentCache& LevelComponentCache() {
+    static LiveComponentCache cache;
+    return cache;
+}
+
 static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRow>& rows,
                                       const std::function<ActorInstance*()>& currentInstance,
                                       const std::function<void()>& onEdited) {
@@ -83,106 +89,95 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
     header.label = comp.componentType + " Component";
     rows.push_back(header);
 
-    auto floatField = [&](const char* label, const char* key, const char* defaultValue) {
-        PropertyRow row;
-        row.id = std::string("field:") + key;
-        row.kind = PropertyRowKind::Float;
-        row.label = label;
-        row.floatValue = SafeParse::ToFloat(comp.Get(key, defaultValue));
-        std::string keyStr = key;
-        row.setFloat = [currentInstance, onEdited, keyStr](float v) {
-            ActorInstance* i = currentInstance();
-            if (!i) return;
-            char vbuf[32];
-            snprintf(vbuf, sizeof(vbuf), "%g", v);
-            i->component.fields[keyStr] = vbuf;
-            if (onEdited) onEdited();
-        };
-        rows.push_back(row);
+    const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(comp.componentType);
+    if (!typeInfo) return;
+
+    std::string cacheKey = "level:" + inst.name;
+    auto writeField = [currentInstance, cacheKey](const std::string& fieldKey, const std::string& value) {
+        ActorInstance* i = currentInstance();
+        if (!i) return;
+        ComponentEditing::WriteField(LevelComponentCache(), cacheKey, i->component, fieldKey, value);
     };
 
-    auto boolField = [&](const char* label, const char* key, const char* defaultValue) {
+    bool colorRowAdded = false;
+    for (const ComponentFieldDesc& f : typeInfo->fields) {
+        if (f.visibleIf && !f.visibleIf(comp)) continue;
+        std::string fieldKey = f.key;
+        std::string value = ComponentEditing::ReadField(LevelComponentCache(), cacheKey, comp, f);
+
+        if (comp.componentType == "LightComponent" && fieldKey.rfind("LightColor", 0) == 0) {
+            if (colorRowAdded) continue;
+            colorRowAdded = true;
+            PropertyRow colorRow;
+            colorRow.id = "field:LightColor";
+            colorRow.kind = PropertyRowKind::Vec3;
+            colorRow.label = "Light Color";
+            for (int c = 0; c < 3; c++) {
+                static const char* channelKeys[3] = { "LightColorR", "LightColorG", "LightColorB" };
+                for (const ComponentFieldDesc& channel : typeInfo->fields) {
+                    if (channel.key == channelKeys[c]) {
+                        colorRow.vec3[c] = SafeParse::ToFloat(ComponentEditing::ReadField(LevelComponentCache(), cacheKey, comp, channel));
+                    }
+                }
+            }
+            colorRow.setVec3 = [writeField, onEdited](float r, float g, float b) {
+                writeField("LightColorR", ComponentField::FloatStr(r));
+                writeField("LightColorG", ComponentField::FloatStr(g));
+                writeField("LightColorB", ComponentField::FloatStr(b));
+                if (onEdited) onEdited();
+            };
+            rows.push_back(colorRow);
+            continue;
+        }
+
         PropertyRow row;
-        row.id = std::string("field:") + key;
-        row.kind = PropertyRowKind::Bool;
-        row.label = label;
-        row.boolValue = comp.Get(key, defaultValue) == "true";
-        std::string keyStr = key;
-        row.setBool = [currentInstance, onEdited, keyStr](bool v) {
-            ActorInstance* i = currentInstance();
-            if (!i) return;
-            i->component.fields[keyStr] = v ? "true" : "false";
-            if (onEdited) onEdited();
-        };
+        row.id = "field:" + fieldKey;
+        row.label = f.label;
+        switch (f.kind) {
+            case ComponentFieldKind::Float:
+                row.kind = PropertyRowKind::Float;
+                row.floatValue = SafeParse::ToFloat(value);
+                row.setFloat = [writeField, onEdited, fieldKey](float v) {
+                    writeField(fieldKey, ComponentField::FloatStr(v));
+                    if (onEdited) onEdited();
+                };
+                break;
+            case ComponentFieldKind::Bool:
+                row.kind = PropertyRowKind::Bool;
+                row.boolValue = value == "true";
+                row.setBool = [writeField, onEdited, fieldKey](bool v) {
+                    writeField(fieldKey, ComponentField::BoolStr(v));
+                    if (onEdited) onEdited();
+                };
+                break;
+            case ComponentFieldKind::Enum:
+                row.kind = PropertyRowKind::Enum;
+                row.stringValue = value;
+                row.enumOptions = f.enumOptions;
+                row.setString = [writeField, onEdited, fieldKey](const std::string& v) {
+                    writeField(fieldKey, v);
+                    if (onEdited) onEdited();
+                };
+                break;
+            case ComponentFieldKind::String:
+                row.kind = PropertyRowKind::String;
+                row.stringValue = value;
+                row.setString = [writeField, onEdited, fieldKey](const std::string& v) {
+                    writeField(fieldKey, v);
+                    if (onEdited) onEdited();
+                };
+                break;
+            case ComponentFieldKind::AssetPath:
+                if (fieldKey != "Sound") continue;
+                row.id = "sound";
+                row.kind = PropertyRowKind::Asset;
+                row.stringValue = AssetDisplayName(value);
+                row.assetExtension = f.assetExtension;
+                break;
+            case ComponentFieldKind::Device:
+                continue;
+        }
         rows.push_back(row);
-    };
-
-    if (comp.componentType == "LightComponent") {
-        std::string lightType = comp.Get("LightType", "Point");
-
-        PropertyRow typeRow;
-        typeRow.id = "field:LightType";
-        typeRow.kind = PropertyRowKind::Enum;
-        typeRow.label = "Light Type";
-        typeRow.stringValue = lightType;
-        typeRow.enumOptions = { "Point", "Rectangle", "Spot", "Global", "Sun" };
-        typeRow.setString = [currentInstance, onEdited](const std::string& v) {
-            ActorInstance* i = currentInstance();
-            if (!i) return;
-            i->component.fields["LightType"] = v;
-            if (onEdited) onEdited();
-        };
-        rows.push_back(typeRow);
-
-        PropertyRow colorRow;
-        colorRow.id = "field:LightColor";
-        colorRow.kind = PropertyRowKind::Vec3;
-        colorRow.label = "Light Color";
-        colorRow.vec3[0] = SafeParse::ToFloat(comp.Get("LightColorR", "1"));
-        colorRow.vec3[1] = SafeParse::ToFloat(comp.Get("LightColorG", "1"));
-        colorRow.vec3[2] = SafeParse::ToFloat(comp.Get("LightColorB", "1"));
-        colorRow.setVec3 = [currentInstance, onEdited](float r, float g, float b) {
-            ActorInstance* i = currentInstance();
-            if (!i) return;
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%g", r); i->component.fields["LightColorR"] = buf;
-            snprintf(buf, sizeof(buf), "%g", g); i->component.fields["LightColorG"] = buf;
-            snprintf(buf, sizeof(buf), "%g", b); i->component.fields["LightColorB"] = buf;
-            if (onEdited) onEdited();
-        };
-        rows.push_back(colorRow);
-
-        floatField("Intensity", "LightIntensity", "1");
-
-        if (lightType != "Global" && lightType != "Sun") {
-            floatField("Radius", "LightRadius", "500");
-        }
-        if (lightType == "Spot") {
-            floatField("Inner Cone Angle", "LightInnerConeAngle", "25");
-            floatField("Outer Cone Angle", "LightOuterConeAngle", "35");
-        }
-        if (lightType == "Rectangle") {
-            floatField("Width", "LightWidth", "100");
-            floatField("Height", "LightHeight", "100");
-        }
-    } else if (comp.componentType == "CameraComponent") {
-        floatField("FOV", "CameraFOV", "50");
-        floatField("Near Clip", "CameraNearClip", "0.1");
-        floatField("Far Clip", "CameraFarClip", "4000");
-        boolField("Orthographic", "CameraOrthographic", "false");
-    } else if (comp.componentType == "AudioComponent") {
-        PropertyRow soundRow;
-        soundRow.id = "sound";
-        soundRow.kind = PropertyRowKind::Asset;
-        soundRow.label = "Sound";
-        soundRow.stringValue = AssetDisplayName(comp.Get("Sound"));
-        soundRow.assetExtension = ".starsound";
-        rows.push_back(soundRow);
-
-        floatField("Volume", "Volume", "1");
-        floatField("Pitch", "Pitch", "1");
-        boolField("Auto Play", "AutoPlay", "false");
-        boolField("Looping", "Looping", "false");
     }
 }
 

@@ -1,5 +1,6 @@
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
+#include "Modules/Stargraph/ComponentEditing.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
@@ -538,31 +539,26 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
             if (f.visibleIf && !f.visibleIf(comp)) continue;
             std::string key = f.key;
             std::string rowId = "f:" + key;
-            std::string value = comp.Get(f.key, f.defaultValue);
+            std::string value = ComponentEditing::ReadField(liveComponents, comp.name, comp, f);
             switch (f.kind) {
                 case ComponentFieldKind::String:
                     rows.push_back(StringRow(rowId, f.label, value, [this, idx, key](const std::string& v) {
-                        if (ComponentDecl* c = DetailComponent(idx)) { c->fields[key] = v; isDirty = true; }
+                        SetComponentField(idx, key, v);
                     }));
                     break;
                 case ComponentFieldKind::Float:
                     rows.push_back(FloatRow(rowId, f.label, SafeParse::ToFloat(value), false, [this, idx, key](float v) {
-                        if (ComponentDecl* c = DetailComponent(idx)) {
-                            char buf[32];
-                            snprintf(buf, sizeof(buf), "%g", v);
-                            c->fields[key] = buf;
-                            isDirty = true;
-                        }
+                        SetComponentField(idx, key, ComponentField::FloatStr(v));
                     }));
                     break;
                 case ComponentFieldKind::Bool:
                     rows.push_back(BoolRow(rowId, f.label, value == "true", [this, idx, key](bool v) {
-                        if (ComponentDecl* c = DetailComponent(idx)) { c->fields[key] = v ? "true" : "false"; isDirty = true; }
+                        SetComponentField(idx, key, ComponentField::BoolStr(v));
                     }));
                     break;
                 case ComponentFieldKind::Enum:
                     rows.push_back(EnumRow(rowId, f.label, value, f.enumOptions, [this, idx, key](const std::string& v) {
-                        if (ComponentDecl* c = DetailComponent(idx)) { c->fields[key] = v; isDirty = true; }
+                        SetComponentField(idx, key, v);
                     }));
                     break;
                 case ComponentFieldKind::AssetPath:
@@ -740,7 +736,7 @@ void StargraphEditorPanel::RenderDetailPickers(Rectangle panel) {
             }
             std::string pickedDevice = inputDevicePicker.Render(deviceEntries, panel);
             if (!pickedDevice.empty()) {
-                comp->fields[activeDeviceFieldKey] = pickedDevice;
+                ComponentEditing::WriteField(liveComponents, comp->name, *comp, activeDeviceFieldKey, pickedDevice);
                 isDirty = true;
             }
         }
@@ -1461,20 +1457,28 @@ std::vector<PropertyRow> StargraphEditorPanel::BuildDetailsRows() {
     return rows;
 }
 
+void StargraphEditorPanel::SetComponentField(int index, const std::string& fieldKey, const std::string& value) {
+    ComponentDecl* c = DetailComponent(index);
+    if (!c) return;
+    ComponentEditing::WriteField(liveComponents, c->name, *c, fieldKey, value);
+    isDirty = true;
+}
+
 void StargraphEditorPanel::OnDetailAssetPicked(const std::string& fullRowId, const std::string& pickedPath) {
     size_t separator = fullRowId.find('|');
     const std::string rowId = (separator == std::string::npos) ? fullRowId : fullRowId.substr(separator + 1);
     if (rowId.rfind("f:", 0) == 0) {
         if (ComponentDecl* c = DetailComponent(lastValidComponentIndex)) {
-            c->fields[rowId.substr(2)] = pickedPath;
+            ComponentEditing::WriteField(liveComponents, c->name, *c, rowId.substr(2), pickedPath);
             isDirty = true;
         }
     } else if (rowId.rfind("mat:", 0) == 0) {
         if (ComponentDecl* c = DetailComponent(lastValidComponentIndex)) {
-            std::vector<std::string>& mats = c->arrayFields["Material"];
+            std::vector<std::string> mats = c->arrayFields["Material"];
             int slot = atoi(rowId.c_str() + 4);
             if (slot >= 0 && slot < (int)mats.size()) {
                 mats[slot] = pickedPath;
+                ComponentEditing::WriteArray(liveComponents, c->name, *c, "Material", mats);
                 isDirty = true;
             }
         }

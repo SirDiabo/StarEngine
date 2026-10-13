@@ -56,7 +56,7 @@ void LogPanel::Render() {
     BeginScissorMode((int)bounds.x + 1, (int)bounds.y + 1, (int)bounds.width - 2, (int)bounds.height - 2);
     float y = bounds.y + padding - scrollOffset;
     for (auto it = logs.rbegin(); it != logs.rend() && y < bounds.y + bounds.height - padding; ++it) {
-        DrawText(it->message.c_str(), (int)bounds.x + 5, (int)y, 10, LogEntryColor(it->level));
+        if (y + lineHeight >= bounds.y) DrawText(it->message.c_str(), (int)bounds.x + 5, (int)y, 10, LogEntryColor(it->level));
         y += lineHeight;
     }
     EndScissorMode();

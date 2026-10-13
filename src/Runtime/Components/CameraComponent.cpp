@@ -316,13 +316,13 @@ ComponentRegistrar registrar_CameraComponent({
     []() -> Component* { return new CameraComponent(); },
     {
         ComponentField::Flt("CameraFOV", "FOV", 50.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).fov = SafeParse::ToFloat(d.Get("CameraFOV", "50")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).fov = SafeParse::ToFloat(d.Get("CameraFOV", "50")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CameraComponent&>(c).fov); }),
         ComponentField::Flt("CameraNearClip", "Near Clip", 0.1f,
-            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).nearClip = SafeParse::ToFloat(d.Get("CameraNearClip", "0.1")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).nearClip = SafeParse::ToFloat(d.Get("CameraNearClip", "0.1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CameraComponent&>(c).nearClip); }),
         ComponentField::Flt("CameraFarClip", "Far Clip", 4000.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).farClip = SafeParse::ToFloat(d.Get("CameraFarClip", "4000")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).farClip = SafeParse::ToFloat(d.Get("CameraFarClip", "4000")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CameraComponent&>(c).farClip); }),
         ComponentField::Bln("CameraOrthographic", "Orthographic", false,
-            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).orthographic = d.Get("CameraOrthographic", "false") == "true"; }),
+            [](Component& c, const ComponentDecl& d) { static_cast<CameraComponent&>(c).orthographic = d.Get("CameraOrthographic", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const CameraComponent&>(c).orthographic); }),
     }
 });
 }

@@ -274,20 +274,21 @@ ComponentRegistrar registrar_AudioComponent({
     []() -> Component* { return new AudioComponent(); },
     {
         ComponentField::Asset("Sound", "Sound Path", ".starsound",
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).soundPath = d.Get("Sound"); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).soundPath = d.Get("Sound"); }, [](const Component& c) { return static_cast<const AudioComponent&>(c).soundPath; }),
         ComponentField::Flt("Volume", "Volume", 1.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).volume = SafeParse::ToFloat(d.Get("Volume", "1")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).volume = SafeParse::ToFloat(d.Get("Volume", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).volume); }),
         ComponentField::Flt("Pitch", "Pitch", 1.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = SafeParse::ToFloat(d.Get("Pitch", "1")); }),
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = SafeParse::ToFloat(d.Get("Pitch", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).pitch); }),
         ComponentField::Bln("AutoPlay", "Auto Play", false,
             [](Component& c, const ComponentDecl& d) {
                 auto& ac = static_cast<AudioComponent&>(c);
                 bool autoPlay = d.Get("AutoPlay", "false") == "true";
-                if (autoPlay && !d.Get("Sound").empty()) ac.Play();
-                else ac.autoPlay = autoPlay;
-            }),
+                ac.autoPlay = autoPlay;
+                if (autoPlay && !d.Get("Sound").empty() && !ComponentRegistry::IsEditorApply()) ac.Play();
+            },
+            [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).autoPlay); }),
         ComponentField::Bln("Looping", "Looping", false,
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }),
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).looping); }),
     }
 });
 }

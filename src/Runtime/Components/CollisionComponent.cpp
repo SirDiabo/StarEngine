@@ -100,31 +100,38 @@ ComponentRegistrar registrar_CollisionComponent({
                 static_cast<CollisionComponent&>(c).shapeType = shape == "Sphere" ? CollisionComponent::Sphere
                                                                 : shape == "Capsule" ? CollisionComponent::Capsule
                                                                                      : CollisionComponent::Box;
+            },
+            [](const Component& c) -> std::string {
+                switch (static_cast<const CollisionComponent&>(c).shapeType) {
+                    case CollisionComponent::Sphere:  return "Sphere";
+                    case CollisionComponent::Capsule: return "Capsule";
+                    default:                          return "Box";
+                }
             }),
         []{ auto f = ComponentField::Flt("CollisionRadius", "Radius", 50.0f,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).radius = SafeParse::ToFloat(d.Get("CollisionRadius", "50")); });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).radius = SafeParse::ToFloat(d.Get("CollisionRadius", "50")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CollisionComponent&>(c).radius); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") != "Box"; };
             return f; }(),
         []{ auto f = ComponentField::Flt("CollisionHeight", "Height", 100.0f,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).height = SafeParse::ToFloat(d.Get("CollisionHeight", "100")); });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).height = SafeParse::ToFloat(d.Get("CollisionHeight", "100")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CollisionComponent&>(c).height); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Capsule"; };
             return f; }(),
         []{ auto f = ComponentField::Flt("BoxWidth", "Box Width", 100.0f,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.x = SafeParse::ToFloat(d.Get("BoxWidth", "100")); });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.x = SafeParse::ToFloat(d.Get("BoxWidth", "100")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CollisionComponent&>(c).boxExtents.x); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
             return f; }(),
         []{ auto f = ComponentField::Flt("BoxHeight", "Box Height", 100.0f,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.y = SafeParse::ToFloat(d.Get("BoxHeight", "100")); });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.y = SafeParse::ToFloat(d.Get("BoxHeight", "100")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CollisionComponent&>(c).boxExtents.y); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
             return f; }(),
         []{ auto f = ComponentField::Flt("BoxDepth", "Box Depth", 100.0f,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.z = SafeParse::ToFloat(d.Get("BoxDepth", "100")); });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).boxExtents.z = SafeParse::ToFloat(d.Get("BoxDepth", "100")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const CollisionComponent&>(c).boxExtents.z); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionShape", "Box") == "Box"; };
             return f; }(),
         ComponentField::Bln("CollisionVisibility", "Visibility", true,
-            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).visible = d.Get("CollisionVisibility", "true") == "true"; }),
+            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).visible = d.Get("CollisionVisibility", "true") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const CollisionComponent&>(c).visible); }),
         []{ auto f = ComponentField::Bln("CollisionHiddenInGame", "Hidden In Game", true,
-                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).hiddenInGame = d.Get("CollisionHiddenInGame", "true") == "true"; });
+                [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).hiddenInGame = d.Get("CollisionHiddenInGame", "true") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const CollisionComponent&>(c).hiddenInGame); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionVisibility", "true") == "true"; };
             return f; }(),
     }

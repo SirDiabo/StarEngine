@@ -16,6 +16,7 @@ public:
     std::string currentAnimPath;
     bool animPlaying = false;
     bool animLooping = false;
+    bool defaultAnimAutoPlay = false;
     float animPlayRate = 1.0f;
     float animTime = 0.0f; // seconds into the current animation
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "Modules/Stargraph/Stargraph.h"
+#include "Modules/Stargraph/ComponentEditing.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "GraphCanvas.h"
 #include "Editor/AssetPickerPopup.h"
@@ -101,6 +102,8 @@ private:
     void BuildCallFunctionRows(std::vector<PropertyRow>& rows, int nodeId);
     void BuildGenericNodeRows(std::vector<PropertyRow>& rows, int nodeId);
     ComponentDecl* DetailComponent(int index);
+    void SetComponentField(int index, const std::string& fieldKey, const std::string& value);
+    LiveComponentCache liveComponents;
     Variable* DetailVariable(int index, bool isLocal);
     FunctionDef* DetailFunction(int index);
     Node* DetailNode(int nodeId);
