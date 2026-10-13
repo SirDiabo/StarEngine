@@ -1,3 +1,4 @@
+#include "Core/KeyLayout.h"
 #include "Core/RotationMath.h"
 #include "ViewportPanel.h"
 #include "Core/ProfilerRender.h"
@@ -477,7 +478,7 @@ void ViewportPanel::UpdateCamera(Rectangle client) {
         }
     }
 
-    if (WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_F) && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
+    if (WidgetInput::ScopeHasKeyboard() && KeyLayout::Pressed('f') && selectedActorIndex >= 0 && selectedActorIndex < (int)starMap.GetInstances().size()) {
         const ActorInstance& inst = starMap.GetInstances()[selectedActorIndex];
         cameraTarget = {inst.posX, inst.posY, inst.posZ};
     }
@@ -689,10 +690,10 @@ void ViewportPanel::HandleMapInteraction(Rectangle client) {
     }
 
     if (!playing && WidgetInput::ScopeHasKeyboard()) {
-        if (IsKeyPressed(KEY_Q)) gizmoMode = GizmoMode::Select;
-        if (IsKeyPressed(KEY_W)) gizmoMode = GizmoMode::Move;
-        if (IsKeyPressed(KEY_E)) gizmoMode = GizmoMode::Rotate;
-        if (IsKeyPressed(KEY_R)) gizmoMode = GizmoMode::Scale;
+        if (KeyLayout::Pressed('q')) gizmoMode = GizmoMode::Select;
+        if (KeyLayout::Pressed('w')) gizmoMode = GizmoMode::Move;
+        if (KeyLayout::Pressed('e')) gizmoMode = GizmoMode::Rotate;
+        if (KeyLayout::Pressed('r')) gizmoMode = GizmoMode::Scale;
     }
 
     if (!playing && WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_DELETE) && selectedActorIndex >= 0) {

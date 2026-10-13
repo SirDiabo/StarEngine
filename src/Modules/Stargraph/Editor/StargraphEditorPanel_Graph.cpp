@@ -1,3 +1,4 @@
+#include "Core/KeyLayout.h"
 #include "StargraphEditorPanel.h"
 #include "Modules/Stargraph/NodeRegistry.h"
 #include "Modules/Stargraph/ObjectEvents.h"
@@ -1866,9 +1867,9 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
     if (graphKeys && IsKeyPressed(KEY_DELETE) && selectedNodeId != -1) DeleteSelected();
 
     if (graphKeys && IsKeyDown(KEY_LEFT_CONTROL) && editingPinId == 0) {
-        if (IsKeyPressed(KEY_C)) CopySelectedNodes();
-        else if (IsKeyPressed(KEY_V)) PasteNodes();
-        else if (IsKeyPressed(KEY_D)) DuplicateSelected();
+        if (KeyLayout::Pressed('c')) CopySelectedNodes();
+        else if (KeyLayout::Pressed('v')) PasteNodes();
+        else if (KeyLayout::Pressed('d')) DuplicateSelected();
     }
 
     if (graphKeys && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S) && isDirty) {

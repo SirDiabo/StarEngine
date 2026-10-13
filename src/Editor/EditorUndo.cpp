@@ -1,3 +1,4 @@
+#include "Core/KeyLayout.h"
 #include "EditorUndo.h"
 #include "Core/UndoManager.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -70,8 +71,8 @@ void Tick() {
     bool modalOpen = WidgetInput::HasModal(WidgetInput::kEditorDevice);
 
     if (!textEditing && !modalOpen && CtrlDown()) {
-        bool zPressed = IsKeyPressed(KEY_Z) || IsKeyPressedRepeat(KEY_Z);
-        bool yPressed = IsKeyPressed(KEY_Y) || IsKeyPressedRepeat(KEY_Y);
+        bool zPressed = KeyLayout::PressedOrRepeat('z');
+        bool yPressed = KeyLayout::PressedOrRepeat('y');
         if (zPressed && !ShiftDown()) { PerformUndo(); return; }
         if (yPressed || (zPressed && ShiftDown())) { PerformRedo(); return; }
     }

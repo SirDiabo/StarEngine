@@ -1,3 +1,4 @@
+#include "Core/KeyLayout.h"
 #include "Core/RotationMath.h"
 #include "StargraphEditorPanel.h"
 #include "Editor/EditorUndo.h"
@@ -184,7 +185,7 @@ void StargraphEditorPanel::UpdatePreviewCamera(Rectangle client) {
         }
     }
 
-    if (WidgetInput::ScopeHasKeyboard() && IsKeyPressed(KEY_F) && selectedComponentIndex >= 0 && selectedComponentIndex < (int)graph.GetComponents().size()) {
+    if (WidgetInput::ScopeHasKeyboard() && KeyLayout::Pressed('f') && selectedComponentIndex >= 0 && selectedComponentIndex < (int)graph.GetComponents().size()) {
         Vector3 wp, wr, ws;
         PreviewComputeDeclWorldTransform(graph.GetComponents(), graph.GetComponents()[selectedComponentIndex], wp, wr, ws);
         previewCameraTarget = wp;
@@ -309,10 +310,10 @@ void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
     }
 
     if (!previewFlying && WidgetInput::ScopeHasKeyboard()) {
-        if (IsKeyPressed(KEY_Q)) previewGizmoMode = GizmoMode::Select;
-        if (IsKeyPressed(KEY_W)) previewGizmoMode = GizmoMode::Move;
-        if (IsKeyPressed(KEY_E)) previewGizmoMode = GizmoMode::Rotate;
-        if (IsKeyPressed(KEY_R)) previewGizmoMode = GizmoMode::Scale;
+        if (KeyLayout::Pressed('q')) previewGizmoMode = GizmoMode::Select;
+        if (KeyLayout::Pressed('w')) previewGizmoMode = GizmoMode::Move;
+        if (KeyLayout::Pressed('e')) previewGizmoMode = GizmoMode::Rotate;
+        if (KeyLayout::Pressed('r')) previewGizmoMode = GizmoMode::Scale;
     }
 }
 
