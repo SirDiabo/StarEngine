@@ -1,4 +1,5 @@
 #include "ImportDetailsPanel.h"
+#include "ContentUndo.h"
 #include "Core/StarAsset.h"
 #include "Core/Project.h"
 #include "AssetImporter.h"
@@ -37,7 +38,17 @@ void ImportDetailsPanel::SaveToAsset() {
     asset.importScaleX = scaleX; asset.importScaleY = scaleY; asset.importScaleZ = scaleZ;
     asset.materialSlots = materialSlots;
 
+    std::string before, after;
+    bool track = !pendingImport;
+    if (track) ContentUndo::ReadFileBytes(assetPath, before);
     asset.SaveToFile(assetPath);
+    if (track) {
+        ContentUndo::ReadFileBytes(assetPath, after);
+        std::string trackedPath = assetPath;
+        ContentUndo::RecordFileEdit(trackedPath, before, after, "Asset Edit", [this, trackedPath]() {
+            if (open && assetPath == trackedPath) LoadFromAsset();
+        });
+    }
 }
 
 void ImportDetailsPanel::Open(const std::string& path, const std::string& type, bool inlinePanelMode) {

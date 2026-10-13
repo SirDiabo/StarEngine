@@ -8,6 +8,7 @@
 #include "Core/Widgets/WidgetElement.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
+#include "Editor/EditorUndo.h"
 #include "Editor/UITheme.h"
 #include "Core/LayoutSerializer.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
@@ -81,6 +82,11 @@ WidgetEditorTab::WidgetEditorTab(const std::string& path)
 }
 
 WidgetEditorTab::~WidgetEditorTab() {
+    if (undoDocument) {
+        UndoManager::Get().UnregisterDocument(undoDocument);
+        delete undoDocument;
+        undoDocument = nullptr;
+    }
     if (graphTeardown) graphTeardown();
     for (Panel* p : graphPanels) delete p;
     delete palettePanel;
@@ -95,6 +101,19 @@ WidgetEditorTab::~WidgetEditorTab() {
 void WidgetEditorTab::Initialize() {
     session = new WidgetEditorSession();
     session->Open(assetPath);
+
+    undoDocument = new FunctionUndoDocument();
+    undoDocument->name = "Widget Edit";
+    undoDocument->tab = this;
+    undoDocument->capture = [this](std::string& content, std::string& selection) {
+        content = session->CaptureDesign();
+        selection = session->SelectedElementId();
+    };
+    undoDocument->restore = [this](const std::string& content, const std::string& selection) {
+        session->RestoreDesign(content, selection);
+    };
+    undoDocument->canTrack = [this]() { return session && session->IsOpen(); };
+    UndoManager::Get().RegisterDocument(undoDocument);
 
     palettePanel = new WidgetPalettePanel();
     hierarchyPanel = new WidgetHierarchyPanel();
@@ -208,6 +227,8 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         ctx.content = session->GetData().behaviorContent;
         ctx.sharedLogPanel = logPanel;
         ctx.sharedViewportPanel = viewportPanel;
+        ctx.revealOwnerTab = [this]() { EditorUndo::RevealTab(this); };
+        ctx.isOwnerTabActive = [this]() { return EditorUndo::IsTabActive(this); };
         ctx.listElements = [this]() {
             std::vector<std::pair<std::string, std::string>> elements;
             std::function<void(WidgetElement*)> walk = [&](WidgetElement* element) {

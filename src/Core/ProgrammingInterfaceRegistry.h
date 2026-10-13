@@ -27,6 +27,8 @@ struct ProgrammingInterfaceContext {
     std::function<std::vector<std::pair<std::string, std::string>>()> listElements;
     std::function<void()> onContentDirtied;
     std::function<void()> onSaveRequested;
+    std::function<void()> revealOwnerTab;
+    std::function<bool()> isOwnerTabActive;
 };
 
 struct ProgrammingInterfacePanelSet {

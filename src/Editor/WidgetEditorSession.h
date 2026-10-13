@@ -31,6 +31,10 @@ public:
     void DeleteElement(WidgetElement* element);
     void ReparentElement(WidgetElement* element, WidgetElement* targetElement, TreeDropPosition pos);
 
+    std::string CaptureDesign() const;
+    std::string SelectedElementId() const;
+    void RestoreDesign(const std::string& text, const std::string& selectedId);
+
     bool IsDirty() const { return dirty; }
     void MarkDirty() { dirty = true; }
 

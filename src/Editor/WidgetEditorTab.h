@@ -12,6 +12,7 @@ class WidgetHierarchyPanel;
 class WidgetCanvasPanel;
 class DetailsPanel;
 class WidgetDetailsSwitch;
+class FunctionUndoDocument;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -50,6 +51,7 @@ private:
     DockArea dockArea;
 
     WidgetEditorSession* session = nullptr;
+    FunctionUndoDocument* undoDocument = nullptr;
     WidgetPalettePanel* palettePanel = nullptr;
     WidgetHierarchyPanel* hierarchyPanel = nullptr;
     WidgetCanvasPanel* canvasPanel = nullptr;

@@ -240,6 +240,19 @@ void ViewportPanel::LoadMap(const std::string& path) {
     mapDirty = false;
     selectedActorIndex = -1;
     StargraphAssetCache::Get().Clear();
+    if (onMapReplaced) onMapReplaced();
+}
+
+void ViewportPanel::CaptureUndoState(std::string& content, std::string& selection) const {
+    content = starMap.SerializeToString();
+    selection = std::to_string(selectedActorIndex);
+}
+
+void ViewportPanel::RestoreUndoState(const std::string& content, const std::string& selection) {
+    starMap.LoadFromString(content);
+    int index = atoi(selection.c_str());
+    selectedActorIndex = (index >= 0 && index < (int)starMap.GetInstances().size()) ? index : -1;
+    mapDirty = true;
 }
 
 void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenPos) {

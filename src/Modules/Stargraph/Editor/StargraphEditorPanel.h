@@ -17,6 +17,7 @@
 #include <functional>
 
 class ViewportPanel;
+class FunctionUndoDocument;
 
 std::string StargraphPinAssetExtension(const Pin& pin);
 
@@ -46,6 +47,9 @@ class StargraphEditorPanel {
 public:
     void Initialize();
     ~StargraphEditorPanel();
+    void SetUndoOwner(std::function<void()> reveal, std::function<bool()> isActive);
+    void CaptureUndoState(std::string& content, std::string& selection);
+    void RestoreUndoState(const std::string& content, const std::string& selection);
 
     bool Open(const std::string& filePath);
     bool OpenEmbedded(const Stargraph& initialGraph, const std::string& logicalName);
@@ -128,6 +132,10 @@ private:
 
     bool IsPrimitiveNode(const Node& node) const;
     float GetPrimitiveNodeHeight() const;
+
+    FunctionUndoDocument* undoDocument = nullptr;
+    std::function<void()> undoReveal;
+    std::function<bool()> undoOwnerActive;
 
     Stargraph graph;
     std::string filePath;

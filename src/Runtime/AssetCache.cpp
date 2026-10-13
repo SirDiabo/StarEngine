@@ -28,6 +28,7 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
 
     auto inserted = meshCache.emplace(normalized, model);
     Model* cached = &inserted.first->second;
+    modelSlotOffset[cached] = SlotOffsetForSource(normalized);
     CaptureDefaultMaterials(cached);
     return cached;
 }
@@ -173,6 +174,27 @@ std::shared_ptr<const CollisionPrivate::ModelBVH> AssetCache::GetOrBuildModelBVH
     return bvh;
 }
 
+int AssetCache::SlotOffsetForSource(const std::string& sourceMeshPath) {
+    std::string ext = GetFileExtension(sourceMeshPath.c_str());
+    for (char& c : ext) c = (char)tolower((unsigned char)c);
+    return (ext == ".gltf" || ext == ".glb") ? 1 : 0;
+}
+
+void AssetCache::RegisterModelInstance(Model* model, const std::string& sourceMeshPath) {
+    if (!model) return;
+    std::string normalized = CookedFile::Open(sourceMeshPath);
+    if (normalized.empty()) normalized = sourceMeshPath;
+    modelDefaultColors.erase(model);
+    modelDefaultTextures.erase(model);
+    modelSlotOffset[model] = SlotOffsetForSource(normalized);
+}
+
+void AssetCache::ForgetModelInstance(Model* model) {
+    modelDefaultColors.erase(model);
+    modelDefaultTextures.erase(model);
+    modelSlotOffset.erase(model);
+}
+
 void AssetCache::CaptureDefaultMaterials(Model* model) {
     if (!model || modelDefaultColors.count(model)) return;
     std::vector<Color> colors;
@@ -196,12 +218,16 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
     bool hasDefaults = defaultColors != AssetCache::Get().modelDefaultColors.end() &&
                         defaultTextures != AssetCache::Get().modelDefaultTextures.end();
 
+    auto offsetIt = AssetCache::Get().modelSlotOffset.find(model);
+    int slotOffset = offsetIt != AssetCache::Get().modelSlotOffset.end() ? offsetIt->second : 0;
+
     for (int i = 0; i < model->materialCount; i++) {
+        int slotIndex = i - slotOffset;
         Color color = hasDefaults && (size_t)i < defaultColors->second.size() ? defaultColors->second[i] : WHITE;
         Texture2D texture = hasDefaults && (size_t)i < defaultTextures->second.size() ? defaultTextures->second[i] : Texture2D{0};
         bool lit = false;
-        if ((size_t)i < materialPaths.size() && !materialPaths[i].empty()) {
-            if (const StarMaterial* material = AssetCache::Get().GetOrLoadMaterial(materialPaths[i])) {
+        if (slotIndex >= 0 && (size_t)slotIndex < materialPaths.size() && !materialPaths[slotIndex].empty()) {
+            if (const StarMaterial* material = AssetCache::Get().GetOrLoadMaterial(materialPaths[slotIndex])) {
                 color = material->baseColor;
                 lit = material->lit;
                 if (!material->textureAssetPath.empty()) {
@@ -230,6 +256,7 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
     modelBoundsCache.erase(&it->second);
     modelDefaultColors.erase(&it->second);
     modelDefaultTextures.erase(&it->second);
+    modelSlotOffset.erase(&it->second);
     UnloadModel(it->second);
     meshCache.erase(it);
 }
@@ -239,6 +266,7 @@ void AssetCache::Clear() {
     modelBoundsCache.clear();
     modelDefaultColors.clear();
     modelDefaultTextures.clear();
+    modelSlotOffset.clear();
     bvhCache.clear();
     ++collisionGeneration;
     meshCache.clear();

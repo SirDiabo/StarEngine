@@ -7,6 +7,7 @@
 #include "StargraphPreviewPanel.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
+#include "Editor/EditorUndo.h"
 #include "Core/LayoutSerializer.h"
 #include "raylib.h"
 #include <filesystem>
@@ -32,6 +33,7 @@ void StargraphEditorTab::Initialize() {
     panel = new StargraphEditorPanel();
     panel->Initialize();
     panel->SetViewportPanel(viewportPanel);
+    panel->SetUndoOwner([this]() { EditorUndo::RevealTab(this); }, [this]() { return EditorUndo::IsTabActive(this); });
     panel->Open(assetPath);
     panel->SetOnTogglePreviewFullscreen([this]() {
         dockArea.ToggleMaximizedPanel("Preview");

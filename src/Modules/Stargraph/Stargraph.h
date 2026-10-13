@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <ostream>
+#include <istream>
 #include <fstream>
 #include "Runtime/ReplicationMode.h"
 #include "Core/SectionFileIO.h"
@@ -268,6 +269,10 @@ public:
 
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
+    bool SaveToStream(std::ostream& out) const;
+    bool LoadFromStream(std::istream& in);
+    std::string SerializeToString() const;
+    bool LoadFromString(const std::string& text);
     void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
     bool LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix);
 

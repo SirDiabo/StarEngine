@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "UndoManager.h"
 #include "ProfilerRender.h"
 #include "ProfilerCapture.h"
 #include "Editor/Editor.h"
@@ -221,6 +222,7 @@ void Application::Run() {
             if (!path.empty()) {
                 if (World::Get().IsPlaying()) World::Get().EndPlay();
                 editor->CloseAllAssetEditorTabs();
+                UndoManager::Get().Clear();
                 AssetCache::Get().Clear();
                 StargraphAssetCache::Get().Clear();
                 Project::Get().Load(path);

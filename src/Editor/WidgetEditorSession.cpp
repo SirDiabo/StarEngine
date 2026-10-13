@@ -33,6 +33,49 @@ bool WidgetEditorSession::Save() {
     return true;
 }
 
+std::string WidgetEditorSession::CaptureDesign() const {
+    if (!isOpen) return std::string();
+    return WidgetAsset::SerializeWidgetAsset(data, false);
+}
+
+std::string WidgetEditorSession::SelectedElementId() const {
+    return lastValidElement ? lastValidElement->elementId : std::string();
+}
+
+static WidgetElement* FindElementById(WidgetElement* root, const std::string& id) {
+    if (!root) return nullptr;
+    if (root->elementId == id) return root;
+    for (WidgetElement* child : root->GetChildren()) {
+        if (WidgetElement* found = FindElementById(child, id)) return found;
+    }
+    return nullptr;
+}
+
+void WidgetEditorSession::RestoreDesign(const std::string& text, const std::string& selectedId) {
+    if (!isOpen || text.empty()) return;
+
+    WidgetAssetData restored;
+    if (!WidgetAsset::DeserializeWidgetAsset(text, restored, false)) return;
+
+    highlightedElement = nullptr;
+    lastValidElement = nullptr;
+
+    delete data.rootElement;
+    data.rootElement = restored.rootElement;
+    restored.rootElement = nullptr;
+    data.assetName = restored.assetName;
+    data.parentClass = restored.parentClass;
+    data.uiScale = restored.uiScale;
+    data.forceNativeResolution = restored.forceNativeResolution;
+
+    if (!selectedId.empty()) {
+        WidgetElement* element = FindElementById(data.rootElement, selectedId);
+        highlightedElement = element;
+        lastValidElement = element;
+    }
+    dirty = true;
+}
+
 WidgetEditorSession::~WidgetEditorSession() {
     delete data.rootElement;
     delete data.behaviorContent;

@@ -2,6 +2,8 @@
 #include "Editor/ViewportPanel.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
+#include "Editor/EditorUndo.h"
+#include <sstream>
 
 std::string StargraphPinAssetExtension(const Pin& pin) {
     if (pin.type != PinType::String) return "";
@@ -19,6 +21,84 @@ const float StargraphEditorPanel::toolbarHeight  = 30.0f;
 const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
 
 void StargraphEditorPanel::Initialize() {
+    if (undoDocument) return;
+    undoDocument = new FunctionUndoDocument();
+    undoDocument->name = "Graph Edit";
+    undoDocument->capture = [this](std::string& content, std::string& selection) { CaptureUndoState(content, selection); };
+    undoDocument->restore = [this](const std::string& content, const std::string& selection) { RestoreUndoState(content, selection); };
+    undoDocument->reveal = [this]() { if (undoReveal) undoReveal(); };
+    undoDocument->canTrack = [this]() {
+        if (!isOpen || !varValueSnapshot.empty()) return false;
+        return undoOwnerActive ? undoOwnerActive() : true;
+    };
+    UndoManager::Get().RegisterDocument(undoDocument);
+}
+
+void StargraphEditorPanel::SetUndoOwner(std::function<void()> reveal, std::function<bool()> isActive) {
+    undoReveal = std::move(reveal);
+    undoOwnerActive = std::move(isActive);
+}
+
+void StargraphEditorPanel::CaptureUndoState(std::string& content, std::string& selection) {
+    if (!isOpen) {
+        content.clear();
+        selection.clear();
+        return;
+    }
+    content = graph.SerializeToString();
+    std::ostringstream sel;
+    sel << openFunctionIndex;
+    for (int id : selectedNodeIds) sel << "," << id;
+    selection = sel.str();
+}
+
+void StargraphEditorPanel::RestoreUndoState(const std::string& content, const std::string& selection) {
+    if (!isOpen || content.empty()) return;
+    graph.LoadFromString(content);
+
+    int functionIndex = -1;
+    std::vector<int> nodeIds;
+    {
+        std::stringstream ss(selection);
+        std::string token;
+        bool first = true;
+        while (std::getline(ss, token, ',')) {
+            if (token.empty()) continue;
+            int value = atoi(token.c_str());
+            if (first) { functionIndex = value; first = false; }
+            else nodeIds.push_back(value);
+        }
+    }
+
+    openFunctionIndex = (functionIndex >= 0 && functionIndex < (int)graph.GetFunctions().size()) ? functionIndex : -1;
+
+    selectedNodeIds.clear();
+    for (int id : nodeIds) {
+        if (ActiveGraph().FindNodeById(id)) selectedNodeIds.push_back(id);
+    }
+    selectedNodeId = selectedNodeIds.empty() ? -1 : selectedNodeIds.back();
+
+    boxSelecting = false;
+    draggingNode = false;
+    linkFromPin = -1;
+    rerouteExtraPins.clear();
+    nodeMenuOpen = false;
+    editingPinId = 0;
+    listeningForKeyPinId = 0;
+    keyPickerOpen = false;
+    keyPickerPinId = 0;
+    multiDragStartPositions.clear();
+
+    if (selectedVariableIndex >= (int)graph.GetVariables().size()) selectedVariableIndex = -1;
+    if (lastValidVariableIndex >= (int)graph.GetVariables().size()) lastValidVariableIndex = -1;
+    if (selectedFunctionIndex >= (int)graph.GetFunctions().size()) selectedFunctionIndex = -1;
+    if (lastValidFunctionIndex >= (int)graph.GetFunctions().size()) lastValidFunctionIndex = -1;
+    if (selectedComponentIndex >= (int)graph.GetComponents().size()) selectedComponentIndex = -1;
+    if (lastValidComponentIndex >= (int)graph.GetComponents().size()) lastValidComponentIndex = -1;
+    if (selectedLocalVariableIndex >= (int)ActiveGraph().GetVariables().size()) selectedLocalVariableIndex = -1;
+    if (lastValidLocalVariableIndex >= (int)ActiveGraph().GetVariables().size()) lastValidLocalVariableIndex = -1;
+
+    isDirty = true;
 }
 
 void StargraphEditorPanel::OpenFunctionGraph(int index) {
@@ -55,6 +135,7 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     isDirty = false;
     embedded = false;
     ResetTransientEditState();
+    if (undoDocument) UndoManager::Get().ForgetHistory(undoDocument);
     return true;
 }
 
@@ -65,6 +146,7 @@ bool StargraphEditorPanel::OpenEmbedded(const Stargraph& initialGraph, const std
     isDirty = false;
     embedded = true;
     ResetTransientEditState();
+    if (undoDocument) UndoManager::Get().ForgetHistory(undoDocument);
     return true;
 }
 

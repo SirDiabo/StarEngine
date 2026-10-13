@@ -533,7 +533,21 @@ static bool FindPinLocation(const std::deque<Node>& nodes, int pinId, std::strin
 bool Stargraph::SaveToFile(const std::string& path) const {
     std::ofstream out(path);
     if (!out.is_open()) return false;
+    return SaveToStream(out);
+}
 
+std::string Stargraph::SerializeToString() const {
+    std::ostringstream out;
+    SaveToStream(out);
+    return out.str();
+}
+
+bool Stargraph::LoadFromString(const std::string& text) {
+    std::istringstream in(text);
+    return LoadFromStream(in);
+}
+
+bool Stargraph::SaveToStream(std::ostream& out) const {
     out << "[Stargraph]\n";
     out << "Version=" << formatVersion << "\n";
     out << "Name=" << assetName << "\n";
@@ -753,7 +767,10 @@ using SectionFileIO::FindEntry;
 bool Stargraph::LoadFromFile(const std::string& path) {
     std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
+    return LoadFromStream(in);
+}
 
+bool Stargraph::LoadFromStream(std::istream& in) {
     components.clear();
     functions.clear();
 

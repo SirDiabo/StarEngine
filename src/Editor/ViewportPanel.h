@@ -36,6 +36,11 @@ public:
 
     bool IsPlaying() const { return playing; }
 
+    void CaptureUndoState(std::string& content, std::string& selection) const;
+    void RestoreUndoState(const std::string& content, const std::string& selection);
+    bool CanTrackUndo() const { return mapLoaded && !playing; }
+    std::function<void()> onMapReplaced;
+
     void SetLogPanel(LogPanel* panel) { logPanel = panel; }
     void InvalidateClassGraph(const std::string& graphAssetPath);
     void SetPackageCallback(std::function<void()> callback) { onPackageRequested = callback; }

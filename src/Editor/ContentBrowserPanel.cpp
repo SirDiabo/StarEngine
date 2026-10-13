@@ -1,4 +1,5 @@
 #include "ContentBrowserPanel.h"
+#include "ContentUndo.h"
 #include "Core/Project.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
@@ -214,6 +215,15 @@ void ContentBrowserPanel::ConfirmRename() {
             } else if (!renamingIsFolder) {
                 const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(renamingExtension);
                 if (info && info->renameAsset) info->renameAsset(newPath.string(), typedName);
+            }
+            if (!ec) {
+                std::string extension = renamingExtension;
+                bool wasFolder = renamingIsFolder;
+                ContentUndo::RecordMove(oldPath, newPath, "Rename", [extension, wasFolder](const fs::path& current) {
+                    if (wasFolder) return;
+                    const AssetTypeInfo* typeInfo = AssetTypeRegistry::Get().FindByExtension(extension);
+                    if (typeInfo && typeInfo->renameAsset) typeInfo->renameAsset(current.string(), current.stem().string());
+                });
             }
         }
     }
@@ -602,7 +612,13 @@ void ContentBrowserPanel::BuildMaterialEditorChrome() {
     saveBtn->offset = { 8.0f, 194.0f };
     saveBtn->size = { 150.0f, 22.0f };
     saveBtn->onActivated = [this]() {
+        std::string materialBefore, materialAfter;
+        ContentUndo::ReadFileBytes(materialEditorPath, materialBefore);
         materialEditorData.SaveToFile(materialEditorPath);
+        ContentUndo::ReadFileBytes(materialEditorPath, materialAfter);
+        std::string undoMaterialPath = materialEditorPath;
+        ContentUndo::RecordFileEdit(undoMaterialPath, materialBefore, materialAfter, "Material Edit",
+                                    [undoMaterialPath]() { AssetCache::Get().ReloadMaterial(undoMaterialPath); });
         AssetCache::Get().ReloadMaterial(materialEditorPath);
         materialEditorOpen = false;
     };
@@ -1057,6 +1073,7 @@ void ContentBrowserPanel::Render() {
                     importStatus = "Move failed: " + destPath.filename().string() + " already exists there";
                 } else {
                     fs::rename(draggedPath, destPath, ec);
+                    if (!ec) ContentUndo::RecordMove(draggedPath, destPath, "Move");
                     importStatus = !ec ? "Moved " + destPath.stem().string()
                                         : "Move failed: " + ec.message();
                     tilesDirty = true;

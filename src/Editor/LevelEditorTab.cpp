@@ -9,10 +9,19 @@
 #include "ProfilerPanel.h"
 #include "PlaceActorsPanel.h"
 #include "MenuBar.h"
+#include "EditorUndo.h"
 #include "Core/LayoutSerializer.h"
 #include <cstdlib>
 #include "NativeFileDialog.h"
 #include <filesystem>
+
+LevelEditorTab::~LevelEditorTab() {
+    if (undoDocument) {
+        UndoManager::Get().UnregisterDocument(undoDocument);
+        delete undoDocument;
+        undoDocument = nullptr;
+    }
+}
 
 bool LevelEditorTab::IsDirty() const {
     return viewportPanel && viewportPanel->IsMapDirty();
@@ -42,6 +51,19 @@ void LevelEditorTab::Initialize() {
 
     modulePanel->SetLogPanel(logPanel);
     viewportPanel->SetLogPanel(logPanel);
+
+    undoDocument = new FunctionUndoDocument();
+    undoDocument->name = "Level Edit";
+    undoDocument->tab = this;
+    undoDocument->capture = [this](std::string& content, std::string& selection) {
+        viewportPanel->CaptureUndoState(content, selection);
+    };
+    undoDocument->restore = [this](const std::string& content, const std::string& selection) {
+        viewportPanel->RestoreUndoState(content, selection);
+    };
+    undoDocument->canTrack = [this]() { return viewportPanel->CanTrackUndo(); };
+    viewportPanel->onMapReplaced = [this]() { UndoManager::Get().ForgetHistory(undoDocument); };
+    UndoManager::Get().RegisterDocument(undoDocument);
 
     // Wire viewport -> details and outliner selection pointers.
     detailsPanel->buildRows = [this]() -> std::vector<PropertyRow> {

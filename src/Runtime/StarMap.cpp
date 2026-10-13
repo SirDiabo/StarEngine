@@ -10,7 +10,21 @@
 bool StarMap::SaveToFile(const std::string& path) const {
     std::ofstream out(path);
     if (!out.is_open()) return false;
+    return SaveToStream(out);
+}
 
+std::string StarMap::SerializeToString() const {
+    std::ostringstream out;
+    SaveToStream(out);
+    return out.str();
+}
+
+bool StarMap::LoadFromString(const std::string& text) {
+    std::istringstream in(text);
+    return LoadFromStream(in);
+}
+
+bool StarMap::SaveToStream(std::ostream& out) const {
     out << "[StarMap]\n";
     out << "Version=" << formatVersion << "\n";
     out << "Name=" << mapName << "\n";
@@ -73,7 +87,7 @@ namespace {
         std::vector<std::pair<std::string, std::string>> entries;
     };
 
-    std::vector<Section> ParseFile(std::ifstream& in) {
+    std::vector<Section> ParseFile(std::istream& in) {
         std::vector<Section> sections;
         std::string line;
         while (std::getline(in, line)) {
@@ -100,7 +114,10 @@ namespace {
 bool StarMap::LoadFromFile(const std::string& path) {
     std::ifstream in(CookedFile::Open(path));
     if (!in.is_open()) return false;
+    return LoadFromStream(in);
+}
 
+bool StarMap::LoadFromStream(std::istream& in) {
     instances.clear();
     auto sections = ParseFile(in);
 

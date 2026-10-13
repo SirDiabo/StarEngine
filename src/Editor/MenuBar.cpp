@@ -1,4 +1,5 @@
 #include "MenuBar.h"
+#include "Core/UndoManager.h"
 #include "Core/EmbeddedAssets.h"
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
@@ -24,6 +25,27 @@ void MenuBar::Initialize() {
 
 void MenuBar::SetMenus(const std::vector<MenuEntry>& entries) {
     menus    = entries;
+
+    UndoManager& undo = UndoManager::Get();
+    std::string undoItem = undo.CanUndo() && !undo.UndoLabel().empty() ? "Undo " + undo.UndoLabel() : "Undo";
+    std::string redoItem = undo.CanRedo() && !undo.RedoLabel().empty() ? "Redo " + undo.RedoLabel() : "Redo";
+    std::vector<std::string> historyItems = { undoItem, redoItem, "---" };
+
+    bool foundEdit = false;
+    for (MenuEntry& menu : menus) {
+        if (menu.label != "Edit") continue;
+        foundEdit = true;
+        menu.items.insert(menu.items.begin(), historyItems.begin(), historyItems.end());
+        if (!menu.checked.empty()) menu.checked.insert(menu.checked.begin(), historyItems.size(), false);
+        break;
+    }
+    if (!foundEdit) {
+        MenuEntry edit;
+        edit.label = "Edit";
+        edit.items = { undoItem, redoItem };
+        size_t at = (!menus.empty() && menus[0].label == "File") ? 1 : 0;
+        menus.insert(menus.begin() + at, edit);
+    }
     activeMenu = -1;
     RebuildBar();
 }

@@ -269,10 +269,12 @@ void MeshComponent::EnsureAnimModelInstance() {
     animModelInstance = model;
     animModelInstancePath = meshPath;
     hasAnimModelInstance = true;
+    AssetCache::Get().RegisterModelInstance(&animModelInstance, asset.ResolveSourcePath());
 }
 
 void MeshComponent::ReleaseAnimModelInstance() {
     if (!hasAnimModelInstance) return;
+    AssetCache::Get().ForgetModelInstance(&animModelInstance);
     UnloadModel(animModelInstance);
     animModelInstance = Model{};
     animModelInstancePath.clear();

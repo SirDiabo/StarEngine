@@ -27,6 +27,7 @@
 #include "LoadingPanel.h"
 #include "Core/LayoutSerializer.h"
 #include "UITheme.h"
+#include "EditorUndo.h"
 #include "raylib.h"
 #include <filesystem>
 #include <algorithm>
@@ -66,6 +67,21 @@ void Editor::Initialize() {
         if (menu == "Window")  HandleWindowMenuAction(item);
         if (menu == "Edit")    HandleEditMenuAction(item);
         if (menu == "Package") HandlePackageMenuAction(item);
+    });
+
+    EditorUndo::SetTabRevealer([this](EditorTab* target) {
+        for (int i = 0; i < (int)editorTabs.size(); i++) {
+            if (editorTabs[i].get() != target) continue;
+            if (activeEditorTab != i) {
+                activeEditorTab = i;
+                target->BuildMenus(menuBar);
+            }
+            return;
+        }
+    });
+
+    EditorUndo::SetActiveTabQuery([this]() -> EditorTab* {
+        return (activeEditorTab >= 0 && activeEditorTab < (int)editorTabs.size()) ? editorTabs[activeEditorTab].get() : nullptr;
     });
 
     // Build initial menu from the first (level) tab.
@@ -154,6 +170,8 @@ void Editor::Render() {
     SearchableListPopup::FlushDeferredDraws();
     WidgetOverlay::TickAndDraw(GetFrameTime(), { 0.0f, 0.0f, (float)w, (float)h });
     DragDrop::Update(GetMousePosition());
+
+    EditorUndo::Tick();
 
     // Layer 9: loading overlay for async rebuild/packaging (blocks everything else visually).
     LoadingPanel::Get().Render();
@@ -388,6 +406,8 @@ void Editor::OpenDefaultMapIfSet() {
 }
 
 void Editor::HandleEditMenuAction(const std::string& item) {
+    if (item.rfind("Undo", 0) == 0) { EditorUndo::PerformUndo(); return; }
+    if (item.rfind("Redo", 0) == 0) { EditorUndo::PerformRedo(); return; }
     if (item == "Editor Settings")  OpenEditorSettingsTab();
     if (item == "Project Settings") OpenProjectSettingsTab();
 }

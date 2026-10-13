@@ -9,6 +9,7 @@
 #include "Runtime/WidgetBehavior.h"
 #include "raylib.h"
 #include <fstream>
+#include <sstream>
 
 namespace WidgetAsset {
 
@@ -19,7 +20,16 @@ bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data) {
         TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for writing", resolvedPath.c_str());
         return false;
     }
+    return WriteWidgetAsset(out, data);
+}
 
+std::string SerializeWidgetAsset(const WidgetAssetData& data, bool includeBehavior) {
+    std::ostringstream out;
+    WriteWidgetAsset(out, data, includeBehavior);
+    return out.str();
+}
+
+bool WriteWidgetAsset(std::ostream& out, const WidgetAssetData& data, bool includeBehavior) {
     out << "[Widget]\n";
     out << "Version=1\n";
     out << "Name=" << data.assetName << "\n";
@@ -31,7 +41,7 @@ bool SaveWidgetAsset(const std::string& path, const WidgetAssetData& data) {
 
     WidgetElementIO::WriteElementTree(out, data.rootElement);
 
-    if (!data.programmingInterface.empty() && data.behaviorContent) {
+    if (includeBehavior && !data.programmingInterface.empty() && data.behaviorContent) {
         const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(data.programmingInterface);
         if (provider && provider->saveContent) provider->saveContent(out, *data.behaviorContent, "Widget.");
     }
@@ -46,7 +56,15 @@ bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
         TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", openPath.c_str());
         return false;
     }
+    return ReadWidgetAsset(in, outData);
+}
 
+bool DeserializeWidgetAsset(const std::string& text, WidgetAssetData& outData, bool loadBehavior) {
+    std::istringstream in(text);
+    return ReadWidgetAsset(in, outData, loadBehavior);
+}
+
+bool ReadWidgetAsset(std::istream& in, WidgetAssetData& outData, bool loadBehavior) {
     std::vector<SectionFileIO::ParsedSection> sections = SectionFileIO::ParseSections(in);
 
     for (const SectionFileIO::ParsedSection& section : sections) {
@@ -60,7 +78,7 @@ bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
 
     outData.rootElement = WidgetElementIO::ReadElementTree(sections);
 
-    if (!outData.programmingInterface.empty()) {
+    if (loadBehavior && !outData.programmingInterface.empty()) {
         const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(outData.programmingInterface);
         if (provider && provider->loadContent) outData.behaviorContent = provider->loadContent(sections, "Widget.");
     }

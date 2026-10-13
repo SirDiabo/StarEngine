@@ -13,9 +13,11 @@ class ModuleBrowserPanel;
 class ProfilerPanel;
 class PlaceActorsPanel;
 class MenuBar;
+class FunctionUndoDocument;
 
 class LevelEditorTab : public EditorTab {
 public:
+    ~LevelEditorTab() override;
     void Initialize() override;
     void Render(float x, float y, float width, float height) override;
     void RenderOverlays() override;
@@ -46,6 +48,7 @@ private:
     void BuildDefaultLayout();
 
     DockArea dockArea;
+    FunctionUndoDocument* undoDocument = nullptr;
 
     ViewportPanel*       viewportPanel  = nullptr;
     DetailsPanel*        detailsPanel   = nullptr;

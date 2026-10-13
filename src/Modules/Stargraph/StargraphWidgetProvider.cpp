@@ -43,6 +43,7 @@ void RegisterStargraphWidgetProvider() {
         session->Initialize();
         session->SetViewportPanel(ctx.sharedViewportPanel);
         session->SetWidgetElementLister(ctx.listElements);
+        session->SetUndoOwner(ctx.revealOwnerTab, ctx.isOwnerTabActive);
         session->OpenEmbedded(content->graph, ctx.assetKind);
 
         auto* stargraphPanel = new StargraphPanel();

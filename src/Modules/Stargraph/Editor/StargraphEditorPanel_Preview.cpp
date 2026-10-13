@@ -1,5 +1,6 @@
 #include "Core/RotationMath.h"
 #include "StargraphEditorPanel.h"
+#include "Editor/EditorUndo.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Editor/BasicActorDefs.h"
@@ -19,6 +20,11 @@
 const float StargraphEditorPanel::previewToolbarHeight = 28.0f;
 
 StargraphEditorPanel::~StargraphEditorPanel() {
+    if (undoDocument) {
+        UndoManager::Get().UnregisterDocument(undoDocument);
+        delete undoDocument;
+        undoDocument = nullptr;
+    }
     if (previewRenderTargetWidth != 0) UnloadRenderTexture(previewRenderTarget);
     for (auto& kv : previewIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
     delete leftChrome;

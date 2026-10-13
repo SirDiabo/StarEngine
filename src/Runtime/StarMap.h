@@ -1,5 +1,7 @@
 #pragma once
 #include "Modules/Stargraph/Stargraph.h"
+#include <istream>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -24,6 +26,10 @@ class StarMap {
 public:
     bool SaveToFile(const std::string& path) const;
     bool LoadFromFile(const std::string& path);
+    bool SaveToStream(std::ostream& out) const;
+    bool LoadFromStream(std::istream& in);
+    std::string SerializeToString() const;
+    bool LoadFromString(const std::string& text);
 
     void AddInstance(const ActorInstance& instance);
     void RemoveInstance(size_t index);
