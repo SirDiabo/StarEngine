@@ -3,6 +3,7 @@
 #include "Core/Profiler.h"
 #include "Actor.h"
 #include "SaveGame.h"
+#include "Core/SaveFileFormat.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
 #include "Modules/Stargraph/TimerManager.h"
@@ -97,6 +98,7 @@ void World::LoadGame(const std::string& saveFile) {
 }
 
 void World::BeginPlay() {
+    SaveFileFormat::InvalidateCache();
     playing = true;
     Profiler::NotifyPlayState(true);
     ReplicationManager::Reset();
@@ -152,9 +154,12 @@ void World::Tick(float deltaTime) {
             }
         }
         if (shouldLockMouse) {
-            HideCursor();
-            SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
-        } else {
+            if (!IsCursorHidden()) HideCursor();
+            const int centerX = GetScreenWidth() / 2;
+            const int centerY = GetScreenHeight() / 2;
+            Vector2 mouse = GetMousePosition();
+            if ((int)mouse.x != centerX || (int)mouse.y != centerY) SetMousePosition(centerX, centerY);
+        } else if (IsCursorHidden()) {
             ShowCursor();
         }
     }
@@ -166,6 +171,7 @@ void World::Tick(float deltaTime) {
 }
 
 void World::EndPlay() {
+    SaveFileFormat::FlushAll();
     std::vector<Actor*> current;
     current.reserve(actors.size());
     for (const auto& a : actors) current.push_back(a.get());
