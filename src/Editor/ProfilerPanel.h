@@ -70,6 +70,7 @@ private:
     ProfilerModel::ColorAllocator colors{ 12 };
 
     std::vector<Vector2> linePoints;
+    std::vector<std::vector<float>> seriesBuffers;
 
     Widget* chrome = nullptr;
     TextElement* lineCountField = nullptr;

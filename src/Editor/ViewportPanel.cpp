@@ -771,22 +771,25 @@ void ViewportPanel::RenderToolbar() {
         float by = toolbar.y + 3;
         float bs = 22;
 
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_select.png", gizmoMode == GizmoMode::Select)) gizmoMode = GizmoMode::Select;
-        bx += bs + 2;
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_move.png", gizmoMode == GizmoMode::Move)) gizmoMode = GizmoMode::Move;
-        bx += bs + 2;
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_rotate.png", gizmoMode == GizmoMode::Rotate)) gizmoMode = GizmoMode::Rotate;
-        bx += bs + 2;
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_scale.png", gizmoMode == GizmoMode::Scale)) gizmoMode = GizmoMode::Scale;
-        bx += bs + 10;
+        {
+            PROFILE_SCOPE("Toolbar Icons");
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_select.png", gizmoMode == GizmoMode::Select)) gizmoMode = GizmoMode::Select;
+            bx += bs + 2;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_move.png", gizmoMode == GizmoMode::Move)) gizmoMode = GizmoMode::Move;
+            bx += bs + 2;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_rotate.png", gizmoMode == GizmoMode::Rotate)) gizmoMode = GizmoMode::Rotate;
+            bx += bs + 2;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_scale.png", gizmoMode == GizmoMode::Scale)) gizmoMode = GizmoMode::Scale;
+            bx += bs + 10;
 
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_world.png", gizmoSpace == GizmoSpace::World)) gizmoSpace = GizmoSpace::World;
-        bx += bs + 2;
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_local.png", gizmoSpace == GizmoSpace::Local)) gizmoSpace = GizmoSpace::Local;
-        bx += bs + 10;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_world.png", gizmoSpace == GizmoSpace::World)) gizmoSpace = GizmoSpace::World;
+            bx += bs + 2;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_local.png", gizmoSpace == GizmoSpace::Local)) gizmoSpace = GizmoSpace::Local;
+            bx += bs + 10;
 
-        if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_grid_snap.png", gridSnapEnabled)) gridSnapEnabled = !gridSnapEnabled;
-        bx += bs + 4;
+            if (ToolbarIconToggle({bx, by, bs, bs}, "icon_gizmo_grid_snap.png", gridSnapEnabled)) gridSnapEnabled = !gridSnapEnabled;
+            bx += bs + 4;
+        }
 
         Rectangle stepFieldRect = {bx, by + 2, 56, bs - 4};
         if (!gridStepField->isEditing) {
@@ -800,9 +803,18 @@ void ViewportPanel::RenderToolbar() {
         fpsValueField->visible = false;
         fpsStatsField->visible = false;
 
-        toolbarChrome->Tick(dt, toolbarBounds, 1.0f);
-        WidgetInput::ProcessInput(toolbarChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
-        toolbarChrome->Draw(toolbarBounds, 1.0f);
+        {
+            PROFILE_SCOPE("Toolbar Chrome Tick");
+            toolbarChrome->Tick(dt, toolbarBounds, 1.0f);
+        }
+        {
+            PROFILE_SCOPE("Toolbar Process Input");
+            WidgetInput::ProcessInput(toolbarChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+        }
+        {
+            PROFILE_SCOPE("Toolbar Chrome Draw");
+            toolbarChrome->Draw(toolbarBounds, 1.0f);
+        }
     }
 
     float btnRight = bounds.x + bounds.width - 4;

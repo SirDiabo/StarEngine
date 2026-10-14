@@ -11,6 +11,7 @@
 #include "raylib.h"
 #include "rlgl.h"
 #include <algorithm>
+#include <unordered_map>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -54,10 +55,23 @@ void DrawRightAligned(const std::string& text, float rightEdge, float y, Color c
 }
 
 std::string ClipText(const std::string& text, float maxWidth) {
-    if ((float)MeasureText(text.c_str(), 10) <= maxWidth) return text;
-    std::string clipped = text;
-    while (!clipped.empty() && (float)MeasureText((clipped + "...").c_str(), 10) > maxWidth) clipped.pop_back();
-    return clipped + "...";
+    struct Entry { int width; std::string clipped; };
+    static std::unordered_map<std::string, Entry> memo;
+    const int widthKey = (int)maxWidth;
+    auto hit = memo.find(text);
+    if (hit != memo.end() && hit->second.width == widthKey) return hit->second.clipped;
+
+    std::string result;
+    if ((float)MeasureText(text.c_str(), 10) <= maxWidth) {
+        result = text;
+    } else {
+        std::string clipped = text;
+        while (!clipped.empty() && (float)MeasureText((clipped + "...").c_str(), 10) > maxWidth) clipped.pop_back();
+        result = clipped + "...";
+    }
+    if (memo.size() > 4096) memo.clear();
+    memo[text] = { widthKey, result };
+    return result;
 }
 
 std::string Percent(double value) {
@@ -482,7 +496,8 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
     }
 
     drawnLines.clear();
-    std::vector<std::vector<float>> series(lineKeys.size());
+    if (seriesBuffers.size() < lineKeys.size()) seriesBuffers.resize(lineKeys.size());
+    std::vector<std::vector<float>>& series = seriesBuffers;
     float dataMax = 0.0f;
     for (size_t i = 0; i < lineKeys.size(); i++) {
         ProfilerModel::FillSeries(lineKeys[i], window, series[i]);
@@ -514,22 +529,31 @@ void ProfilerPanel::DrawGraph(Rectangle area, const std::vector<ProfilerModel::R
     }
 
     const float step = plot.width / (float)(window - 1);
+    const size_t pool = std::max<size_t>(1, (size_t)std::ceil(2.0f / std::max(step, 0.001f)));
     linePoints.resize(window);
     for (size_t li = 0; li < lineKeys.size(); li++) {
         Color color = LineColor(lineKeys[li]);
         size_t validCount = window;
         while (validCount > 0 && std::isnan(series[li][validCount - 1])) validCount--;
         if (validCount < 2) continue;
-        for (size_t i = 0; i < validCount; i++) {
-            float value = std::isnan(series[li][i]) ? 0.0f : series[li][i];
-            float x = plot.x + step * (float)i;
+
+        const size_t pointCount = (validCount + pool - 1) / pool;
+        size_t end = validCount;
+        for (size_t p = pointCount; p-- > 0;) {
+            size_t begin = end > pool ? end - pool : 0;
+            float value = 0.0f;
+            for (size_t i = begin; i < end; i++) {
+                if (!std::isnan(series[li][i])) value = std::max(value, series[li][i]);
+            }
+            float x = plot.x + step * (float)(end - 1);
             float y = plot.y + plot.height - std::min(1.0f, value / yMax) * plot.height;
-            linePoints[i] = { x, y };
+            linePoints[p] = { x, y };
+            end = begin;
         }
-        DrawLineStrip(linePoints.data(), (int)validCount, color);
+        DrawLineStrip(linePoints.data(), (int)pointCount, color);
         if (lineKeys[li] == ProfilerModel::kKeyWork || lineKeys[li] == ProfilerModel::kKeyGpu) {
-            for (size_t i = 0; i < validCount; i++) linePoints[i].y += 1.0f;
-            DrawLineStrip(linePoints.data(), (int)validCount, color);
+            for (size_t i = 0; i < pointCount; i++) linePoints[i].y += 1.0f;
+            DrawLineStrip(linePoints.data(), (int)pointCount, color);
         }
     }
 
