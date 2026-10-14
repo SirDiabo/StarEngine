@@ -61,5 +61,9 @@ Texture2D EmbeddedAssets::LoadTextureAsset(const std::string& fileName) {
 
     Texture2D tex = ::LoadTextureFromImage(img);
     ::UnloadImage(img);
+    if (tex.id != 0) {
+        ::GenTextureMipmaps(&tex);
+        ::SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR);
+    }
     return tex;
 }
