@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "Core/StarMaterial.h"
+#include "Core/StarAsset.h"
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -8,9 +9,21 @@
 
 namespace CollisionPrivate { struct ModelBVH; }
 
+struct MeshSourceInfo {
+    std::string assetType;
+    std::string sourcePath;
+    std::vector<MaterialSlot> materialSlots;
+    long modTime = 0;
+    double lastValidated = 0.0;
+    bool valid = false;
+};
+
 class AssetCache {
 public:
     static AssetCache& Get();
+
+    const MeshSourceInfo* GetMeshSource(const std::string& meshAssetPath);
+    void InvalidateMeshSource(const std::string& meshAssetPath);
 
     Model* GetOrLoadModel(const std::string& sourceMeshPath);
     Model LoadPrivateModel(const std::string& sourceMeshPath);
@@ -39,6 +52,8 @@ private:
     };
 
     std::unordered_map<std::string, Model> meshCache;
+    std::unordered_map<std::string, Model*> meshRawLookup;
+    std::unordered_map<std::string, MeshSourceInfo> meshSourceCache;
     std::unordered_map<std::string, Texture2D> textureCache;
     std::unordered_map<std::string, StarMaterial> materialCache;
     std::unordered_map<Model*, BoundingBox> modelBoundsCache;

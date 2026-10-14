@@ -1,5 +1,6 @@
 #include "ImportDetailsPanel.h"
 #include "ContentUndo.h"
+#include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
 #include "Core/Project.h"
 #include "AssetImporter.h"
@@ -42,6 +43,7 @@ void ImportDetailsPanel::SaveToAsset() {
     bool track = !pendingImport;
     if (track) ContentUndo::ReadFileBytes(assetPath, before);
     asset.SaveToFile(assetPath);
+    AssetCache::Get().InvalidateMeshSource(assetPath);
     if (track) {
         ContentUndo::ReadFileBytes(assetPath, after);
         std::string trackedPath = assetPath;

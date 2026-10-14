@@ -11,12 +11,52 @@ AssetCache& AssetCache::Get() {
     return instance;
 }
 
+const MeshSourceInfo* AssetCache::GetMeshSource(const std::string& meshAssetPath) {
+    constexpr double kRevalidateSeconds = 0.5;
+    double now = GetTime();
+
+    auto it = meshSourceCache.find(meshAssetPath);
+    if (it != meshSourceCache.end()) {
+        MeshSourceInfo& info = it->second;
+        if (now - info.lastValidated < kRevalidateSeconds) return info.valid ? &info : nullptr;
+        info.lastValidated = now;
+        std::string opened = CookedFile::Open(meshAssetPath);
+        long modTime = opened.empty() ? 0 : GetFileModTime(opened.c_str());
+        if (modTime == info.modTime && (info.valid || modTime == 0)) return info.valid ? &info : nullptr;
+    }
+
+    MeshSourceInfo& info = meshSourceCache[meshAssetPath];
+    info = MeshSourceInfo{};
+    info.lastValidated = now;
+
+    std::string opened = CookedFile::Open(meshAssetPath);
+    info.modTime = opened.empty() ? 0 : GetFileModTime(opened.c_str());
+
+    StarAsset asset;
+    if (!StarAsset::LoadFromFile(meshAssetPath, asset)) return nullptr;
+    info.assetType = asset.assetType;
+    info.sourcePath = asset.ResolveSourcePath();
+    info.materialSlots = asset.materialSlots;
+    info.valid = true;
+    return &info;
+}
+
+void AssetCache::InvalidateMeshSource(const std::string& meshAssetPath) {
+    meshSourceCache.erase(meshAssetPath);
+}
+
 Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
+    auto rawHit = meshRawLookup.find(sourceMeshPath);
+    if (rawHit != meshRawLookup.end()) return rawHit->second;
+
     std::string normalized = CookedFile::Open(sourceMeshPath);
     if (normalized.empty()) normalized = sourceMeshPath;
 
     auto it = meshCache.find(normalized);
-    if (it != meshCache.end()) return &it->second;
+    if (it != meshCache.end()) {
+        meshRawLookup[sourceMeshPath] = &it->second;
+        return &it->second;
+    }
 
     if (normalized.empty() || !FileExists(normalized.c_str())) return nullptr;
 
@@ -30,6 +70,7 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
     Model* cached = &inserted.first->second;
     modelSlotOffset[cached] = SlotOffsetForSource(normalized);
     CaptureDefaultMaterials(cached);
+    meshRawLookup[sourceMeshPath] = cached;
     return cached;
 }
 
@@ -253,6 +294,10 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
 
     auto it = meshCache.find(normalized);
     if (it == meshCache.end()) return;
+    for (auto raw = meshRawLookup.begin(); raw != meshRawLookup.end();) {
+        if (raw->second == &it->second) raw = meshRawLookup.erase(raw);
+        else ++raw;
+    }
     modelBoundsCache.erase(&it->second);
     modelDefaultColors.erase(&it->second);
     modelDefaultTextures.erase(&it->second);
@@ -263,6 +308,8 @@ void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
 
 void AssetCache::Clear() {
     for (auto& kv : meshCache) UnloadModel(kv.second);
+    meshRawLookup.clear();
+    meshSourceCache.clear();
     modelBoundsCache.clear();
     modelDefaultColors.clear();
     modelDefaultTextures.clear();

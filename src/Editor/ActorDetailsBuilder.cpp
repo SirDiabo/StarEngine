@@ -1,4 +1,5 @@
 #include "ActorDetailsBuilder.h"
+#include "Runtime/AssetCache.h"
 #include "Modules/Stargraph/ComponentEditing.h"
 #include "Core/StarAsset.h"
 #include "Modules/Stargraph/StargraphAssetCache.h"
@@ -44,8 +45,7 @@ static void BuildStaticMeshRows(ActorInstance& inst, std::vector<PropertyRow>& r
 
     std::vector<MaterialSlot> meshSlots;
     if (!inst.meshAssetPath.empty()) {
-        StarAsset meshAsset;
-        if (StarAsset::LoadFromFile(inst.meshAssetPath, meshAsset)) meshSlots = meshAsset.materialSlots;
+        if (const MeshSourceInfo* source = AssetCache::Get().GetMeshSource(inst.meshAssetPath)) meshSlots = source->materialSlots;
     }
     if (inst.materialAssetPaths.size() != meshSlots.size()) inst.materialAssetPaths.resize(meshSlots.size());
 

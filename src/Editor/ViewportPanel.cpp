@@ -161,15 +161,14 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
                                         Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor) {
     Model* model = nullptr;
     if (!meshAssetPath.empty()) {
-        StarAsset asset;
-        bool assetLoaded;
+        const MeshSourceInfo* source;
         {
-            PROFILE_SCOPE("Load Mesh Asset (file read)");
-            assetLoaded = StarAsset::LoadFromFile(meshAssetPath, asset);
+            PROFILE_SCOPE("Mesh Asset Info (cached)");
+            source = AssetCache::Get().GetMeshSource(meshAssetPath);
         }
-        if (assetLoaded && asset.assetType == "StaticMesh") {
+        if (source && source->assetType == "StaticMesh") {
             PROFILE_SCOPE("Get Model (cache)");
-            model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
+            model = AssetCache::Get().GetOrLoadModel(source->sourcePath);
         }
     }
 

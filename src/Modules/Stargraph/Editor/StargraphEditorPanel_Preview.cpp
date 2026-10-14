@@ -216,9 +216,9 @@ void StargraphEditorPanel::RenderPreviewScene() {
             std::string meshAssetPath = comp.Get("Mesh");
             Model* model = nullptr;
             if (!meshAssetPath.empty()) {
-                StarAsset asset;
-                if (StarAsset::LoadFromFile(meshAssetPath, asset) && asset.assetType == "StaticMesh") {
-                    model = AssetCache::Get().GetOrLoadModel(asset.ResolveSourcePath());
+                const MeshSourceInfo* source = AssetCache::Get().GetMeshSource(meshAssetPath);
+                if (source && source->assetType == "StaticMesh") {
+                    model = AssetCache::Get().GetOrLoadModel(source->sourcePath);
                 }
             }
             if (model) {
