@@ -63,6 +63,26 @@ void StargraphBehavior::OnDestroyed(Actor* owner) {
     GraphExecutor::Run(graph, "Event_Destroyed", ctx);
 }
 
+void StargraphBehavior::CollectSavableVariables(std::vector<SavableVariable>& out) {
+    for (const Variable& v : graph.GetVariables()) {
+        if (v.saveFile.empty()) continue;
+        SavableVariable saved;
+        saved.name = v.name;
+        saved.saveFile = v.saveFile;
+        saved.isArray = v.isArray;
+        saved.value = v.value;
+        saved.arrayValues = v.arrayValues;
+        out.push_back(std::move(saved));
+    }
+}
+
+void StargraphBehavior::ApplySavedVariable(const SavableVariable& saved) {
+    Variable* var = graph.FindVariable(saved.name);
+    if (!var) return;
+    if (saved.isArray && var->isArray) var->arrayValues = saved.arrayValues;
+    else if (!saved.isArray && !var->isArray) var->value = saved.value;
+}
+
 void StargraphBehavior::OnConstruct(Widget* owner) {
     ExecutionContext ctx;
     ctx.widget = owner;

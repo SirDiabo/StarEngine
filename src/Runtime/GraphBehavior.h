@@ -6,6 +6,14 @@
 class Actor;
 class Component;
 
+struct SavableVariable {
+    std::string name;
+    std::string saveFile;
+    bool isArray = false;
+    std::string value;
+    std::vector<std::string> arrayValues;
+};
+
 class GraphBehavior {
 public:
     virtual ~GraphBehavior() = default;
@@ -21,4 +29,7 @@ public:
                                    const std::vector<std::pair<std::string, std::string>>& params) {}
 
     virtual void OnDestroyed(Actor* owner) {}
+
+    virtual void CollectSavableVariables(std::vector<SavableVariable>& out) {}
+    virtual void ApplySavedVariable(const SavableVariable& saved) {}
 };

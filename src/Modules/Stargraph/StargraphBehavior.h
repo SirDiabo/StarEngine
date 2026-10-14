@@ -18,6 +18,8 @@ public:
     void OnComponentEvent(Actor* owner, Component* component, const std::string& eventName,
                            const std::vector<std::pair<std::string, std::string>>& params) override;
     void OnDestroyed(Actor* owner) override;
+    void CollectSavableVariables(std::vector<SavableVariable>& out) override;
+    void ApplySavedVariable(const SavableVariable& saved) override;
 
     void OnConstruct(Widget* owner) override;
     void OnTick(Widget* owner, float deltaTime) override;

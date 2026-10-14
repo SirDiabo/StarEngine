@@ -1,5 +1,6 @@
 #include "Core/RotationMath.h"
 #include "Actor.h"
+#include "SaveGame.h"
 #include "ProfilerLabels.h"
 #include "Core/Profiler.h"
 #include "Components/Component.h"
@@ -63,6 +64,14 @@ void Actor::GetProperties(PropertyList& outProperties) {
     outProperties.AddBool("Use Control Yaw", &useControlYaw);
     outProperties.AddBool("Use Control Pitch", &useControlPitch);
     outProperties.AddBool("Use Control Roll", &useControlRoll);
+}
+
+void Actor::SaveState(const std::string& saveFile) {
+    SaveGame::SaveActor(this, saveFile);
+}
+
+void Actor::LoadState(const std::string& saveFile) {
+    SaveGame::LoadActor(this, saveFile);
 }
 
 void Actor::SetGraphBehavior(GraphBehavior* behavior) {

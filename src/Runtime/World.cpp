@@ -2,6 +2,7 @@
 #include "ProfilerLabels.h"
 #include "Core/Profiler.h"
 #include "Actor.h"
+#include "SaveGame.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
 #include "Modules/Stargraph/TimerManager.h"
@@ -85,6 +86,14 @@ bool World::ConsumeQuitRequest() {
     if (!quitRequested) return false;
     quitRequested = false;
     return true;
+}
+
+void World::SaveGame(const std::string& saveFile) {
+    ::SaveGame::SaveWorld(saveFile);
+}
+
+void World::LoadGame(const std::string& saveFile) {
+    ::SaveGame::LoadWorld(saveFile);
 }
 
 void World::BeginPlay() {

@@ -31,6 +31,8 @@ public:
 
     void SetGraphBehavior(GraphBehavior* behavior);
     GraphBehavior* GetGraphBehavior() const { return graphBehavior; }
+    void SaveState(const std::string& saveFile = "");
+    void LoadState(const std::string& saveFile = "");
     Matrix GetWorldMatrix() const;
 
     uint32_t GetNetId() const { return netId; }

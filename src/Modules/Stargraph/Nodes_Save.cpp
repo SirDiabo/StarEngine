@@ -1,6 +1,7 @@
 #include "Nodes_Save.h"
 #include "NodeRegistry.h"
 #include "Runtime/Actor.h"
+#include "Runtime/SaveGame.h"
 #include "Runtime/Components/Component.h"
 #include "Runtime/Property.h"
 #include "Core/SaveFileFormat.h"
@@ -9,46 +10,8 @@
 #include <unordered_map>
 
 namespace {
-    std::string PropertyToString(const PropertyHandle& h) {
-        switch (h.type) {
-            case PropertyType::Float: {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%.2f", h.AsFloat());
-                return buf;
-            }
-            case PropertyType::Int: return std::to_string(h.AsInt());
-            case PropertyType::Bool: return h.AsBool() ? "true" : "false";
-            case PropertyType::String: return h.AsString();
-            case PropertyType::Vector3: {
-                float* v = h.AsVector3();
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", v[0], v[1], v[2]);
-                return buf;
-            }
-        }
-        return "";
-    }
-
-    void PropertyFromString(const PropertyHandle& h, const std::string& text) {
-        switch (h.type) {
-            case PropertyType::Float:  h.AsFloat() = (float)atof(text.c_str()); break;
-            case PropertyType::Int:    h.AsInt() = atoi(text.c_str()); break;
-            case PropertyType::Bool:   h.AsBool() = (text == "true" || text == "1"); break;
-            case PropertyType::String: h.AsString() = text; break;
-            case PropertyType::Vector3: {
-                float* v = h.AsVector3();
-                sscanf(text.c_str(), "%f,%f,%f", &v[0], &v[1], &v[2]);
-                break;
-            }
-        }
-    }
-
     std::string VariableKey(Actor* actor, const std::string& varName) {
         return actor->GetName() + "." + varName;
-    }
-
-    std::string ComponentFieldKey(Actor* actor, Component* comp, const std::string& fieldName) {
-        return actor->GetName() + "." + comp->GetName() + "." + fieldName;
     }
 
     std::string InputValue(const Node& node, const std::string& pinName) {
@@ -90,23 +53,7 @@ void RegisterSaveNodes() {
     };
     saveAll.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        std::unordered_map<std::string, std::unordered_map<std::string, std::string>> byFile;
-
-        for (const Variable& v : graph.GetVariables()) {
-            if (v.saveFile.empty()) continue;
-            byFile[v.saveFile][VariableKey(ctx.actor, v.name)] = v.value;
-        }
-        for (Component* comp : ctx.actor->GetComponents()) {
-            PropertyList props;
-            comp->GetProperties(props);
-            for (const PropertyHandle& h : props.GetAll()) {
-                if (h.readOnly) continue;
-                auto it = comp->savableFields.find(h.name);
-                if (it == comp->savableFields.end() || it->second.empty()) continue;
-                byFile[it->second][ComponentFieldKey(ctx.actor, comp, h.name)] = PropertyToString(h);
-            }
-        }
-        for (const auto& kv : byFile) SaveFileFormat::WriteEntries(kv.first, kv.second);
+        SaveGame::SaveActor(ctx.actor);
     };
     NodeRegistry::Get().RegisterNode(saveAll);
 
@@ -175,25 +122,7 @@ void RegisterSaveNodes() {
         if (!ctx.actor) return;
         std::string targetFile = InputValue(node, "Target File");
         if (targetFile.empty()) return;
-
-        auto entries = SaveFileFormat::ReadEntries(targetFile);
-
-        for (Variable& v : graph.GetVariables()) {
-            if (v.saveFile != targetFile) continue;
-            auto it = entries.find(VariableKey(ctx.actor, v.name));
-            if (it != entries.end()) v.value = it->second;
-        }
-        for (Component* comp : ctx.actor->GetComponents()) {
-            PropertyList props;
-            comp->GetProperties(props);
-            for (const PropertyHandle& h : props.GetAll()) {
-                if (h.readOnly) continue;
-                auto sit = comp->savableFields.find(h.name);
-                if (sit == comp->savableFields.end() || sit->second != targetFile) continue;
-                auto eit = entries.find(ComponentFieldKey(ctx.actor, comp, h.name));
-                if (eit != entries.end()) PropertyFromString(h, eit->second);
-            }
-        }
+        SaveGame::LoadActor(ctx.actor, targetFile);
     };
     NodeRegistry::Get().RegisterNode(loadFile);
 
@@ -207,31 +136,33 @@ void RegisterSaveNodes() {
     };
     loadAll.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         if (!ctx.actor) return;
-        std::unordered_map<std::string, std::unordered_map<std::string, std::string>> fileCache;
-        auto entriesFor = [&](const std::string& file) -> std::unordered_map<std::string, std::string>& {
-            auto it = fileCache.find(file);
-            if (it != fileCache.end()) return it->second;
-            return fileCache[file] = SaveFileFormat::ReadEntries(file);
-        };
-
-        for (Variable& v : graph.GetVariables()) {
-            if (v.saveFile.empty()) continue;
-            auto& entries = entriesFor(v.saveFile);
-            auto it = entries.find(VariableKey(ctx.actor, v.name));
-            if (it != entries.end()) v.value = it->second;
-        }
-        for (Component* comp : ctx.actor->GetComponents()) {
-            PropertyList props;
-            comp->GetProperties(props);
-            for (const PropertyHandle& h : props.GetAll()) {
-                if (h.readOnly) continue;
-                auto sit = comp->savableFields.find(h.name);
-                if (sit == comp->savableFields.end() || sit->second.empty()) continue;
-                auto& entries = entriesFor(sit->second);
-                auto eit = entries.find(ComponentFieldKey(ctx.actor, comp, h.name));
-                if (eit != entries.end()) PropertyFromString(h, eit->second);
-            }
-        }
+        SaveGame::LoadActor(ctx.actor);
     };
     NodeRegistry::Get().RegisterNode(loadAll);
+
+    NodeTemplate saveGame;
+    saveGame.type = "Save_Game";
+    saveGame.category = "Save";
+    saveGame.moduleName = "Stargraph";
+    saveGame.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    saveGame.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        SaveGame::SaveWorld();
+    };
+    NodeRegistry::Get().RegisterNode(saveGame);
+
+    NodeTemplate loadGame;
+    loadGame.type = "Load_Game";
+    loadGame.category = "Save";
+    loadGame.moduleName = "Stargraph";
+    loadGame.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    loadGame.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        SaveGame::LoadWorld();
+    };
+    NodeRegistry::Get().RegisterNode(loadGame);
 }

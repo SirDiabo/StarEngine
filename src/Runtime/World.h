@@ -20,6 +20,9 @@ public:
 
     bool IsPlaying() const { return playing; }
 
+    void SaveGame(const std::string& saveFile = "");
+    void LoadGame(const std::string& saveFile = "");
+
     const std::vector<std::unique_ptr<Actor>>& GetActors() const { return actors; }
     bool IsActorValid(Actor* actor) const;
 
