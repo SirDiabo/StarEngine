@@ -183,8 +183,9 @@ void RegisterWidgetNodes() {
         }
         if (!target && ctx.actor) {
             const std::vector<Component*>& all = ctx.actor->GetComponents();
-            for (auto it = all.rbegin(); it != all.rend() && !target; ++it) {
-                target = dynamic_cast<WidgetComponent*>(*it);
+            for (Component* candidate : all) {
+                target = dynamic_cast<WidgetComponent*>(candidate);
+                if (target) break;
             }
         }
         if (!target) return;

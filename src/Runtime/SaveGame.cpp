@@ -17,21 +17,24 @@ using FileEntries = std::unordered_map<std::string, EntryMap>;
 
 const char kArraySeparator = '\x1f';
 
+std::string FloatToString(float value) {
+    char buf[32];
+    for (int precision = 6; precision <= 9; precision++) {
+        snprintf(buf, sizeof(buf), "%.*g", precision, value);
+        if (strtof(buf, nullptr) == value) break;
+    }
+    return buf;
+}
+
 std::string PropertyToString(const PropertyHandle& h) {
     switch (h.type) {
-        case PropertyType::Float: {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%.2f", h.AsFloat());
-            return buf;
-        }
+        case PropertyType::Float: return FloatToString(h.AsFloat());
         case PropertyType::Int: return std::to_string(h.AsInt());
         case PropertyType::Bool: return h.AsBool() ? "true" : "false";
         case PropertyType::String: return h.AsString();
         case PropertyType::Vector3: {
             float* v = h.AsVector3();
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%.2f,%.2f,%.2f", v[0], v[1], v[2]);
-            return buf;
+            return FloatToString(v[0]) + "," + FloatToString(v[1]) + "," + FloatToString(v[2]);
         }
     }
     return "";
@@ -39,7 +42,7 @@ std::string PropertyToString(const PropertyHandle& h) {
 
 void PropertyFromString(const PropertyHandle& h, const std::string& text) {
     switch (h.type) {
-        case PropertyType::Float:  h.AsFloat() = (float)atof(text.c_str()); break;
+        case PropertyType::Float:  h.AsFloat() = strtof(text.c_str(), nullptr); break;
         case PropertyType::Int:    h.AsInt() = atoi(text.c_str()); break;
         case PropertyType::Bool:   h.AsBool() = (text == "true" || text == "1"); break;
         case PropertyType::String: h.AsString() = text; break;

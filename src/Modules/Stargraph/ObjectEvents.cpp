@@ -100,8 +100,8 @@ bool NodeTargetsComponent(Node& node, Actor* owner, Component* component,
 
     if (componentRef.empty()) {
         const std::vector<Component*>& all = owner->GetComponents();
-        for (auto it = all.rbegin(); it != all.rend(); ++it) {
-            if (componentType == (*it)->GetClassName()) return *it == component;
+        for (Component* candidate : all) {
+            if (componentType == candidate->GetClassName()) return candidate == component;
         }
         return false;
     }

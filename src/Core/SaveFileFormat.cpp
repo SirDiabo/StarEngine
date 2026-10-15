@@ -3,13 +3,20 @@
 #include "SaveFileRegistry.h"
 #include "PackageCipher.h"
 #include "Project.h"
+#include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
 #include <mutex>
 #include <thread>
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -47,10 +54,31 @@ namespace {
         return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     }
 
-    void WriteRawFile(const std::string& path, const std::vector<uint8_t>& data) {
-        std::ofstream out(path, std::ios::binary);
-        if (!out.is_open()) return;
-        out.write(reinterpret_cast<const char*>(data.data()), (std::streamsize)data.size());
+    bool SyncToDisk(FILE* file) {
+#ifdef _WIN32
+        return _commit(_fileno(file)) == 0;
+#else
+        return fsync(fileno(file)) == 0;
+#endif
+    }
+
+    bool WriteRawFile(const std::string& path, const std::vector<uint8_t>& data) {
+        const std::string tempPath = path + ".tmp";
+        FILE* file = fopen(tempPath.c_str(), "wb");
+        if (!file) return false;
+
+        bool ok = data.empty() || fwrite(data.data(), 1, data.size(), file) == data.size();
+        ok = (fflush(file) == 0) && ok;
+        if (ok) ok = SyncToDisk(file);
+        ok = (fclose(file) == 0) && ok;
+
+        std::error_code ec;
+        if (ok) {
+            fs::rename(tempPath, path, ec);
+            ok = !ec;
+        }
+        if (!ok) fs::remove(tempPath, ec);
+        return ok;
     }
 }
 
@@ -63,6 +91,7 @@ struct CachedFile {
     bool dirty = false;
     bool encrypted = false;
     std::string encryptionKey;
+    int failedWrites = 0;
 };
 
 class SaveWriteBehind {
@@ -99,7 +128,7 @@ public:
         wake.notify_all();
     }
 
-    void FlushDirty() {
+    void FlushDirty(std::vector<std::string>* failedOut = nullptr) {
         std::lock_guard<std::mutex> writeLock(writeMutex);
         std::vector<std::pair<std::string, std::vector<uint8_t>>> jobs;
         {
@@ -118,17 +147,50 @@ public:
             }
             pending = false;
         }
+        std::vector<std::string> failed;
+        std::vector<std::string> succeeded;
         for (const auto& job : jobs) {
             std::error_code ec;
             fs::create_directories(fs::path(job.first).parent_path(), ec);
-            WriteRawFile(job.first, job.second);
+            if (WriteRawFile(job.first, job.second)) succeeded.push_back(job.first);
+            else failed.push_back(job.first);
+        }
+
+        if (!jobs.empty()) {
+            std::lock_guard<std::mutex> lock(cacheMutex);
+            for (const std::string& path : succeeded) {
+                auto it = files.find(path);
+                if (it != files.end()) it->second.failedWrites = 0;
+            }
+            for (const std::string& path : failed) {
+                auto it = files.find(path);
+                if (it == files.end()) continue;
+                it->second.dirty = true;
+                it->second.failedWrites++;
+                if (it->second.failedWrites < kMaxWriteRetries) {
+                    pending = true;
+                    flushAt = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+                }
+            }
+        }
+        if (failedOut) *failedOut = std::move(failed);
+    }
+
+    void FlushAndReport() {
+        std::vector<std::string> failed;
+        FlushDirty(&failed);
+        for (const std::string& path : failed) {
+            TraceLog(LOG_ERROR, "SaveFileFormat: could not write '%s'; the previous save file was left untouched", path.c_str());
         }
     }
 
     void Invalidate() {
-        FlushDirty();
+        FlushAndReport();
         std::lock_guard<std::mutex> lock(cacheMutex);
-        files.clear();
+        for (auto it = files.begin(); it != files.end();) {
+            if (it->second.dirty) ++it;
+            else it = files.erase(it);
+        }
     }
 
 private:
@@ -165,6 +227,8 @@ private:
         }
     }
 
+    static constexpr int kMaxWriteRetries = 5;
+
     std::mutex cacheMutex;
     std::mutex writeMutex;
     std::condition_variable wake;
@@ -196,7 +260,7 @@ bool SaveFileFormat::WriteEntries(const std::string& saveFileName, const std::un
 }
 
 void SaveFileFormat::FlushAll() {
-    Writer().FlushDirty();
+    Writer().FlushAndReport();
 }
 
 void SaveFileFormat::InvalidateCache() {

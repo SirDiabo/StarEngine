@@ -220,9 +220,13 @@ Vector3 Actor::GetComponentWorldRotation(Component* comp) const {
     return rot;
 }
 
-void Actor::AddComponent(Component* component) {
+void Actor::AddComponent(Component* component, Component* parent) {
+    Component* resolvedParent = parent ? parent : GetRootComponent();
+    for (Component* ancestor = resolvedParent; ancestor; ancestor = ancestor->parent) {
+        if (ancestor == component) { resolvedParent = GetRootComponent(); break; }
+    }
     components.push_back(component);
-    component->parent = GetRootComponent();
+    component->parent = resolvedParent;
     component->owningActor = this;
 }
 

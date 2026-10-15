@@ -74,7 +74,7 @@ public:
     void AddControlRollInput(float value);
     void AddMovementInput(Vector3 worldDirection, float scaleValue);
 
-    void AddComponent(Component* component);
+    void AddComponent(Component* component, Component* parent = nullptr);
     void RemoveComponent(Component* component);
     Component* GetRootComponent();
     const std::vector<Component*>& GetComponents() const { return components; }
@@ -92,11 +92,10 @@ protected:
     virtual void OnEndPlay() {}
 
 private:
-    // Most recently added wins.
     template<typename T>
     T* FindComponentOfType() const {
-        for (auto it = components.rbegin(); it != components.rend(); ++it) {
-            if (T* match = dynamic_cast<T*>(*it)) return match;
+        for (Component* c : components) {
+            if (T* match = dynamic_cast<T*>(c)) return match;
         }
         return nullptr;
     }

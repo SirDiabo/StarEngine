@@ -911,25 +911,52 @@ void StargraphEditorPanel::DuplicateSelected() {
     isDirty = true;
 }
 
+static void WarnAboutOrphanedEventCallers(Stargraph& graph, const std::vector<std::string>& removedEvents) {
+    for (const std::string& eventName : removedEvents) {
+        if (graph.FindCustomEventByName(eventName)) continue;
+
+        int callCount = 0;
+        int timerCount = 0;
+        for (const Node& node : graph.GetNodes()) {
+            const char* pinName = nullptr;
+            if (node.type == "Call_Custom_Event") pinName = "Event Name";
+            else if (node.type == "Timer_By_Function_Name") pinName = "Function Name";
+            if (!pinName) continue;
+
+            for (const Pin& pin : node.inputs) {
+                if (pin.name != pinName || pin.defaultValue != eventName) continue;
+                if (node.type == "Call_Custom_Event") callCount++;
+                else timerCount++;
+                break;
+            }
+        }
+
+        if (callCount + timerCount == 0) continue;
+        TraceLog(LOG_WARNING, "Stargraph: deleted Custom Event '%s' but %d Call Event and %d Timer node(s) in this graph still reference it by name",
+                 eventName.c_str(), callCount, timerCount);
+    }
+}
+
 void StargraphEditorPanel::DeleteSelected() {
     if (selectedNodeId == -1 && selectedNodeIds.empty()) return;
 
-    if (!selectedNodeIds.empty()) {
-        for (int id : selectedNodeIds) {
-            Node* n = ActiveGraph().FindNodeById(id);
-            if (n && n->type == "Function_Entry") continue;
-            ActiveGraph().RemoveNode(id);
-        }
-        selectedNodeIds.clear();
-        selectedNodeId = -1;
-    } else {
-        Node* n = ActiveGraph().FindNodeById(selectedNodeId);
-        if (!(n && n->type == "Function_Entry")) {
-            ActiveGraph().RemoveNode(selectedNodeId);
-        }
-        selectedNodeId = -1;
+    std::vector<int> ids = selectedNodeIds;
+    if (ids.empty()) ids.push_back(selectedNodeId);
+
+    Stargraph& active = ActiveGraph();
+    std::vector<std::string> removedEvents;
+    for (int id : ids) {
+        Node* n = active.FindNodeById(id);
+        if (n && n->type == "Function_Entry") continue;
+        if (n && n->type == "Custom_Event" && !n->title.empty()) removedEvents.push_back(n->title);
+        active.RemoveNode(id);
     }
+
+    selectedNodeIds.clear();
+    selectedNodeId = -1;
     isDirty = true;
+
+    WarnAboutOrphanedEventCallers(active, removedEvents);
 }
 
 Node* StargraphEditorPanel::GetNodeAtPos(Vector2 pos) {
@@ -1021,12 +1048,21 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             listeningForKeyPinId = 0;
         } else {
             int keyCode = GetKeyPressed();
+            while (keyCode != 0 && InputKeyCodeIsModifier(keyCode)) keyCode = GetKeyPressed();
             if (keyCode != 0) {
                 std::string keyName = InputKeyCodeToName(keyCode);
                 if (!keyName.empty()) {
                     for (Node& n : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
+                        bool ownsPin = false;
                         for (Pin& p : n.inputs) {
-                            if (p.id == listeningForKeyPinId) { p.defaultValue = keyName; isDirty = true; }
+                            if (p.id == listeningForKeyPinId) { p.defaultValue = keyName; ownsPin = true; isDirty = true; }
+                        }
+                        if (ownsPin && n.type == "Input_Key") {
+                            for (Pin& p : n.inputs) {
+                                if (p.name == "Ctrl")       p.defaultValue = IsCtrlKeyDown()  ? "true" : "false";
+                                else if (p.name == "Alt")   p.defaultValue = IsAltKeyDown()   ? "true" : "false";
+                                else if (p.name == "Shift") p.defaultValue = IsShiftKeyDown() ? "true" : "false";
+                            }
                         }
                     }
                 }

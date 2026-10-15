@@ -37,10 +37,12 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
             auto* behavior = new StargraphBehavior(*cachedGraph);
             actor->SetGraphBehavior(behavior);
 
+            const std::vector<ComponentDecl>& decls = behavior->GetGraph().GetComponents();
+            std::vector<Component*> built;
+            built.reserve(decls.size());
             std::unordered_map<std::string, Component*> componentsByName;
-            std::vector<std::pair<Component*, std::string>> pendingParents;
 
-            for (const ComponentDecl& decl : behavior->GetGraph().GetComponents()) {
+            for (const ComponentDecl& decl : decls) {
                 Component* comp = BuildComponentFromDecl(decl);
 
                 comp->position = {decl.posX, decl.posY, decl.posZ};
@@ -48,15 +50,18 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
                 comp->scale    = {decl.scaleX, decl.scaleY, decl.scaleZ};
                 comp->SetName(decl.name);
                 comp->savableFields = decl.savableFields;
-                actor->AddComponent(comp);
 
+                built.push_back(comp);
                 componentsByName[decl.name] = comp;
-                if (!decl.parentName.empty()) pendingParents.push_back({comp, decl.parentName});
             }
 
-            for (auto& [comp, parentName] : pendingParents) {
-                auto it = componentsByName.find(parentName);
-                if (it != componentsByName.end() && it->second != comp) comp->parent = it->second;
+            for (size_t i = 0; i < decls.size(); i++) {
+                Component* parent = nullptr;
+                if (!decls[i].parentName.empty()) {
+                    auto it = componentsByName.find(decls[i].parentName);
+                    if (it != componentsByName.end()) parent = it->second;
+                }
+                actor->AddComponent(built[i], parent);
             }
         }
     } else if (!inst.actorKind.empty()) {
@@ -86,4 +91,4 @@ void WorldSpawner::SpawnMapActors(const StarMap& map) {
         Actor* actor = SpawnActorFromInstance(inst);
         actor->SetNetId(World::Get().AllocateNetId());
     }
-}
+}

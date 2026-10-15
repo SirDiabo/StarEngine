@@ -56,6 +56,9 @@ void RegisterEventNodes() {
     inputKey.isEvent = true;
     inputKey.createPins = [](Node* node) {
         node->inputs.push_back({"Key", PinType::String, true, false, 0, "W"});
+        node->inputs.push_back({"Ctrl", PinType::Boolean, true, false, 0, "false"});
+        node->inputs.push_back({"Alt", PinType::Boolean, true, false, 0, "false"});
+        node->inputs.push_back({"Shift", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Triggered", PinType::Exec, false, true});
         node->outputs.push_back({"Started", PinType::Exec, false, true});
         node->outputs.push_back({"Completed", PinType::Exec, false, true});
@@ -65,10 +68,19 @@ void RegisterEventNodes() {
     };
     inputKey.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string keyName;
-        for (const Pin& p : node.inputs) if (p.name == "Key") keyName = p.defaultValue;
+        bool requireCtrl = false, requireAlt = false, requireShift = false;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Key") keyName = p.defaultValue;
+            else if (p.name == "Ctrl")  requireCtrl  = (p.defaultValue == "true" || p.defaultValue == "1");
+            else if (p.name == "Alt")   requireAlt   = (p.defaultValue == "true" || p.defaultValue == "1");
+            else if (p.name == "Shift") requireShift = (p.defaultValue == "true" || p.defaultValue == "1");
+        }
 
         float axis = 0.0f;
-        bool held = PollInputKey(keyName, axis);
+        bool held = false;
+        if ((!requireCtrl || IsCtrlKeyDown()) && (!requireAlt || IsAltKeyDown()) && (!requireShift || IsShiftKeyDown())) {
+            held = PollInputKey(keyName, axis);
+        }
 
         float inputTime = held ? (ctx.deltaTime * 120.0f) : 0.0f;
         char timeBuf[32];
