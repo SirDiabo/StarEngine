@@ -236,6 +236,7 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
         root->AddChild(renderScaleField);
     }
     if (!renderScaleField->isEditing) {
+        snprintf(renderScaleBuf, sizeof(renderScaleBuf), "%.2f", RenderSettings::Get().GetRenderScale() * 100.0f);
         renderScaleField->text = renderScaleBuf;
     }
     renderScaleField->size = { scaleRow.width, scaleRow.height };

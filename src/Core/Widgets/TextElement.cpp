@@ -198,10 +198,21 @@ void TextElement::OnDrawSelf(Rectangle rect, float uiScale) {
     float spacing = scaledSize / 10.0f;
 
     if (!editable) {
-        Vector2 textSize = MeasureTextEx(font, text.c_str(), scaledSize, spacing);
+        std::string shown = text;
+        Vector2 textSize = MeasureTextEx(font, shown.c_str(), scaledSize, spacing);
+        if (truncateToRect && textSize.x > rect.width) {
+            const std::string ellipsis = "...";
+            while (!shown.empty()) {
+                while (!shown.empty() && ((unsigned char)shown.back() & 0xC0) == 0x80) shown.pop_back();
+                if (!shown.empty()) shown.pop_back();
+                textSize = MeasureTextEx(font, (shown + ellipsis).c_str(), scaledSize, spacing);
+                if (textSize.x <= rect.width) break;
+            }
+            shown += ellipsis;
+        }
         float drawX = rect.x + (rect.width - textSize.x) * pivot.x;
         float drawY = rect.y + (rect.height - textSize.y) * pivot.y;
-        DrawTextEx(font, text.c_str(), {drawX, drawY}, scaledSize, spacing, color);
+        DrawTextEx(font, shown.c_str(), {drawX, drawY}, scaledSize, spacing, color);
         return;
     }
 

@@ -13,6 +13,7 @@ public:
     float fontSize = 16.0f;
 
     bool editable = false;
+    bool truncateToRect = false;
     bool numericOnly = false;
     Color backgroundColor{ 35, 35, 40, 255 };
     Color borderColor{ 80, 80, 85, 255 };

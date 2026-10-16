@@ -537,9 +537,34 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
     if (typeInfo) {
         for (const ComponentFieldDesc& f : typeInfo->fields) {
             if (f.visibleIf && !f.visibleIf(comp)) continue;
+            if (f.hiddenInDetails) continue;
             std::string key = f.key;
             std::string rowId = "f:" + key;
             std::string value = ComponentEditing::ReadField(liveComponents, comp.name, comp, f);
+            if (f.colorKeys.size() == 3) {
+                PropertyRow colorRow;
+                colorRow.id = rowId;
+                colorRow.kind = PropertyRowKind::Color;
+                colorRow.label = f.label;
+                colorRow.colorHasAlpha = false;
+                int bytes[3] = { 255, 255, 255 };
+                for (int c = 0; c < 3; c++) {
+                    for (const ComponentFieldDesc& channel : typeInfo->fields) {
+                        if (channel.key == f.colorKeys[c]) {
+                            bytes[c] = ComponentField::ChannelToByte(SafeParse::ToFloat(ComponentEditing::ReadField(liveComponents, comp.name, comp, channel)));
+                        }
+                    }
+                }
+                colorRow.colorValue = Color{ (unsigned char)bytes[0], (unsigned char)bytes[1], (unsigned char)bytes[2], 255 };
+                std::vector<std::string> keys = f.colorKeys;
+                colorRow.setColor = [this, idx, keys](Color picked) {
+                    SetComponentField(idx, keys[0], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.r)));
+                    SetComponentField(idx, keys[1], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.g)));
+                    SetComponentField(idx, keys[2], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.b)));
+                };
+                rows.push_back(std::move(colorRow));
+                continue;
+            }
             switch (f.kind) {
                 case ComponentFieldKind::String:
                     rows.push_back(StringRow(rowId, f.label, value, [this, idx, key](const std::string& v) {

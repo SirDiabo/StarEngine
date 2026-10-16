@@ -99,31 +99,32 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
         ComponentEditing::WriteField(LevelComponentCache(), cacheKey, i->component, fieldKey, value);
     };
 
-    bool colorRowAdded = false;
     for (const ComponentFieldDesc& f : typeInfo->fields) {
         if (f.visibleIf && !f.visibleIf(comp)) continue;
+        if (f.hiddenInDetails) continue;
         std::string fieldKey = f.key;
         std::string value = ComponentEditing::ReadField(LevelComponentCache(), cacheKey, comp, f);
 
-        if (comp.componentType == "LightComponent" && fieldKey.rfind("LightColor", 0) == 0) {
-            if (colorRowAdded) continue;
-            colorRowAdded = true;
+        if (f.colorKeys.size() == 3) {
             PropertyRow colorRow;
-            colorRow.id = "field:LightColor";
-            colorRow.kind = PropertyRowKind::Vec3;
-            colorRow.label = "Light Color";
+            colorRow.id = "field:" + f.colorKeys[0];
+            colorRow.kind = PropertyRowKind::Color;
+            colorRow.label = f.label;
+            colorRow.colorHasAlpha = false;
+            int bytes[3] = { 255, 255, 255 };
             for (int c = 0; c < 3; c++) {
-                static const char* channelKeys[3] = { "LightColorR", "LightColorG", "LightColorB" };
                 for (const ComponentFieldDesc& channel : typeInfo->fields) {
-                    if (channel.key == channelKeys[c]) {
-                        colorRow.vec3[c] = SafeParse::ToFloat(ComponentEditing::ReadField(LevelComponentCache(), cacheKey, comp, channel));
+                    if (channel.key == f.colorKeys[c]) {
+                        bytes[c] = ComponentField::ChannelToByte(SafeParse::ToFloat(ComponentEditing::ReadField(LevelComponentCache(), cacheKey, comp, channel)));
                     }
                 }
             }
-            colorRow.setVec3 = [writeField, onEdited](float r, float g, float b) {
-                writeField("LightColorR", ComponentField::FloatStr(r));
-                writeField("LightColorG", ComponentField::FloatStr(g));
-                writeField("LightColorB", ComponentField::FloatStr(b));
+            colorRow.colorValue = Color{ (unsigned char)bytes[0], (unsigned char)bytes[1], (unsigned char)bytes[2], 255 };
+            std::vector<std::string> keys = f.colorKeys;
+            colorRow.setColor = [writeField, onEdited, keys](Color picked) {
+                writeField(keys[0], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.r)));
+                writeField(keys[1], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.g)));
+                writeField(keys[2], ComponentField::FloatStr(ComponentField::ByteToChannel(picked.b)));
                 if (onEdited) onEdited();
             };
             rows.push_back(colorRow);

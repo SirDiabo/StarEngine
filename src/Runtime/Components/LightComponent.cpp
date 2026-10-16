@@ -48,12 +48,12 @@ ComponentRegistrar registrar_LightComponent({
                     default:                        return "Point";
                 }
             }),
-        ComponentField::Flt("LightColorR", "Color R", 1.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.x = SafeParse::ToFloat(d.Get("LightColorR", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.x); }),
-        ComponentField::Flt("LightColorG", "Color G", 1.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.y = SafeParse::ToFloat(d.Get("LightColorG", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.y); }),
-        ComponentField::Flt("LightColorB", "Color B", 1.0f,
-            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.z = SafeParse::ToFloat(d.Get("LightColorB", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.z); }),
+        ComponentField::AsColorRGB(ComponentField::Flt("LightColorR", "Color R", 1.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.x = SafeParse::ToFloat(d.Get("LightColorR", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.x); }), "Light Color", { "LightColorR", "LightColorG", "LightColorB" }),
+        ComponentField::HiddenInDetails(ComponentField::Flt("LightColorG", "Color G", 1.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.y = SafeParse::ToFloat(d.Get("LightColorG", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.y); })),
+        ComponentField::HiddenInDetails(ComponentField::Flt("LightColorB", "Color B", 1.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).lightColor.z = SafeParse::ToFloat(d.Get("LightColorB", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).lightColor.z); })),
         ComponentField::Flt("LightIntensity", "Intensity", 1.0f,
             [](Component& c, const ComponentDecl& d) { static_cast<LightComponent&>(c).intensity = SafeParse::ToFloat(d.Get("LightIntensity", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const LightComponent&>(c).intensity); }),
         [] { ComponentFieldDesc f = ComponentField::Flt("LightRadius", "Radius", 500.0f,

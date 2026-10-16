@@ -12,6 +12,20 @@
 
 namespace {
 
+float AdaptiveLabelWidth(float baseWidth, float rowWidth, float uiScale) {
+    float minWidth = baseWidth * uiScale;
+    float maxWidth = 160.0f * uiScale;
+    return std::max(minWidth, std::min(maxWidth, rowWidth * 0.4f));
+}
+
+Rectangle CenterControlVertically(const WidgetElement* child, Rectangle rect, float uiScale) {
+    if (child->size.y <= 0.0f) return rect;
+    float height = std::min(child->size.y * uiScale, rect.height);
+    rect.y += (rect.height - height) * 0.5f;
+    rect.height = height;
+    return rect;
+}
+
 class LabeledRow : public WidgetElement {
 public:
     float labelWidth = 90.0f;
@@ -20,17 +34,17 @@ public:
 
 protected:
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
-        float lw = labelWidth * uiScale;
+        float lw = AdaptiveLabelWidth(labelWidth, ownRect.width, uiScale);
         float tw = trailingWidth * uiScale;
         float gap = 4.0f * uiScale;
         if (hasTrailing && childIndex == 2) return { ownRect.x + ownRect.width - tw, ownRect.y, tw, ownRect.height };
-        if (childIndex == 0) return { ownRect.x, ownRect.y, lw, ownRect.height };
+        if (childIndex == 0) return { ownRect.x + gap, ownRect.y, std::max(0.0f, lw - gap * 2.0f), ownRect.height };
         float controlX = ownRect.x + lw;
         float controlW = ownRect.width - lw - (hasTrailing ? tw + gap : 0.0f);
-        if (child->size.x > 0.0f) {
-            return { controlX, ownRect.y, child->size.x * uiScale, ownRect.height };
-        }
-        return { controlX, ownRect.y, controlW, ownRect.height };
+        Rectangle rect = (child->size.x > 0.0f)
+            ? Rectangle{ controlX, ownRect.y, child->size.x * uiScale, ownRect.height }
+            : Rectangle{ controlX, ownRect.y, controlW, ownRect.height };
+        return CenterControlVertically(child, rect, uiScale);
     }
 };
 
@@ -82,15 +96,17 @@ protected:
 class ColorRow : public WidgetElement {
 public:
     float labelWidth = 90.0f;
-    float swatchWidth = 36.0f;
+    float swatchWidth = 28.0f;
+    float swatchHeight = 16.0f;
 
 protected:
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
-        float lw = labelWidth * uiScale;
+        float lw = AdaptiveLabelWidth(labelWidth, ownRect.width, uiScale);
         float sw = swatchWidth * uiScale;
+        float sh = std::min(swatchHeight * uiScale, ownRect.height);
         float gap = 4.0f * uiScale;
-        if (childIndex == 0) return { ownRect.x, ownRect.y, lw, ownRect.height };
-        if (childIndex == 1) return { ownRect.x + lw, ownRect.y, sw, ownRect.height };
+        if (childIndex == 0) return { ownRect.x + gap, ownRect.y, std::max(0.0f, lw - gap * 2.0f), ownRect.height };
+        if (childIndex == 1) return { ownRect.x + lw, ownRect.y + (ownRect.height - sh) * 0.5f, sw, sh };
         float textX = ownRect.x + lw + sw + gap;
         return { textX, ownRect.y, std::max(0.0f, ownRect.x + ownRect.width - textX), ownRect.height };
     }
@@ -360,10 +376,11 @@ void PropertyPanel::RebuildRows() {
             colorLabel->anchor = { 0.0f, 0.5f };
             colorLabel->pivot = { 0.0f, 0.5f };
             colorLabel->offset = { 4.0f, 0.0f };
+            colorLabel->truncateToRect = true;
             colorRow->AddChild(colorLabel);
 
             auto* swatch = new ButtonElement();
-            swatch->size = { colorRow->swatchWidth, rowHeight };
+            swatch->size = { colorRow->swatchWidth, colorRow->swatchHeight };
             swatch->defaultColor = fieldBorder;
             swatch->hoveredColor = labelColor;
             swatch->selectedColor = labelColor;
@@ -373,7 +390,7 @@ void PropertyPanel::RebuildRows() {
                 if (onColorFieldClicked) onColorFieldClicked(rows[i].id, rows[i].colorValue, rowWidgets[i].swatchButton->lastResolvedRect);
             };
             auto* fill = new SwatchFillElement();
-            fill->size = { colorRow->swatchWidth, rowHeight };
+            fill->size = { colorRow->swatchWidth, colorRow->swatchHeight };
             swatch->AddChild(fill);
             colorRow->AddChild(swatch);
 
@@ -383,12 +400,14 @@ void PropertyPanel::RebuildRows() {
             colorBox->backgroundColor = fieldBg;
             colorBox->borderColor = fieldBorder;
             colorBox->editingBorderColor = fieldEditingBorder;
-            colorBox->placeholder = "r,g,b,a or #RRGGBBAA";
+            colorBox->placeholder = row.colorHasAlpha ? "r,g,b,a or #RRGGBBAA" : "r,g,b or #RRGGBB";
             colorBox->size = { 0.0f, rowHeight };
             colorBox->onTextCommitted = [this, i](const std::string& text) {
                 if (i >= rows.size() || !rows[i].setColor) return;
                 Color parsed;
-                if (ParseColorText(text, parsed)) rows[i].setColor(parsed);
+                if (!ParseColorText(text, parsed)) return;
+                if (!rows[i].colorHasAlpha) parsed.a = 255;
+                rows[i].setColor(parsed);
             };
             colorRow->AddChild(colorBox);
 
@@ -484,6 +503,7 @@ void PropertyPanel::RebuildRows() {
         label->anchor = { 0.0f, 0.5f };
         label->pivot = { 0.0f, 0.5f };
         label->offset = { 4.0f, 0.0f };
+        label->truncateToRect = true;
         rowBox->AddChild(label);
 
         switch (row.kind) {
@@ -534,7 +554,7 @@ void PropertyPanel::RebuildRows() {
             }
             case PropertyRowKind::Bool: {
                 auto* check = new CheckBoxElement();
-                check->size = { rowHeight - 2.0f, rowHeight - 2.0f };
+                check->size = { rowHeight - 4.0f, rowHeight - 4.0f };
                 check->boxColor = checkBoxColor;
                 check->hoveredBoxColor = checkBoxHoveredColor;
                 check->borderColor = checkBoxBorderColor;
@@ -608,6 +628,11 @@ void PropertyPanel::RebuildRows() {
         root->AddChild(rowBox);
     }
 
+    const std::vector<WidgetElement*>& rootChildren = root->GetChildren();
+    for (size_t k = 0; k < rootChildren.size(); k++) {
+        rootChildren[k]->margin = { paddingX, k == 0 ? paddingTop : 0.0f, paddingX, 0.0f };
+    }
+
     RefreshValues();
 }
 
@@ -645,8 +670,16 @@ void PropertyPanel::RefreshValues() {
                 if (rw.vecW && !rw.vecW->isEditing) rw.vecW->text = FormatFloat(row.vec4[3]);
                 break;
             case PropertyRowKind::Color:
-                if (rw.swatchFill) static_cast<SwatchFillElement*>(rw.swatchFill)->color = row.colorValue;
-                if (rw.textField && !rw.textField->isEditing) rw.textField->text = FormatColor(row.colorValue);
+                if (rw.swatchFill) {
+                    Color shown = row.colorValue;
+                    if (!row.colorHasAlpha) shown.a = 255;
+                    static_cast<SwatchFillElement*>(rw.swatchFill)->color = shown;
+                }
+                if (rw.textField && !rw.textField->isEditing) {
+                    std::string formatted = FormatColor(row.colorValue);
+                    if (!row.colorHasAlpha) formatted = formatted.substr(0, formatted.rfind(','));
+                    rw.textField->text = formatted;
+                }
                 break;
             case PropertyRowKind::Asset:
             case PropertyRowKind::Enum:

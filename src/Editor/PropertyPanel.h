@@ -59,6 +59,7 @@ struct PropertyRow {
     float vec4[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     std::vector<std::string> axisLabels;
     Color colorValue{ 255, 255, 255, 255 };
+    bool colorHasAlpha = true;
     std::vector<std::string> enumOptions;
     std::string assetExtension;
     Color iconColor{ 0, 0, 0, 0 };
@@ -103,6 +104,8 @@ public:
     Color checkBoxBorderColor{ 90, 90, 95, 255 };
     Color checkBoxCheckColor{ 90, 140, 220, 255 };
     float rowHeight = 20.0f;
+    float paddingX = 8.0f;
+    float paddingTop = 4.0f;
     float labelWidth = 90.0f;
 
     std::function<void(const std::string& rowId, const std::string& extension, Vector2 screenPos)> onAssetFieldClicked;

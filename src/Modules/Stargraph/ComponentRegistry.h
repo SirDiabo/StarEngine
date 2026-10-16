@@ -18,6 +18,8 @@ struct ComponentFieldDesc {
     std::string assetExtension;
     std::vector<std::string> enumOptions;
     std::function<bool(const ComponentDecl&)> visibleIf;
+    std::vector<std::string> colorKeys;
+    bool hiddenInDetails = false;
     std::function<void(Component&, const ComponentDecl&)> apply;
     ComponentReader read;
 };
@@ -59,6 +61,20 @@ struct ComponentRegistrar {
 };
 
 namespace ComponentField {
+    inline int ChannelToByte(float value) {
+        float scaled = value * 255.0f + 0.5f;
+        return scaled < 0.0f ? 0 : scaled > 255.0f ? 255 : (int)scaled;
+    }
+    inline float ByteToChannel(int value) { return (float)(value < 0 ? 0 : value > 255 ? 255 : value) / 255.0f; }
+    inline ComponentFieldDesc AsColorRGB(ComponentFieldDesc firstChannel, const std::string& label, std::vector<std::string> channelKeys) {
+        firstChannel.label = label;
+        firstChannel.colorKeys = std::move(channelKeys);
+        return firstChannel;
+    }
+    inline ComponentFieldDesc HiddenInDetails(ComponentFieldDesc field) {
+        field.hiddenInDetails = true;
+        return field;
+    }
     std::string FloatStr(float value);
     std::string BoolStr(bool value);
     ComponentFieldDesc Str(const std::string& key, const std::string& label, const std::string& defaultValue,
