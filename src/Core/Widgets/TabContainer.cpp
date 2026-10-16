@@ -49,12 +49,12 @@ void TabContainer::Draw(Rectangle rect, float uiScale) {
     if (kids.empty()) return;
 
     Rectangle headerRect{ rect.x, rect.y, rect.width, headerHeight * uiScale };
-    kids[0]->Draw(headerRect, uiScale);
+    kids[0]->Draw(kids[0]->FitToSlot(headerRect, uiScale), uiScale);
 
     int contentIndex = activeIndex + 1;
     if (contentIndex >= 1 && contentIndex < (int)kids.size()) {
         Rectangle contentRect{ rect.x, rect.y + headerRect.height, rect.width, rect.height - headerRect.height };
-        kids[contentIndex]->Draw(contentRect, uiScale);
+        kids[contentIndex]->Draw(kids[contentIndex]->FitToSlot(contentRect, uiScale), uiScale);
     }
 }
 
@@ -63,11 +63,11 @@ void TabContainer::Tick(float deltaTime, Rectangle rect, float uiScale) {
     if (kids.empty()) return;
 
     Rectangle headerRect{ rect.x, rect.y, rect.width, headerHeight * uiScale };
-    kids[0]->Tick(deltaTime, headerRect, uiScale);
+    kids[0]->Tick(deltaTime, kids[0]->FitToSlot(headerRect, uiScale), uiScale);
 
     int contentIndex = activeIndex + 1;
     if (contentIndex >= 1 && contentIndex < (int)kids.size()) {
         Rectangle contentRect{ rect.x, rect.y + headerRect.height, rect.width, rect.height - headerRect.height };
-        kids[contentIndex]->Tick(deltaTime, contentRect, uiScale);
+        kids[contentIndex]->Tick(deltaTime, kids[contentIndex]->FitToSlot(contentRect, uiScale), uiScale);
     }
 }

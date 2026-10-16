@@ -7,6 +7,15 @@
 
 class Widget;
 
+struct WidgetMargin {
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 0.0f;
+    float bottom = 0.0f;
+
+    bool IsZero() const { return left == 0.0f && top == 0.0f && right == 0.0f && bottom == 0.0f; }
+};
+
 enum class WidgetInteractionState {
     Default,
     Hovered,
@@ -29,6 +38,9 @@ public:
     Vector2 pivot{ 0.0f, 0.0f };
     Vector2 offset{ 0.0f, 0.0f };
     Vector2 size{ 100.0f, 30.0f };
+    WidgetMargin margin;
+    Vector2 minSize{ 0.0f, 0.0f };
+    Vector2 maxSize{ 0.0f, 0.0f };
     bool visible = true;
 
     bool selectable = false;
@@ -54,6 +66,11 @@ public:
     static void EnsureNextElementIdAtLeast(int id);
 
     Rectangle ResolveRect(Rectangle parentRect, float uiScale) const;
+
+    Rectangle InsetByMargin(Rectangle slot, float uiScale) const;
+    float ConstrainWidth(float width, float uiScale) const;
+    float ConstrainHeight(float height, float uiScale) const;
+    Rectangle FitToSlot(Rectangle slot, float uiScale) const;
 
     virtual void Draw(Rectangle rect, float uiScale);
     virtual void Tick(float deltaTime, Rectangle rect, float uiScale);

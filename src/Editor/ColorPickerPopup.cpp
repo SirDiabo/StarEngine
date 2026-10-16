@@ -13,7 +13,7 @@
 
 namespace {
 
-const float POPUP_W = 260.0f;
+const float POPUP_W = ColorPickerPopup::kPopupWidth;
 const float POPUP_H = 415.0f;
 
 struct PresetSwatch {

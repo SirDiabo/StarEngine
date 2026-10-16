@@ -13,6 +13,19 @@ using SectionFileIO::FindEntry;
 
 std::unordered_map<std::string, WidgetElement*> defaultInstanceCache;
 
+int ParseFloatList(const std::string& text, float* out, int maxCount) {
+    int count = 0;
+    size_t start = 0;
+    while (count < maxCount && start <= text.size()) {
+        size_t comma = text.find(',', start);
+        std::string token = text.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+        out[count++] = SafeParse::ToFloat(token);
+        if (comma == std::string::npos) break;
+        start = comma + 1;
+    }
+    return count;
+}
+
 WidgetElement* GetDefaultInstance(const std::string& elementType) {
     auto it = defaultInstanceCache.find(elementType);
     if (it != defaultInstanceCache.end()) return it->second;
@@ -38,6 +51,12 @@ void WriteElement(std::ostream& out, WidgetElement* element, const std::string& 
         out << "Offset=" << element->offset.x << "," << element->offset.y << "\n";
     if (element->size.x != 100.0f || element->size.y != 30.0f)
         out << "Size=" << element->size.x << "," << element->size.y << "\n";
+    if (!element->margin.IsZero())
+        out << "Margin=" << element->margin.left << "," << element->margin.top << "," << element->margin.right << "," << element->margin.bottom << "\n";
+    if (element->minSize.x != 0.0f || element->minSize.y != 0.0f)
+        out << "MinSize=" << element->minSize.x << "," << element->minSize.y << "\n";
+    if (element->maxSize.x != 0.0f || element->maxSize.y != 0.0f)
+        out << "MaxSize=" << element->maxSize.x << "," << element->maxSize.y << "\n";
     if (!element->visible) out << "Visible=false\n";
     if (element->selectable) out << "Selectable=true\n";
     if (element->disabled) out << "Disabled=true\n";
@@ -152,6 +171,18 @@ WidgetElement* ReadElementTree(const std::vector<ParsedSection>& sections) {
                 element->size.x = SafeParse::ToFloat(v->substr(0, comma));
                 element->size.y = SafeParse::ToFloat(v->substr(comma + 1));
             }
+        }
+        if (const std::string* v = FindEntry(section, "Margin")) {
+            float values[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            if (ParseFloatList(*v, values, 4) == 4) element->margin = WidgetMargin{ values[0], values[1], values[2], values[3] };
+        }
+        if (const std::string* v = FindEntry(section, "MinSize")) {
+            float values[2] = { 0.0f, 0.0f };
+            if (ParseFloatList(*v, values, 2) == 2) element->minSize = { values[0], values[1] };
+        }
+        if (const std::string* v = FindEntry(section, "MaxSize")) {
+            float values[2] = { 0.0f, 0.0f };
+            if (ParseFloatList(*v, values, 2) == 2) element->maxSize = { values[0], values[1] };
         }
         if (const std::string* v = FindEntry(section, "Visible")) element->visible = (*v == "true");
         if (const std::string* v = FindEntry(section, "Selectable")) element->selectable = (*v == "true");

@@ -1,4 +1,5 @@
 #include "GridElement.h"
+#include <algorithm>
 
 Rectangle GridElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const {
     int cols = columns > 0 ? columns : 1;
@@ -9,9 +10,11 @@ Rectangle GridElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect,
     float spacing = cellSpacing * uiScale;
     float x = ownRect.x + col * (cw + spacing);
     float y = ownRect.y + row * (rh + spacing);
-    float w = child->size.x > 0.0f ? child->size.x * uiScale : cw;
-    float h = child->size.y > 0.0f ? child->size.y * uiScale : rh;
-    return Rectangle{ x, y, w, h };
+    const WidgetMargin& m = child->margin;
+    float w = child->size.x > 0.0f ? child->size.x * uiScale : std::max(0.0f, cw - (m.left + m.right) * uiScale);
+    float h = child->size.y > 0.0f ? child->size.y * uiScale : std::max(0.0f, rh - (m.top + m.bottom) * uiScale);
+    return Rectangle{ x + m.left * uiScale, y + m.top * uiScale,
+                      child->ConstrainWidth(w, uiScale), child->ConstrainHeight(h, uiScale) };
 }
 
 WidgetElement* GridElement::GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const {

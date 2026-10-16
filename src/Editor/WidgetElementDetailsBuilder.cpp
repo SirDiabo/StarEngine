@@ -2,7 +2,19 @@
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/WidgetElementFields.h"
 #include "Core/SafeParse.h"
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+
+namespace {
+
+Color ParseColorField(const std::string& text) {
+    int r = 255, g = 255, b = 255, a = 255;
+    sscanf(text.c_str(), "%d,%d,%d,%d", &r, &g, &b, &a);
+    return Color{ (unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a };
+}
+
+}
 
 std::vector<PropertyRow> BuildWidgetElementPropertyRows(
     WidgetElement& element,
@@ -77,6 +89,26 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
     vec2Row("offset", "Offset", element.offset, [](WidgetElement& e, Vector2 v) { e.offset = v; });
     vec2Row("size", "Size", element.size, [](WidgetElement& e, Vector2 v) { e.size = v; });
 
+    PropertyRow marginRow;
+    marginRow.id = "margin";
+    marginRow.kind = PropertyRowKind::Vec4;
+    marginRow.label = "Margin";
+    marginRow.axisLabels = { "L", "T", "R", "B" };
+    marginRow.vec4[0] = element.margin.left;
+    marginRow.vec4[1] = element.margin.top;
+    marginRow.vec4[2] = element.margin.right;
+    marginRow.vec4[3] = element.margin.bottom;
+    marginRow.setVec4 = [currentElement, onEdited](float l, float t, float r, float b) {
+        WidgetElement* e = currentElement();
+        if (!e) return;
+        e->margin = WidgetMargin{ l, t, r, b };
+        if (onEdited) onEdited();
+    };
+    rows.push_back(marginRow);
+
+    vec2Row("minSize", "Min Size (0 = none)", element.minSize, [](WidgetElement& e, Vector2 v) { e.minSize = { std::max(0.0f, v.x), std::max(0.0f, v.y) }; });
+    vec2Row("maxSize", "Max Size (0 = none)", element.maxSize, [](WidgetElement& e, Vector2 v) { e.maxSize = { std::max(0.0f, v.x), std::max(0.0f, v.y) }; });
+
     std::string className = element.GetClassName();
     for (const WidgetElementFieldDesc& desc : GetWidgetElementFields()) {
         if (className != desc.elementType) continue;
@@ -92,6 +124,17 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
                 WidgetElement* e = currentElement();
                 if (!e) return;
                 desc.setValue(*e, v ? "true" : "false");
+                if (onEdited) onEdited();
+            };
+        } else if (desc.kind == WidgetFieldKind::Color) {
+            row.kind = PropertyRowKind::Color;
+            row.colorValue = ParseColorField(desc.getValue(element));
+            row.setColor = [currentElement, onEdited, desc](Color c) {
+                WidgetElement* e = currentElement();
+                if (!e) return;
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%d,%d,%d,%d", (int)c.r, (int)c.g, (int)c.b, (int)c.a);
+                desc.setValue(*e, buf);
                 if (onEdited) onEdited();
             };
         } else if (desc.kind == WidgetFieldKind::Float || desc.kind == WidgetFieldKind::Int) {

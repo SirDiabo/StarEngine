@@ -5,6 +5,7 @@
 #include "Core/Widgets/ButtonElement.h"
 #include "Core/Widgets/CheckBoxElement.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -55,6 +56,46 @@ protected:
     }
 };
 
+class SwatchFillElement : public WidgetElement {
+public:
+    Color color{ 255, 255, 255, 255 };
+
+protected:
+    void OnDrawSelf(Rectangle rect, float uiScale) override {
+        Rectangle inner{ rect.x + 2.0f, rect.y + 2.0f, std::max(0.0f, rect.width - 4.0f), std::max(0.0f, rect.height - 4.0f) };
+        if (color.a < 255) {
+            DrawRectangleRec(inner, Color{ 205, 205, 205, 255 });
+            const float cell = 5.0f * uiScale;
+            int iy = 0;
+            for (float y = 0.0f; y < inner.height; y += cell, iy++) {
+                int ix = 0;
+                for (float x = 0.0f; x < inner.width; x += cell, ix++) {
+                    if (((ix + iy) & 1) == 0) continue;
+                    DrawRectangleRec(Rectangle{ inner.x + x, inner.y + y, std::min(cell, inner.width - x), std::min(cell, inner.height - y) }, Color{ 140, 140, 140, 255 });
+                }
+            }
+        }
+        DrawRectangleRec(inner, color);
+    }
+};
+
+class ColorRow : public WidgetElement {
+public:
+    float labelWidth = 90.0f;
+    float swatchWidth = 36.0f;
+
+protected:
+    Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override {
+        float lw = labelWidth * uiScale;
+        float sw = swatchWidth * uiScale;
+        float gap = 4.0f * uiScale;
+        if (childIndex == 0) return { ownRect.x, ownRect.y, lw, ownRect.height };
+        if (childIndex == 1) return { ownRect.x + lw, ownRect.y, sw, ownRect.height };
+        float textX = ownRect.x + lw + sw + gap;
+        return { textX, ownRect.y, std::max(0.0f, ownRect.x + ownRect.width - textX), ownRect.height };
+    }
+};
+
 class CellRow : public WidgetElement {
 public:
     float indent = 0.0f;
@@ -94,6 +135,45 @@ bool RowsShapeEqual(const std::vector<PropertyRow>& a, const std::vector<Propert
             if (a[i].cells[c].kind != b[i].cells[c].kind || a[i].cells[c].width != b[i].cells[c].width) return false;
         }
     }
+    return true;
+}
+
+std::string FormatColor(Color color) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d,%d,%d,%d", (int)color.r, (int)color.g, (int)color.b, (int)color.a);
+    return buf;
+}
+
+bool ParseColorText(const std::string& text, Color& out) {
+    size_t first = text.find_first_not_of(" \t");
+    if (first == std::string::npos) return false;
+    std::string trimmed = text.substr(first);
+
+    if (trimmed[0] == '#') {
+        std::string hex = trimmed.substr(1);
+        while (!hex.empty() && std::isspace((unsigned char)hex.back())) hex.pop_back();
+        if (hex.size() != 6 && hex.size() != 8) return false;
+        for (char ch : hex) if (!std::isxdigit((unsigned char)ch)) return false;
+        unsigned long value = strtoul(hex.c_str(), nullptr, 16);
+        if (hex.size() == 6) out = Color{ (unsigned char)((value >> 16) & 0xFF), (unsigned char)((value >> 8) & 0xFF), (unsigned char)(value & 0xFF), 255 };
+        else out = Color{ (unsigned char)((value >> 24) & 0xFF), (unsigned char)((value >> 16) & 0xFF), (unsigned char)((value >> 8) & 0xFF), (unsigned char)(value & 0xFF) };
+        return true;
+    }
+
+    int values[4] = { 0, 0, 0, 255 };
+    int count = 0;
+    const char* cursor = trimmed.c_str();
+    while (count < 4) {
+        while (*cursor == ' ' || *cursor == ',' || *cursor == '\t') cursor++;
+        if (!*cursor) break;
+        char* end = nullptr;
+        long parsed = strtol(cursor, &end, 10);
+        if (end == cursor) return false;
+        values[count++] = (int)std::max(0L, std::min(255L, parsed));
+        cursor = end;
+    }
+    if (count < 3) return false;
+    out = Color{ (unsigned char)values[0], (unsigned char)values[1], (unsigned char)values[2], (unsigned char)values[3] };
     return true;
 }
 
@@ -268,8 +348,60 @@ void PropertyPanel::RebuildRows() {
             continue;
         }
 
-        if (row.kind == PropertyRowKind::Vec3 || row.kind == PropertyRowKind::Vec2) {
-            int count = (row.kind == PropertyRowKind::Vec3) ? 3 : 2;
+        if (row.kind == PropertyRowKind::Color) {
+            auto* colorRow = new ColorRow();
+            colorRow->size = { 0.0f, rowHeight };
+            colorRow->labelWidth = labelWidth;
+
+            auto* colorLabel = new TextElement();
+            colorLabel->text = row.label;
+            colorLabel->color = labelColor;
+            colorLabel->fontSize = 11.0f;
+            colorLabel->anchor = { 0.0f, 0.5f };
+            colorLabel->pivot = { 0.0f, 0.5f };
+            colorLabel->offset = { 4.0f, 0.0f };
+            colorRow->AddChild(colorLabel);
+
+            auto* swatch = new ButtonElement();
+            swatch->size = { colorRow->swatchWidth, rowHeight };
+            swatch->defaultColor = fieldBorder;
+            swatch->hoveredColor = labelColor;
+            swatch->selectedColor = labelColor;
+            swatch->pressedColor = labelColor;
+            swatch->onActivated = [this, i]() {
+                if (i >= rows.size() || i >= rowWidgets.size() || !rowWidgets[i].swatchButton) return;
+                if (onColorFieldClicked) onColorFieldClicked(rows[i].id, rows[i].colorValue, rowWidgets[i].swatchButton->lastResolvedRect);
+            };
+            auto* fill = new SwatchFillElement();
+            fill->size = { colorRow->swatchWidth, rowHeight };
+            swatch->AddChild(fill);
+            colorRow->AddChild(swatch);
+
+            auto* colorBox = new TextElement();
+            colorBox->editable = true;
+            colorBox->fontSize = 11.0f;
+            colorBox->backgroundColor = fieldBg;
+            colorBox->borderColor = fieldBorder;
+            colorBox->editingBorderColor = fieldEditingBorder;
+            colorBox->placeholder = "r,g,b,a or #RRGGBBAA";
+            colorBox->size = { 0.0f, rowHeight };
+            colorBox->onTextCommitted = [this, i](const std::string& text) {
+                if (i >= rows.size() || !rows[i].setColor) return;
+                Color parsed;
+                if (ParseColorText(text, parsed)) rows[i].setColor(parsed);
+            };
+            colorRow->AddChild(colorBox);
+
+            rw.swatchButton = swatch;
+            rw.swatchFill = fill;
+            rw.textField = colorBox;
+            root->AddChild(colorRow);
+            continue;
+        }
+
+        if (row.kind == PropertyRowKind::Vec3 || row.kind == PropertyRowKind::Vec2 || row.kind == PropertyRowKind::Vec4) {
+            int count = (row.kind == PropertyRowKind::Vec4) ? 4 : (row.kind == PropertyRowKind::Vec3) ? 3 : 2;
+            bool isVec4 = (row.kind == PropertyRowKind::Vec4);
 
             auto* label = new TextElement();
             label->text = row.label;
@@ -286,13 +418,13 @@ void PropertyPanel::RebuildRows() {
             triplet->size = { 0.0f, rowHeight };
             triplet->hasTrailing = !row.trailingLabel.empty();
 
-            const char* axisNames[3] = { "X", "Y", "Z" };
-            Color axisColors[3] = { axisXColor, axisYColor, axisZColor };
-            TextElement** boxes[3] = { &rw.vecX, &rw.vecY, &rw.vecZ };
+            const char* axisNames[4] = { "X", "Y", "Z", "W" };
+            Color axisColors[4] = { axisXColor, axisYColor, axisZColor, labelColor };
+            TextElement** boxes[4] = { &rw.vecX, &rw.vecY, &rw.vecZ, &rw.vecW };
 
             for (int a = 0; a < count; a++) {
                 auto* axisLabel = new TextElement();
-                axisLabel->text = axisNames[a];
+                axisLabel->text = (a < (int)row.axisLabels.size()) ? row.axisLabels[a] : std::string(axisNames[a]);
                 axisLabel->color = axisColors[a];
                 axisLabel->fontSize = 10.0f;
                 axisLabel->anchor = { 0.0f, 0.5f };
@@ -309,16 +441,29 @@ void PropertyPanel::RebuildRows() {
                 box->size = { 0.0f, rowHeight };
                 std::function<void(float, float, float)> setVec3 = row.setVec3;
                 int axisIndex = a;
-                box->onTextChanged = [this, i, setVec3, axisIndex](const std::string& text) {
-                    if (i >= rowWidgets.size()) return;
-                    float x = rowWidgets[i].vecX ? (float)atof(rowWidgets[i].vecX->text.c_str()) : 0.0f;
-                    float y = rowWidgets[i].vecY ? (float)atof(rowWidgets[i].vecY->text.c_str()) : 0.0f;
-                    float z = rowWidgets[i].vecZ ? (float)atof(rowWidgets[i].vecZ->text.c_str()) : 0.0f;
-                    if (axisIndex == 0) x = (float)atof(text.c_str());
-                    if (axisIndex == 1) y = (float)atof(text.c_str());
-                    if (axisIndex == 2) z = (float)atof(text.c_str());
-                    if (setVec3) setVec3(x, y, z);
-                };
+                if (isVec4) {
+                    box->onTextChanged = [this, i, axisIndex](const std::string& text) {
+                        if (i >= rowWidgets.size() || i >= rows.size() || !rows[i].setVec4) return;
+                        TextElement* sources[4] = { rowWidgets[i].vecX, rowWidgets[i].vecY, rowWidgets[i].vecZ, rowWidgets[i].vecW };
+                        float values[4];
+                        for (int k = 0; k < 4; k++) {
+                            values[k] = sources[k] ? (float)atof(sources[k]->text.c_str()) : 0.0f;
+                        }
+                        values[axisIndex] = (float)atof(text.c_str());
+                        rows[i].setVec4(values[0], values[1], values[2], values[3]);
+                    };
+                } else {
+                    box->onTextChanged = [this, i, setVec3, axisIndex](const std::string& text) {
+                        if (i >= rowWidgets.size()) return;
+                        float x = rowWidgets[i].vecX ? (float)atof(rowWidgets[i].vecX->text.c_str()) : 0.0f;
+                        float y = rowWidgets[i].vecY ? (float)atof(rowWidgets[i].vecY->text.c_str()) : 0.0f;
+                        float z = rowWidgets[i].vecZ ? (float)atof(rowWidgets[i].vecZ->text.c_str()) : 0.0f;
+                        if (axisIndex == 0) x = (float)atof(text.c_str());
+                        if (axisIndex == 1) y = (float)atof(text.c_str());
+                        if (axisIndex == 2) z = (float)atof(text.c_str());
+                        if (setVec3) setVec3(x, y, z);
+                    };
+                }
                 triplet->AddChild(box);
                 *boxes[a] = box;
             }
@@ -492,6 +637,16 @@ void PropertyPanel::RefreshValues() {
             case PropertyRowKind::Vec2:
                 if (rw.vecX && !rw.vecX->isEditing) rw.vecX->text = FormatFloat(row.vec3[0]);
                 if (rw.vecY && !rw.vecY->isEditing) rw.vecY->text = FormatFloat(row.vec3[1]);
+                break;
+            case PropertyRowKind::Vec4:
+                if (rw.vecX && !rw.vecX->isEditing) rw.vecX->text = FormatFloat(row.vec4[0]);
+                if (rw.vecY && !rw.vecY->isEditing) rw.vecY->text = FormatFloat(row.vec4[1]);
+                if (rw.vecZ && !rw.vecZ->isEditing) rw.vecZ->text = FormatFloat(row.vec4[2]);
+                if (rw.vecW && !rw.vecW->isEditing) rw.vecW->text = FormatFloat(row.vec4[3]);
+                break;
+            case PropertyRowKind::Color:
+                if (rw.swatchFill) static_cast<SwatchFillElement*>(rw.swatchFill)->color = row.colorValue;
+                if (rw.textField && !rw.textField->isEditing) rw.textField->text = FormatColor(row.colorValue);
                 break;
             case PropertyRowKind::Asset:
             case PropertyRowKind::Enum:

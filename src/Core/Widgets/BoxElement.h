@@ -23,5 +23,6 @@ public:
     WidgetElement* GetNextSelectableInDirection(WidgetElement* current, int dx, int dy) const override;
 
 protected:
+    float GetSlotExtent(const WidgetElement* element, float uiScale) const;
     Rectangle ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const override;
 };

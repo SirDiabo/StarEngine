@@ -1,30 +1,41 @@
 #include "BoxElement.h"
+#include <algorithm>
+
+float BoxElement::GetSlotExtent(const WidgetElement* element, float uiScale) const {
+    if (axis == BoxAxis::Vertical) {
+        return (element->margin.top + element->margin.bottom) * uiScale + element->ConstrainHeight(element->size.y * uiScale, uiScale);
+    }
+    return (element->margin.left + element->margin.right) * uiScale + element->ConstrainWidth(element->size.x * uiScale, uiScale);
+}
 
 Rectangle BoxElement::ComputeChildRect(WidgetElement* child, Rectangle ownRect, float uiScale, int childIndex) const {
     float running = -scrollOffset * uiScale;
     for (int i = 0; i < childIndex; i++) {
         WidgetElement* sibling = children[i];
         if (!sibling->visible) continue;
-        float extent = (axis == BoxAxis::Vertical ? sibling->size.y : sibling->size.x) * uiScale;
-        running += extent + childSpacing * uiScale;
+        running += GetSlotExtent(sibling, uiScale) + childSpacing * uiScale;
     }
 
+    const WidgetMargin& m = child->margin;
     float childW = child->size.x * uiScale;
     float childH = child->size.y * uiScale;
 
     if (axis == BoxAxis::Vertical) {
-        return Rectangle{ ownRect.x, ownRect.y + running, childW > 0.0f ? childW : ownRect.width, childH };
+        float width = childW > 0.0f ? childW : std::max(0.0f, ownRect.width - (m.left + m.right) * uiScale);
+        return Rectangle{ ownRect.x + m.left * uiScale, ownRect.y + running + m.top * uiScale,
+                          child->ConstrainWidth(width, uiScale), child->ConstrainHeight(childH, uiScale) };
     }
 
-    return Rectangle{ ownRect.x + running, ownRect.y, childW, childH > 0.0f ? childH : ownRect.height };
+    float height = childH > 0.0f ? childH : std::max(0.0f, ownRect.height - (m.top + m.bottom) * uiScale);
+    return Rectangle{ ownRect.x + running + m.left * uiScale, ownRect.y + m.top * uiScale,
+                      child->ConstrainWidth(childW, uiScale), child->ConstrainHeight(height, uiScale) };
 }
 
 float BoxElement::GetContentExtent(float uiScale) const {
     float total = 0.0f;
     for (int i = 0; i < (int)children.size(); i++) {
         if (!children[i]->visible) continue;
-        float extent = (axis == BoxAxis::Vertical ? children[i]->size.y : children[i]->size.x) * uiScale;
-        total += extent + childSpacing * uiScale;
+        total += GetSlotExtent(children[i], uiScale) + childSpacing * uiScale;
     }
     return total;
 }

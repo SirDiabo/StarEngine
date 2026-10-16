@@ -18,6 +18,8 @@ enum class PropertyRowKind {
     Bool,
     Vec2,
     Vec3,
+    Vec4,
+    Color,
     Asset,
     Enum,
     Button,
@@ -54,6 +56,9 @@ struct PropertyRow {
     float floatValue = 0.0f;
     bool boolValue = false;
     float vec3[3] = { 0.0f, 0.0f, 0.0f };
+    float vec4[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    std::vector<std::string> axisLabels;
+    Color colorValue{ 255, 255, 255, 255 };
     std::vector<std::string> enumOptions;
     std::string assetExtension;
     Color iconColor{ 0, 0, 0, 0 };
@@ -71,6 +76,8 @@ struct PropertyRow {
     std::function<void(float)> setFloat;
     std::function<void(bool)> setBool;
     std::function<void(float, float, float)> setVec3;
+    std::function<void(float, float, float, float)> setVec4;
+    std::function<void(Color)> setColor;
     std::function<void()> onButtonPressed;
 };
 
@@ -99,6 +106,7 @@ public:
     float labelWidth = 90.0f;
 
     std::function<void(const std::string& rowId, const std::string& extension, Vector2 screenPos)> onAssetFieldClicked;
+    std::function<void(const std::string& rowId, Color current, Rectangle swatchRect)> onColorFieldClicked;
 
     void SetProperties(std::vector<PropertyRow> rows);
 
@@ -117,6 +125,9 @@ private:
         TextElement* vecX = nullptr;
         TextElement* vecY = nullptr;
         TextElement* vecZ = nullptr;
+        TextElement* vecW = nullptr;
+        ButtonElement* swatchButton = nullptr;
+        WidgetElement* swatchFill = nullptr;
         ButtonElement* assetOrEnumButton = nullptr;
         TextElement* assetOrEnumLabel = nullptr;
         ButtonElement* trailingButton = nullptr;

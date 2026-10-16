@@ -7,6 +7,8 @@ class TextElement;
 
 class ColorPickerPopup {
 public:
+    static constexpr float kPopupWidth = 260.0f;
+
     void Open(Vector2 anchorPos, Color startColor);
     void Close();
     bool IsOpen() const { return open; }

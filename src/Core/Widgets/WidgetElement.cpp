@@ -99,9 +99,38 @@ void WidgetElement::ClearChildren() {
     children.clear();
 }
 
+Rectangle WidgetElement::InsetByMargin(Rectangle slot, float uiScale) const {
+    if (margin.IsZero()) return slot;
+    float left = margin.left * uiScale;
+    float top = margin.top * uiScale;
+    float width = slot.width - left - margin.right * uiScale;
+    float height = slot.height - top - margin.bottom * uiScale;
+    return Rectangle{ slot.x + left, slot.y + top, std::max(0.0f, width), std::max(0.0f, height) };
+}
+
+float WidgetElement::ConstrainWidth(float width, float uiScale) const {
+    if (maxSize.x > 0.0f) width = std::min(width, maxSize.x * uiScale);
+    if (minSize.x > 0.0f) width = std::max(width, minSize.x * uiScale);
+    return width;
+}
+
+float WidgetElement::ConstrainHeight(float height, float uiScale) const {
+    if (maxSize.y > 0.0f) height = std::min(height, maxSize.y * uiScale);
+    if (minSize.y > 0.0f) height = std::max(height, minSize.y * uiScale);
+    return height;
+}
+
+Rectangle WidgetElement::FitToSlot(Rectangle slot, float uiScale) const {
+    Rectangle inner = InsetByMargin(slot, uiScale);
+    inner.width = ConstrainWidth(inner.width, uiScale);
+    inner.height = ConstrainHeight(inner.height, uiScale);
+    return inner;
+}
+
 Rectangle WidgetElement::ResolveRect(Rectangle parentRect, float uiScale) const {
+    parentRect = InsetByMargin(parentRect, uiScale);
     Vector2 anchorPoint{ parentRect.x + parentRect.width * anchor.x, parentRect.y + parentRect.height * anchor.y };
-    Vector2 scaledSize{ size.x * uiScale, size.y * uiScale };
+    Vector2 scaledSize{ ConstrainWidth(size.x * uiScale, uiScale), ConstrainHeight(size.y * uiScale, uiScale) };
     Vector2 topLeft{
         anchorPoint.x + offset.x * uiScale - scaledSize.x * pivot.x,
         anchorPoint.y + offset.y * uiScale - scaledSize.y * pivot.y

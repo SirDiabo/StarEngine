@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Panel.h"
 #include "AssetPickerPopup.h"
+#include "ColorPickerPopup.h"
 #include "PropertyPanel.h"
 #include <functional>
 #include <string>
@@ -24,4 +25,9 @@ private:
 
     AssetPickerPopup assetPicker;
     std::string pendingAssetRowId;
+
+    ColorPickerPopup colorPicker;
+    std::string pendingColorRowId;
+    Color colorBeforeEdit{ 255, 255, 255, 255 };
+    Color lastAppliedColor{ 255, 255, 255, 255 };
 };
