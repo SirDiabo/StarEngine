@@ -87,6 +87,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
 }
 
 void WorldSpawner::SpawnMapActors(const StarMap& map) {
+    World::Get().SetCurrentLevelName(map.mapName);
     for (const ActorInstance& inst : map.GetInstances()) {
         Actor* actor = SpawnActorFromInstance(inst);
         actor->SetNetId(World::Get().AllocateNetId());

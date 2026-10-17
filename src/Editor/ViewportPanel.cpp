@@ -12,6 +12,7 @@
 #include "Runtime/PrintMessageLog.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
+#include "Core/SaveSlots.h"
 #include "Core/Widgets/WidgetRenderer.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/RenderSettings.h"
@@ -839,6 +840,7 @@ void ViewportPanel::RenderToolbar() {
             savedOrbitRadius = orbitRadius;
             savedCameraTarget = cameraTarget;
             if (flying) { flying = false; ShowCursor(); }
+            SaveSlots::OnPlayBegin();
             GameSession::BeginSession(starMap);
             }
         btnRight -= 26;

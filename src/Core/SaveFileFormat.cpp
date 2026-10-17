@@ -3,10 +3,12 @@
 #include "SaveFileRegistry.h"
 #include "PackageCipher.h"
 #include "Project.h"
+#include "SaveSlots.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
@@ -21,28 +23,75 @@
 namespace fs = std::filesystem;
 
 namespace {
+    const char* const kFormatHeader = "#starsav 2";
+
+    std::string EscapeText(const std::string& text, bool escapeEquals) {
+        std::string out;
+        out.reserve(text.size());
+        for (char c : text) {
+            switch (c) {
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '=': if (escapeEquals) out += "\\e"; else out += c; break;
+                default: out += c;
+            }
+        }
+        return out;
+    }
+
+    std::string UnescapeText(const std::string& text) {
+        std::string out;
+        out.reserve(text.size());
+        for (size_t i = 0; i < text.size(); i++) {
+            if (text[i] != '\\' || i + 1 >= text.size()) { out += text[i]; continue; }
+            char next = text[i + 1];
+            if (next == '\\') { out += '\\'; i++; }
+            else if (next == 'n') { out += '\n'; i++; }
+            else if (next == 'r') { out += '\r'; i++; }
+            else if (next == 'e') { out += '='; i++; }
+            else out += text[i];
+        }
+        return out;
+    }
+
     std::unordered_map<std::string, std::string> ParseEntries(const std::string& text) {
         std::unordered_map<std::string, std::string> entries;
         std::istringstream in(text);
         std::string line;
+        bool escaped = false;
+        bool firstLine = true;
         while (std::getline(in, line)) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (firstLine) {
+                firstLine = false;
+                if (line == kFormatHeader) { escaped = true; continue; }
+            }
             if (line.empty()) continue;
 
             size_t separator = line.find('=');
             if (separator == std::string::npos) continue;
 
-            entries[line.substr(0, separator)] = line.substr(separator + 1);
+            std::string key = line.substr(0, separator);
+            std::string value = line.substr(separator + 1);
+            if (escaped) { key = UnescapeText(key); value = UnescapeText(value); }
+            entries[key] = value;
         }
         return entries;
     }
 
     std::string SerializeEntries(const std::unordered_map<std::string, std::string>& entries) {
-        std::string text;
-        for (const auto& kv : entries) {
-            text += kv.first;
+        std::vector<const std::pair<const std::string, std::string>*> ordered;
+        ordered.reserve(entries.size());
+        for (const auto& kv : entries) ordered.push_back(&kv);
+        std::sort(ordered.begin(), ordered.end(), [](const auto* a, const auto* b) { return a->first < b->first; });
+
+        std::string text = kFormatHeader;
+        text += "\n";
+        for (const auto* kv : ordered) {
+            text += EscapeText(kv->first, true);
             text += "=";
-            text += kv.second;
+            text += EscapeText(kv->second, false);
             text += "\n";
         }
         return text;
@@ -184,6 +233,18 @@ public:
         }
     }
 
+    void DiscardUnder(const std::string& directory) {
+        FlushAndReport();
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        for (auto it = files.begin(); it != files.end();) {
+            const std::string& path = it->first;
+            bool inside = path.size() > directory.size() && path.compare(0, directory.size(), directory) == 0 &&
+                          (path[directory.size()] == '/' || path[directory.size()] == '\\');
+            if (inside && path.find_first_of("/\\", directory.size() + 1) == std::string::npos) it = files.erase(it);
+            else ++it;
+        }
+    }
+
     void Invalidate() {
         FlushAndReport();
         std::lock_guard<std::mutex> lock(cacheMutex);
@@ -247,16 +308,30 @@ SaveWriteBehind& Writer() {
 }
 
 std::unordered_map<std::string, std::string> SaveFileFormat::ReadEntries(const std::string& saveFileName) {
-    return Writer().Read(SavePaths::GetSaveFilePath(saveFileName),
+    return ReadEntriesInSlot(SavePaths::GetCurrentSlot(), saveFileName);
+}
+
+bool SaveFileFormat::WriteEntries(const std::string& saveFileName, const std::unordered_map<std::string, std::string>& updates) {
+    bool written = WriteEntriesInSlot(SavePaths::GetCurrentSlot(), saveFileName, updates);
+    if (written && !SaveSlots::IsMetadataFile(saveFileName)) SaveSlots::NotifySaved();
+    return written;
+}
+
+std::unordered_map<std::string, std::string> SaveFileFormat::ReadEntriesInSlot(const std::string& slot, const std::string& saveFileName) {
+    return Writer().Read(SavePaths::GetSaveFilePathInSlot(slot, saveFileName),
                          SaveFileRegistry::Get().IsEncrypted(saveFileName),
                          Project::Get().GetSettings().saveEncryptionKey);
 }
 
-bool SaveFileFormat::WriteEntries(const std::string& saveFileName, const std::unordered_map<std::string, std::string>& updates) {
-    Writer().Write(SavePaths::GetSaveFilePath(saveFileName),
+bool SaveFileFormat::WriteEntriesInSlot(const std::string& slot, const std::string& saveFileName, const std::unordered_map<std::string, std::string>& updates) {
+    Writer().Write(SavePaths::GetSaveFilePathInSlot(slot, saveFileName),
                    SaveFileRegistry::Get().IsEncrypted(saveFileName),
                    Project::Get().GetSettings().saveEncryptionKey, updates);
     return true;
+}
+
+void SaveFileFormat::DiscardSlotCache(const std::string& slot) {
+    Writer().DiscardUnder(SavePaths::GetSlotDirectory(slot));
 }
 
 void SaveFileFormat::FlushAll() {

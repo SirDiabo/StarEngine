@@ -16,6 +16,7 @@
 #include "Core/Widgets/WidgetRenderer.h"
 #include "Core/RenderPipeline.h"
 #include "Core/GameSession.h"
+#include "Core/SaveSlots.h"
 #include "Core/ProfilerRender.h"
 #include "Core/ProfilerRuntime.h"
 #include "Core/RenderSettings.h"
@@ -239,6 +240,7 @@ int main(int argc, char* argv[]) {
     } else {
         TraceLog(LOG_WARNING, "GameMain: no default map set, starting with an empty world");
     }
+    SaveSlots::OnPlayBegin();
     GameSession::BeginSession(map);
     TraceLog(LOG_INFO, "GameMain: spawned %d actors", (int)World::Get().GetActors().size());
 

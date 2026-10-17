@@ -35,6 +35,9 @@ public:
     uint32_t AllocateNetId();
     void ResetNetIds() { nextNetId = 1; }
 
+    const std::string& GetCurrentLevelName() const { return currentLevelName; }
+    void SetCurrentLevelName(const std::string& name) { currentLevelName = name; }
+
     void RequestLoadLevel(const std::string& path);
     bool ConsumePendingLevelLoad(std::string& outPath);
 
@@ -48,6 +51,7 @@ private:
     Actor* viewTarget = nullptr;
     Actor* inputFocus = nullptr;
     uint32_t nextNetId = 1;
+    std::string currentLevelName;
     std::string pendingLevelPath;
     bool hasPendingLevelLoad = false;
     bool quitRequested = false;
