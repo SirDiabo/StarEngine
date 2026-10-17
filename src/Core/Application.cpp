@@ -8,6 +8,7 @@
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Core/StarMaterial.h"
+#include "Core/SaveMigration.h"
 #include "Core/BuildRunner.h"
 #include "Core/EmbeddedAssets.h"
 #include "Core/ExecutablePath.h"
@@ -172,6 +173,8 @@ bool Application::Initialize(int argc, char* argv[]) {
     }
 
     ModuleManager::Get().InitializeAll();
+
+    SaveMigration::SetProjectVersion(1);
 
     SetCollisionDebugEnabled(true);
     DebugDraw::LoadSettings();
