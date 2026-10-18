@@ -50,19 +50,21 @@ public:
     std::function<void()> onRightActivated;
     std::function<void()> onKeyActivated;
     std::string selectionKey;
+    std::string slotName;
 
     WidgetElement* parent = nullptr;
     Widget* owningWidget = nullptr;
     Rectangle lastResolvedRect{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-    void AddChild(WidgetElement* child);
-    void InsertChild(WidgetElement* child, int index);
-    WidgetElement* DetachChild(WidgetElement* child);
-    void RemoveChild(WidgetElement* child);
+    virtual void AddChild(WidgetElement* child);
+    virtual void InsertChild(WidgetElement* child, int index);
+    virtual WidgetElement* DetachChild(WidgetElement* child);
+    virtual void RemoveChild(WidgetElement* child);
     void RemoveChildAt(int index);
-    void ClearChildren();
+    virtual void ClearChildren();
     const std::vector<WidgetElement*>& GetChildren() const { return children; }
-    void SetOwningWidgetRecursive(Widget* widget);
+    virtual const std::vector<WidgetElement*>& GetAuthoredChildren() const { return children; }
+    virtual void SetOwningWidgetRecursive(Widget* widget);
     static void EnsureNextElementIdAtLeast(int id);
 
     Rectangle ResolveRect(Rectangle parentRect, float uiScale) const;

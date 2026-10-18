@@ -86,22 +86,24 @@ bool ReadWidgetAsset(std::istream& in, WidgetAssetData& outData, bool loadBehavi
     return true;
 }
 
-Widget* InstantiateWidget(const std::string& path) {
+void AttachWidgetBehavior(Widget* widget, const std::string& path) {
+    if (!widget) return;
+    const WidgetAssetData* cached = WidgetAssetCache::Get().GetOrLoad(path);
+    if (!cached || cached->programmingInterface.empty() || !cached->behaviorContent) return;
+    const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(cached->programmingInterface);
+    if (provider && provider->createWidgetBehavior) {
+        widget->SetBehavior(provider->createWidgetBehavior(*cached->behaviorContent));
+    }
+}
+
+Widget* InstantiateWidget(const std::string& path, bool withBehavior) {
     const WidgetAssetData* cached = WidgetAssetCache::Get().GetOrLoad(path);
     if (!cached) return nullptr;
-
     Widget* widget = new Widget();
     widget->SetRoot(WidgetElementIO::CloneElementTree(cached->rootElement));
     widget->uiScale = cached->uiScale;
     widget->forceNativeResolution = cached->forceNativeResolution;
-
-    if (!cached->programmingInterface.empty() && cached->behaviorContent) {
-        const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(cached->programmingInterface);
-        if (provider && provider->createWidgetBehavior) {
-            widget->SetBehavior(provider->createWidgetBehavior(*cached->behaviorContent));
-        }
-    }
-
+    if (withBehavior) AttachWidgetBehavior(widget, path);
     return widget;
 }
 

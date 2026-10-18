@@ -7,16 +7,35 @@
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetObjectElement.h"
+#include "Core/Widgets/ColorPickerElement.h"
+#include <cstdio>
+#include "StargraphBehavior.h"
+#include "GraphExecutor.h"
 #include "Runtime/Components/WidgetComponent.h"
 #include "Runtime/Actor.h"
 
 static WidgetElement* FindWidgetElementByName(WidgetElement* root, const std::string& name) {
     if (!root) return nullptr;
     if (root->elementId == name) return root;
-    for (WidgetElement* child : root->GetChildren()) {
+    for (WidgetElement* child : root->GetAuthoredChildren()) {
         if (WidgetElement* found = FindWidgetElementByName(child, name)) return found;
     }
     return nullptr;
+}
+
+std::vector<std::pair<std::string, std::string>> ParseWidgetCallArgs(const std::string& text) {
+    std::vector<std::pair<std::string, std::string>> out;
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find(';', start);
+        if (end == std::string::npos) end = text.size();
+        std::string item = text.substr(start, end - start);
+        size_t eq = item.find('=');
+        if (eq != std::string::npos && eq > 0) out.emplace_back(item.substr(0, eq), item.substr(eq + 1));
+        start = end + 1;
+    }
+    return out;
 }
 
 void RegisterWidgetNodes() {
@@ -192,4 +211,201 @@ void RegisterWidgetNodes() {
         target->widgetAssetPath = assetPath;
     };
     NodeRegistry::Get().RegisterNode(setWidget);
+
+    NodeTemplate addWidgetObject;
+    addWidgetObject.type = "Add_Widget_Object";
+    addWidgetObject.category = "Widgets";
+    addWidgetObject.moduleName = "Stargraph";
+    addWidgetObject.menuLabel = "Add Widget Object";
+    addWidgetObject.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Container", PinType::Object, true, false, 0, "", false, "WidgetElement"});
+        node->inputs.push_back({"Widget Asset", PinType::String, true, false, 0, "", false, "Widget"});
+        node->inputs.push_back({"Element_Name", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Element", PinType::Object, false, true, 0, "", false, "WidgetObjectElement"});
+    };
+    addWidgetObject.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string containerRef, assetPath, elementName;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Container") containerRef = p.defaultValue;
+            else if (p.name == "Widget Asset") assetPath = p.defaultValue;
+            else if (p.name == "Element_Name") elementName = p.defaultValue;
+        }
+        if (containerRef.empty() || assetPath.empty()) return;
+        WidgetElement* container = ObjectPinRef::ResolveAs<WidgetElement>(node, containerRef, "WidgetElement", ctx);
+        if (!container) return;
+        WidgetObjectElement* object = new WidgetObjectElement();
+        if (!elementName.empty()) object->elementId = elementName;
+        container->AddChild(object);
+        object->SetWidgetAsset(assetPath);
+        for (Pin& p : node.outputs) {
+            if (p.name == "Element") p.defaultValue = ObjectPinRef::Encode(object->GetObjectKind(), object->GetObjectId());
+        }
+    };
+    NodeRegistry::Get().RegisterNode(addWidgetObject);
+
+    NodeTemplate clearChildren;
+    clearChildren.type = "Clear_Widget_Children";
+    clearChildren.category = "Widgets";
+    clearChildren.moduleName = "Stargraph";
+    clearChildren.menuLabel = "Clear Widget Children";
+    clearChildren.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Container", PinType::Object, true, false, 0, "", false, "WidgetElement"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    clearChildren.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string containerRef;
+        for (const Pin& p : node.inputs) if (p.name == "Container") containerRef = p.defaultValue;
+        if (containerRef.empty()) return;
+        WidgetElement* container = ObjectPinRef::ResolveAs<WidgetElement>(node, containerRef, "WidgetElement", ctx);
+        if (container) container->ClearChildren();
+    };
+    NodeRegistry::Get().RegisterNode(clearChildren);
+
+    ObjectEvents::RegisterWidgetElementEvents("ColorPickerElement", { "ColorChanged" });
+
+    NodeTemplate setPickerColor;
+    setPickerColor.type = "Set_Color_Picker_Color";
+    setPickerColor.category = "Widgets";
+    setPickerColor.moduleName = "Stargraph";
+    setPickerColor.menuLabel = "Set Color Picker Color";
+    setPickerColor.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "ColorPickerElement"});
+        node->inputs.push_back({"Color (R,G,B,A)", PinType::String, true, false, 0, "255,255,255,255"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setPickerColor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string targetRef, colorText;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target") targetRef = p.defaultValue;
+            else if (p.name == "Color (R,G,B,A)") colorText = p.defaultValue;
+        }
+        if (targetRef.empty()) return;
+        ColorPickerElement* picker = ObjectPinRef::ResolveAs<ColorPickerElement>(node, targetRef, "ColorPickerElement", ctx);
+        if (!picker) return;
+        int r = 255, g = 255, b = 255, a = 255;
+        sscanf(colorText.c_str(), "%d,%d,%d,%d", &r, &g, &b, &a);
+        picker->SetColor(Color{ (unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a });
+    };
+    NodeRegistry::Get().RegisterNode(setPickerColor);
+
+    NodeTemplate getPickerColor;
+    getPickerColor.type = "Get_Color_Picker_Color";
+    getPickerColor.category = "Widgets";
+    getPickerColor.moduleName = "Stargraph";
+    getPickerColor.menuLabel = "Get Color Picker Color";
+    getPickerColor.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "ColorPickerElement"});
+        node->outputs.push_back({"Color (R,G,B,A)", PinType::String, false, true});
+    };
+    getPickerColor.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string targetRef;
+        for (const Pin& p : node.inputs) if (p.name == "Target") targetRef = p.defaultValue;
+        if (targetRef.empty()) return;
+        ColorPickerElement* picker = ObjectPinRef::ResolveAs<ColorPickerElement>(node, targetRef, "ColorPickerElement", ctx);
+        if (!picker) return;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d,%d,%d,%d", (int)picker->color.r, (int)picker->color.g, (int)picker->color.b, (int)picker->color.a);
+        for (Pin& p : node.outputs) if (p.name == "Color (R,G,B,A)") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getPickerColor);
+
+    NodeTemplate callWidgetEvent;
+    callWidgetEvent.type = "Call_Widget_Event";
+    callWidgetEvent.category = "Widgets";
+    callWidgetEvent.moduleName = "Stargraph";
+    callWidgetEvent.menuLabel = "Call Widget Event";
+    callWidgetEvent.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "WidgetObjectElement"});
+        node->inputs.push_back({"Event Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Params (Name=Value;...)", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    callWidgetEvent.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string targetRef, eventName, paramText;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target") targetRef = p.defaultValue;
+            else if (p.name == "Event Name") eventName = p.defaultValue;
+            else if (p.name == "Params (Name=Value;...)") paramText = p.defaultValue;
+        }
+        if (targetRef.empty() || eventName.empty()) return;
+        WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
+        if (!target || !target->GetChildWidget()) return;
+        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        if (!behavior) return;
+        behavior->OnCustomEvent(target->GetChildWidget(), eventName, ParseWidgetCallArgs(paramText));
+    };
+    NodeRegistry::Get().RegisterNode(callWidgetEvent);
+
+    NodeTemplate callWidgetFunction;
+    callWidgetFunction.type = "Call_Widget_Function";
+    callWidgetFunction.category = "Widgets";
+    callWidgetFunction.moduleName = "Stargraph";
+    callWidgetFunction.menuLabel = "Call Widget Function";
+    callWidgetFunction.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "WidgetObjectElement"});
+        node->inputs.push_back({"Function Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Args (Name=Value;...)", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Result", PinType::String, false, true});
+    };
+    callWidgetFunction.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string targetRef, functionName, argText;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target") targetRef = p.defaultValue;
+            else if (p.name == "Function Name") functionName = p.defaultValue;
+            else if (p.name == "Args (Name=Value;...)") argText = p.defaultValue;
+        }
+        if (targetRef.empty() || functionName.empty()) return;
+        WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
+        if (!target || !target->GetChildWidget()) return;
+        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        if (!behavior) return;
+        ExecutionContext childCtx;
+        childCtx.widget = target->GetChildWidget();
+        childCtx.deltaTime = ctx.deltaTime;
+        childCtx.rootGraph = &behavior->GetGraph();
+        childCtx.callDepth = ctx.callDepth;
+        std::vector<std::pair<std::string, std::string>> results;
+        if (!GraphExecutor::RunFunction(behavior->GetGraph(), functionName, childCtx, ParseWidgetCallArgs(argText), results)) return;
+        for (Pin& p : node.outputs) {
+            if (p.name == "Result") p.defaultValue = results.empty() ? std::string() : results[0].second;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(callWidgetFunction);
+
+    NodeTemplate setWidgetVariable;
+    setWidgetVariable.type = "Set_Widget_Variable";
+    setWidgetVariable.category = "Widgets";
+    setWidgetVariable.moduleName = "Stargraph";
+    setWidgetVariable.menuLabel = "Set Widget Variable";
+    setWidgetVariable.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "WidgetObjectElement"});
+        node->inputs.push_back({"Variable_Name", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Value", PinType::String, true, false, 0, ""});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setWidgetVariable.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        std::string targetRef, variableName, value;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target") targetRef = p.defaultValue;
+            else if (p.name == "Variable_Name") variableName = p.defaultValue;
+            else if (p.name == "Value") value = p.defaultValue;
+        }
+        if (targetRef.empty() || variableName.empty()) return;
+        WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
+        if (!target || !target->GetChildWidget()) return;
+        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        if (!behavior) return;
+        for (Variable& v : behavior->GetGraph().GetVariables()) {
+            if (v.name == variableName) { v.value = value; return; }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setWidgetVariable);
 }

@@ -1,8 +1,11 @@
 #include "WidgetElementDetailsBuilder.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/WidgetElementFields.h"
+#include "Core/Widgets/WidgetObjectElement.h"
+#include "Core/Widgets/SlotElement.h"
 #include "Core/SafeParse.h"
 #include <algorithm>
+#include <filesystem>
 #include <cstdio>
 #include <cstdlib>
 
@@ -15,6 +18,8 @@ Color ParseColorField(const std::string& text) {
 }
 
 }
+
+namespace fs = std::filesystem;
 
 std::vector<PropertyRow> BuildWidgetElementPropertyRows(
     WidgetElement& element,
@@ -109,6 +114,28 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
     vec2Row("minSize", "Min Size (0 = none)", element.minSize, [](WidgetElement& e, Vector2 v) { e.minSize = { std::max(0.0f, v.x), std::max(0.0f, v.y) }; });
     vec2Row("maxSize", "Max Size (0 = none)", element.maxSize, [](WidgetElement& e, Vector2 v) { e.maxSize = { std::max(0.0f, v.x), std::max(0.0f, v.y) }; });
 
+    WidgetObjectElement* fillOwner = nullptr;
+    if (WidgetElement* host = element.parent) {
+        fillOwner = dynamic_cast<WidgetObjectElement*>(host);
+        if (!fillOwner && dynamic_cast<SlotElement*>(host)) {
+            for (WidgetElement* e = host->parent; e && !fillOwner; e = e->parent) fillOwner = dynamic_cast<WidgetObjectElement*>(e);
+        }
+    }
+    if (fillOwner) {
+        PropertyRow slotRow;
+        slotRow.id = "slotName";
+        slotRow.label = "Slot";
+        slotRow.kind = PropertyRowKind::String;
+        slotRow.stringValue = element.slotName;
+        slotRow.setString = [currentElement, onEdited, fillOwner](const std::string& v) {
+            WidgetElement* e = currentElement();
+            if (!e) return;
+            fillOwner->SetFillSlot(e, v);
+            if (onEdited) onEdited();
+        };
+        rows.push_back(slotRow);
+    }
+
     std::string className = element.GetClassName();
     for (const WidgetElementFieldDesc& desc : GetWidgetElementFields()) {
         if (className != desc.elementType) continue;
@@ -116,6 +143,17 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
         PropertyRow row;
         row.id = std::string("field:") + desc.key;
         row.label = desc.key;
+
+        if (desc.elementType == "WidgetObjectElement" && desc.key == "WidgetAsset") {
+            std::string value = desc.getValue(element);
+            row.id = "widgetAsset";
+            row.label = "Widget";
+            row.kind = PropertyRowKind::Asset;
+            row.assetExtension = ".starwidget";
+            row.stringValue = value.empty() ? "None" : fs::path(value).stem().string();
+            rows.push_back(row);
+            continue;
+        }
 
         if (desc.kind == WidgetFieldKind::Bool) {
             row.kind = PropertyRowKind::Bool;
@@ -154,6 +192,7 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
             row.setString = [currentElement, onEdited, desc](const std::string& v) {
                 WidgetElement* e = currentElement();
                 if (!e) return;
+                WidgetObjectElement::BehaviorScope inert(false);
                 desc.setValue(*e, v);
                 if (onEdited) onEdited();
             };

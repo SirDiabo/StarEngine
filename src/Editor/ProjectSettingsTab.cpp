@@ -7,6 +7,7 @@
 #include "Core/ShadingTechniqueRegistry.h"
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
@@ -51,6 +52,7 @@ void ProjectSettingsTab::Initialize() {
 void ProjectSettingsTab::RefreshFromProject() {
     snprintf(renderScaleBuf, sizeof(renderScaleBuf), "%.2f", RenderSettings::Get().GetRenderScale() * 100.0f);
     activeField = 0;
+    migrationsLoaded = false;
     newSaveFileBuf[0] = '\0';
     newSaveFileName.clear();
     mapPicker.Close();
@@ -335,6 +337,189 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
         newSaveNameField->text.clear();
     }
     fy += 30;
+
+    RenderMigrationSection(area, fx, fy, fw);
+}
+
+static const char* MigrationTypeName(SaveMigration::MigrationOp::Type type) {
+    switch (type) {
+        case SaveMigration::MigrationOp::Type::RenameActor:    return "Rename Actor";
+        case SaveMigration::MigrationOp::Type::RenameVariable: return "Rename Variable";
+        case SaveMigration::MigrationOp::Type::RenameKey:      return "Rename Key";
+        case SaveMigration::MigrationOp::Type::DeleteKey:      return "Delete Key";
+    }
+    return "";
+}
+
+void ProjectSettingsTab::CommitMigrations() {
+    SaveMigration::SetSteps(migrationSteps);
+    SaveMigration::SetProjectVersion(migrationVersion);
+    SaveMigration::Save();
+}
+
+void ProjectSettingsTab::RebuildMigrationFields() {
+    const UIPalette& theme = UITheme::Get();
+    if (!migrationChrome) {
+        migrationChrome = new Widget();
+        migrationChrome->SetRoot(new WidgetElement());
+    }
+    migrationChrome->rootElement->ClearChildren();
+    migrationFields.clear();
+    if (selectedMigrationStep < 0 || selectedMigrationStep >= (int)migrationSteps.size()) return;
+
+    SaveMigration::MigrationStep& step = migrationSteps[selectedMigrationStep];
+    for (size_t i = 0; i < step.ops.size(); i++) {
+        using OpType = SaveMigration::MigrationOp::Type;
+        OpType type = step.ops[i].type;
+        const char* placeholders[3] = {
+            "Actor",
+            type == OpType::RenameActor ? "Old actor name" : (type == OpType::RenameKey || type == OpType::DeleteKey ? "Key" : "Old variable"),
+            type == OpType::RenameActor ? "New actor name" : (type == OpType::RenameKey ? "New key" : "New variable"),
+        };
+        for (int col = 0; col < 3; col++) {
+            auto* field = new TextElement();
+            field->editable = true;
+            field->fontSize = 12.0f;
+            field->placeholder = placeholders[col];
+            field->backgroundColor = theme.fieldBg;
+            field->borderColor = theme.fieldBorder;
+            field->editingBorderColor = theme.accent;
+            field->text = col == 0 ? step.ops[i].actor : (col == 1 ? step.ops[i].oldName : step.ops[i].newName);
+            int stepIndex = selectedMigrationStep;
+            field->onTextChanged = [this, stepIndex, i, col](const std::string& text) {
+                if (stepIndex >= (int)migrationSteps.size() || i >= migrationSteps[stepIndex].ops.size()) return;
+                SaveMigration::MigrationOp& op = migrationSteps[stepIndex].ops[i];
+                if (col == 0) op.actor = text;
+                else if (col == 1) op.oldName = text;
+                else op.newName = text;
+                CommitMigrations();
+            };
+            migrationChrome->rootElement->AddChild(field);
+            migrationFields.push_back(field);
+        }
+    }
+}
+
+void ProjectSettingsTab::RenderMigrationSection(Rectangle area, float fx, float& fy, float fw) {
+    const UIPalette& theme = UITheme::Get();
+    using OpType = SaveMigration::MigrationOp::Type;
+
+    if (!migrationsLoaded) {
+        migrationSteps = SaveMigration::GetSteps();
+        migrationVersion = SaveMigration::GetProjectVersion();
+        selectedMigrationStep = migrationSteps.empty() ? -1 : (int)migrationSteps.size() - 1;
+        migrationsLoaded = true;
+        migrationSignature.clear();
+    }
+
+    DrawText("Save Data Version", (int)fx, (int)fy, 14, theme.sectionHeader);
+    fy += 24;
+    DrawText("Saves older than the current version are migrated when loaded, then rewritten. Keys are actor and variable name based.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 18;
+
+    DrawText(TextFormat("Current version: %d", migrationVersion), (int)fx, (int)fy + 4, 12, theme.textPrimary);
+    if (InlineButton({fx + 150, fy, 100, 20}, "+ Add Step")) {
+        SaveMigration::MigrationStep step;
+        step.fromVersion = migrationVersion;
+        step.toVersion = migrationVersion + 1;
+        migrationSteps.push_back(step);
+        migrationVersion = step.toVersion;
+        selectedMigrationStep = (int)migrationSteps.size() - 1;
+        CommitMigrations();
+    }
+    if (!migrationSteps.empty() && InlineButton({fx + 256, fy, 100, 20}, "Remove Last")) {
+        migrationVersion = migrationSteps.back().fromVersion;
+        migrationSteps.pop_back();
+        if (selectedMigrationStep >= (int)migrationSteps.size()) selectedMigrationStep = (int)migrationSteps.size() - 1;
+        CommitMigrations();
+    }
+    fy += 28;
+
+    std::string warning;
+    int expectedFrom = 0;
+    for (const SaveMigration::MigrationStep& step : migrationSteps) {
+        if (step.fromVersion != expectedFrom) { warning = "Steps do not form a chain; saves may skip a step."; break; }
+        expectedFrom = step.toVersion;
+    }
+    if (warning.empty() && !migrationSteps.empty() && expectedFrom != migrationVersion) warning = "Last step does not reach the current version.";
+    if (!warning.empty()) {
+        DrawText(warning.c_str(), (int)fx, (int)fy, 10, theme.accent);
+        fy += 16;
+    }
+
+    float stepX = fx;
+    for (int i = 0; i < (int)migrationSteps.size(); i++) {
+        Rectangle r = {stepX, fy, 64, 20};
+        if (i == selectedMigrationStep) DrawRectangleRec({r.x - 2, r.y - 2, r.width + 4, r.height + 4}, theme.accent);
+        std::string label = std::to_string(migrationSteps[i].fromVersion) + " > " + std::to_string(migrationSteps[i].toVersion);
+        if (InlineButton(r, label.c_str())) selectedMigrationStep = i;
+        stepX += 70;
+        if (stepX + 64 > fx + fw) break;
+    }
+    fy += 30;
+
+    if (selectedMigrationStep < 0 || selectedMigrationStep >= (int)migrationSteps.size()) {
+        DrawText("No migration steps. Add a step when a rename would orphan existing saves.", (int)fx, (int)fy, 10, theme.textSecondary);
+        fy += 20;
+        return;
+    }
+
+    SaveMigration::MigrationStep& step = migrationSteps[selectedMigrationStep];
+    std::string signature = std::to_string(selectedMigrationStep);
+    for (const SaveMigration::MigrationOp& op : step.ops) signature += "," + std::to_string((int)op.type);
+    if (signature != migrationSignature || !migrationChrome) {
+        migrationSignature = signature;
+        RebuildMigrationFields();
+    }
+
+    float typeW = 120.0f;
+    float delW = 20.0f;
+    float colW = (fw - typeW - delW - 4 * 6.0f) / 3.0f;
+    int removeIndex = -1;
+    int cycleIndex = -1;
+    for (size_t i = 0; i < step.ops.size(); i++) {
+        float x = fx;
+        if (InlineButton({x, fy, typeW, 20}, MigrationTypeName(step.ops[i].type))) cycleIndex = (int)i;
+        x += typeW + 6;
+        bool usesActor = step.ops[i].type != OpType::RenameActor;
+        for (int col = 0; col < 3; col++) {
+            TextElement* field = (i * 3 + col < migrationFields.size()) ? migrationFields[i * 3 + col] : nullptr;
+            bool used = col != 0 || usesActor;
+            bool usesNew = col != 2 || step.ops[i].type != OpType::DeleteKey;
+            if (field) {
+                field->visible = used && usesNew;
+                field->size = { colW, 20 };
+                field->offset = { x, fy };
+            }
+            x += colW + 6;
+        }
+        if (InlineButton({x, fy, delW, 20}, "x")) removeIndex = (int)i;
+        fy += 24;
+    }
+
+    float dt = GetFrameTime();
+    Rectangle chromeArea = {0, 0, area.width + area.x, area.height + area.y};
+    migrationChrome->Tick(dt, chromeArea, 1.0f);
+    WidgetInput::ProcessInput(migrationChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    migrationChrome->Draw(chromeArea, 1.0f);
+
+    if (InlineButton({fx, fy, 70, 20}, "+ Op")) {
+        SaveMigration::MigrationOp op;
+        op.type = OpType::RenameVariable;
+        step.ops.push_back(op);
+        CommitMigrations();
+    }
+    fy += 28;
+
+    if (cycleIndex >= 0) {
+        step.ops[cycleIndex].type = (OpType)(((int)step.ops[cycleIndex].type + 1) % 4);
+        CommitMigrations();
+    }
+    if (removeIndex >= 0) {
+        step.ops.erase(step.ops.begin() + removeIndex);
+        CommitMigrations();
+    }
 }
 
 void ProjectSettingsTab::BuildMenus(MenuBar* menuBar) {

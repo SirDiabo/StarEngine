@@ -5,7 +5,6 @@
 #include "Components/Component.h"
 #include "Property.h"
 #include "Core/SaveFileFormat.h"
-#include "Core/SaveMigration.h"
 #include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
@@ -139,19 +138,13 @@ void CollectActor(Actor* actor, const std::string& onlyFile, FileEntries& out) {
 }
 
 void WriteAll(const FileEntries& byFile) {
-    for (const auto& kv : byFile) {
-        EntryMap entries = kv.second;
-        SaveMigration::InjectVersion(entries);
-        SaveFileFormat::WriteEntries(kv.first, entries);
-    }
+    for (const auto& kv : byFile) SaveFileFormat::WriteEntries(kv.first, kv.second);
 }
 
 const EntryMap& EntriesFor(FileEntries& cache, const std::string& file) {
     auto it = cache.find(file);
     if (it != cache.end()) return it->second;
-    EntryMap entries = SaveFileFormat::ReadEntries(file);
-    SaveMigration::ApplyMigrations(file, entries);
-    return cache[file] = std::move(entries);
+    return cache[file] = SaveFileFormat::ReadEntries(file);
 }
 
 void ApplyActor(Actor* actor, const std::string& onlyFile, FileEntries& cache) {
@@ -219,10 +212,8 @@ bool SaveVariable(Actor* actor, const std::string& variableName, const std::stri
         if (v.name != variableName) continue;
         std::string target = !file.empty() ? file : v.saveFile;
         if (target.empty()) return false;
-        EntryMap entries = {{ VariableKey(actor, v.name, v.isArray),
-                              v.isArray ? JoinArray(v.arrayValues) : v.value }};
-        SaveMigration::InjectVersion(entries);
-        return SaveFileFormat::WriteEntries(target, entries);
+        return SaveFileFormat::WriteEntries(target, {{ VariableKey(actor, v.name, v.isArray),
+                                                       v.isArray ? JoinArray(v.arrayValues) : v.value }});
     }
     return false;
 }
@@ -237,7 +228,6 @@ bool LoadVariable(Actor* actor, const std::string& variableName, const std::stri
         std::string source = !file.empty() ? file : v.saveFile;
         if (source.empty()) return false;
         EntryMap entries = SaveFileFormat::ReadEntries(source);
-        SaveMigration::ApplyMigrations(source, entries);
         auto it = entries.find(VariableKey(actor, v.name, v.isArray));
         if (it == entries.end()) return false;
         SavableVariable loaded = v;

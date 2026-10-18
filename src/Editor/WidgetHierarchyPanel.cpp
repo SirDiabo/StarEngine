@@ -18,7 +18,7 @@ void FlattenEntries(WidgetElement* element, const std::string& parentId, WidgetE
     entry.isCurrent = session && session->GetSelectedElement() == element;
     out.push_back(entry);
 
-    for (WidgetElement* child : element->GetChildren()) {
+    for (WidgetElement* child : element->GetAuthoredChildren()) {
         FlattenEntries(child, element->elementId, session, out);
     }
 }
@@ -26,7 +26,7 @@ void FlattenEntries(WidgetElement* element, const std::string& parentId, WidgetE
 WidgetElement* FindById(WidgetElement* root, const std::string& id) {
     if (!root) return nullptr;
     if (root->elementId == id) return root;
-    for (WidgetElement* child : root->GetChildren()) {
+    for (WidgetElement* child : root->GetAuthoredChildren()) {
         if (WidgetElement* found = FindById(child, id)) return found;
     }
     return nullptr;

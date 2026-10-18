@@ -4,6 +4,7 @@
 #include "WidgetHierarchyPanel.h"
 #include "WidgetCanvasPanel.h"
 #include "DetailsPanel.h"
+#include "Core/Widgets/WidgetObjectElement.h"
 #include "WidgetElementDetailsBuilder.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Editor/LogPanel.h"
@@ -138,6 +139,15 @@ void WidgetEditorTab::Initialize() {
         return BuildWidgetElementPropertyRows(*selected, currentElement, onEdited);
     };
 
+    detailsPanel->onAssetPicked = [this](const std::string& rowId, const std::string& pickedPath) {
+        if (!session || rowId != "widgetAsset") return;
+        WidgetObjectElement* object = dynamic_cast<WidgetObjectElement*>(session->GetSelectedElement());
+        if (!object) return;
+        WidgetObjectElement::BehaviorScope inert(false);
+        object->SetWidgetAsset(pickedPath);
+        session->MarkDirty();
+    };
+
     detailsSwitch = new WidgetDetailsSwitch();
     detailsSwitch->elementDetails = detailsPanel;
     detailsSwitch->currentElement = [this]() -> WidgetElement* {
@@ -234,7 +244,7 @@ bool WidgetEditorTab::ApplyGraphLayout() {
             std::function<void(WidgetElement*)> walk = [&](WidgetElement* element) {
                 if (!element) return;
                 elements.emplace_back(element->elementId, element->GetClassName());
-                for (WidgetElement* child : element->GetChildren()) walk(child);
+                for (WidgetElement* child : element->GetAuthoredChildren()) walk(child);
             };
             walk(session->GetData().rootElement);
             return elements;

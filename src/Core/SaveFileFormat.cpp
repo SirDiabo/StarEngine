@@ -4,6 +4,7 @@
 #include "PackageCipher.h"
 #include "Project.h"
 #include "SaveSlots.h"
+#include "SaveMigration.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -155,16 +156,19 @@ public:
         FlushDirty();
     }
 
-    EntryMap Read(const std::string& path, bool encrypted, const std::string& key) {
+    EntryMap Read(const std::string& path, const std::string& name, bool versioned, bool encrypted, const std::string& key) {
         std::lock_guard<std::mutex> lock(cacheMutex);
-        return Load(path, encrypted, key).entries;
+        return Load(path, name, versioned, encrypted, key).entries;
     }
 
-    void Write(const std::string& path, bool encrypted, const std::string& key, const EntryMap& updates) {
+    void Write(const std::string& path, const std::string& name, bool versioned, bool encrypted, const std::string& key, const EntryMap& updates) {
         {
             std::lock_guard<std::mutex> lock(cacheMutex);
-            CachedFile& file = Load(path, encrypted, key);
+            CachedFile& file = Load(path, name, versioned, encrypted, key);
             for (const auto& kv : updates) file.entries[kv.first] = kv.second;
+            if (versioned && SaveMigration::FileVersion(file.entries) == 0 && file.entries.count("@saveDataVersion") == 0) {
+                SaveMigration::InjectVersion(file.entries);
+            }
             file.dirty = true;
             file.encrypted = encrypted;
             file.encryptionKey = key;
@@ -255,7 +259,7 @@ public:
     }
 
 private:
-    CachedFile& Load(const std::string& path, bool encrypted, const std::string& key) {
+    CachedFile& Load(const std::string& path, const std::string& name, bool versioned, bool encrypted, const std::string& key) {
         auto it = files.find(path);
         if (it != files.end()) return it->second;
 
@@ -267,6 +271,7 @@ private:
                 cipher->Transform(raw, key);
             }
             file.entries = ParseEntries(std::string(raw.begin(), raw.end()));
+            if (versioned && !file.entries.empty() && SaveMigration::Migrate(name, file.entries)) file.dirty = true;
         }
         return files.emplace(path, std::move(file)).first->second;
     }
@@ -318,13 +323,15 @@ bool SaveFileFormat::WriteEntries(const std::string& saveFileName, const std::un
 }
 
 std::unordered_map<std::string, std::string> SaveFileFormat::ReadEntriesInSlot(const std::string& slot, const std::string& saveFileName) {
-    return Writer().Read(SavePaths::GetSaveFilePathInSlot(slot, saveFileName),
+    return Writer().Read(SavePaths::GetSaveFilePathInSlot(slot, saveFileName), saveFileName,
+                         !SaveSlots::IsMetadataFile(saveFileName),
                          SaveFileRegistry::Get().IsEncrypted(saveFileName),
                          Project::Get().GetSettings().saveEncryptionKey);
 }
 
 bool SaveFileFormat::WriteEntriesInSlot(const std::string& slot, const std::string& saveFileName, const std::unordered_map<std::string, std::string>& updates) {
-    Writer().Write(SavePaths::GetSaveFilePathInSlot(slot, saveFileName),
+    Writer().Write(SavePaths::GetSaveFilePathInSlot(slot, saveFileName), saveFileName,
+                   !SaveSlots::IsMetadataFile(saveFileName),
                    SaveFileRegistry::Get().IsEncrypted(saveFileName),
                    Project::Get().GetSettings().saveEncryptionKey, updates);
     return true;

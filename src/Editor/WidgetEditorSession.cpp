@@ -2,9 +2,11 @@
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/WidgetElementFields.h"
 #include "Core/Widgets/WidgetAssetCache.h"
+#include "Core/Widgets/WidgetObjectElement.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 
 bool WidgetEditorSession::Open(const std::string& path) {
+    WidgetObjectElement::BehaviorScope inert(false);
     if (!WidgetAsset::LoadWidgetAsset(path, data)) return false;
     assetPath = path;
     isOpen = true;
@@ -45,7 +47,7 @@ std::string WidgetEditorSession::SelectedElementId() const {
 static WidgetElement* FindElementById(WidgetElement* root, const std::string& id) {
     if (!root) return nullptr;
     if (root->elementId == id) return root;
-    for (WidgetElement* child : root->GetChildren()) {
+    for (WidgetElement* child : root->GetAuthoredChildren()) {
         if (WidgetElement* found = FindElementById(child, id)) return found;
     }
     return nullptr;
@@ -54,6 +56,7 @@ static WidgetElement* FindElementById(WidgetElement* root, const std::string& id
 void WidgetEditorSession::RestoreDesign(const std::string& text, const std::string& selectedId) {
     if (!isOpen || text.empty()) return;
 
+    WidgetObjectElement::BehaviorScope inert(false);
     WidgetAssetData restored;
     if (!WidgetAsset::DeserializeWidgetAsset(text, restored, false)) return;
 
@@ -117,7 +120,7 @@ void WidgetEditorSession::ReparentElement(WidgetElement* element, WidgetElement*
     } else {
         newParent = targetElement->parent;
         if (!newParent) return;
-        const std::vector<WidgetElement*>& siblings = newParent->GetChildren();
+        const std::vector<WidgetElement*>& siblings = newParent->GetAuthoredChildren();
         for (int i = 0; i < (int)siblings.size(); i++) {
             if (siblings[i] == targetElement) {
                 insertIndex = (pos == TreeDropPosition::Before) ? i : i + 1;

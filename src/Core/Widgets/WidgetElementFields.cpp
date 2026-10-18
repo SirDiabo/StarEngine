@@ -14,6 +14,9 @@
 #include "CheckBoxElement.h"
 #include "SliderElement.h"
 #include "TreeListElement.h"
+#include "SlotElement.h"
+#include "ColorPickerElement.h"
+#include "WidgetObjectElement.h"
 #include "Core/SafeParse.h"
 #include <cstdio>
 
@@ -96,10 +99,24 @@ WidgetElementFieldDesc SplitAxisF(const char* type, const char* key, BoxAxis Spl
     return d;
 }
 
+WidgetElementFieldDesc WidgetAssetF() {
+    WidgetElementFieldDesc d;
+    d.elementType = "WidgetObjectElement";
+    d.key = "WidgetAsset";
+    d.kind = WidgetFieldKind::String;
+    d.getValue = [](const WidgetElement& e) { return static_cast<const WidgetObjectElement&>(e).widgetAssetPath; };
+    d.setValue = [](WidgetElement& e, const std::string& v) { static_cast<WidgetObjectElement&>(e).SetWidgetAsset(v); };
+    return d;
+}
+
 }
 
 const std::vector<WidgetElementFieldDesc>& GetWidgetElementFields() {
     static const std::vector<WidgetElementFieldDesc> fields = {
+        WidgetAssetF(),
+        ColF<ColorPickerElement>("ColorPickerElement", "Color", &ColorPickerElement::color),
+        BlnF<ColorPickerElement>("ColorPickerElement", "ShowAlpha", &ColorPickerElement::showAlpha),
+        StrF<SlotElement>("SlotElement", "SlotName", &SlotElement::slotName),
         StrF<TextElement>("TextElement", "Text", &TextElement::text),
         FltF<TextElement>("TextElement", "FontSize", &TextElement::fontSize),
         ColF<TextElement>("TextElement", "Color", &TextElement::color),
@@ -213,6 +230,9 @@ const std::vector<WidgetElementTypeDesc>& GetWidgetElementTypes() {
         { "CheckBoxElement", []() -> WidgetElement* { return new CheckBoxElement(); } },
         { "SliderElement", []() -> WidgetElement* { return new SliderElement(); } },
         { "TreeListElement", []() -> WidgetElement* { return new TreeListElement(); } },
+        { "ColorPickerElement", []() -> WidgetElement* { return new ColorPickerElement(); } },
+        { "SlotElement", []() -> WidgetElement* { return new SlotElement(); } },
+        { "WidgetObjectElement", []() -> WidgetElement* { return new WidgetObjectElement(); } },
     };
     return types;
 }

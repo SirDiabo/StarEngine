@@ -24,5 +24,6 @@ namespace WidgetAsset {
     bool ReadWidgetAsset(std::istream& in, WidgetAssetData& outData, bool loadBehavior = true);
     std::string SerializeWidgetAsset(const WidgetAssetData& data, bool includeBehavior = true);
     bool DeserializeWidgetAsset(const std::string& text, WidgetAssetData& outData, bool loadBehavior = true);
-    Widget* InstantiateWidget(const std::string& path);
+    Widget* InstantiateWidget(const std::string& path, bool withBehavior = true);
+    void AttachWidgetBehavior(Widget* widget, const std::string& path);
 }

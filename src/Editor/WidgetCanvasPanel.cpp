@@ -2,6 +2,7 @@
 #include "WidgetEditorSession.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/WidgetElement.h"
+#include "Core/Widgets/SlotElement.h"
 
 void WidgetCanvasPanel::Initialize() {
     name = "Canvas";
@@ -9,7 +10,7 @@ void WidgetCanvasPanel::Initialize() {
 
 WidgetElement* WidgetCanvasPanel::HitTest(WidgetElement* element, Vector2 point) const {
     if (!element || !element->visible) return nullptr;
-    const std::vector<WidgetElement*>& children = element->GetChildren();
+    const std::vector<WidgetElement*>& children = element->GetAuthoredChildren();
     for (int i = (int)children.size() - 1; i >= 0; i--) {
         WidgetElement* hit = HitTest(children[i], point);
         if (hit) return hit;
@@ -32,7 +33,9 @@ void WidgetCanvasPanel::Render() {
     if (uiScale <= 0.0f) uiScale = 1.0f;
 
     root->Tick(0.0f, bounds, uiScale);
+    SlotElement::showPlaceholders = true;
     root->Draw(bounds, uiScale);
+    SlotElement::showPlaceholders = false;
 
     Vector2 mouse = GetMousePosition();
     bool insideCanvas = CheckCollisionPointRec(mouse, bounds);

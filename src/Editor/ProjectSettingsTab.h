@@ -3,6 +3,7 @@
 #include "AssetPickerPopup.h"
 #include "ChoicePopup.h"
 #include "SettingsSwitcher.h"
+#include "Core/SaveMigration.h"
 #include <string>
 #include <vector>
 
@@ -23,6 +24,9 @@ private:
     void RenderMapsCategory(Rectangle area);
     void RenderRenderingCategory(Rectangle area);
     void RenderSaveFilesCategory(Rectangle area);
+    void RenderMigrationSection(Rectangle area, float fx, float& fy, float fw);
+    void RebuildMigrationFields();
+    void CommitMigrations();
 
     SettingsSwitcher switcher;
 
@@ -44,4 +48,12 @@ private:
     TextElement* renderScaleField = nullptr;
     Widget* newSaveNameChrome = nullptr;
     TextElement* newSaveNameField = nullptr;
+
+    std::vector<SaveMigration::MigrationStep> migrationSteps;
+    int migrationVersion = 1;
+    int selectedMigrationStep = -1;
+    bool migrationsLoaded = false;
+    std::string migrationSignature;
+    Widget* migrationChrome = nullptr;
+    std::vector<TextElement*> migrationFields;
 };

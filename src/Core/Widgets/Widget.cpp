@@ -25,6 +25,10 @@ void Widget::SetBehavior(WidgetBehavior* newBehavior) {
 }
 
 void Widget::FireElementEvent(WidgetElement* target, const std::string& eventName) {
+    if (target && target->owningWidget && target->owningWidget != this) {
+        target->owningWidget->FireElementEvent(target, eventName);
+        return;
+    }
     if (behavior) behavior->OnElementEvent(this, target, eventName);
 }
 

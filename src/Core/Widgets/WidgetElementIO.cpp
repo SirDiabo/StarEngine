@@ -57,6 +57,7 @@ void WriteElement(std::ostream& out, WidgetElement* element, const std::string& 
         out << "MinSize=" << element->minSize.x << "," << element->minSize.y << "\n";
     if (element->maxSize.x != 0.0f || element->maxSize.y != 0.0f)
         out << "MaxSize=" << element->maxSize.x << "," << element->maxSize.y << "\n";
+    if (!element->slotName.empty()) out << "Slot=" << element->slotName << "\n";
     if (!element->visible) out << "Visible=false\n";
     if (element->selectable) out << "Selectable=true\n";
     if (element->disabled) out << "Disabled=true\n";
@@ -71,7 +72,7 @@ void WriteElement(std::ostream& out, WidgetElement* element, const std::string& 
     }
     out << "\n";
 
-    for (WidgetElement* child : element->GetChildren()) {
+    for (WidgetElement* child : element->GetAuthoredChildren()) {
         WriteElement(out, child, element->elementId);
     }
 }
@@ -108,7 +109,7 @@ void WriteElementTree(std::ostream& out, WidgetElement* root) {
         WidgetElement* current = stack.back();
         stack.pop_back();
         elementCount++;
-        for (WidgetElement* child : current->GetChildren()) stack.push_back(child);
+        for (WidgetElement* child : current->GetAuthoredChildren()) stack.push_back(child);
     }
 
     out << "[Elements]\n";
@@ -184,6 +185,7 @@ WidgetElement* ReadElementTree(const std::vector<ParsedSection>& sections) {
             float values[2] = { 0.0f, 0.0f };
             if (ParseFloatList(*v, values, 2) == 2) element->maxSize = { values[0], values[1] };
         }
+        if (const std::string* v = FindEntry(section, "Slot")) element->slotName = *v;
         if (const std::string* v = FindEntry(section, "Visible")) element->visible = (*v == "true");
         if (const std::string* v = FindEntry(section, "Selectable")) element->selectable = (*v == "true");
         if (const std::string* v = FindEntry(section, "Disabled")) element->disabled = (*v == "true");

@@ -3,6 +3,7 @@
 #include "LayoutSerializer.h"
 #include "NamedListRegistry.h"
 #include "SaveFileRegistry.h"
+#include "SaveMigration.h"
 #include "InputMappingRegistry.h"
 #include "RenderSettings.h"
 #include "ContentPathResolver.h"
@@ -109,6 +110,7 @@ bool Project::Load(const std::string& path) {
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
     NamedListRegistry::Get().Load(rootPath);
     SaveFileRegistry::Get().Load(rootPath);
+    SaveMigration::Load(rootPath);
     InputMappingRegistry::Get().Load(rootPath);
     RenderSettings::Get().Load(rootPath);
 
