@@ -95,8 +95,26 @@ void PackageTab::Initialize() {
     permanent = false;
 
     platforms = GetAvailablePackagePlatforms();
+    selectedPlatformIndex = -1;
+
+#ifdef _WIN32
+    PackagePlatform nativePlatform = PackagePlatform::Windows;
+#elif defined(__APPLE__)
+    PackagePlatform nativePlatform = PackagePlatform::macOS;
+#else
+    PackagePlatform nativePlatform = PackagePlatform::Linux;
+#endif
+
     for (int i = 0; i < (int)platforms.size(); i++) {
-        if (platforms[i].available) { selectedPlatformIndex = i; break; }
+        if (platforms[i].platform == nativePlatform && platforms[i].available) {
+            selectedPlatformIndex = i;
+            break;
+        }
+    }
+    if (selectedPlatformIndex < 0) {
+        for (int i = 0; i < (int)platforms.size(); i++) {
+            if (platforms[i].available) { selectedPlatformIndex = i; break; }
+        }
     }
 
     renderer = Project::Get().GetSettings().renderer;

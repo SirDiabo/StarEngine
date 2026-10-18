@@ -68,6 +68,15 @@ std::string WriteToolchainFileIfNeeded(PackagePlatform platform, const std::stri
             "set(CMAKE_CXX_COMPILER o64-clang++)\n";
     }
 #endif
+#if defined(_WIN32)
+    if (platform == PackagePlatform::Linux) {
+        content =
+            "set(CMAKE_SYSTEM_NAME Linux)\n"
+            "set(CMAKE_SYSTEM_PROCESSOR x86_64)\n"
+            "set(CMAKE_C_COMPILER x86_64-linux-gnu-gcc)\n"
+            "set(CMAKE_CXX_COMPILER x86_64-linux-gnu-g++)\n";
+    }
+#endif
 
     if (content.empty()) return "";
 
@@ -100,6 +109,21 @@ std::string RewriteToContentRelative(const std::string& mapPath, const fs::path&
     return relative.generic_string();
 }
 
+#ifdef _WIN32
+std::string ToWslPath(const std::string& winPath) {
+    std::string p = winPath;
+    for (char& c : p) {
+        if (c == '\\') c = '/';
+    }
+    if (p.size() >= 2 && p[1] == ':') {
+        char drive = p[0];
+        if (drive >= 'A' && drive <= 'Z') drive = static_cast<char>(drive + ('a' - 'A'));
+        p = "/mnt/" + std::string(1, drive) + p.substr(2);
+    }
+    return p;
+}
+#endif
+
 } // namespace
 
 PackageResult PackageRunner::Package(const PackageOptions& options,
@@ -130,6 +154,12 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     std::string rendererKey = GameRendererName(options.renderer);
     fs::path buildDir = fs::temp_directory_path() / "StarEnginePackageBuild" / (platformKey + "_" + rendererKey);
 
+#ifdef _WIN32
+    bool useWsl = (options.platform == PackagePlatform::Linux);
+#else
+    bool useWsl = false;
+#endif
+
     if (CMakeBuild::CacheSourceMismatch(buildDir.string(), engineRoot.string())) {
         std::error_code wipeEc;
         fs::remove_all(buildDir, wipeEc);
@@ -137,19 +167,31 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
 
     std::string toolchainFile = WriteToolchainFileIfNeeded(options.platform, buildDir.string());
 
+    std::string wslEngineRoot = engineRoot.string();
+    std::string wslBuildDir = buildDir.string();
+    std::string wslToolchainFile = toolchainFile;
+#ifdef _WIN32
+    if (useWsl) {
+        wslEngineRoot = ToWslPath(engineRoot.string());
+        wslBuildDir = ToWslPath(buildDir.string());
+        if (!toolchainFile.empty()) wslToolchainFile = ToWslPath(toolchainFile);
+    }
+#endif
+
     bool isWeb = options.platform == PackagePlatform::Web;
 
     std::vector<std::string> configureArgs;
+    if (useWsl) configureArgs.push_back("wsl");
     if (isWeb) configureArgs.push_back("emcmake");
     configureArgs.push_back("cmake");
     configureArgs.push_back("-S");
-    configureArgs.push_back(engineRoot.string());
+    configureArgs.push_back(wslEngineRoot);
     configureArgs.push_back("-B");
-    configureArgs.push_back(buildDir.string());
+    configureArgs.push_back(wslBuildDir);
     configureArgs.push_back("-DSTARENGINE_BUILD_GAME=ON");
     configureArgs.push_back("-DCMAKE_BUILD_TYPE=Release");
-    if (!toolchainFile.empty()) {
-        configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile);
+    if (!wslToolchainFile.empty()) {
+        configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + wslToolchainFile);
     }
     if (isWeb) configureArgs.push_back("-DPLATFORM=Web");
     if (isWeb) configureArgs.push_back("-DCMAKE_EXE_LINKER_FLAGS=-sALLOW_MEMORY_GROWTH=1 -sASYNCIFY=1 -sUSE_WEBGL2=1");
@@ -172,10 +214,11 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     unsigned int jobs = std::thread::hardware_concurrency();
     if (jobs == 0) jobs = 2;
     std::vector<std::string> buildArgs;
+    if (useWsl) buildArgs.push_back("wsl");
     if (isWeb) buildArgs.push_back("emmake");
     buildArgs.push_back("cmake");
     buildArgs.push_back("--build");
-    buildArgs.push_back(buildDir.string());
+    buildArgs.push_back(wslBuildDir);
     buildArgs.push_back("--config");
     buildArgs.push_back("Release");
     buildArgs.push_back("-j" + std::to_string(jobs));

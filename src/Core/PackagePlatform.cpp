@@ -12,6 +12,13 @@ bool CommandExists(const std::string& name) {
     return system(cmd.c_str()) == 0;
 }
 
+#ifdef _WIN32
+bool WslCommandExists(const std::string& name) {
+    std::string cmd = "wsl which " + name + " >nul 2>nul";
+    return system(cmd.c_str()) == 0;
+}
+#endif
+
 } // namespace
 
 std::string PackagePlatformName(PackagePlatform platform) {
@@ -41,10 +48,23 @@ std::vector<PackagePlatformInfo> GetAvailablePackagePlatforms() {
     linuxInfo.name = "Linux";
     linuxInfo.displayName = "Linux (x86_64)";
 #if defined(__linux__)
-    linuxInfo.available = true;
+    linuxInfo.available = CommandExists("g++") && CommandExists("make") && CommandExists("cmake");
+    if (!linuxInfo.available) {
+        linuxInfo.unavailableReason = "Requires the Linux build tools (g++, make, cmake). "
+            "Install them, e.g. \"sudo apt install build-essential cmake\" on Debian/Ubuntu.";
+    }
 #else
-    linuxInfo.available = CommandExists("x86_64-linux-gnu-g++");
-    if (!linuxInfo.available) linuxInfo.unavailableReason = "Requires an x86_64-linux-gnu cross toolchain.";
+    if (!CommandExists("wsl")) {
+        linuxInfo.available = false;
+        linuxInfo.unavailableReason = "WSL (Windows Subsystem for Linux) is not installed. "
+            "Install WSL, then install build-essential, gcc, g++, make, and cmake inside it.";
+    } else if (!WslCommandExists("x86_64-linux-gnu-g++") || !WslCommandExists("cmake")) {
+        linuxInfo.available = false;
+        linuxInfo.unavailableReason = "WSL is installed but the Linux build tools are missing inside it. "
+            "Inside WSL run: sudo apt install build-essential cmake";
+    } else {
+        linuxInfo.available = true;
+    }
 #endif
     list.push_back(linuxInfo);
 
