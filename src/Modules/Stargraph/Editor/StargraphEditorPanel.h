@@ -274,6 +274,8 @@ private:
     int listeningForInputBindingIndex = -1;
 
     RegistryPickerPopup savePicker;
+    RegistryPickerPopup layerPicker;
+    int layerPickerPinId = 0;
     std::string saveTargetFieldKey;
     int saveTargetKind = 0;
     int saveTargetIndex = -1;

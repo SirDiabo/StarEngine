@@ -461,6 +461,7 @@ Node* StargraphEditorPanel::DetailNode(int nodeId) {
 
 void StargraphEditorPanel::ResetDetailPickers() {
     savePicker.Close();
+    layerPicker.Close();
     inputMappingPicker.Close();
     inputKeyPicker.Close();
     inputDevicePicker.Close();
@@ -847,6 +848,14 @@ void StargraphEditorPanel::RenderDetailPickers(Rectangle panel) {
                     }
                 }
             }
+        }
+    }
+
+    std::string pickedLayer;
+    if (layerPicker.Render(pickedLayer)) {
+        if (Pin* layerPin = ActiveGraph().FindPin(layerPickerPinId)) {
+            layerPin->defaultValue = pickedLayer.empty() ? std::string("All") : pickedLayer;
+            isDirty = true;
         }
     }
 
@@ -1416,12 +1425,13 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
             rows.push_back(AssetRow("pin:" + std::to_string(pin.id), pin.name, assetExtension, StemOrNone(value)));
         } else if (node->type == "Line_Trace_For_Mesh" && pin.name == "Channel") {
             int pinId = pin.id;
-            std::vector<std::string> channelOptions = { "All" };
-            for (const std::string& layerName : CollisionLayers::Names()) channelOptions.push_back(layerName);
-            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "All" : value,
-                channelOptions, [this, pinId](const std::string& v) {
-                    if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v; isDirty = true; }
-                }));
+            rows.push_back(CellsRow("n.p" + std::to_string(pin.id), {
+                LabelCell(pin.name, 90.0f),
+                ButtonCell(value.empty() ? std::string("All") : value, 0.0f, [this, pinId](Rectangle r) {
+                    layerPickerPinId = pinId;
+                    layerPicker.OpenList({ r.x, r.y + r.height }, CollisionLayers::Names(), "All");
+                })
+            }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

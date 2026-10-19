@@ -6,10 +6,20 @@
 #include <algorithm>
 
 void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
-    open = true;
-    hasPending = false;
     category = cat;
     entries = NamedListRegistry::Get().GetList(category);
+    OpenInternal(anchorPos, "(None)", true);
+}
+
+void RegistryPickerPopup::OpenList(Vector2 anchorPos, const std::vector<std::string>& names, const std::string& noneLabel) {
+    category.clear();
+    entries = names;
+    OpenInternal(anchorPos, noneLabel, false);
+}
+
+void RegistryPickerPopup::OpenInternal(Vector2 anchorPos, const std::string& noneLabel, bool allowCreate) {
+    open = true;
+    hasPending = false;
 
     float rowH = 20.0f;
     float contentHeight = (float)(entries.size() + 2) * rowH;
@@ -26,7 +36,7 @@ void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
 
     auto* list = new SearchListElement();
     list->rowHeight = rowH;
-    list->allowCreate = true;
+    list->allowCreate = allowCreate;
     list->createLabel = "+ New...";
     const UIPalette& theme = UITheme::Get();
     list->backgroundColor = theme.panelBg;
@@ -40,7 +50,7 @@ void RegistryPickerPopup::Open(Vector2 anchorPos, const std::string& cat) {
 
     SearchListElement::Entry noneEntry;
     noneEntry.id = "";
-    noneEntry.label = "(None)";
+    noneEntry.label = noneLabel;
     listEntries.push_back(noneEntry);
 
     for (const std::string& name : entries) {
