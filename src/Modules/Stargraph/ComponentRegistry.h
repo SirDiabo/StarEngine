@@ -43,6 +43,7 @@ public:
     void Register(ComponentTypeInfo info);
     const std::vector<ComponentTypeInfo>& GetAll() const { return types; }
     const ComponentTypeInfo* Find(const std::string& componentType) const;
+    bool TypeHasState(const std::string& componentType) const;
 
     bool CaptureFields(const std::string& componentType, const Component& component, ComponentDecl& outDecl) const;
     int VerifyRoundTrip() const;

@@ -38,6 +38,10 @@ public:
     void InvalidateCachedModel();
 
     ~MeshComponent();
+    void Destroy() override;
+    bool HasSerializableState() const override { return true; }
+    void Serialize(ComponentState& out) const override;
+    void Deserialize(const ComponentState& in) override;
 
 private:
     std::string cachedModelPath;

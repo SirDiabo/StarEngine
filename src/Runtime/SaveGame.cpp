@@ -108,6 +108,8 @@ std::string VariableKey(const Actor* actor, const std::string& name, bool isArra
     return actor->GetName() + "." + name + (isArray ? "[]" : "");
 }
 
+const char* const kComponentStateField = "@State";
+
 std::string ComponentFieldKey(const Actor* actor, const Component* comp, const std::string& fieldName) {
     return actor->GetName() + "." + comp->GetName() + "." + fieldName;
 }
@@ -133,6 +135,14 @@ void CollectActor(Actor* actor, const std::string& onlyFile, FileEntries& out) {
             auto it = comp->savableFields.find(h.name);
             if (it == comp->savableFields.end() || !Wanted(it->second, onlyFile)) continue;
             out[it->second][ComponentFieldKey(actor, comp, h.name)] = PropertyToString(h);
+        }
+        auto stateIt = comp->savableFields.find(kComponentStateField);
+        if (stateIt != comp->savableFields.end() && Wanted(stateIt->second, onlyFile)) {
+            ComponentState state;
+            comp->Serialize(state);
+            for (const auto& kv : state) {
+                out[stateIt->second][ComponentFieldKey(actor, comp, std::string(kComponentStateField) + "." + kv.first)] = kv.second;
+            }
         }
     }
 }
@@ -172,6 +182,18 @@ void ApplyActor(Actor* actor, const std::string& onlyFile, FileEntries& cache) {
             const EntryMap& entries = EntriesFor(cache, sit->second);
             auto eit = entries.find(ComponentFieldKey(actor, comp, h.name));
             if (eit != entries.end()) PropertyFromString(h, eit->second);
+        }
+        auto stateIt = comp->savableFields.find(kComponentStateField);
+        if (stateIt != comp->savableFields.end() && Wanted(stateIt->second, onlyFile)) {
+            const EntryMap& entries = EntriesFor(cache, stateIt->second);
+            std::string prefix = ComponentFieldKey(actor, comp, std::string(kComponentStateField) + ".");
+            ComponentState state;
+            for (const auto& kv : entries) {
+                if (kv.first.size() > prefix.size() && kv.first.compare(0, prefix.size(), prefix) == 0) {
+                    state[kv.first.substr(prefix.size())] = kv.second;
+                }
+            }
+            if (!state.empty()) comp->Deserialize(state);
         }
     }
 }

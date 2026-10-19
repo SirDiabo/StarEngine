@@ -14,6 +14,24 @@ void ComponentRegistry::Register(ComponentTypeInfo info) {
     types.push_back(std::move(info));
 }
 
+bool ComponentRegistry::TypeHasState(const std::string& componentType) const {
+    static std::unordered_map<std::string, bool> cache;
+    auto cached = cache.find(componentType);
+    if (cached != cache.end()) return cached->second;
+    bool result = false;
+    if (const ComponentTypeInfo* info = Find(componentType)) {
+        if (info->factory) {
+            Component* probe = info->factory();
+            if (probe) {
+                result = probe->HasSerializableState();
+                delete probe;
+            }
+        }
+    }
+    cache[componentType] = result;
+    return result;
+}
+
 const ComponentTypeInfo* ComponentRegistry::Find(const std::string& componentType) const {
     for (const ComponentTypeInfo& info : types) {
         if (info.componentType == componentType) return &info;

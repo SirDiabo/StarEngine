@@ -38,6 +38,7 @@ Actor::~Actor() {
         std::lock_guard<std::mutex> lock(NetIdRegistryMutex());
         NetIdRegistry().erase(netId);
     }
+    for (auto it = components.rbegin(); it != components.rend(); ++it) (*it)->DestroyOnce();
     delete graphBehavior;
     for (Component* c : components) delete c;
 }
@@ -82,6 +83,7 @@ void Actor::SetGraphBehavior(GraphBehavior* behavior) {
 void Actor::BeginPlay() {
     controlRotation = rotation;
     hasBegunPlay = true;
+    for (size_t i = 0; i < components.size(); i++) components[i]->InitializeOnce();
     OnBeginPlay();
     if (graphBehavior) graphBehavior->OnBeginPlay(this);
 }
@@ -228,11 +230,13 @@ void Actor::AddComponent(Component* component, Component* parent) {
     components.push_back(component);
     component->parent = resolvedParent;
     component->owningActor = this;
+    if (hasBegunPlay) component->InitializeOnce();
 }
 
 void Actor::RemoveComponent(Component* component) {
     auto it = std::find(components.begin(), components.end(), component);
     if (it != components.end()) {
+        component->DestroyOnce();
         if (rootComponent == component) rootComponent = nullptr;
         components.erase(it);
         delete component;

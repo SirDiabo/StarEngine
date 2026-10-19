@@ -535,6 +535,20 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
         if (ComponentDecl* c = DetailComponent(idx)) { c->scaleX = x; c->scaleY = y; c->scaleZ = z; isDirty = true; }
     });
 
+    if (ComponentRegistry::Get().TypeHasState(comp.componentType)) {
+        auto stateIt = comp.savableFields.find("@State");
+        std::string stateFile = stateIt == comp.savableFields.end() ? std::string() : stateIt->second;
+        rows.push_back(CellsRow("comp.state", {
+            LabelCell("State Save File", 110.0f),
+            ButtonCell(stateFile.empty() ? std::string("None") : stateFile, 0.0f, [this, idx](Rectangle r) {
+                saveTargetKind = 0;
+                saveTargetIndex = idx;
+                saveTargetFieldKey = "@State";
+                savePicker.Open({ r.x, r.y + r.height }, SaveFileRegistry::Category());
+            })
+        }));
+    }
+
     const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(comp.componentType);
     if (typeInfo) {
         for (const ComponentFieldDesc& f : typeInfo->fields) {

@@ -157,6 +157,24 @@ MeshComponent::~MeshComponent() {
     ReleaseAnimModelInstance();
 }
 
+void MeshComponent::Destroy() {
+    ReleaseAnimModelInstance();
+}
+
+void MeshComponent::Serialize(ComponentState& out) const {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.9g", animTime);
+    out["AnimTime"] = buf;
+}
+
+void MeshComponent::Deserialize(const ComponentState& in) {
+    auto it = in.find("AnimTime");
+    if (it == in.end()) return;
+    char* end = nullptr;
+    float value = strtof(it->second.c_str(), &end);
+    if (end != it->second.c_str()) animTime = value;
+}
+
 void MeshComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
 
