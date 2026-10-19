@@ -24,6 +24,8 @@ private:
     void RenderMapsCategory(Rectangle area);
     void RenderRenderingCategory(Rectangle area);
     void RenderSaveFilesCategory(Rectangle area);
+    void RenderCollisionLayersCategory(Rectangle area);
+    void RebuildLayerFields();
     void RenderMigrationSection(Rectangle area, float fx, float& fy, float fw);
     void RebuildMigrationFields();
     void CommitMigrations();
@@ -56,4 +58,11 @@ private:
     std::string migrationSignature;
     Widget* migrationChrome = nullptr;
     std::vector<TextElement*> migrationFields;
+
+    Widget* layerChrome = nullptr;
+    std::vector<TextElement*> layerFields;
+    std::vector<int> layerFieldIndices;
+    Widget* newLayerChrome = nullptr;
+    TextElement* newLayerField = nullptr;
+    std::string newLayerName;
 };

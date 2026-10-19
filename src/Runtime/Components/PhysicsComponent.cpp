@@ -194,6 +194,8 @@ void PhysicsComponent::Update(float deltaTime) {
 
     CollisionTrace::QueryParams params;
     params.ignoreActor = actor;
+    params.layer = body->collisionLayer;
+    params.mask = body->collisionMask;
     CollisionTrace::ScopedBatch batch;
     const bool wasGrounded = grounded;
     const float preMoveFallSpeed = velocity.y < 0.0f ? -velocity.y : 0.0f;

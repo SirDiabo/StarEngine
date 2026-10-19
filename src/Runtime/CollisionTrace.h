@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include <cstdint>
 #include <vector>
 
 class Actor;
@@ -19,10 +20,15 @@ namespace CollisionTrace {
         Vector3 half{ 0, 0, 0 };
     };
 
+    enum class TriggerMode { Ignore, Include, Only };
+
     struct QueryParams {
         Actor* ignoreActor = nullptr;
+        int layer = -1;
+        uint32_t mask = 0xFFFFFFFFu;
         bool meshes = true;
         bool shapes = true;
+        TriggerMode triggers = TriggerMode::Ignore;
     };
 
     struct HitResult {
@@ -34,6 +40,7 @@ namespace CollisionTrace {
         float time = 0.0f;
         float penetration = 0.0f;
         bool startPenetrating = false;
+        bool isTrigger = false;
     };
 
     Shape MakeSphere(const Vector3& center, float radius);

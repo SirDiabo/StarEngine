@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "SceneComponent.h"
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,8 @@ public:
 
     enum CollisionMode { CollisionMesh, CollisionNone };
     CollisionMode collisionMode = CollisionMesh;
+    int collisionLayer = 0;
+    uint32_t collisionMask = 0xFFFFFFFFu;
 
     std::string currentAnimPath;
     bool animPlaying = false;

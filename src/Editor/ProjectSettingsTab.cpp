@@ -7,6 +7,7 @@
 #include "Core/ShadingTechniqueRegistry.h"
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
+#include "Core/CollisionLayers.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -45,7 +46,7 @@ static bool InlineBoolBox(Rectangle r, bool& value) {
 void ProjectSettingsTab::Initialize() {
     title     = "Project Settings";
     permanent = false;
-    switcher.SetCategories({ "General", "Maps", "Rendering", "Save Files" });
+    switcher.SetCategories({ "General", "Maps", "Rendering", "Save Files", "Collision" });
     RefreshFromProject();
 }
 
@@ -75,6 +76,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
         case 1: RenderMapsCategory(content);       break;
         case 2: RenderRenderingCategory(content);  break;
         case 3: RenderSaveFilesCategory(content);  break;
+        case 4: RenderCollisionLayersCategory(content); break;
         default: break;
     }
 }
@@ -339,6 +341,105 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
     fy += 30;
 
     RenderMigrationSection(area, fx, fy, fw);
+}
+
+void ProjectSettingsTab::RebuildLayerFields() {
+    const UIPalette& theme = UITheme::Get();
+    if (!layerChrome) {
+        layerChrome = new Widget();
+        layerChrome->SetRoot(new WidgetElement());
+    }
+    layerChrome->rootElement->ClearChildren();
+    layerFields.clear();
+    layerFieldIndices = CollisionLayers::UsedIndices();
+    for (int index : layerFieldIndices) {
+        auto* field = new TextElement();
+        field->editable = true;
+        field->fontSize = 12.0f;
+        field->backgroundColor = theme.fieldBg;
+        field->borderColor = theme.fieldBorder;
+        field->editingBorderColor = theme.accent;
+        field->text = CollisionLayers::NameAt(index);
+        field->onTextChanged = [index](const std::string& text) {
+            if (CollisionLayers::Rename(index, text)) CollisionLayers::Save();
+        };
+        layerChrome->rootElement->AddChild(field);
+        layerFields.push_back(field);
+    }
+}
+
+void ProjectSettingsTab::RenderCollisionLayersCategory(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
+
+    DrawText("Collision Layers", (int)fx, (int)fy, 14, theme.sectionHeader);
+    fy += 24;
+    DrawText("A layer is what a collider is. The same names are the channels trace nodes pick from.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 14;
+    DrawText("Colliders choose their layer and which layers they collide with. Slot 0 cannot be removed.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 22;
+
+    if (!layerChrome || layerFieldIndices != CollisionLayers::UsedIndices()) RebuildLayerFields();
+
+    int removeIndex = -1;
+    for (size_t i = 0; i < layerFieldIndices.size(); i++) {
+        int index = layerFieldIndices[i];
+        DrawText(TextFormat("%d", index), (int)fx, (int)fy + 4, 12, theme.textSecondary);
+        layerFields[i]->size = { fw - 70, 20 };
+        layerFields[i]->offset = { fx + 28, fy };
+        if (index > 0 && InlineButton({fx + fw - 20, fy, 20, 20}, "x")) removeIndex = index;
+        fy += 24;
+    }
+
+    float dt = GetFrameTime();
+    Rectangle chromeArea = {0, 0, area.width + area.x, area.height + area.y};
+    layerChrome->Tick(dt, chromeArea, 1.0f);
+    WidgetInput::ProcessInput(layerChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    layerChrome->Draw(chromeArea, 1.0f);
+
+    if (removeIndex >= 0 && CollisionLayers::Remove(removeIndex)) {
+        CollisionLayers::Save();
+        RebuildLayerFields();
+    }
+
+    fy += 6;
+    Rectangle newRow = {fx + 28, fy, fw - 28 - 60, 20};
+    Rectangle addBtn = {fx + fw - 56, fy, 56, 20};
+    if (!newLayerChrome) {
+        newLayerChrome = new Widget();
+        auto* root = new WidgetElement();
+        newLayerChrome->SetRoot(root);
+        newLayerField = new TextElement();
+        newLayerField->editable = true;
+        newLayerField->fontSize = 12.0f;
+        newLayerField->placeholder = "New layer name";
+        newLayerField->backgroundColor = theme.fieldBg;
+        newLayerField->borderColor = theme.fieldBorder;
+        newLayerField->editingBorderColor = theme.accent;
+        newLayerField->onTextChanged = [this](const std::string& text) { newLayerName = text; };
+        root->AddChild(newLayerField);
+    }
+    newLayerField->size = { newRow.width, newRow.height };
+    newLayerField->offset = { newRow.x, newRow.y };
+    newLayerChrome->Tick(dt, chromeArea, 1.0f);
+    WidgetInput::ProcessInput(newLayerChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    newLayerChrome->Draw(chromeArea, 1.0f);
+    if (InlineButton(addBtn, "+ Add") && !newLayerName.empty()) {
+        if (CollisionLayers::Add(newLayerName) >= 0) {
+            CollisionLayers::Save();
+            newLayerName.clear();
+            newLayerField->text.clear();
+            RebuildLayerFields();
+        }
+    }
+    fy += 28;
+    if (CollisionLayers::UsedIndices().size() >= (size_t)CollisionLayers::kMaxLayers) {
+        DrawText("All 32 layer slots are in use.", (int)fx, (int)fy, 10, theme.accent);
+    }
 }
 
 static const char* MigrationTypeName(SaveMigration::MigrationOp::Type type) {

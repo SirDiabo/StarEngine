@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include "Modules/Stargraph/ObjectPinRef.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
+#include "CollisionFilterFields.h"
 
 void RegisterMeshComponentNodes() {
     NodeTemplate setStaticMesh;
@@ -305,6 +306,8 @@ ComponentRegistrar registrar_MeshComponent({
             [](const Component& c) -> std::string {
                 return static_cast<const MeshComponent&>(c).collisionMode == MeshComponent::CollisionNone ? "None" : "Mesh";
             }),
+        CollisionFilterFields::Layer<MeshComponent>([](const ComponentDecl& d) { return d.Get("MeshCollision", "Mesh") != "None"; }),
+        CollisionFilterFields::Mask<MeshComponent>([](const ComponentDecl& d) { return d.Get("MeshCollision", "Mesh") != "None"; }),
         ComponentField::Asset("DefaultAnim", "Default Anim", ".staranim",
             [](Component& c, const ComponentDecl& d) {
                 auto& mc = static_cast<MeshComponent&>(c);

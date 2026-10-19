@@ -53,7 +53,8 @@ std::vector<std::string> ProbeValues(const ComponentFieldDesc& field) {
     switch (field.kind) {
         case ComponentFieldKind::Float: return { "7.25", "-3.5" };
         case ComponentFieldKind::Bool: return { "true", "false" };
-        case ComponentFieldKind::Enum: return field.enumOptions;
+        case ComponentFieldKind::Enum: return ComponentField::EnumOptionsOf(field);
+        case ComponentFieldKind::LayerMask: return { "5", "4294967295" };
         case ComponentFieldKind::AssetPath: return { "Test/Probe" + field.assetExtension };
         case ComponentFieldKind::Device: return { "Probe" };
         default: return { "probe" };

@@ -7,6 +7,7 @@
 #include "Runtime/Components/MeshComponent.h"
 #include "Runtime/CollisionTrace.h"
 #include "Runtime/DebugDraw.h"
+#include "Core/CollisionLayers.h"
 #include "raymath.h"
 #include <cstdio>
 #include <vector>
@@ -48,21 +49,29 @@ void RegisterCollisionNodes() {
         node->inputs.push_back({"End",     PinType::Vec3,    true,  false, 0, "0,0,100"});
         node->inputs.push_back({"IgnoreSelf", PinType::Boolean, true,  false, 0, "true"});
         node->inputs.push_back({"DrawDebug",  PinType::Boolean, true,  false, 0, "false"});
+        node->inputs.push_back({"Channel",    PinType::String,  true,  false, 0, "All"});
+        node->inputs.push_back({"IncludeShapes", PinType::Boolean, true, false, 0, "false"});
+        node->inputs.push_back({"IncludeTriggers", PinType::Boolean, true, false, 0, "false"});
         node->outputs.push_back({"Out",              PinType::Exec,    false, true});
         node->outputs.push_back({"Did Overlap",      PinType::Boolean, false, true});
         node->outputs.push_back({"Overlap Object",   PinType::Object,  false, true, 0, "", false, "Actor"});
         node->outputs.push_back({"Overlap Location", PinType::Vec3,    false, true});
         node->outputs.push_back({"Overlap Normal",   PinType::Vec3,    false, true});
         node->outputs.push_back({"Distance",         PinType::Float,   false, true});
+        node->outputs.push_back({"Is Trigger",       PinType::Boolean, false, true});
     };
     lineTraceForMesh.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Vector3 start = {0,0,0}, end = {0,0,100};
-        bool ignoreSelf = true, drawDebug = false;
+        bool ignoreSelf = true, drawDebug = false, includeShapes = false, includeTriggers = false;
+        std::string channel;
         for (const Pin& p : node.inputs) {
             if (p.name == "Start")      ReadVec3(p, start.x, start.y, start.z);
             if (p.name == "End")     ReadVec3(p, end.x, end.y, end.z);
             if (p.name == "IgnoreSelf") ignoreSelf = ReadBool(p);
             if (p.name == "DrawDebug")  drawDebug = ReadBool(p);
+            if (p.name == "Channel")    channel = p.defaultValue;
+            if (p.name == "IncludeShapes") includeShapes = ReadBool(p);
+            if (p.name == "IncludeTriggers") includeTriggers = ReadBool(p);
         }
         Actor* exclude = ignoreSelf ? ctx.actor : nullptr;
 
@@ -71,7 +80,9 @@ void RegisterCollisionNodes() {
         float hitDist = Vector3Distance(start, end);
         CollisionTrace::QueryParams queryParams;
         queryParams.ignoreActor = exclude;
-        queryParams.shapes = false;
+        queryParams.shapes = includeShapes || includeTriggers;
+        queryParams.triggers = includeTriggers ? CollisionTrace::TriggerMode::Include : CollisionTrace::TriggerMode::Ignore;
+        queryParams.layer = channel.empty() || channel == "All" ? -1 : CollisionLayers::IndexOf(channel);
         CollisionTrace::HitResult traceHit;
         bool hit = CollisionTrace::Raycast(start, end, queryParams, traceHit);
         if (hit) {
@@ -95,6 +106,8 @@ void RegisterCollisionNodes() {
             } else if (p.name == "Overlap Normal") {
                 char b[64]; snprintf(b, sizeof(b), "%.3f,%.3f,%.3f", hitNormal.x, hitNormal.y, hitNormal.z);
                 p.defaultValue = b;
+            } else if (p.name == "Is Trigger") {
+                p.defaultValue = hit && traceHit.isTrigger ? "true" : "false";
             } else if (p.name == "Distance") {
                 char b[32]; snprintf(b, sizeof(b), "%.3f", hitDist);
                 p.defaultValue = b;

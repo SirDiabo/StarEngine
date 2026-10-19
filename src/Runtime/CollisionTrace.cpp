@@ -1,6 +1,7 @@
 #include "Core/RotationMath.h"
 #include "CollisionTrace.h"
 #include "CollisionPrivate.h"
+#include "CollisionFilter.h"
 #include "Actor.h"
 #include "World.h"
 #include "AssetCache.h"
@@ -77,6 +78,7 @@ namespace {
 
 using CollisionTrace::HitResult;
 using CollisionTrace::QueryParams;
+using CollisionTrace::TriggerMode;
 
 Matrix ComposeWorld(const Vector3& pos, const Vector3& rot, const Vector3& scl) {
     Matrix scaleM = MatrixScale(scl.x, scl.y, scl.z);
@@ -91,6 +93,9 @@ struct Record {
     Component* comp = nullptr;
     Actor* actor = nullptr;
     bool isMesh = false;
+    int layer = 0;
+    uint32_t mask = 0xFFFFFFFFu;
+    bool isTrigger = false;
     uint32_t stamp = 0;
     float key[kKeyCapacity];
     int keyCount = -1;
@@ -129,7 +134,10 @@ std::shared_ptr<const ModelBVH> LoadModelBVH(const std::string& meshAssetPath) {
 
 bool Accept(const Record& r, const QueryParams& qp) {
     if (r.actor == qp.ignoreActor && qp.ignoreActor != nullptr) return false;
-    return r.isMesh ? qp.meshes : qp.shapes;
+    if (!(r.isMesh ? qp.meshes : qp.shapes)) return false;
+    if (qp.triggers == TriggerMode::Ignore && r.isTrigger) return false;
+    if (qp.triggers == TriggerMode::Only && !r.isTrigger) return false;
+    return CollisionFilter::Allows(qp.layer, qp.mask, r.layer, r.mask);
 }
 
 struct Scene {
@@ -178,6 +186,9 @@ void Scene::Refresh() {
             }
             rec.actor = actor;
             rec.stamp = stamp;
+            rec.layer = mc ? mc->collisionLayer : cc->collisionLayer;
+            rec.mask = mc ? mc->collisionMask : cc->collisionMask;
+            rec.isTrigger = cc ? cc->isTrigger : false;
             ++seen;
 
             if (mc) {
@@ -319,6 +330,7 @@ void FillFromContact(HitResult& out, const Record& r, const Contact& c) {
     out.point = c.point;
     out.normal = c.normal;
     out.penetration = c.depth;
+    out.isTrigger = r.isTrigger;
 }
 
 }
@@ -403,6 +415,8 @@ bool CollisionTrace::MoveActorSwept(Actor* actor, const Vector3& desiredPosition
 
     QueryParams params;
     params.ignoreActor = actor;
+    params.layer = body->collisionLayer;
+    params.mask = body->collisionMask;
 
     Vector3 remaining = delta;
     bool blocked = false;
@@ -523,6 +537,7 @@ bool CollisionTrace::Raycast(const Vector3& start, const Vector3& end, const Que
     outHit.component = bestRec->comp;
     outHit.distance = bestT;
     outHit.time = bestT / dist;
+    outHit.isTrigger = bestRec->isTrigger;
     outHit.point = Add(start, Mul(dir, bestT));
     if (bestRec->isMesh) {
         const Tri& lt = bestRec->model->meshes[bestMesh].tris[bestTri];
@@ -708,6 +723,7 @@ void CollisionTrace::DrawDebugShape(const Shape& s, Color color) {
 
 void CollisionTrace::DrawDebugShapes() {
     const Color color = { 90, 200, 255, 230 };
+    const Color triggerColor = { 255, 170, 60, 230 };
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (!actor) continue;
@@ -716,7 +732,7 @@ void CollisionTrace::DrawDebugShapes() {
             if (!cc || !cc->visible || cc->hiddenInGame) continue;
             Shape s;
             if (!GetComponentShape(actor, cc, s)) continue;
-            DrawDebugShape(s, color);
+            DrawDebugShape(s, cc->isTrigger ? triggerColor : color);
         }
     }
 }

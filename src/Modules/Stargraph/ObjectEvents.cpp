@@ -56,7 +56,7 @@ void RegisterComponentEvent(const std::string& componentType, const ObjectEventD
         node->inputs.push_back({"Component", PinType::Object, true, false, 0, "", false, componentType});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         for (const ObjectEventParam& param : params) {
-            node->outputs.push_back({param.name, param.type, false, true});
+            node->outputs.push_back({param.name, param.type, false, true, 0, "", false, param.objectKind});
         }
     };
     NodeRegistry::Get().RegisterNode(nodeTemplate);

@@ -4,6 +4,7 @@
 #include "NamedListRegistry.h"
 #include "SaveFileRegistry.h"
 #include "SaveMigration.h"
+#include "CollisionLayers.h"
 #include "InputMappingRegistry.h"
 #include "RenderSettings.h"
 #include "ContentPathResolver.h"
@@ -111,6 +112,7 @@ bool Project::Load(const std::string& path) {
     NamedListRegistry::Get().Load(rootPath);
     SaveFileRegistry::Get().Load(rootPath);
     SaveMigration::Load(rootPath);
+    CollisionLayers::Load(rootPath);
     InputMappingRegistry::Get().Load(rootPath);
     RenderSettings::Get().Load(rootPath);
 

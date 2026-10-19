@@ -8,7 +8,7 @@ class Component;
 
 using ComponentReader = std::function<std::string(const Component&)>;
 
-enum class ComponentFieldKind { String, AssetPath, Float, Bool, Enum, Device };
+enum class ComponentFieldKind { String, AssetPath, Float, Bool, Enum, Device, LayerMask };
 
 struct ComponentFieldDesc {
     std::string key;
@@ -17,6 +17,7 @@ struct ComponentFieldDesc {
     std::string defaultValue;
     std::string assetExtension;
     std::vector<std::string> enumOptions;
+    std::function<std::vector<std::string>()> enumProvider;
     std::function<bool(const ComponentDecl&)> visibleIf;
     std::vector<std::string> colorKeys;
     bool hiddenInDetails = false;
@@ -61,6 +62,9 @@ struct ComponentRegistrar {
 };
 
 namespace ComponentField {
+    inline std::vector<std::string> EnumOptionsOf(const ComponentFieldDesc& field) {
+        return field.enumProvider ? field.enumProvider() : field.enumOptions;
+    }
     inline int ChannelToByte(float value) {
         float scaled = value * 255.0f + 0.5f;
         return scaled < 0.0f ? 0 : scaled > 255.0f ? 255 : (int)scaled;

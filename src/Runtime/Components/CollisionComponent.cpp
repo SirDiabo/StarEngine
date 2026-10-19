@@ -3,9 +3,15 @@
 #include "Modules/Stargraph/Stargraph.h"
 #include "Modules/Stargraph/ObjectPinRef.h"
 #include "Modules/Stargraph/ComponentRegistry.h"
+#include "CollisionFilterFields.h"
+#include "Modules/Stargraph/ObjectEvents.h"
+#include "Runtime/Actor.h"
 #include "Core/SafeParse.h"
 
 void RegisterCollisionComponentNodes() {
+    ObjectEvents::RegisterComponentEvent("CollisionComponent", { "Begin Overlap", { { "Other Actor", PinType::Object, "Actor" } } });
+    ObjectEvents::RegisterComponentEvent("CollisionComponent", { "End Overlap", { { "Other Actor", PinType::Object, "Actor" } } });
+
     NodeTemplate setCollisionRadius;
     setCollisionRadius.type = "Set_Collision_Radius";
     setCollisionRadius.category = "Collision";
@@ -68,6 +74,7 @@ void CollisionComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddVector3("Box Extents", &boxExtents.x);
     outProperties.AddBool("Visibility", &visible);
     outProperties.AddBool("Hidden In Game", &hiddenInGame);
+    outProperties.AddBool("Is Trigger", &isTrigger);
 }
 
 bool CollisionComponent::DeclVisibleInEditor(const ComponentDecl& decl) {
@@ -85,8 +92,43 @@ bool CollisionComponent::BuildShapeFromDecl(const ComponentDecl& decl, const Vec
     return CollisionTrace::MakeComponentShape(type, radius, height, extents, pos, rot, scl, outShape);
 }
 
+void CollisionComponent::CollectTriggerOverlaps(std::vector<TriggerOverlapEntry>& out) const {
+    out.clear();
+    Actor* owner = GetOwningActor();
+    if (!owner) return;
+    CollisionTrace::Shape shape;
+    if (!CollisionTrace::GetComponentShape(owner, this, shape)) return;
+    CollisionTrace::QueryParams params;
+    params.ignoreActor = owner;
+    params.layer = collisionLayer;
+    params.mask = collisionMask;
+    params.triggers = CollisionTrace::TriggerMode::Include;
+    std::vector<CollisionTrace::HitResult> hits;
+    CollisionTrace::ScopedBatch batch;
+    CollisionTrace::OverlapShapeAll(shape, params, hits);
+    for (const CollisionTrace::HitResult& hit : hits) {
+        if (!hit.actor || TriggerOverlap::Contains(out, hit.actor)) continue;
+        TriggerOverlapEntry entry;
+        entry.actor = hit.actor;
+        entry.ref = ObjectPinRef::Encode(hit.actor->GetObjectKind(), hit.actor->GetObjectId());
+        out.push_back(entry);
+    }
+}
+
+void CollisionComponent::ProcessTriggerOverlaps(std::vector<TriggerOverlapEntry>& began, std::vector<TriggerOverlapEntry>& ended) {
+    std::vector<TriggerOverlapEntry> current;
+    if (isTrigger) CollectTriggerOverlaps(current);
+    TriggerOverlap::Diff(overlapping, current, began, ended);
+    overlapping = std::move(current);
+}
+
 void CollisionComponent::Update(float deltaTime) {
     SceneComponent::Update(deltaTime);
+    if (!isTrigger && overlapping.empty()) return;
+    std::vector<TriggerOverlapEntry> began, ended;
+    ProcessTriggerOverlaps(began, ended);
+    for (const TriggerOverlapEntry& e : ended) ObjectEvents::RaiseComponentEvent(this, "End Overlap", { { "Other Actor", e.ref } });
+    for (const TriggerOverlapEntry& e : began) ObjectEvents::RaiseComponentEvent(this, "Begin Overlap", { { "Other Actor", e.ref } });
 }
 
 namespace {
@@ -134,6 +176,11 @@ ComponentRegistrar registrar_CollisionComponent({
                 [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).hiddenInGame = d.Get("CollisionHiddenInGame", "true") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const CollisionComponent&>(c).hiddenInGame); });
             f.visibleIf = [](const ComponentDecl& d) { return d.Get("CollisionVisibility", "true") == "true"; };
             return f; }(),
+        ComponentField::Bln("IsTrigger", "Is Trigger", false,
+            [](Component& c, const ComponentDecl& d) { static_cast<CollisionComponent&>(c).isTrigger = d.Get("IsTrigger", "false") == "true"; },
+            [](const Component& c) -> std::string { return static_cast<const CollisionComponent&>(c).isTrigger ? "true" : "false"; }),
+        CollisionFilterFields::Layer<CollisionComponent>(),
+        CollisionFilterFields::Mask<CollisionComponent>(),
     }
 });
 }

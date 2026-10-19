@@ -1,4 +1,5 @@
 #include "ActorDetailsBuilder.h"
+#include "Core/CollisionLayers.h"
 #include "Runtime/AssetCache.h"
 #include "Modules/Stargraph/ComponentEditing.h"
 #include "Core/StarAsset.h"
@@ -154,7 +155,7 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
             case ComponentFieldKind::Enum:
                 row.kind = PropertyRowKind::Enum;
                 row.stringValue = value;
-                row.enumOptions = f.enumOptions;
+                row.enumOptions = ComponentField::EnumOptionsOf(f);
                 row.setString = [writeField, onEdited, fieldKey](const std::string& v) {
                     writeField(fieldKey, v);
                     if (onEdited) onEdited();
@@ -175,6 +176,28 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
                 row.stringValue = AssetDisplayName(value);
                 row.assetExtension = f.assetExtension;
                 break;
+            case ComponentFieldKind::LayerMask: {
+                uint32_t maskValue = CollisionLayers::ParseMask(value);
+                PropertyRow header;
+                header.id = "field:" + fieldKey + ".h";
+                header.kind = PropertyRowKind::Header;
+                header.label = f.label;
+                rows.push_back(header);
+                for (int layerIndex : CollisionLayers::UsedIndices()) {
+                    PropertyRow layerRow;
+                    layerRow.id = "field:" + fieldKey + "." + std::to_string(layerIndex);
+                    layerRow.label = CollisionLayers::NameAt(layerIndex);
+                    layerRow.kind = PropertyRowKind::Bool;
+                    layerRow.boolValue = (maskValue & CollisionLayers::Bit(layerIndex)) != 0;
+                    layerRow.setBool = [writeField, onEdited, fieldKey, maskValue, layerIndex](bool v) {
+                        uint32_t next = v ? (maskValue | CollisionLayers::Bit(layerIndex)) : (maskValue & ~CollisionLayers::Bit(layerIndex));
+                        writeField(fieldKey, CollisionLayers::MaskToString(next));
+                        if (onEdited) onEdited();
+                    };
+                    rows.push_back(layerRow);
+                }
+                continue;
+            }
             case ComponentFieldKind::Device:
                 continue;
         }

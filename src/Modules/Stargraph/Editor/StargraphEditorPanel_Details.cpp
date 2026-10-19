@@ -7,6 +7,7 @@
 #include "Core/StarAsset.h"
 #include "Core/SaveFileRegistry.h"
 #include "Core/SafeParse.h"
+#include "Core/CollisionLayers.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -582,10 +583,23 @@ void StargraphEditorPanel::BuildComponentRows(std::vector<PropertyRow>& rows, in
                     }));
                     break;
                 case ComponentFieldKind::Enum:
-                    rows.push_back(EnumRow(rowId, f.label, value, f.enumOptions, [this, idx, key](const std::string& v) {
+                    rows.push_back(EnumRow(rowId, f.label, value, ComponentField::EnumOptionsOf(f), [this, idx, key](const std::string& v) {
                         SetComponentField(idx, key, v);
                     }));
                     break;
+                case ComponentFieldKind::LayerMask: {
+                    uint32_t maskValue = CollisionLayers::ParseMask(value);
+                    rows.push_back(HeaderRow(rowId + ".h", f.label));
+                    for (int layerIndex : CollisionLayers::UsedIndices()) {
+                        bool enabled = (maskValue & CollisionLayers::Bit(layerIndex)) != 0;
+                        rows.push_back(BoolRow(rowId + "." + std::to_string(layerIndex), CollisionLayers::NameAt(layerIndex), enabled,
+                            [this, idx, key, maskValue, layerIndex](bool v) {
+                                uint32_t next = v ? (maskValue | CollisionLayers::Bit(layerIndex)) : (maskValue & ~CollisionLayers::Bit(layerIndex));
+                                SetComponentField(idx, key, CollisionLayers::MaskToString(next));
+                            }));
+                    }
+                    break;
+                }
                 case ComponentFieldKind::AssetPath:
                     rows.push_back(AssetRow(rowId, f.label, f.assetExtension, StemOrNone(value)));
                     break;
@@ -1400,6 +1414,14 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
         std::string assetExtension = StargraphPinAssetExtension(pin);
         if (!assetExtension.empty()) {
             rows.push_back(AssetRow("pin:" + std::to_string(pin.id), pin.name, assetExtension, StemOrNone(value)));
+        } else if (node->type == "Line_Trace_For_Mesh" && pin.name == "Channel") {
+            int pinId = pin.id;
+            std::vector<std::string> channelOptions = { "All" };
+            for (const std::string& layerName : CollisionLayers::Names()) channelOptions.push_back(layerName);
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "All" : value,
+                channelOptions, [this, pinId](const std::string& v) {
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v; isDirty = true; }
+                }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

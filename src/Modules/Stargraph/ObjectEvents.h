@@ -11,6 +11,7 @@ struct ExecutionContext;
 struct ObjectEventParam {
     std::string name;
     PinType type = PinType::String;
+    std::string objectKind;
 };
 
 struct ObjectEventDecl {
