@@ -1,5 +1,7 @@
 #include "CookedFile.h"
 #include "ContentPathResolver.h"
+#include "PackageCompression.h"
+#include "raylib.h"
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -48,8 +50,20 @@ namespace {
             for (const std::string& sibling : activePak.SiblingsOf(virtualPath)) {
                 if (ParentOf(sibling) != parent) continue;
 
+                StarPak::Entry info;
+                if (!activePak.GetEntryInfo(sibling, info)) continue;
+
                 std::vector<uint8_t> bytes = activePak.ReadEntry(sibling);
                 cipherImpl->Transform(bytes, activeKey);
+
+                if (info.compression != PackCompression::None) {
+                    std::vector<uint8_t> raw;
+                    if (!PackageCompression::Decompress(info.compression, bytes, info.rawSize, raw)) {
+                        TraceLog(LOG_WARNING, "CookedFile: could not decompress %s", sibling.c_str());
+                        continue;
+                    }
+                    bytes.swap(raw);
+                }
 
                 fs::path destPath = mirroredDir / fs::path(sibling).filename();
                 std::ofstream out(destPath, std::ios::binary);

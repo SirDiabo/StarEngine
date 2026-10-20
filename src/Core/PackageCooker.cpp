@@ -44,10 +44,10 @@ std::string UniqueImportedName(const fs::path& source, std::unordered_set<std::s
     return name;
 }
 
-using CookSink = std::function<void(const std::string& virtualPath, std::vector<uint8_t>&& bytes)>;
+using CookSink = std::function<void(const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t rawSize, PackCompression compression)>;
 
 CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const std::string& cipherKey,
-                         const CookSink& sink) {
+                         PackCompression compression, const CookSink& sink) {
     CookResult result;
     fs::path importedDirRelative = "_Imported";
 
@@ -58,6 +58,24 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
 
     std::error_code ec;
     auto cipherImpl = CreateCookCipher(cipher);
+
+    auto finish = [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes) {
+        uint64_t rawSize = bytes.size();
+        PackCompression used = PackCompression::None;
+        if (compression != PackCompression::None && !bytes.empty()) {
+            std::vector<uint8_t> packed;
+            if (PackageCompression::Compress(compression, bytes, packed) && packed.size() < bytes.size()) {
+                bytes.swap(packed);
+                used = compression;
+                result.filesCompressed++;
+            }
+        }
+        cipherImpl->Transform(bytes, cipherKey);
+        result.rawBytes += rawSize;
+        result.storedBytes += bytes.size();
+        sink(virtualPath, std::move(bytes), rawSize, used);
+        result.filesCooked++;
+    };
 
     std::unordered_map<std::string, std::string> importedNames; // absolute source path -> virtual path
     std::unordered_set<std::string> reservedImportedNames;
@@ -127,9 +145,7 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
             bytes = ReadBytes(entry.path());
         }
 
-        cipherImpl->Transform(bytes, cipherKey);
-        sink(virtualPath, std::move(bytes));
-        result.filesCooked++;
+        finish(virtualPath, std::move(bytes));
     }
 
     for (size_t i = 0; i < importQueue.size(); i++) {
@@ -151,9 +167,7 @@ CookResult CookInternal(const fs::path& contentRoot, CookCipher cipher, const st
             }
         }
 
-        cipherImpl->Transform(bytes, cipherKey);
-        sink(virtualPath, std::move(bytes));
-        result.filesCooked++;
+        finish(virtualPath, std::move(bytes));
     }
 
     result.success = true;
@@ -168,8 +182,8 @@ CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std
     std::error_code ec;
     fs::create_directories(outputContentDir, ec);
 
-    return CookInternal(fs::path(contentRootStr), cipher, cipherKey,
-        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes) {
+    return CookInternal(fs::path(contentRootStr), cipher, cipherKey, PackCompression::None,
+        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t, PackCompression) {
             WriteBytes(outputContentDir / virtualPath, bytes);
         });
 }
@@ -177,12 +191,13 @@ CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std
 CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std::string& outputPakFileStr,
                                      CookCipher cipher, const std::string& cipherKey,
                                      const std::string& bootConfigText,
-                                     const std::vector<ExtraPakFile>& extraFiles) {
+                                     const std::vector<ExtraPakFile>& extraFiles,
+                                     PackCompression compression) {
     StarPak::Writer writer;
 
-    CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey,
-        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes) {
-            writer.AddFile(virtualPath, bytes);
+    CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey, compression,
+        [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t rawSize, PackCompression used) {
+            writer.AddEntry(virtualPath, bytes, rawSize, used);
         });
     if (!result.success) return result;
 

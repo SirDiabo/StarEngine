@@ -28,6 +28,25 @@ namespace fs = std::filesystem;
 
 namespace {
 
+std::string FormatByteSize(uint64_t bytes) {
+    char buf[32];
+    if (bytes >= 1024ull * 1024ull) snprintf(buf, sizeof(buf), "%.1f MB", (double)bytes / (1024.0 * 1024.0));
+    else if (bytes >= 1024ull) snprintf(buf, sizeof(buf), "%.1f KB", (double)bytes / 1024.0);
+    else snprintf(buf, sizeof(buf), "%llu B", (unsigned long long)bytes);
+    return buf;
+}
+
+std::string DescribeCookedPak(const CookResult& cookResult, PackCompression compression) {
+    std::string text = "Cooked " + std::to_string(cookResult.filesCooked) + " files into a single .starpak.\n";
+    if (compression != PackCompression::None) {
+        int percent = cookResult.rawBytes > 0 ? (int)((cookResult.storedBytes * 100ull) / cookResult.rawBytes) : 100;
+        text += "Compression (" + PackCompressionName(compression) + "): " + std::to_string(cookResult.filesCompressed) + " of " +
+                std::to_string(cookResult.filesCooked) + " files compressed, " + FormatByteSize(cookResult.rawBytes) + " -> " +
+                FormatByteSize(cookResult.storedBytes) + " (" + std::to_string(percent) + "%).\n";
+    }
+    return text;
+}
+
 std::string GetEngineRoot() {
     return EngineRoot::Resolve();
 }
@@ -337,15 +356,13 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             }
 
             CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                                options.cipher, cipherKey, bootConfig.ToText(), extraFiles);
+                                                                options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
             if (!cookResult.success) {
                 result.error = "Cooking failed: " + cookResult.error;
                 return result;
             }
-            result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
-                " files into a single .starpak.\n";
-            if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
-                " files into a single .starpak.\n");
+            result.log += "\n== Cook ==\n" + DescribeCookedPak(cookResult, options.compression);
+            if (onOutput) onOutput("\n== Cook ==\n" + DescribeCookedPak(cookResult, options.compression));
 
             fs::path bootstrapPath = fs::path(options.outputDir) / (foundJs.stem().string() + ".starproject");
             std::ofstream out(bootstrapPath);
@@ -446,15 +463,13 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         }
 
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                            options.cipher, cipherKey, bootConfig.ToText(), extraFiles);
+                                                            options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
         if (!cookResult.success) {
             result.error = "Cooking failed: " + cookResult.error;
             return result;
         }
-        result.log += "\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
-            " files into a single .starpak.\n";
-        if (onOutput) onOutput("\n== Cook ==\nCooked " + std::to_string(cookResult.filesCooked) +
-            " files into a single .starpak.\n");
+        result.log += "\n== Cook ==\n" + DescribeCookedPak(cookResult, options.compression);
+        if (onOutput) onOutput("\n== Cook ==\n" + DescribeCookedPak(cookResult, options.compression));
 
         if (!StarPak::AppendPakToExecutable(outputExe.string(), pakTempPath.string())) {
             result.error = "Could not append pak data to the packaged executable.";

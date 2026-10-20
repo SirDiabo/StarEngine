@@ -1,6 +1,7 @@
 #pragma once
 #include "PackagePlatform.h"
 #include "PackageCipher.h"
+#include "PackageCompression.h"
 #include "Project.h"
 #include <string>
 #include <functional>
@@ -19,6 +20,7 @@ struct PackageOptions {
     PackagePlatform platform = PackagePlatform::Linux;
     GameRenderer renderer = GameRenderer::Hardware;
     CookCipher cipher = CookCipher::None;
+    PackCompression compression = PackCompression::None;
     PackageFormat format = PackageFormat::SingleFile;
 };
 

@@ -7,7 +7,8 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '1'};
+constexpr char kMagicV1[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '1'};
+constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '2'};
 constexpr char kFooterMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', 'F'};
 
 #pragma pack(push, 1)
@@ -17,6 +18,21 @@ struct Footer {
     uint64_t pakSize;
 };
 #pragma pack(pop)
+
+std::vector<std::string> SplitTabs(const std::string& line) {
+    std::vector<std::string> fields;
+    size_t start = 0;
+    while (true) {
+        size_t tab = line.find('\t', start);
+        if (tab == std::string::npos) {
+            fields.push_back(line.substr(start));
+            break;
+        }
+        fields.push_back(line.substr(start, tab - start));
+        start = tab + 1;
+    }
+    return fields;
+}
 
 std::string ParentOf(const std::string& virtualPath) {
     size_t slash = virtualPath.find_last_of('/');
@@ -28,12 +44,18 @@ std::string ParentOf(const std::string& virtualPath) {
 namespace StarPak {
 
 void Writer::AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes) {
+    AddEntry(virtualPath, bytes, bytes.size(), PackCompression::None);
+}
+
+void Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, PackCompression compression) {
     Entry e;
     e.path = virtualPath;
     e.offset = blob.size();
-    e.size = bytes.size();
+    e.size = storedBytes.size();
+    e.rawSize = rawSize;
+    e.compression = compression;
     entries.push_back(std::move(e));
-    blob.insert(blob.end(), bytes.begin(), bytes.end());
+    blob.insert(blob.end(), storedBytes.begin(), storedBytes.end());
 }
 
 bool Writer::WriteToFile(const std::string& outputPath) const {
@@ -46,7 +68,7 @@ bool Writer::WriteToFile(const std::string& outputPath) const {
     out.write(kMagic, sizeof(kMagic));
     out << "\n" << entries.size() << "\n";
     for (const auto& e : entries) {
-        out << e.path << "\t" << e.offset << "\t" << e.size << "\n";
+        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << (int)e.compression << "\n";
     }
     out.write(reinterpret_cast<const char*>(blob.data()), (std::streamsize)blob.size());
     return out.good();
@@ -68,7 +90,8 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
     };
 
     if (buffer.size() < sizeof(kMagic)) return false;
-    if (std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) != 0) return false;
+    bool versionOne = std::memcmp(buffer.data(), kMagicV1, sizeof(kMagicV1)) == 0;
+    if (!versionOne && std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) != 0) return false;
     pos = sizeof(kMagic);
     if (pos < buffer.size() && buffer[pos] == '\n') pos++;
 
@@ -86,16 +109,23 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
         std::string line;
         if (!readLine(line)) return false;
 
-        size_t t1 = line.find('\t');
-        if (t1 == std::string::npos) return false;
-        size_t t2 = line.find('\t', t1 + 1);
-        if (t2 == std::string::npos) return false;
+        std::vector<std::string> fields = SplitTabs(line);
+        size_t required = versionOne ? 3 : 5;
+        if (fields.size() < required) return false;
 
         Entry e;
-        e.path = line.substr(0, t1);
+        e.path = fields[0];
         try {
-            e.offset = std::stoull(line.substr(t1 + 1, t2 - t1 - 1));
-            e.size = std::stoull(line.substr(t2 + 1));
+            e.offset = std::stoull(fields[1]);
+            e.size = std::stoull(fields[2]);
+            if (versionOne) {
+                e.rawSize = e.size;
+            } else {
+                e.rawSize = std::stoull(fields[3]);
+                int method = std::stoi(fields[4]);
+                if (!IsKnownPackCompression(method)) return false;
+                e.compression = (PackCompression)method;
+            }
         } catch (...) {
             return false;
         }
@@ -146,6 +176,13 @@ bool Reader::LoadFromExecutable(const std::string& exePath) {
 
 bool Reader::HasEntry(const std::string& virtualPath) const {
     return indexByPath.count(virtualPath) != 0;
+}
+
+bool Reader::GetEntryInfo(const std::string& virtualPath, Entry& out) const {
+    auto it = indexByPath.find(virtualPath);
+    if (it == indexByPath.end()) return false;
+    out = entries[it->second];
+    return true;
 }
 
 std::vector<uint8_t> Reader::ReadEntry(const std::string& virtualPath) const {

@@ -1,4 +1,5 @@
 #pragma once
+#include "PackageCompression.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -13,11 +14,14 @@ struct Entry {
     std::string path;
     uint64_t offset = 0;
     uint64_t size = 0;
+    uint64_t rawSize = 0;
+    PackCompression compression = PackCompression::None;
 };
 
 class Writer {
 public:
     void AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes);
+    void AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, PackCompression compression);
     bool WriteToFile(const std::string& outputPath) const;
 
 private:
@@ -32,6 +36,7 @@ public:
     bool LoadBuffer(const std::vector<uint8_t>& buffer);
 
     bool HasEntry(const std::string& virtualPath) const;
+    bool GetEntryInfo(const std::string& virtualPath, Entry& out) const;
     std::vector<uint8_t> ReadEntry(const std::string& virtualPath) const;
 
     std::vector<std::string> SiblingsOf(const std::string& virtualPath) const;

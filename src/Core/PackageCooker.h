@@ -1,5 +1,6 @@
 #pragma once
 #include "PackageCipher.h"
+#include "PackageCompression.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -8,6 +9,9 @@ struct CookResult {
     bool success = false;
     std::string error;
     int filesCooked = 0;
+    int filesCompressed = 0;
+    uint64_t rawBytes = 0;
+    uint64_t storedBytes = 0;
 };
 
 namespace PackageCooker {
@@ -21,5 +25,6 @@ namespace PackageCooker {
 
     CookResult CookToPak(const std::string& contentRoot, const std::string& outputPakFile,
                          CookCipher cipher, const std::string& cipherKey, const std::string& bootConfigText,
-                         const std::vector<ExtraPakFile>& extraFiles = {});
+                         const std::vector<ExtraPakFile>& extraFiles = {},
+                         PackCompression compression = PackCompression::None);
 }

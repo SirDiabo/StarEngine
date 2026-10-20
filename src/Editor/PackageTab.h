@@ -4,6 +4,7 @@
 #include "ConfirmPopup.h"
 #include "Core/PackagePlatform.h"
 #include "Core/PackageCipher.h"
+#include "Core/PackageCompression.h"
 #include "Core/PackageRunner.h"
 #include "Core/Project.h"
 #include "Core/AsyncTask.h"
@@ -29,6 +30,7 @@ private:
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
     CookCipher cipher = CookCipher::None;
+    PackCompression compression = PackCompression::Deflate;
     PackageFormat format = PackageFormat::SingleFile;
     std::string outputDir;
 
@@ -37,6 +39,7 @@ private:
     ChoicePopup cipherPopup;
     
     ChoicePopup formatPopup;
+    ChoicePopup compressionPopup;
     ConfirmPopup unsavedLevelPopup;
 
     std::function<bool()> hasUnsavedLevelChanges;
