@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
             std::vector<uint8_t> mappingBytes = pak.ReadEntry(StarPak::kInputMappingsPath);
             InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
         }
-        CookedFile::SetActivePak(std::move(pak), CookCipherFromName(config.cipher), config.cipherKey);
+        CookedFile::SetActivePak(std::move(pak), config.cipher, config.cipherKey);
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
 #ifdef _WIN32
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
                         std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                         InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                     }
-                    CookedFile::SetActivePak(std::move(sibling), CookCipherFromName(config.cipher), config.cipherKey);
+                    CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                     TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
                 }
             }
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
 
         if (!pakLoaded) {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-            CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+            CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
         }
@@ -182,17 +182,17 @@ int main(int argc, char* argv[]) {
                     std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                     InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                 }
-                CookedFile::SetActivePak(std::move(sibling), CookCipherFromName(config.cipher), config.cipherKey);
+                CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                 TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             } else {
                 ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-                CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+                CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
                 InputMappingRegistry::Get().Load(bootstrapDir.string());
                 TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             }
         } else {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-            CookedFile::SetActiveCipher(CookCipherFromName(config.cipher), config.cipherKey);
+            CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
         }

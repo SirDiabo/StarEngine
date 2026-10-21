@@ -192,8 +192,8 @@ public:
                 std::string text = SerializeEntries(file.entries);
                 std::vector<uint8_t> raw(text.begin(), text.end());
                 if (file.encrypted) {
-                    auto cipher = CreateCookCipher(CookCipher::XorSimple);
-                    cipher->Transform(raw, file.encryptionKey);
+                    auto cipher = CreateCookCipher(CookCiphers::XorSimple);
+                    cipher->Encrypt(raw, file.encryptionKey, kv.first);
                 }
                 jobs.emplace_back(kv.first, std::move(raw));
                 file.dirty = false;
@@ -267,8 +267,8 @@ private:
         std::vector<uint8_t> raw = ReadRawFile(path);
         if (!raw.empty()) {
             if (encrypted) {
-                auto cipher = CreateCookCipher(CookCipher::XorSimple);
-                cipher->Transform(raw, key);
+                auto cipher = CreateCookCipher(CookCiphers::XorSimple);
+                cipher->Decrypt(raw, key, path);
             }
             file.entries = ParseEntries(std::string(raw.begin(), raw.end()));
             if (versioned && !file.entries.empty() && SaveMigration::Migrate(name, file.entries)) file.dirty = true;

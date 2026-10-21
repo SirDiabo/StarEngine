@@ -1,4 +1,5 @@
 #include "StarPak.h"
+#include "Sha256.h"
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -8,7 +9,8 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr char kMagicV1[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '1'};
-constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '2'};
+constexpr char kMagicV2[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '2'};
+constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '3'};
 constexpr char kFooterMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', 'F'};
 
 #pragma pack(push, 1)
@@ -44,16 +46,17 @@ std::string ParentOf(const std::string& virtualPath) {
 namespace StarPak {
 
 void Writer::AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes) {
-    AddEntry(virtualPath, bytes, bytes.size(), PackCompression::None);
+    AddEntry(virtualPath, bytes, bytes.size(), kNoCompression);
 }
 
-void Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, PackCompression compression) {
+void Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression) {
     Entry e;
     e.path = virtualPath;
     e.offset = blob.size();
     e.size = storedBytes.size();
     e.rawSize = rawSize;
-    e.compression = compression;
+    e.compression = compression.empty() ? std::string(kNoCompression) : compression;
+    if (hashEntries) e.sha256 = Sha256::ToHex(Sha256::Compute(storedBytes));
     entries.push_back(std::move(e));
     blob.insert(blob.end(), storedBytes.begin(), storedBytes.end());
 }
@@ -68,7 +71,7 @@ bool Writer::WriteToFile(const std::string& outputPath) const {
     out.write(kMagic, sizeof(kMagic));
     out << "\n" << entries.size() << "\n";
     for (const auto& e : entries) {
-        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << (int)e.compression << "\n";
+        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << e.compression << "\t" << e.sha256 << "\n";
     }
     out.write(reinterpret_cast<const char*>(blob.data()), (std::streamsize)blob.size());
     return out.good();
@@ -91,7 +94,8 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
 
     if (buffer.size() < sizeof(kMagic)) return false;
     bool versionOne = std::memcmp(buffer.data(), kMagicV1, sizeof(kMagicV1)) == 0;
-    if (!versionOne && std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) != 0) return false;
+    bool versionTwo = std::memcmp(buffer.data(), kMagicV2, sizeof(kMagicV2)) == 0;
+    if (!versionOne && !versionTwo && std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) != 0) return false;
     pos = sizeof(kMagic);
     if (pos < buffer.size() && buffer[pos] == '\n') pos++;
 
@@ -122,9 +126,20 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
                 e.rawSize = e.size;
             } else {
                 e.rawSize = std::stoull(fields[3]);
-                int method = std::stoi(fields[4]);
-                if (!IsKnownPackCompression(method)) return false;
-                e.compression = (PackCompression)method;
+                if (versionTwo) {
+                    int method = std::stoi(fields[4]);
+                    if (method == 0) e.compression = kNoCompression;
+                    else if (method == 1) e.compression = "Deflate";
+                    else return false;
+                } else {
+                    if (fields[4].empty()) return false;
+                    e.compression = fields[4];
+                    if (fields.size() > 5 && !fields[5].empty()) {
+                        Sha256::Digest parsed;
+                        if (!Sha256::FromHex(fields[5], parsed)) return false;
+                        e.sha256 = fields[5];
+                    }
+                }
             }
         } catch (...) {
             return false;
@@ -185,13 +200,37 @@ bool Reader::GetEntryInfo(const std::string& virtualPath, Entry& out) const {
     return true;
 }
 
-std::vector<uint8_t> Reader::ReadEntry(const std::string& virtualPath) const {
+bool Reader::ReadEntryVerified(const std::string& virtualPath, std::vector<uint8_t>& out, std::string& error) const {
+    out.clear();
     auto it = indexByPath.find(virtualPath);
-    if (it == indexByPath.end()) return {};
+    if (it == indexByPath.end()) {
+        error = "entry not found";
+        return false;
+    }
 
     const Entry& e = entries[it->second];
-    if (e.offset + e.size > blob.size()) return {};
-    return std::vector<uint8_t>(blob.begin() + e.offset, blob.begin() + e.offset + e.size);
+    if (e.offset > blob.size() || e.size > blob.size() - e.offset) {
+        error = "entry lies outside the package data";
+        return false;
+    }
+
+    out.assign(blob.begin() + (std::ptrdiff_t)e.offset, blob.begin() + (std::ptrdiff_t)(e.offset + e.size));
+    if (verifyOnRead && !e.sha256.empty()) {
+        Sha256::Digest expected;
+        if (!Sha256::FromHex(e.sha256, expected) || !Sha256::Equal(expected, Sha256::Compute(out))) {
+            out.clear();
+            error = "integrity check failed (sha256 mismatch)";
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<uint8_t> Reader::ReadEntry(const std::string& virtualPath) const {
+    std::vector<uint8_t> bytes;
+    std::string error;
+    if (!ReadEntryVerified(virtualPath, bytes, error)) return {};
+    return bytes;
 }
 
 std::vector<std::string> Reader::SiblingsOf(const std::string& virtualPath) const {

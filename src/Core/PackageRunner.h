@@ -19,8 +19,9 @@ struct PackageOptions {
     std::string outputDir;
     PackagePlatform platform = PackagePlatform::Linux;
     GameRenderer renderer = GameRenderer::Hardware;
-    CookCipher cipher = CookCipher::None;
-    PackCompression compression = PackCompression::None;
+    std::string cipher = CookCiphers::None;
+    std::string compression = PackCompressions::None;
+    bool integrity = true;
     PackageFormat format = PackageFormat::SingleFile;
 };
 

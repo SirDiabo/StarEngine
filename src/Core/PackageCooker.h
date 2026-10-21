@@ -10,13 +10,14 @@ struct CookResult {
     std::string error;
     int filesCooked = 0;
     int filesCompressed = 0;
+    int filesHashed = 0;
     uint64_t rawBytes = 0;
     uint64_t storedBytes = 0;
 };
 
 namespace PackageCooker {
     CookResult CookLoose(const std::string& contentRoot, const std::string& outputContentDir,
-                          CookCipher cipher, const std::string& cipherKey);
+                          const std::string& cipher, const std::string& cipherKey);
 
     struct ExtraPakFile {
         std::string virtualPath;
@@ -24,7 +25,8 @@ namespace PackageCooker {
     };
 
     CookResult CookToPak(const std::string& contentRoot, const std::string& outputPakFile,
-                         CookCipher cipher, const std::string& cipherKey, const std::string& bootConfigText,
+                         const std::string& cipher, const std::string& cipherKey, const std::string& bootConfigText,
                          const std::vector<ExtraPakFile>& extraFiles = {},
-                         PackCompression compression = PackCompression::None);
+                         const std::string& compression = PackCompressions::None,
+                         bool hashEntries = true);
 }

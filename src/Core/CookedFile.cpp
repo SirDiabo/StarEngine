@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 
 namespace {
     bool usingPak = false;
-    CookCipher activeCipher = CookCipher::None;
+    std::string activeCipher = CookCiphers::None;
     std::string activeKey;
 
     StarPak::Reader activePak;
@@ -47,19 +47,28 @@ namespace {
             fs::create_directories(mirroredDir, ec);
 
             auto cipherImpl = CreateCookCipher(activeCipher);
+            if (!cipherImpl) {
+                TraceLog(LOG_ERROR, "CookedFile: encryption method '%s' is not available. Is the module that provides it enabled?", activeCipher.c_str());
+                return "";
+            }
             for (const std::string& sibling : activePak.SiblingsOf(virtualPath)) {
                 if (ParentOf(sibling) != parent) continue;
 
                 StarPak::Entry info;
                 if (!activePak.GetEntryInfo(sibling, info)) continue;
 
-                std::vector<uint8_t> bytes = activePak.ReadEntry(sibling);
-                cipherImpl->Transform(bytes, activeKey);
+                std::vector<uint8_t> bytes;
+                std::string readError;
+                if (!activePak.ReadEntryVerified(sibling, bytes, readError)) {
+                    TraceLog(LOG_ERROR, "CookedFile: could not read %s: %s", sibling.c_str(), readError.c_str());
+                    continue;
+                }
+                cipherImpl->Decrypt(bytes, activeKey, sibling);
 
-                if (info.compression != PackCompression::None) {
+                if (info.compression != StarPak::kNoCompression) {
                     std::vector<uint8_t> raw;
                     if (!PackageCompression::Decompress(info.compression, bytes, info.rawSize, raw)) {
-                        TraceLog(LOG_WARNING, "CookedFile: could not decompress %s", sibling.c_str());
+                        TraceLog(LOG_ERROR, "CookedFile: could not decompress %s (method '%s' missing or data damaged)", sibling.c_str(), info.compression.c_str());
                         continue;
                     }
                     bytes.swap(raw);
@@ -79,18 +88,18 @@ namespace {
     }
 }
 
-void CookedFile::SetActiveCipher(CookCipher cipher, const std::string& key) {
+void CookedFile::SetActiveCipher(const std::string& cipher, const std::string& key) {
     usingPak = false;
-    activeCipher = cipher;
+    activeCipher = cipher.empty() ? CookCiphers::None : cipher;
     activeKey = key;
     decipheredPaths.clear();
     extractedDirs.clear();
 }
 
-void CookedFile::SetActivePak(StarPak::Reader&& pak, CookCipher cipher, const std::string& key) {
+void CookedFile::SetActivePak(StarPak::Reader&& pak, const std::string& cipher, const std::string& key) {
     activePak = std::move(pak);
     usingPak = true;
-    activeCipher = cipher;
+    activeCipher = cipher.empty() ? CookCiphers::None : cipher;
     activeKey = key;
     decipheredPaths.clear();
     extractedDirs.clear();
@@ -100,7 +109,7 @@ std::string CookedFile::Open(const std::string& path) {
     if (usingPak) return OpenFromPak(path);
 
     std::string resolved = ContentPathResolver::Resolve(path);
-    if (activeCipher == CookCipher::None || resolved.empty()) return resolved;
+    if (activeCipher == CookCiphers::None || resolved.empty()) return resolved;
 
     auto cached = decipheredPaths.find(resolved);
     if (cached != decipheredPaths.end()) return cached->second;
@@ -115,6 +124,11 @@ std::string CookedFile::Open(const std::string& path) {
     fs::path mirroredDir = tempDir / std::to_string(dirHash);
 
     if (!fs::exists(mirroredDir, ec)) {
+        auto looseCipher = CreateCookCipher(activeCipher);
+        if (!looseCipher) {
+            TraceLog(LOG_ERROR, "CookedFile: encryption method '%s' is not available. Is the module that provides it enabled?", activeCipher.c_str());
+            return resolved;
+        }
         fs::create_directories(mirroredDir, ec);
         for (const auto& entry : fs::directory_iterator(sourceDir, ec)) {
             if (!entry.is_regular_file()) continue;
@@ -124,7 +138,7 @@ std::string CookedFile::Open(const std::string& path) {
             std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             in.close();
 
-            CreateCookCipher(activeCipher)->Transform(data, activeKey);
+            looseCipher->Decrypt(data, activeKey, ContentPathResolver::MakeRelative(entry.path().string()));
 
             std::ofstream out(mirroredDir / entry.path().filename(), std::ios::binary);
             out.write(reinterpret_cast<const char*>(data.data()), (std::streamsize)data.size());

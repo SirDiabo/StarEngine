@@ -1,4 +1,5 @@
 #include "PackageCompression.h"
+#include "Module.h"
 #include "raylib.h"
 #include <climits>
 #include <cstring>
@@ -286,46 +287,87 @@ bool DeflateDecompress(const std::vector<uint8_t>& input, uint64_t rawSize, std:
     return true;
 }
 
-}
 
-std::vector<PackCompression> AllPackCompressions() {
-    return { PackCompression::None, PackCompression::Deflate };
-}
-
-std::string PackCompressionName(PackCompression method) {
-    switch (method) {
-        case PackCompression::Deflate: return "Deflate";
-        case PackCompression::None:    return "None";
+class DeflateCompressor : public IPackCompressor {
+public:
+    bool Compress(const std::vector<uint8_t>& input, std::vector<uint8_t>& output) const override {
+        return DeflateCompress(input, output);
     }
-    return "None";
-}
 
-std::string PackCompressionDisplayName(PackCompression method) {
-    switch (method) {
-        case PackCompression::Deflate: return "Deflate (smaller package)";
-        case PackCompression::None:    return "None";
+    bool Decompress(const std::vector<uint8_t>& input, uint64_t rawSize, std::vector<uint8_t>& output) const override {
+        return DeflateDecompress(input, rawSize, output);
     }
-    return "None";
+};
+
 }
 
-PackCompression PackCompressionFromName(const std::string& name) {
-    if (name == "Deflate") return PackCompression::Deflate;
-    return PackCompression::None;
+PackCompressionRegistry& PackCompressionRegistry::Get() {
+    static PackCompressionRegistry instance;
+    return instance;
 }
 
-bool PackageCompression::Compress(PackCompression method, const std::vector<uint8_t>& input, std::vector<uint8_t>& output) {
-    output.clear();
-    if (method == PackCompression::Deflate) return DeflateCompress(input, output);
+PackCompressionRegistry::PackCompressionRegistry() {
+    PackCompressionInfo none;
+    none.id = PackCompressions::None;
+    none.displayName = "None";
+    none.description = "Files are stored as they are.";
+    methods.push_back(none);
+
+    PackCompressionInfo deflate;
+    deflate.id = PackCompressions::Deflate;
+    deflate.displayName = "Deflate (smaller package)";
+    deflate.description = "Applied before encryption. Files that do not shrink, such as png or ogg, are stored as they are.";
+    deflate.compressor = std::make_shared<DeflateCompressor>();
+    methods.push_back(deflate);
+}
+
+void PackCompressionRegistry::Register(const PackCompressionInfo& info) {
+    if (info.id.empty() || !info.compressor) return;
+    std::lock_guard<std::mutex> lock(mutex);
+    for (PackCompressionInfo& existing : methods) {
+        if (existing.id == info.id) {
+            existing = info;
+            return;
+        }
+    }
+    methods.push_back(info);
+}
+
+bool PackCompressionRegistry::Find(const std::string& id, PackCompressionInfo& out) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    for (const PackCompressionInfo& info : methods) {
+        if (info.id == id) {
+            out = info;
+            return true;
+        }
+    }
     return false;
 }
 
-bool PackageCompression::Decompress(PackCompression method, const std::vector<uint8_t>& input, uint64_t rawSize, std::vector<uint8_t>& output) {
+bool PackCompressionRegistry::IsAvailable(const PackCompressionInfo& info) const {
+    return info.moduleName.empty() || ModuleManager::Get().IsModuleEnabled(info.moduleName);
+}
+
+std::vector<PackCompressionInfo> PackCompressionRegistry::GetAll() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return methods;
+}
+
+bool PackageCompression::Compress(const std::string& id, const std::vector<uint8_t>& input, std::vector<uint8_t>& output) {
     output.clear();
-    if (method == PackCompression::None) {
+    PackCompressionInfo info;
+    if (!PackCompressionRegistry::Get().Find(id, info) || !info.compressor) return false;
+    return info.compressor->Compress(input, output);
+}
+
+bool PackageCompression::Decompress(const std::string& id, const std::vector<uint8_t>& input, uint64_t rawSize, std::vector<uint8_t>& output) {
+    output.clear();
+    if (id.empty() || id == PackCompressions::None) {
         if (input.size() != rawSize) return false;
         output = input;
         return true;
     }
-    if (method == PackCompression::Deflate) return DeflateDecompress(input, rawSize, output);
-    return false;
+    PackCompressionInfo info;
+    if (!PackCompressionRegistry::Get().Find(id, info) || !info.compressor) return false;
+    return info.compressor->Decompress(input, rawSize, output);
 }

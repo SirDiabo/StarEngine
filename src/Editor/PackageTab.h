@@ -29,8 +29,11 @@ private:
     std::vector<PackagePlatformInfo> platforms;
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
-    CookCipher cipher = CookCipher::None;
-    PackCompression compression = PackCompression::Deflate;
+    std::string cipher = CookCiphers::None;
+    std::string compression = PackCompressions::Deflate;
+    bool integrity = true;
+    std::vector<std::string> cipherChoiceIds;
+    std::vector<std::string> compressionChoiceIds;
     PackageFormat format = PackageFormat::SingleFile;
     std::string outputDir;
 
@@ -40,6 +43,7 @@ private:
     
     ChoicePopup formatPopup;
     ChoicePopup compressionPopup;
+    ChoicePopup integrityPopup;
     ConfirmPopup unsavedLevelPopup;
 
     std::function<bool()> hasUnsavedLevelChanges;
