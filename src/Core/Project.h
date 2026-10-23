@@ -17,6 +17,7 @@ struct ProjectSettings {
     GameRenderer renderer = GameRenderer::Hardware;
     std::vector<std::string> disabledModules;
     std::string saveEncryptionKey;
+    std::string iconPath;
 };
 
 class Project {

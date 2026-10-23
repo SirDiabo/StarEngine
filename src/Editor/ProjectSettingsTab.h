@@ -13,6 +13,7 @@ class TextElement;
 
 class ProjectSettingsTab : public EditorTab {
 public:
+    ~ProjectSettingsTab() override;
     void Initialize() override;
     void Render(float x, float y, float width, float height) override;
     void BuildMenus(MenuBar* menuBar) override;
@@ -31,6 +32,10 @@ private:
     void CommitMigrations();
 
     SettingsSwitcher switcher;
+
+    Texture2D iconPreview{};
+    std::string iconPreviewSource;
+    std::string iconError;
 
     AssetPickerPopup mapPicker;
     AssetPickerPopup gameMapPicker;

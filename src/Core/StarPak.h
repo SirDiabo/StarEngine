@@ -8,6 +8,7 @@ namespace StarPak {
 
 constexpr const char* kBootConfigPath = "__boot__";
 constexpr const char* kInputMappingsPath = "__input_mappings__";
+constexpr const char* kIconPath = "__icon__";
 constexpr const char* kNoCompression = "None";
 
 struct Entry {

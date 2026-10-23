@@ -87,6 +87,7 @@ int main(int argc, char* argv[]) {
     }
 
     PackagedGameConfig config;
+    std::vector<uint8_t> embeddedIcon;
 
     StarPak::Reader pak;
     if (!exePath.empty() && pak.LoadFromExecutable(exePath.string())) {
@@ -103,6 +104,7 @@ int main(int argc, char* argv[]) {
             std::vector<uint8_t> mappingBytes = pak.ReadEntry(StarPak::kInputMappingsPath);
             InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
         }
+        if (pak.HasEntry(StarPak::kIconPath)) embeddedIcon = pak.ReadEntry(StarPak::kIconPath);
         CookedFile::SetActivePak(std::move(pak), config.cipher, config.cipherKey);
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
@@ -151,6 +153,7 @@ int main(int argc, char* argv[]) {
                         std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                         InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                     }
+                    if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
                     CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                     TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
                 }
@@ -182,6 +185,7 @@ int main(int argc, char* argv[]) {
                     std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                     InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                 }
+                if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
                 CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                 TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             } else {
@@ -223,8 +227,17 @@ int main(int argc, char* argv[]) {
     int renderTargetWidth = 0;
     int renderTargetHeight = 0;
 
+    bool windowIconSet = false;
+    if (!embeddedIcon.empty()) {
+        Image icon = LoadImageFromMemory(".png", embeddedIcon.data(), (int)embeddedIcon.size());
+        if (icon.data) {
+            SetWindowIcon(icon);
+            UnloadImage(icon);
+            windowIconSet = true;
+        }
+    }
     fs::path iconPath = exeDir / "icon.png";
-    if (fs::exists(iconPath)) {
+    if (!windowIconSet && fs::exists(iconPath)) {
         Image icon = LoadImage(iconPath.string().c_str());
         if (icon.data) {
             SetWindowIcon(icon);

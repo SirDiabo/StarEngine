@@ -13,6 +13,8 @@ include(cmake/StarEngineModule.cmake)
 # Discovers built-in + project modules
 include(cmake/DiscoverModules.cmake)
 
+include(cmake/StarWindowsIcon.cmake)
+
 set(MODULES_GENERATED_FILE "${CMAKE_BINARY_DIR}/Modules.modules.generated.h")
 
 add_custom_target(generate_modules ALL
@@ -30,6 +32,7 @@ add_custom_target(generate_modules ALL
 )
 
 if(STARENGINE_BUILD_GAME)
+
     file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS "src/Core/*.cpp" "src/Runtime/*.cpp" "src/Modules/*.cpp")
     list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/Core/Application\\.cpp$")
     list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/Modules/[^/]+/Editor/.*")
@@ -37,6 +40,10 @@ if(STARENGINE_BUILD_GAME)
 
     add_executable(StarEngineGame ${GAME_SOURCES} src/GameMain.cpp ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngineGame generate_modules)
+
+    if(STAR_GAME_ICON_ICO)
+        star_embed_windows_icon(StarEngineGame "${STAR_GAME_ICON_ICO}")
+    endif()
 
     target_include_directories(StarEngineGame PRIVATE src)
     target_include_directories(StarEngineGame PRIVATE "${CMAKE_BINARY_DIR}")
@@ -70,6 +77,7 @@ else()
 
     add_executable(StarEngine ${SOURCES} ${MODULES_GENERATED_FILE})
     add_dependencies(StarEngine generate_modules)
+    star_embed_windows_icon(StarEngine "${CMAKE_SOURCE_DIR}/src/Resources/StarEngine.ico")
 
     target_include_directories(StarEngine PRIVATE src)
     target_include_directories(StarEngine PRIVATE "${CMAKE_BINARY_DIR}")

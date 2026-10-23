@@ -96,6 +96,7 @@ bool Project::Load(const std::string& path) {
         else if (key == "defaultMap") settings.editorDefaultMapPath = value;
         else if (key == "renderer") settings.renderer = GameRendererFromName(value);
         else if (key == "saveEncryptionKey") settings.saveEncryptionKey = value;
+        else if (key == "icon") settings.iconPath = value;
         else if (key == "disabledModules") {
             settings.disabledModules.clear();
             std::stringstream ss(value);
@@ -151,6 +152,7 @@ void Project::Save() {
     out << "gameDefaultMap=" << settings.gameDefaultMapPath << "\n";
     out << "renderer=" << GameRendererName(settings.renderer) << "\n";
     out << "saveEncryptionKey=" << settings.saveEncryptionKey << "\n";
+    out << "icon=" << settings.iconPath << "\n";
 
     out << "disabledModules=";
     for (size_t i = 0; i < settings.disabledModules.size(); i++) {

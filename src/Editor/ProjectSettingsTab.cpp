@@ -8,6 +8,9 @@
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/CollisionLayers.h"
+#include "Core/IconBuilder.h"
+#include "Core/EmbeddedAssets.h"
+#include "NativeFileDialog.h"
 #include "Core/Widgets/WidgetElement.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -41,6 +44,10 @@ static bool InlineBoolBox(Rectangle r, bool& value) {
         return true;
     }
     return false;
+}
+
+ProjectSettingsTab::~ProjectSettingsTab() {
+    if (iconPreview.id != 0) UnloadTexture(iconPreview);
 }
 
 void ProjectSettingsTab::Initialize() {
@@ -99,6 +106,71 @@ void ProjectSettingsTab::RenderGeneralCategory(Rectangle area) {
     DrawRectangleLinesEx(nameRow, 1, theme.fieldBorder);
     DrawText(settings.name.c_str(), (int)nameRow.x + 6, (int)nameRow.y + 4, 12, theme.textPrimary);
     fy += 34;
+
+    DrawText("Game Icon", (int)fx, (int)fy, 11, theme.textSecondary);
+    fy += 14;
+
+    const std::string& projectRoot = Project::Get().GetRootPath();
+    std::error_code iconEc;
+    fs::path customIconFile = settings.iconPath.empty() ? fs::path() : fs::path(projectRoot) / settings.iconPath;
+    const bool hasCustomIcon = !settings.iconPath.empty() && fs::exists(customIconFile, iconEc);
+
+    std::string wantedPreview = hasCustomIcon ? customIconFile.string() : std::string("default");
+    if (wantedPreview != iconPreviewSource) {
+        if (iconPreview.id != 0) UnloadTexture(iconPreview);
+        iconPreview = hasCustomIcon ? LoadTexture(customIconFile.string().c_str()) : EmbeddedAssets::Get().LoadTextureAsset("logo.png");
+        iconPreviewSource = wantedPreview;
+    }
+
+    Rectangle previewBox = {fx, fy, 56, 56};
+    DrawRectangleRec(previewBox, theme.fieldBg);
+    DrawRectangleLinesEx(previewBox, 1, theme.fieldBorder);
+    if (iconPreview.id != 0) {
+        DrawTexturePro(iconPreview, {0, 0, (float)iconPreview.width, (float)iconPreview.height},
+                       {previewBox.x + 4, previewBox.y + 4, previewBox.width - 8, previewBox.height - 8}, {0, 0}, 0.0f, WHITE);
+    }
+
+    float controlX = fx + 68;
+    Rectangle iconNameRow = {controlX, fy, fw - 68, 20};
+    DrawRectangleRec(iconNameRow, theme.fieldBg);
+    DrawRectangleLinesEx(iconNameRow, 1, theme.fieldBorder);
+    std::string iconLabel = hasCustomIcon ? settings.iconPath : std::string("Default (StarEngine logo)");
+    DrawText(iconLabel.c_str(), (int)iconNameRow.x + 6, (int)iconNameRow.y + 4, 12, theme.textPrimary);
+
+    if (InlineButton({controlX, fy + 28, 90, 22}, "Browse...")) {
+        std::string chosen = NativeFileDialog::OpenFile("Choose Game Icon", projectRoot, "Image (png, jpg, bmp)", "*.png;*.jpg;*.jpeg;*.bmp");
+        if (!chosen.empty()) {
+            IconBuilder::Result built;
+            if (!IconBuilder::BuildFromFile(chosen, built)) {
+                iconError = built.error;
+            } else {
+                fs::path stored = fs::path(projectRoot) / "Config" / "GameIcon.png";
+                if (IconBuilder::WriteBytes(stored.string(), built.png)) {
+                    settings.iconPath = "Config/GameIcon.png";
+                    Project::Get().Save();
+                    iconError.clear();
+                    iconPreviewSource.clear();
+                } else {
+                    iconError = "The icon could not be saved into the project.";
+                }
+            }
+        }
+    }
+    if (hasCustomIcon && InlineButton({controlX + 98, fy + 28, 70, 22}, "Reset")) {
+        fs::remove(customIconFile, iconEc);
+        settings.iconPath.clear();
+        Project::Get().Save();
+        iconError.clear();
+    }
+    fy += 64;
+
+    if (!iconError.empty()) {
+        DrawText(iconError.c_str(), (int)fx, (int)fy, 10, theme.danger);
+        fy += 14;
+    }
+    DrawText("Used for the window and, on Windows, the executable itself. Square images of 256x256 or larger work best.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 24;
 }
 
 void ProjectSettingsTab::RenderMapsCategory(Rectangle area) {

@@ -4,6 +4,7 @@
 #include "SafeProcess.h"
 #include "EngineRoot.h"
 #include "CMakeBuild.h"
+#include "IconBuilder.h"
 #include "BuildDiagnostics.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
@@ -193,6 +194,32 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         fs::remove_all(buildDir, wipeEc);
     }
 
+    IconBuilder::Result gameIcon;
+    const std::string configuredIcon = Project::Get().GetSettings().iconPath;
+    const std::string iconSource = IconBuilder::ResolveSourcePath(options.projectRoot, configuredIcon, engineRoot.string());
+    bool haveIcon = IconBuilder::BuildFromFile(iconSource, gameIcon);
+    std::string iconNote;
+    if (!haveIcon) {
+        iconNote = "Warning: " + gameIcon.error + " Using the default icon.\n";
+        haveIcon = IconBuilder::BuildFromFile((engineRoot / "Assets" / "logo.png").string(), gameIcon);
+    }
+    std::string windowsIconFile;
+    if (haveIcon && options.platform == PackagePlatform::Windows) {
+        std::error_code iconEc;
+        fs::create_directories(buildDir, iconEc);
+        fs::path icoPath = buildDir / "game_icon.ico";
+        if (IconBuilder::WriteBytes(icoPath.string(), gameIcon.ico)) windowsIconFile = icoPath.generic_string();
+    }
+    if (haveIcon) {
+        bool customIcon = !configuredIcon.empty() && iconNote.empty() && iconSource != (engineRoot / "Assets" / "logo.png").string();
+        iconNote += std::string("Icon: ") + (customIcon ? fs::path(iconSource).filename().string() : "default StarEngine logo") +
+                    (windowsIconFile.empty() ? "" : ", embedded in the executable") + ".\n";
+    }
+    if (!iconNote.empty()) {
+        result.log += iconNote;
+        if (onOutput) onOutput(iconNote);
+    }
+
     std::string toolchainFile = WriteToolchainFileIfNeeded(options.platform, buildDir.string());
 
     std::string wslEngineRoot = engineRoot.string();
@@ -218,6 +245,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     configureArgs.push_back(wslBuildDir);
     configureArgs.push_back("-DSTARENGINE_BUILD_GAME=ON");
     configureArgs.push_back("-DCMAKE_BUILD_TYPE=Release");
+    if (!windowsIconFile.empty()) configureArgs.push_back("-DSTAR_GAME_ICON_ICO=" + windowsIconFile);
     if (!wslToolchainFile.empty()) {
         configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + wslToolchainFile);
     }
@@ -431,11 +459,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         }
     }
 
-    fs::path defaultIcon = engineRoot / "Assets" / "logo.png";
-    if (fs::exists(defaultIcon)) {
-        fs::copy_file(defaultIcon, fs::path(options.outputDir) / "icon.png",
-                       fs::copy_options::overwrite_existing, ec);
-        ec.clear();
+    if (options.format == PackageFormat::LooseFolder && haveIcon) {
+        IconBuilder::WriteBytes((fs::path(options.outputDir) / "icon.png").string(), gameIcon.png);
     }
 
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
@@ -470,6 +495,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         if (!inputMappingsBytes.empty()) {
             extraFiles.push_back({StarPak::kInputMappingsPath, inputMappingsBytes});
         }
+        if (haveIcon) extraFiles.push_back({StarPak::kIconPath, gameIcon.png});
 
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
                                                             options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression, options.integrity);
