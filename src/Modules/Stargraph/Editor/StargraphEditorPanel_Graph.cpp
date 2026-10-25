@@ -997,7 +997,7 @@ void StargraphEditorPanel::RenderWireInProgress() {
 
 void StargraphEditorPanel::RenderGraph(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
-    previewGizmoState.hoverAxis = -1;
+    actorEditor.ResetGizmoHover();
 
     if (openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()) {
         Rectangle bar = {area.x, area.y, area.width, 22};
@@ -1222,8 +1222,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     lastValidVariableIndex = -1;
                     selectedFunctionIndex = -1;
                     lastValidFunctionIndex = -1;
-                    selectedComponentIndex = -1;
-                    lastValidComponentIndex = -1;
+                    actorEditor.ClearSelection();
                     selectedLocalVariableIndex = -1;
                     lastValidLocalVariableIndex = -1;
                     draggingNode = true;
@@ -1617,8 +1616,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 lastValidVariableIndex = -1;
                 selectedFunctionIndex = -1;
                 lastValidFunctionIndex = -1;
-                selectedComponentIndex = -1;
-                lastValidComponentIndex = -1;
+                actorEditor.ClearSelection();
                 selectedLocalVariableIndex = -1;
                 lastValidLocalVariableIndex = -1;
                 draggingNode = true;

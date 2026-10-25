@@ -22,7 +22,22 @@ const float StargraphEditorPanel::headerHeight   = 26.0f;
 const float StargraphEditorPanel::toolbarHeight  = 30.0f;
 const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
 
+StargraphEditorPanel::~StargraphEditorPanel() {
+    if (undoDocument) {
+        UndoManager::Get().UnregisterDocument(undoDocument);
+        delete undoDocument;
+        undoDocument = nullptr;
+    }
+    delete leftChrome;
+}
+
 void StargraphEditorPanel::Initialize() {
+    ActorClassEditorHost host;
+    host.components = [this]() -> std::vector<ComponentDecl>& { return graph.GetComponents(); };
+    host.markDirty = [this]() { isDirty = true; };
+    host.onComponentSelected = [this]() { ClearOtherLeftSelections(3); };
+    actorEditor.SetHost(std::move(host));
+
     if (undoDocument) return;
     undoDocument = new FunctionUndoDocument();
     undoDocument->name = "Graph Edit";
@@ -95,8 +110,7 @@ void StargraphEditorPanel::RestoreUndoState(const std::string& content, const st
     if (lastValidVariableIndex >= (int)graph.GetVariables().size()) lastValidVariableIndex = -1;
     if (selectedFunctionIndex >= (int)graph.GetFunctions().size()) selectedFunctionIndex = -1;
     if (lastValidFunctionIndex >= (int)graph.GetFunctions().size()) lastValidFunctionIndex = -1;
-    if (selectedComponentIndex >= (int)graph.GetComponents().size()) selectedComponentIndex = -1;
-    if (lastValidComponentIndex >= (int)graph.GetComponents().size()) lastValidComponentIndex = -1;
+    actorEditor.OnDocumentReplaced();
     if (selectedLocalVariableIndex >= (int)ActiveGraph().GetVariables().size()) selectedLocalVariableIndex = -1;
     if (lastValidLocalVariableIndex >= (int)ActiveGraph().GetVariables().size()) lastValidLocalVariableIndex = -1;
 
@@ -115,8 +129,7 @@ void StargraphEditorPanel::OpenFunctionGraph(int index) {
     lastValidLocalVariableIndex = -1;
     selectedVariableIndex = -1;
     lastValidVariableIndex = -1;
-    selectedComponentIndex = -1;
-    lastValidComponentIndex = -1;
+    actorEditor.ClearSelection();
 }
 
 void StargraphEditorPanel::CloseFunctionGraph() {
@@ -136,6 +149,8 @@ bool StargraphEditorPanel::Open(const std::string& path) {
     isOpen = true;
     isDirty = false;
     embedded = false;
+    actorEditor.OnDocumentReplaced();
+    actorEditor.ClearSelection();
     ResetTransientEditState();
     if (undoDocument) UndoManager::Get().ForgetHistory(undoDocument);
     return true;
@@ -147,6 +162,8 @@ bool StargraphEditorPanel::OpenEmbedded(const Stargraph& initialGraph, const std
     isOpen = true;
     isDirty = false;
     embedded = true;
+    actorEditor.OnDocumentReplaced();
+    actorEditor.ClearSelection();
     ResetTransientEditState();
     if (undoDocument) UndoManager::Get().ForgetHistory(undoDocument);
     return true;
@@ -260,8 +277,7 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
                 selectedNodeId = -1;
                 selectedNodeIds.clear();
                 selectedVariableIndex = -1;
-                selectedComponentIndex = -1;
-                lastValidComponentIndex = -1;
+                actorEditor.ClearSelection();
             }
         }
         if (canStop && CheckCollisionPointRec(mp, stopBtn)) {

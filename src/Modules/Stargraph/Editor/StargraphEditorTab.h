@@ -4,11 +4,11 @@
 #include <string>
 
 class StargraphEditorPanel;
-class StargraphOutlinerPanel;
+class ComponentOutlinerPanel;
 class StargraphPanel;
 class StargraphGraphPanel;
 class StargraphDetailsPanel;
-class StargraphPreviewPanel;
+class ActorPreviewPanel;
 class LogPanel;
 class MenuBar;
 class ViewportPanel;
@@ -42,11 +42,11 @@ private:
     DockArea dockArea;
 
     StargraphEditorPanel*    panel          = nullptr;
-    StargraphOutlinerPanel*  outlinerPanel  = nullptr;
+    ComponentOutlinerPanel*  outlinerPanel  = nullptr;
     StargraphPanel*          stargraphPanel = nullptr;
     StargraphGraphPanel*     graphPanel     = nullptr;
     StargraphDetailsPanel*   detailsPanel   = nullptr;
-    StargraphPreviewPanel*   previewPanel   = nullptr;
+    ActorPreviewPanel*       previewPanel   = nullptr;
     LogPanel* logPanel = nullptr;
     ViewportPanel* viewportPanel = nullptr;
 };

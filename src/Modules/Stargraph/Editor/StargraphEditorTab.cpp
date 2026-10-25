@@ -1,10 +1,9 @@
 #include "StargraphEditorTab.h"
 #include "StargraphEditorPanel.h"
-#include "StargraphOutlinerPanel.h"
+#include "Editor/ActorClassPanels.h"
 #include "StargraphPanel.h"
 #include "StargraphGraphPanel.h"
 #include "StargraphDetailsPanel.h"
-#include "StargraphPreviewPanel.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
 #include "Editor/EditorUndo.h"
@@ -35,15 +34,15 @@ void StargraphEditorTab::Initialize() {
     panel->SetViewportPanel(viewportPanel);
     panel->SetUndoOwner([this]() { EditorUndo::RevealTab(this); }, [this]() { return EditorUndo::IsTabActive(this); });
     panel->Open(assetPath);
-    panel->SetOnTogglePreviewFullscreen([this]() {
+    panel->GetActorEditor().SetOnTogglePreviewFullscreen([this]() {
         dockArea.ToggleMaximizedPanel("Preview");
     });
 
-    outlinerPanel  = new StargraphOutlinerPanel();
+    outlinerPanel  = new ComponentOutlinerPanel();
     stargraphPanel = new StargraphPanel();
     graphPanel     = new StargraphGraphPanel();
     detailsPanel   = new StargraphDetailsPanel();
-    previewPanel   = new StargraphPreviewPanel();
+    previewPanel   = new ActorPreviewPanel();
 
     outlinerPanel->Initialize();
     stargraphPanel->Initialize();
@@ -51,11 +50,12 @@ void StargraphEditorTab::Initialize() {
     detailsPanel->Initialize();
     previewPanel->Initialize();
 
-    outlinerPanel->SetSession(panel);
+    outlinerPanel->SetEditor(&panel->GetActorEditor());
+    outlinerPanel->SetScreenBoundsProvider([this]() { return panel->GetScreenBounds(); });
     stargraphPanel->SetSession(panel);
     graphPanel->SetSession(panel);
     detailsPanel->SetSession(panel);
-    previewPanel->SetSession(panel);
+    previewPanel->SetEditor(&panel->GetActorEditor());
 
     std::vector<Panel*> panels = { outlinerPanel, stargraphPanel, graphPanel, detailsPanel, previewPanel };
     if (logPanel) panels.push_back(logPanel);
@@ -120,7 +120,7 @@ void StargraphEditorTab::Render(float x, float y, float width, float height) {
 
     panel->SetScreenBounds({ x, y, width, height });
     panel->RenderToolbar({ x, y, width, toolbarH });
-    panel->SetPreviewFullscreen(dockArea.IsPanelMaximized("Preview"));
+    panel->GetActorEditor().SetPreviewFullscreen(dockArea.IsPanelMaximized("Preview"));
 
     dockArea.Render({ x, y + toolbarH, width, height - toolbarH });
 }

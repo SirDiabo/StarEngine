@@ -1,7 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "Modules/Stargraph/Stargraph.h"
-#include "Editor/ComponentEditing.h"
+#include "Editor/ActorClassEditor.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "GraphCanvas.h"
 #include "Editor/AssetPickerPopup.h"
@@ -9,7 +9,6 @@
 #include "Editor/SearchableListPopup.h"
 #include "Editor/ChoicePopup.h"
 #include "Core/Widgets/TreeListElement.h"
-#include "Editor/GizmoRenderer.h"
 #include "Editor/PropertyPanel.h"
 #include <string>
 #include <vector>
@@ -21,24 +20,6 @@ class ViewportPanel;
 class FunctionUndoDocument;
 
 std::string StargraphPinAssetExtension(const Pin& pin);
-
-template <typename T>
-inline void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDropPosition pos) {
-    if (fromIndex < 0 || fromIndex >= (int)items.size()) return;
-    if (toIndex < 0 || toIndex >= (int)items.size()) return;
-    if (fromIndex == toIndex) return;
-
-    T moved = items[fromIndex];
-    items.erase(items.begin() + fromIndex);
-
-    int insertAt = toIndex;
-    if (fromIndex < toIndex) insertAt--;
-    if (pos == TreeDropPosition::After) insertAt++;
-    if (insertAt < 0) insertAt = 0;
-    if (insertAt > (int)items.size()) insertAt = (int)items.size();
-
-    items.insert(items.begin() + insertAt, moved);
-}
 
 class Widget;
 class VerticalBoxElement;
@@ -68,12 +49,13 @@ public:
     }
 
     void SetScreenBounds(Rectangle b) { screenBounds = b; }
+    Rectangle GetScreenBounds() const { return screenBounds; }
+    ActorClassEditor& GetActorEditor() { return actorEditor; }
 
     static float GetToolbarHeight() { return toolbarHeight; }
 
     void SaveGraph();
     void RenderToolbar(Rectangle area);
-    void RenderComponentOutliner(Rectangle area);
     void RenderLeftPanel(Rectangle area);
     void RenderLeftPanelPopups();
     void RenderGraph(Rectangle area);
@@ -85,25 +67,18 @@ public:
     void CloseNodeMenu();
     void SpawnNodeFromMenu(const std::string& nodeTypeIdIn, const std::string& sourceKind);
 
-    void RenderPreviewViewport(Rectangle area);
-    void SetPreviewFullscreen(bool v) { previewFullscreen = v; }
-    void SetOnTogglePreviewFullscreen(std::function<void()> cb) { onTogglePreviewFullscreen = cb; }
 
 public:
     bool IsDirty() const { return isDirty; }
 private:
     void ResetTransientEditState();
 
-    void BuildComponentRows(std::vector<PropertyRow>& rows, int index);
     void BuildVariableRows(std::vector<PropertyRow>& rows, int index, bool isLocal);
     void BuildFunctionRows(std::vector<PropertyRow>& rows, int index);
     void BuildCustomEventRows(std::vector<PropertyRow>& rows, int nodeId);
     void BuildCallCustomEventRows(std::vector<PropertyRow>& rows, int nodeId);
     void BuildCallFunctionRows(std::vector<PropertyRow>& rows, int nodeId);
     void BuildGenericNodeRows(std::vector<PropertyRow>& rows, int nodeId);
-    ComponentDecl* DetailComponent(int index);
-    void SetComponentField(int index, const std::string& fieldKey, const std::string& value);
-    LiveComponentCache liveComponents;
     Variable* DetailVariable(int index, bool isLocal);
     FunctionDef* DetailFunction(int index);
     Node* DetailNode(int nodeId);
@@ -141,6 +116,7 @@ private:
     std::function<bool()> undoOwnerActive;
 
     Stargraph graph;
+    ActorClassEditor actorEditor;
     std::string filePath;
     bool isOpen = false;
     bool isDirty = false;
@@ -159,11 +135,6 @@ private:
     int leftContextKind = -1;
     int leftContextIndex = -1;
     void BuildLeftPanelChrome();
-    void BuildComponentChrome();
-    Widget* compChrome = nullptr;
-    VerticalBoxElement* compRoot = nullptr;
-    TreeListElement* compList = nullptr;
-    TextElement* compEmptyText = nullptr;
     void ClearOtherLeftSelections(int keepKind);
     void RemoveFunctionAt(int index);
     TextElement* graphNameText = nullptr;
@@ -254,65 +225,17 @@ private:
     Vector2 elementDragPos{0, 0};
     bool elementDragActive = false;
 
-    int selectedComponentIndex = -1;
-    int lastValidComponentIndex = -1;
-    SearchableListPopup addComponentMenu;
-
     AssetPickerPopup actorClassPicker;
     int actorClassPickerPinId = 0;
     ViewportPanel* viewportPanel = nullptr;
     std::function<std::vector<std::pair<std::string, std::string>>()> listWidgetElements;
-    std::string activeDeviceFieldKey;
     std::string lastDetailsSelectionKey;
-
-    RegistryPickerPopup inputMappingPicker;
-    SearchableListPopup inputKeyPicker;
-    SearchableListPopup inputDevicePicker;
-    int inputKeyPickerMappingIndex = -1;
-    int inputKeyPickerBindingIndex = -1;
-    int listeningForInputBindingMappingIndex = -1;
-    int listeningForInputBindingIndex = -1;
 
     RegistryPickerPopup savePicker;
     RegistryPickerPopup layerPicker;
     int layerPickerPinId = 0;
-    std::string saveTargetFieldKey;
-    int saveTargetKind = 0;
     int saveTargetIndex = -1;
 
     bool showSelfActorDetails = false;
 
-    void UpdatePreviewCamera(Rectangle client);
-    void RenderPreviewScene();
-    void HandlePreviewInteraction(Rectangle client);
-    void RenderPreviewToolbar(Rectangle toolbarArea);
-    void EnsurePreviewRenderTarget(int width, int height);
-    Texture2D GetOrLoadPreviewIcon(const std::string& iconFile);
-
-    Camera3D previewCamera{{0, 0, 0}, {0, 0, 0}, {0, 1, 0}, 50.0f, CAMERA_PERSPECTIVE};
-    RenderTexture2D previewRenderTarget{};
-    int previewRenderTargetWidth = 0;
-    int previewRenderTargetHeight = 0;
-
-    bool previewFlying = false;
-    bool previewOrbiting = false;
-    Vector2 previewLookStart{0, 0};
-    Vector2 previewOrbitStart{0, 0};
-    Vector3 previewFlyPosition{0, 0, 0};
-    float previewYaw = 45.0f;
-    float previewPitch = 35.0f;
-    float previewOrbitRadius = 400.0f;
-    float previewFlySpeed = 400.0f;
-    Vector3 previewCameraTarget{0, 0, 0};
-
-    std::unordered_map<std::string, Texture2D> previewIcons;
-
-    GizmoMode previewGizmoMode = GizmoMode::Select;
-    GizmoSpace previewGizmoSpace = GizmoSpace::World;
-    GizmoDragState previewGizmoState;
-
-    bool previewFullscreen = false;
-    std::function<void()> onTogglePreviewFullscreen;
-
-    static const float previewToolbarHeight;
 };

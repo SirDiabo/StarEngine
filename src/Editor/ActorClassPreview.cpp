@@ -1,6 +1,6 @@
 #include "Core/KeyLayout.h"
 #include "Core/RotationMath.h"
-#include "StargraphEditorPanel.h"
+#include "ActorClassEditor.h"
 #include "Editor/EditorUndo.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -18,19 +18,7 @@
 #include "rlgl.h"
 #include <cmath>
 
-const float StargraphEditorPanel::previewToolbarHeight = 28.0f;
-
-StargraphEditorPanel::~StargraphEditorPanel() {
-    if (undoDocument) {
-        UndoManager::Get().UnregisterDocument(undoDocument);
-        delete undoDocument;
-        undoDocument = nullptr;
-    }
-    if (previewRenderTargetWidth != 0) UnloadRenderTexture(previewRenderTarget);
-    for (auto& kv : previewIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
-    delete leftChrome;
-    delete compChrome;
-}
+const float ActorClassEditor::previewToolbarHeight = 28.0f;
 
 static void PreviewUpdateOrbitPosition(Camera3D& camera, float yaw, float pitch, float radius, Vector3 target) {
     float yr = yaw * DEG2RAD;
@@ -83,7 +71,7 @@ static std::string PreviewIconForComponent(const ComponentDecl& comp) {
     return "icon_actor.png";
 }
 
-Texture2D StargraphEditorPanel::GetOrLoadPreviewIcon(const std::string& iconFile) {
+Texture2D ActorClassEditor::GetOrLoadPreviewIcon(const std::string& iconFile) {
     if (iconFile.empty()) return Texture2D{};
     auto it = previewIcons.find(iconFile);
     if (it != previewIcons.end()) return it->second;
@@ -92,7 +80,7 @@ Texture2D StargraphEditorPanel::GetOrLoadPreviewIcon(const std::string& iconFile
     return tex;
 }
 
-void StargraphEditorPanel::EnsurePreviewRenderTarget(int width, int height) {
+void ActorClassEditor::EnsurePreviewRenderTarget(int width, int height) {
     if (width <= 0 || height <= 0) return;
     if (previewRenderTargetWidth == width && previewRenderTargetHeight == height) return;
     if (previewRenderTargetWidth != 0) UnloadRenderTexture(previewRenderTarget);
@@ -101,7 +89,7 @@ void StargraphEditorPanel::EnsurePreviewRenderTarget(int width, int height) {
     previewRenderTargetHeight = height;
 }
 
-void StargraphEditorPanel::UpdatePreviewCamera(Rectangle client) {
+void ActorClassEditor::UpdatePreviewCamera(Rectangle client) {
     Vector2 mp = GetMousePosition();
     if (!CheckCollisionPointRec(mp, client) && !previewFlying && !previewOrbiting) return;
 
@@ -185,23 +173,23 @@ void StargraphEditorPanel::UpdatePreviewCamera(Rectangle client) {
         }
     }
 
-    if (WidgetInput::ScopeHasKeyboard() && KeyLayout::Pressed('f') && selectedComponentIndex >= 0 && selectedComponentIndex < (int)graph.GetComponents().size()) {
+    if (WidgetInput::ScopeHasKeyboard() && KeyLayout::Pressed('f') && selectedComponentIndex >= 0 && selectedComponentIndex < (int)Components().size()) {
         Vector3 wp, wr, ws;
-        PreviewComputeDeclWorldTransform(graph.GetComponents(), graph.GetComponents()[selectedComponentIndex], wp, wr, ws);
+        PreviewComputeDeclWorldTransform(Components(), Components()[selectedComponentIndex], wp, wr, ws);
         previewCameraTarget = wp;
     }
 
     PreviewUpdateOrbitPosition(previewCamera, previewYaw, previewPitch, previewOrbitRadius, previewCameraTarget);
 }
 
-void StargraphEditorPanel::RenderPreviewScene() {
+void ActorClassEditor::RenderPreviewScene() {
     rlSetClipPlanes(0.1, 500000.0);
     DebugDraw::viewportHeight = (float)previewRenderTargetHeight;
     BeginMode3D(previewCamera);
 
     DrawGrid(20, 50.0f);
 
-    std::vector<ComponentDecl>& comps = graph.GetComponents();
+    std::vector<ComponentDecl>& comps = Components();
     Vector3 selectedPos{0, 0, 0};
     Vector3 selectedRot{0, 0, 0};
     bool haveSelected = false;
@@ -267,10 +255,10 @@ void StargraphEditorPanel::RenderPreviewScene() {
     EndMode3D();
 }
 
-void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
+void ActorClassEditor::HandlePreviewInteraction(Rectangle client) {
     if (IsKeyPressed(KEY_F11) && onTogglePreviewFullscreen) onTogglePreviewFullscreen();
 
-    std::vector<ComponentDecl>& comps = graph.GetComponents();
+    std::vector<ComponentDecl>& comps = Components();
 
     bool gizmoActive = false;
     bool selectionValid = selectedComponentIndex >= 0 && selectedComponentIndex < (int)comps.size();
@@ -290,7 +278,7 @@ void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
         comp.posX = gizmoPos.x; comp.posY = gizmoPos.y; comp.posZ = gizmoPos.z;
         comp.rotX = gizmoRot.x; comp.rotY = gizmoRot.y; comp.rotZ = gizmoRot.z;
         comp.scaleX = gizmoScale.x; comp.scaleY = gizmoScale.y; comp.scaleZ = gizmoScale.z;
-        isDirty = true;
+        MarkDirty();
     }
 
     Vector2 mp = GetMousePosition();
@@ -317,7 +305,7 @@ void StargraphEditorPanel::HandlePreviewInteraction(Rectangle client) {
     }
 }
 
-void StargraphEditorPanel::RenderPreviewToolbar(Rectangle toolbarArea) {
+void ActorClassEditor::RenderPreviewToolbar(Rectangle toolbarArea) {
     const UIPalette& theme = UITheme::Get();
     DrawRectangleRec(toolbarArea, theme.panelBg);
     DrawRectangleLinesEx(toolbarArea, 1, theme.panelBorder);
@@ -347,7 +335,7 @@ void StargraphEditorPanel::RenderPreviewToolbar(Rectangle toolbarArea) {
     }
 }
 
-void StargraphEditorPanel::RenderPreviewViewport(Rectangle area) {
+void ActorClassEditor::RenderPreview(Rectangle area) {
     Rectangle toolbarArea = {area.x, area.y, area.width, previewToolbarHeight};
     Rectangle client = {area.x, area.y + previewToolbarHeight, area.width, area.height - previewToolbarHeight};
 
@@ -367,4 +355,10 @@ void StargraphEditorPanel::RenderPreviewViewport(Rectangle area) {
     DrawTexturePro(previewRenderTarget.texture,
         {0, 0, (float)previewRenderTarget.texture.width, -(float)previewRenderTarget.texture.height},
         client, {0, 0}, 0, WHITE);
+}
+
+ActorClassEditor::~ActorClassEditor() {
+    if (previewRenderTargetWidth != 0) UnloadRenderTexture(previewRenderTarget);
+    for (auto& kv : previewIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
+    delete compChrome;
 }

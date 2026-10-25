@@ -253,7 +253,7 @@ void StargraphEditorPanel::ClearOtherLeftSelections(int keepKind) {
     if (keepKind != 0) { selectedFunctionIndex = -1; lastValidFunctionIndex = -1; }
     if (keepKind != 1) { selectedVariableIndex = -1; lastValidVariableIndex = -1; }
     if (keepKind != 2) { selectedLocalVariableIndex = -1; lastValidLocalVariableIndex = -1; }
-    if (keepKind != 3) { selectedComponentIndex = -1; lastValidComponentIndex = -1; }
+    if (keepKind != 3) actorEditor.ClearSelection();
     selectedNodeId = -1;
     selectedNodeIds.clear();
 }
