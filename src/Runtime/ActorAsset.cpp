@@ -223,7 +223,7 @@ ActorBehavior* CreateBehavior(const ActorAssetData& data) {
     if (data.programmingInterface.empty() || !data.behaviorContent) return nullptr;
     const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(data.programmingInterface);
     if (!provider || !provider->createActorBehavior) return nullptr;
-    return provider->createActorBehavior(*data.behaviorContent);
+    return provider->createActorBehavior(*data.behaviorContent, data.components);
 }
 
 }

@@ -1,9 +1,9 @@
 name=Stargraph
 version=1.0
-description=Visual scripting system for actor logic, inspired by Unreal Engine Blueprints.
+description=Visual scripting system for actor logic, with node based programming.
 author=StarEngine
 category=Scripting
 enabledByDefault=true
 dependencies=
-assetTypes=.stargraph
+assetTypes=
 nodeCategories=Events,Flow,Math,Conversions,Variables,Actor,Input

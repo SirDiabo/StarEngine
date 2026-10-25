@@ -1,0 +1,9 @@
+name=Starscript
+version=1.0
+description=Text-based scripting language for actor logic with Python-like syntax.
+author=StarEngine
+category=Scripting
+enabledByDefault=true
+dependencies=
+assetTypes=
+nodeCategories=Events,Flow,Math,Conversions,Variables,Actor,Input

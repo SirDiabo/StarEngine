@@ -10,7 +10,7 @@ namespace {
 
 bool CreateActorAsset(const std::string& fullPath, const std::string& assetName, const std::string& interfaceName) {
     const ProgrammingInterfaceInfo* info = ProgrammingInterfaceRegistry::Get().Find(interfaceName);
-    if (!info || !info->SupportsActors() || !info->IsAvailable()) return false;
+    if (!info || !info->SupportsActors() || !info->IsAvailable() || !info->createActorEditorTab) return false;
 
     ActorAssetData data;
     data.assetName = assetName;
@@ -31,7 +31,7 @@ void RegisterActorAssetSupport() {
     actorType.listCreateVariants = []() {
         std::vector<AssetCreateVariant> variants;
         for (const ProgrammingInterfaceInfo* info : ProgrammingInterfaceRegistry::Get().GetAvailableForActors()) {
-            variants.push_back({ info->name, info->name });
+            if (info->createActorEditorTab) variants.push_back({ info->name, info->name });
         }
         return variants;
     };
@@ -41,7 +41,10 @@ void RegisterActorAssetSupport() {
     };
 
     actorType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
-        std::vector<const ProgrammingInterfaceInfo*> available = ProgrammingInterfaceRegistry::Get().GetAvailableForActors();
+        std::vector<const ProgrammingInterfaceInfo*> available;
+        for (const ProgrammingInterfaceInfo* info : ProgrammingInterfaceRegistry::Get().GetAvailableForActors()) {
+            if (info->createActorEditorTab) available.push_back(info);
+        }
         if (available.size() != 1) return false;
         return CreateActorAsset(fullPath, assetName, available[0]->name);
     };

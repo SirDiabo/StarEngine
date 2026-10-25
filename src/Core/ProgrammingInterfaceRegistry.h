@@ -1,4 +1,5 @@
 #pragma once
+#include "Runtime/ComponentDecl.h"
 #include "Core/SectionFileIO.h"
 #include <ostream>
 #include <string>
@@ -60,7 +61,7 @@ struct ProgrammingInterfaceInfo {
     std::function<IBehaviorContent*()> createActorContent;
     std::function<void(std::ostream&, const IBehaviorContent&, const std::string& prefix)> saveActorContent;
     std::function<IBehaviorContent*(const std::vector<SectionFileIO::ParsedSection>&, const std::string& prefix)> loadActorContent;
-    std::function<ActorBehavior*(IBehaviorContent&)> createActorBehavior;
+    std::function<ActorBehavior*(IBehaviorContent&, const std::vector<ComponentDecl>& components)> createActorBehavior;
     std::function<EditorTab*(const std::string& fullPath, const EditorServices& services)> createActorEditorTab;
 
     bool SupportsWidgets() const { return static_cast<bool>(createWidgetBehavior); }

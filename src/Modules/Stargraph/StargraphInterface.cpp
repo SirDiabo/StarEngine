@@ -56,7 +56,7 @@ void RegisterStargraphInterface() {
         return content;
     };
 
-    info.createActorBehavior = [](IBehaviorContent& content) -> ActorBehavior* {
+    info.createActorBehavior = [](IBehaviorContent& content, const std::vector<ComponentDecl>&) -> ActorBehavior* {
         return new StargraphBehavior(static_cast<StargraphBehaviorContent&>(content).graph);
     };
 
