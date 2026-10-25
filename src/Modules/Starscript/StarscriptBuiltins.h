@@ -56,6 +56,10 @@ struct PropertyDef {
     PropertySetFn set;
 };
 
+const std::vector<BuiltinDef>& AllBuiltins();
+const std::vector<MethodDef>& AllMethods();
+const std::vector<PropertyDef>& AllProperties();
+
 const BuiltinDef* FindBuiltin(const std::string& name);
 const MethodDef* FindMethod(Kind receiver, const std::string& name);
 const PropertyDef* FindProperty(Kind receiver, const std::string& name);

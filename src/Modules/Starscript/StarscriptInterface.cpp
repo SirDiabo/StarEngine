@@ -4,6 +4,10 @@
 #include "Core/SectionFileIO.h"
 #include "Core/SafeParse.h"
 #include <sstream>
+#ifndef STARENGINE_GAME_BUILD
+#include "Editor/StarscriptEditorTab.h"
+#include "Core/EditorAssetHandlerRegistry.h"
+#endif
 
 namespace Starscript {
 
@@ -66,6 +70,15 @@ void RegisterStarscriptInterface() {
         if (!content.compiled) content.compiled = Compile(content.source, components);
         return new StarscriptBehavior(content.compiled);
     };
+
+#ifndef STARENGINE_GAME_BUILD
+    info.createActorEditorTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
+        auto* tab = new StarscriptEditorTab(fullPath);
+        tab->SetSharedLogPanel(services.sharedLogPanel);
+        tab->SetViewportPanel(services.sharedViewportPanel);
+        return tab;
+    };
+#endif
 
     ProgrammingInterfaceRegistry::Get().RegisterInterface(info);
 }

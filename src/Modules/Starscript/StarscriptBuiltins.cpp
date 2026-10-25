@@ -452,6 +452,10 @@ const std::vector<PropertyDef>& Properties() {
 
 }
 
+const std::vector<BuiltinDef>& AllBuiltins() { return Builtins(); }
+const std::vector<MethodDef>& AllMethods() { return Methods(); }
+const std::vector<PropertyDef>& AllProperties() { return Properties(); }
+
 const BuiltinDef* FindBuiltin(const std::string& name) {
     for (const BuiltinDef& b : Builtins()) if (name == b.name) return &b;
     return nullptr;
