@@ -83,6 +83,34 @@ void StargraphBehavior::ApplySavedVariable(const SavableVariable& saved) {
     else if (!saved.isArray && !var->isArray) var->value = saved.value;
 }
 
+void StargraphBehavior::VisitReplicatedVariables(const ReplicatedVariableVisitor& visitor) {
+    for (const Variable& var : graph.GetVariables()) visitor(var.name, var.value, var.replication);
+}
+
+bool StargraphBehavior::FindReplicatedVariable(const std::string& name, ReplicationMode& outMode) {
+    for (const Variable& var : graph.GetVariables()) {
+        if (var.name != name) continue;
+        outMode = var.replication;
+        return true;
+    }
+    return false;
+}
+
+void StargraphBehavior::SetReplicatedVariable(const std::string& name, const std::string& value) {
+    for (Variable& var : graph.GetVariables()) {
+        if (var.name != name) continue;
+        var.value = value;
+        return;
+    }
+}
+
+bool StargraphBehavior::FindEventReplication(const std::string& eventName, ReplicationMode& outMode) {
+    Node* eventNode = graph.FindCustomEventByName(eventName);
+    if (!eventNode) return false;
+    outMode = eventNode->eventReplication;
+    return true;
+}
+
 void StargraphBehavior::OnConstruct(Widget* owner) {
     ExecutionContext ctx;
     ctx.widget = owner;

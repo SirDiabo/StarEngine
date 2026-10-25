@@ -11,5 +11,8 @@ public:
     std::string GetParentKind(const std::string& kind) const;
 
 private:
+    ObjectKindRegistry();
+    void RegisterBuiltInKinds();
+
     std::unordered_map<std::string, std::string> parents;
 };

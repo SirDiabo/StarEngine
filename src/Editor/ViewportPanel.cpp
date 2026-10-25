@@ -4,7 +4,7 @@
 #include "Core/ProfilerRender.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
-#include "Modules/Stargraph/Nodes_Collision.h"
+#include "Runtime/CollisionDebug.h"
 #include "Runtime/AssetCache.h"
 #include "Runtime/DebugDraw.h"
 #include "Runtime/CollisionTrace.h"
@@ -16,8 +16,7 @@
 #include "Core/Widgets/WidgetRenderer.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/RenderSettings.h"
-#include "Modules/Stargraph/Stargraph.h"
-#include "Modules/Stargraph/StargraphAssetCache.h"
+#include "Runtime/ActorClassCache.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/ContentPathResolver.h"
@@ -150,12 +149,12 @@ ViewportPanel::~ViewportPanel() {
     for (auto& kv : editorIcons) if (kv.second.id != 0) UnloadTexture(kv.second);
 }
 
-const Stargraph* ViewportPanel::GetOrLoadClassGraph(const std::string& graphAssetPath) {
-    return StargraphAssetCache::Get().GetOrLoad(graphAssetPath);
+const ActorAssetData* ViewportPanel::GetOrLoadClass(const std::string& classAssetPath) {
+    return ActorClassCache::Get().GetOrLoad(classAssetPath);
 }
 
-void ViewportPanel::InvalidateClassGraph(const std::string& graphAssetPath) {
-    StargraphAssetCache::Get().Invalidate(graphAssetPath);
+void ViewportPanel::InvalidateClass(const std::string& classAssetPath) {
+    ActorClassCache::Get().Invalidate(classAssetPath);
 }
 
 void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
@@ -240,7 +239,7 @@ void ViewportPanel::LoadMap(const std::string& path) {
     mapLoaded = true;
     mapDirty = false;
     selectedActorIndex = -1;
-    StargraphAssetCache::Get().Clear();
+    ActorClassCache::Get().Clear();
     if (onMapReplaced) onMapReplaced();
 }
 
@@ -284,7 +283,7 @@ void ViewportPanel::DropActorAsset(const std::string& assetPath, Vector2 screenP
     ActorInstance inst;
     inst.name = assetName + "_" + std::to_string(starMap.GetInstances().size() + 1);
     inst.className = "Actor";
-    inst.graphAssetPath = ContentPathResolver::MakeRelative(assetPath);
+    inst.classAssetPath = ContentPathResolver::MakeRelative(assetPath);
     inst.posX = worldX;
     inst.posY = 0;
     inst.posZ = worldZ;
@@ -567,19 +566,19 @@ void ViewportPanel::RenderScene() {
             bool selected = (selectedActorIndex == (int)i);
             Color fallbackColor = selected ? Color{255, 200, 50, 255} : ClassColor(inst.className);
 
-            if (!inst.graphAssetPath.empty()) {
-                const Stargraph* classGraph = nullptr;
+            if (!inst.classAssetPath.empty()) {
+                const ActorAssetData* classData = nullptr;
                 {
                     PROFILE_SCOPE("Class Graph Lookup");
-                    classGraph = GetOrLoadClassGraph(inst.graphAssetPath);
+                    classData = GetOrLoadClass(inst.classAssetPath);
                 }
                 bool drewAnyMesh = false;
                 bool drewBillboard = false;
 
-                if (classGraph) {
-                    for (const ComponentDecl& comp : classGraph->GetComponents()) {
+                if (classData) {
+                    for (const ComponentDecl& comp : classData->components) {
                         Vector3 compPos, compRot, compScale;
-                        ComputeDeclWorldTransform(classGraph->GetComponents(), comp, pos, rot, scl,
+                        ComputeDeclWorldTransform(classData->components, comp, pos, rot, scl,
                                                    compPos, compRot, compScale);
 
                         if (comp.componentType == "MeshComponent") {

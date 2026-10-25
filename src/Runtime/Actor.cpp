@@ -39,7 +39,7 @@ Actor::~Actor() {
         NetIdRegistry().erase(netId);
     }
     for (auto it = components.rbegin(); it != components.rend(); ++it) (*it)->DestroyOnce();
-    delete graphBehavior;
+    delete behavior;
     for (Component* c : components) delete c;
 }
 
@@ -75,9 +75,9 @@ void Actor::LoadState(const std::string& saveFile) {
     SaveGame::LoadActor(this, saveFile);
 }
 
-void Actor::SetGraphBehavior(GraphBehavior* behavior) {
-    delete graphBehavior;
-    graphBehavior = behavior;
+void Actor::SetBehavior(ActorBehavior* newBehavior) {
+    delete behavior;
+    behavior = newBehavior;
 }
 
 void Actor::BeginPlay() {
@@ -85,7 +85,7 @@ void Actor::BeginPlay() {
     hasBegunPlay = true;
     for (size_t i = 0; i < components.size(); i++) components[i]->InitializeOnce();
     OnBeginPlay();
-    if (graphBehavior) graphBehavior->OnBeginPlay(this);
+    if (behavior) behavior->OnBeginPlay(this);
 }
 
 void Actor::Tick(float deltaTime) {
@@ -93,7 +93,7 @@ void Actor::Tick(float deltaTime) {
         PROFILE_SCOPE("Native OnTick");
         OnTick(deltaTime);
     }
-    if (graphBehavior) graphBehavior->OnTick(this, deltaTime);
+    if (behavior) behavior->OnTick(this, deltaTime);
 
     if (useControlYaw)   rotation.y = controlRotation.y;
     if (useControlPitch) rotation.x = controlRotation.x;
@@ -121,7 +121,7 @@ void Actor::Tick(float deltaTime) {
 
 void Actor::EndPlay() {
     OnEndPlay();
-    if (graphBehavior) graphBehavior->OnEndPlay(this);
+    if (behavior) behavior->OnEndPlay(this);
     hasBegunPlay = false;
 }
 

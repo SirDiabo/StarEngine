@@ -7,4 +7,4 @@ public:
     Stargraph graph;
 };
 
-void RegisterStargraphWidgetProvider();
+void RegisterStargraphInterface();

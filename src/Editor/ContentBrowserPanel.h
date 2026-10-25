@@ -45,7 +45,7 @@ private:
     void NavigateToRelativeFolder(const std::string& relativePath);
 
     void BeginCreateFolder();
-    void BeginCreateAsset(const AssetTypeInfo& info);
+    void BeginCreateAsset(const AssetTypeInfo& info, const std::string& variantId = std::string());
     void ConfirmPendingCreate();
     void CancelPendingCreate();
     void CookImportedAsset(const std::string& srcPath, const std::string& assetType,
@@ -86,6 +86,7 @@ private:
     ChoicePopup gridContextMenu;
     ChoicePopup itemContextMenu;
     std::vector<std::string> gridMenuExtensions;
+    std::vector<std::string> gridMenuVariants;
     std::vector<std::string> itemMenuActions;
 
     struct TileRef {
@@ -124,6 +125,7 @@ private:
     bool isCreatingNewItem = false;
     bool isCreatingFolder = false;
     std::string pendingExtension;
+    std::string pendingVariant;
     char nameBuffer[128] = "";
 
     std::string importStatus;

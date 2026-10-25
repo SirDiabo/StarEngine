@@ -1,7 +1,8 @@
 #include "Stargraph.h"
 #include "StargraphArray.h"
 #include "NodeRegistry.h"
-#include "ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
+#include "Runtime/ActorAsset.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
 #include "Core/ObjectKindRegistry.h"
@@ -547,61 +548,24 @@ bool Stargraph::LoadFromString(const std::string& text) {
     return LoadFromStream(in);
 }
 
+static const char* const kStargraphInterfaceName = "Stargraph";
+
 bool Stargraph::SaveToStream(std::ostream& out) const {
-    out << "[Stargraph]\n";
-    out << "Version=" << formatVersion << "\n";
-    out << "Name=" << assetName << "\n";
-    out << "ParentClass=" << parentClass << "\n";
-    out << "\n";
+    ActorAssetHeader header;
+    header.version = formatVersion;
+    header.assetName = assetName;
+    header.parentClass = parentClass;
+    header.programmingInterface = kStargraphInterfaceName;
+    ActorAsset::WriteHeader(out, header);
+    ActorAsset::WriteComponents(out, components);
+    SaveContent(out, ActorAsset::ContentPrefix);
+    return true;
+}
 
-    out << "[Components]\n";
-    out << "Count=" << components.size() << "\n";
-    out << "\n";
-    for (size_t i = 0; i < components.size(); i++) {
-        const ComponentDecl& comp = components[i];
-        out << "[Component" << comp.name << "]\n";
-        out << "Type=" << comp.componentType << "\n";
-        out << "Name=" << comp.name << "\n";
-        out << "Parent=" << comp.parentName << "\n";
-        if (comp.posX != 0.0f) out << "PosX=" << comp.posX << "\n";
-        if (comp.posY != 0.0f) out << "PosY=" << comp.posY << "\n";
-        if (comp.posZ != 0.0f) out << "PosZ=" << comp.posZ << "\n";
-        if (comp.rotX != 0.0f) out << "RotX=" << comp.rotX << "\n";
-        if (comp.rotY != 0.0f) out << "RotY=" << comp.rotY << "\n";
-        if (comp.rotZ != 0.0f) out << "RotZ=" << comp.rotZ << "\n";
-        if (comp.scaleX != 1.0f) out << "ScaleX=" << comp.scaleX << "\n";
-        if (comp.scaleY != 1.0f) out << "ScaleY=" << comp.scaleY << "\n";
-        if (comp.scaleZ != 1.0f) out << "ScaleZ=" << comp.scaleZ << "\n";
-        const ComponentTypeInfo* typeInfo = ComponentRegistry::Get().Find(comp.componentType);
-        if (typeInfo) {
-            for (const ComponentFieldDesc& f : typeInfo->fields) {
-                auto it = comp.fields.find(f.key);
-                if (it == comp.fields.end() || it->second == f.defaultValue) continue;
-                out << f.key << "=" << it->second << "\n";
-            }
-        }
-        for (const auto& kv : comp.arrayFields) {
-            const auto& arr = kv.second;
-            if (!arr.empty()) {
-                out << kv.first << "Count=" << arr.size() << "\n";
-                for (size_t m = 0; m < arr.size(); m++) out << kv.first << m << "=" << arr[m] << "\n";
-            }
-        }
-        {
-            std::string savable;
-            for (const auto& kv : comp.savableFields) {
-                if (kv.second.empty()) continue;
-                if (!savable.empty()) savable += ",";
-                savable += kv.first + ":" + kv.second;
-            }
-            out << "SavableFields=" << savable << "\n";
-        }
-        out << "\n";
-    }
+void Stargraph::SaveContent(std::ostream& out, const std::string& prefix) const {
+    SaveGraphContent(out, prefix);
 
-    SaveGraphContent(out, "");
-
-    out << "[Functions]\n";
+    out << "[" << prefix << "Functions]\n";
     out << "Count=" << functions.size() << "\n";
     for (size_t i = 0; i < functions.size(); i++) {
         out << "Name" << i << "=" << functions[i].name << "\n";
@@ -609,10 +573,8 @@ bool Stargraph::SaveToStream(std::ostream& out) const {
     out << "\n";
 
     for (size_t i = 0; i < functions.size(); i++) {
-        functions[i].graph.SaveGraphContent(out, "Function" + std::to_string(i) + ".");
+        functions[i].graph.SaveGraphContent(out, prefix + "Function" + std::to_string(i) + ".");
     }
-
-    return true;
 }
 
 void Stargraph::SaveGraphContent(std::ostream& out, const std::string& prefix) const {
@@ -776,76 +738,34 @@ bool Stargraph::LoadFromStream(std::istream& in) {
 
     std::vector<ParsedSection> sections = ParseSections(in);
 
+    ActorAssetHeader header = ActorAsset::ReadHeader(sections);
+    if (header.found && header.programmingInterface != kStargraphInterfaceName) return false;
+    if (header.found) {
+        formatVersion = header.version;
+        assetName = header.assetName;
+        parentClass = header.parentClass;
+    }
+
+    ActorAsset::ReadComponents(sections, components);
+    return LoadContent(sections, header.found && !header.isLegacy ? std::string(ActorAsset::ContentPrefix) : std::string());
+}
+
+bool Stargraph::LoadContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix) {
+    functions.clear();
+
     for (const ParsedSection& section : sections) {
-        if (section.name == "Stargraph") {
-            if (const std::string* v = FindEntry(section, "Version")) formatVersion = SafeParse::ToInt(*v);
-            if (const std::string* v = FindEntry(section, "Name")) assetName = *v;
-            if (const std::string* v = FindEntry(section, "ParentClass")) parentClass = *v;
-        } else if (section.name != "Components" && section.name.rfind("Component", 0) == 0) {
-            ComponentDecl comp;
-            if (const std::string* v = FindEntry(section, "Type")) comp.componentType = *v;
-            if (const std::string* v = FindEntry(section, "Name")) comp.name = *v;
-            if (const std::string* v = FindEntry(section, "Parent")) comp.parentName = *v;
-            if (const std::string* v = FindEntry(section, "PosX")) comp.posX = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "PosY")) comp.posY = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "PosZ")) comp.posZ = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "RotX")) comp.rotX = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "RotY")) comp.rotY = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "RotZ")) comp.rotZ = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "ScaleX")) comp.scaleX = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "ScaleY")) comp.scaleY = SafeParse::ToFloat(*v);
-            if (const std::string* v = FindEntry(section, "ScaleZ")) comp.scaleZ = SafeParse::ToFloat(*v);
-            std::unordered_set<std::string> consumed = {
-                "Type", "Name", "Parent", "PosX", "PosY", "PosZ", "RotX", "RotY", "RotZ",
-                "ScaleX", "ScaleY", "ScaleZ", "SavableFields"
-            };
-            for (const auto& entry : section.entries) {
-                const std::string& key = entry.first;
-                if (key.size() > 5 && key.compare(key.size() - 5, 5, "Count") == 0) {
-                    std::string baseKey = key.substr(0, key.size() - 5);
-                    int count = SafeParse::ToInt(entry.second);
-                    consumed.insert(key);
-                    if (count > 0) {
-                        std::vector<std::string> arr;
-                        arr.resize((size_t)count);
-                        for (int m = 0; m < count; m++) {
-                            std::string elemKey = baseKey + std::to_string(m);
-                            consumed.insert(elemKey);
-                            if (const std::string* mv = FindEntry(section, elemKey)) arr[(size_t)m] = *mv;
-                        }
-                        comp.arrayFields[baseKey] = std::move(arr);
-                    }
-                }
-            }
-            for (const auto& entry : section.entries) {
-                if (consumed.count(entry.first)) continue;
-                comp.fields[entry.first] = entry.second;
-            }
-            if (const std::string* v = FindEntry(section, "SavableFields")) {
-                std::stringstream ss(*v);
-                std::string entry;
-                while (std::getline(ss, entry, ',')) {
-                    size_t colon = entry.find(':');
-                    if (colon == std::string::npos) continue;
-                    comp.savableFields[entry.substr(0, colon)] = entry.substr(colon + 1);
-                }
-            }
-            components.push_back(comp);
-        } else if (section.name == "Functions") {
-            int count = 0;
-            if (const std::string* v = FindEntry(section, "Count")) count = SafeParse::ToInt(*v);
-            for (int i = 0; i < count; i++) {
-                if (const std::string* v = FindEntry(section, "Name" + std::to_string(i))) {
-                    FunctionDef* fn = AddFunction(*v);
-                    fn->graph.LoadGraphContent(sections, "Function" + std::to_string(i) + ".");
-                }
+        if (section.name != prefix + "Functions") continue;
+        int count = 0;
+        if (const std::string* v = FindEntry(section, "Count")) count = SafeParse::ToInt(*v);
+        for (int i = 0; i < count; i++) {
+            if (const std::string* v = FindEntry(section, "Name" + std::to_string(i))) {
+                FunctionDef* fn = AddFunction(*v);
+                fn->graph.LoadGraphContent(sections, prefix + "Function" + std::to_string(i) + ".");
             }
         }
     }
 
-    LoadGraphContent(sections, "");
-
-    return true;
+    return LoadGraphContent(sections, prefix);
 }
 
 bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix) {

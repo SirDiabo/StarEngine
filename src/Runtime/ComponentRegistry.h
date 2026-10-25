@@ -1,5 +1,5 @@
 #pragma once
-#include "Stargraph.h"
+#include "ComponentDecl.h"
 #include <functional>
 #include <string>
 #include <vector>

@@ -1,5 +1,5 @@
 #pragma once
-#include "Modules/Stargraph/Stargraph.h"
+#include "Runtime/ComponentDecl.h"
 #include "raylib.h"
 #include <string>
 #include <vector>

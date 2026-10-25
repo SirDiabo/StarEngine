@@ -1,19 +1,23 @@
-#include "StargraphWidgetProvider.h"
+#include "StargraphInterface.h"
 #include "StargraphBehavior.h"
 #include "Runtime/WidgetBehavior.h"
 
 #ifndef STARENGINE_GAME_BUILD
 #include "Core/DockNode.h"
 #include "Editor/StargraphEditorPanel.h"
+#include "Editor/StargraphEditorTab.h"
+#include "Core/EditorAssetHandlerRegistry.h"
 #include "Editor/StargraphPanel.h"
 #include "Editor/StargraphGraphPanel.h"
 #include "Editor/StargraphDetailsPanel.h"
 #endif
 
-void RegisterStargraphWidgetProvider() {
+void RegisterStargraphInterface() {
     ProgrammingInterfaceInfo info;
     info.name = "Stargraph";
     info.displayLabel = "Graph";
+    info.moduleName = "Stargraph";
+    info.legacyActorSection = "Stargraph";
 
     info.createDefaultContent = []() -> IBehaviorContent* {
         auto* content = new StargraphBehaviorContent();
@@ -35,7 +39,35 @@ void RegisterStargraphWidgetProvider() {
         return new StargraphBehavior(static_cast<StargraphBehaviorContent&>(content).graph);
     };
 
+    info.createActorContent = []() -> IBehaviorContent* {
+        auto* content = new StargraphBehaviorContent();
+        content->graph.parentClass = "Actor";
+        return content;
+    };
+
+    info.saveActorContent = [](std::ostream& out, const IBehaviorContent& content, const std::string& prefix) {
+        static_cast<const StargraphBehaviorContent&>(content).graph.SaveContent(out, prefix);
+    };
+
+    info.loadActorContent = [](const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix) -> IBehaviorContent* {
+        auto* content = new StargraphBehaviorContent();
+        content->graph.LoadContent(sections, prefix);
+        content->graph.parentClass = "Actor";
+        return content;
+    };
+
+    info.createActorBehavior = [](IBehaviorContent& content) -> ActorBehavior* {
+        return new StargraphBehavior(static_cast<StargraphBehaviorContent&>(content).graph);
+    };
+
 #ifndef STARENGINE_GAME_BUILD
+    info.createActorEditorTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
+        auto* tab = new StargraphEditorTab(fullPath);
+        tab->SetSharedLogPanel(services.sharedLogPanel);
+        tab->SetViewportPanel(services.sharedViewportPanel);
+        return tab;
+    };
+
     info.buildWidgetEditorPanels = [](const ProgrammingInterfaceContext& ctx) -> ProgrammingInterfacePanelSet {
         auto* content = static_cast<StargraphBehaviorContent*>(ctx.content);
 
@@ -59,6 +91,8 @@ void RegisterStargraphWidgetProvider() {
         ProgrammingInterfacePanelSet result;
         result.panels = { stargraphPanel, graphPanel, detailsPanel };
         result.detailsPanel = detailsPanel;
+        result.listPanelName = "My Stargraph";
+        result.mainPanelName = "Graph";
         result.detailsSelectionKey = [session]() { return session->DetailsSelectionKey(); };
 
         auto graphLeaf = std::make_unique<DockNode>();

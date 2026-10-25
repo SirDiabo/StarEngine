@@ -1,7 +1,7 @@
 #include "StarMap.h"
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -39,7 +39,7 @@ bool StarMap::SaveToStream(std::ostream& out) const {
         out << "[Instance" << i << "]\n";
         out << "Name=" << inst.name << "\n";
         out << "Class=" << inst.className << "\n";
-        out << "Graph=" << inst.graphAssetPath << "\n";
+        out << "Graph=" << inst.classAssetPath << "\n";
         out << "Mesh=" << inst.meshAssetPath << "\n";
         out << "CastsShadow=" << (inst.castsShadow ? "true" : "false") << "\n";
         out << "MaterialCount=" << inst.materialAssetPaths.size() << "\n";
@@ -129,7 +129,7 @@ bool StarMap::LoadFromStream(std::istream& in) {
             ActorInstance inst;
             if (const std::string* v = Find(section, "Name"))   inst.name  = *v;
             if (const std::string* v = Find(section, "Class"))  inst.className = *v;
-            if (const std::string* v = Find(section, "Graph"))  inst.graphAssetPath = *v;
+            if (const std::string* v = Find(section, "Graph"))  inst.classAssetPath = *v;
             if (const std::string* v = Find(section, "Mesh"))   inst.meshAssetPath = *v;
             if (const std::string* v = Find(section, "CastsShadow")) inst.castsShadow = (*v == "true");
             if (const std::string* v = Find(section, "MaterialCount")) {

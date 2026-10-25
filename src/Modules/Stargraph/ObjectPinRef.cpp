@@ -14,7 +14,7 @@ static std::string FormatNodeName(const Node& node) {
 }
 
 std::string ObjectPinRef::Encode(const std::string& kind, unsigned int objectId) {
-    return kind + ":" + std::to_string(objectId);
+    return ObjectRefRegistry::Encode(kind, objectId);
 }
 
 Object* ObjectPinRef::Resolve(const Node& node, const std::string& encodedValue,

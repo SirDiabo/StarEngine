@@ -1,4 +1,6 @@
 #include "StargraphEditorPanel.h"
+#include "Runtime/ActorClassCache.h"
+#include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Editor/ViewportPanel.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -183,7 +185,8 @@ void StargraphEditorPanel::SaveGraph() {
     }
     if (!graph.SaveToFile(filePath)) return;
     isDirty = false;
-    if (viewportPanel) viewportPanel->InvalidateClassGraph(filePath);
+    ActorClassCache::Get().Invalidate(filePath);
+    StargraphAssetCache::Get().Invalidate(filePath);
 }
 
 void StargraphEditorPanel::RenderToolbar(Rectangle area) {

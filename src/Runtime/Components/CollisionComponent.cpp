@@ -1,71 +1,10 @@
 #include "CollisionComponent.h"
-#include "Modules/Stargraph/NodeRegistry.h"
-#include "Modules/Stargraph/Stargraph.h"
-#include "Modules/Stargraph/ObjectPinRef.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include "CollisionFilterFields.h"
-#include "Modules/Stargraph/ObjectEvents.h"
+#include "Runtime/ComponentEvents.h"
+#include "Core/ObjectRefRegistry.h"
 #include "Runtime/Actor.h"
 #include "Core/SafeParse.h"
-
-void RegisterCollisionComponentNodes() {
-    ObjectEvents::RegisterComponentEvent("CollisionComponent", { "Begin Overlap", { { "Other Actor", PinType::Object, "Actor" } } });
-    ObjectEvents::RegisterComponentEvent("CollisionComponent", { "End Overlap", { { "Other Actor", PinType::Object, "Actor" } } });
-
-    NodeTemplate setCollisionRadius;
-    setCollisionRadius.type = "Set_Collision_Radius";
-    setCollisionRadius.category = "Collision";
-    setCollisionRadius.moduleName = "Stargraph";
-    setCollisionRadius.hideFromContextMenu = true;
-    setCollisionRadius.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CollisionComponent"});
-        node->inputs.push_back({"Radius", PinType::Float, true, false, 0, "50.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setCollisionRadius.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float radius = 50.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CollisionComponent", ctx);
-            }
-            if (p.name == "Radius" && !p.defaultValue.empty()) radius = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(target)) {
-            cc->radius = radius;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setCollisionRadius);
-
-    NodeTemplate setCollisionHeight;
-    setCollisionHeight.type = "Set_Collision_Height";
-    setCollisionHeight.category = "Collision";
-    setCollisionHeight.moduleName = "Stargraph";
-    setCollisionHeight.hideFromContextMenu = true;
-    setCollisionHeight.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CollisionComponent"});
-        node->inputs.push_back({"Height", PinType::Float, true, false, 0, "100.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setCollisionHeight.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float height = 100.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CollisionComponent", ctx);
-            }
-            if (p.name == "Height" && !p.defaultValue.empty()) height = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (CollisionComponent* cc = dynamic_cast<CollisionComponent*>(target)) {
-            cc->height = height;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setCollisionHeight);
-}
 
 void CollisionComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
@@ -110,7 +49,7 @@ void CollisionComponent::CollectTriggerOverlaps(std::vector<TriggerOverlapEntry>
         if (!hit.actor || TriggerOverlap::Contains(out, hit.actor)) continue;
         TriggerOverlapEntry entry;
         entry.actor = hit.actor;
-        entry.ref = ObjectPinRef::Encode(hit.actor->GetObjectKind(), hit.actor->GetObjectId());
+        entry.ref = ObjectRefRegistry::Encode(hit.actor->GetObjectKind(), hit.actor->GetObjectId());
         out.push_back(entry);
     }
 }
@@ -127,11 +66,19 @@ void CollisionComponent::Update(float deltaTime) {
     if (!isTrigger && overlapping.empty()) return;
     std::vector<TriggerOverlapEntry> began, ended;
     ProcessTriggerOverlaps(began, ended);
-    for (const TriggerOverlapEntry& e : ended) ObjectEvents::RaiseComponentEvent(this, "End Overlap", { { "Other Actor", e.ref } });
-    for (const TriggerOverlapEntry& e : began) ObjectEvents::RaiseComponentEvent(this, "Begin Overlap", { { "Other Actor", e.ref } });
+    for (const TriggerOverlapEntry& e : ended) ComponentEvents::Raise(this, "End Overlap", { { "Other Actor", e.ref } });
+    for (const TriggerOverlapEntry& e : began) ComponentEvents::Raise(this, "Begin Overlap", { { "Other Actor", e.ref } });
 }
 
 namespace {
+ComponentEventRegistrar registrar_CollisionComponentBeginOverlap({
+    "CollisionComponent", "Begin Overlap", { { "Other Actor", EventValueType::Object, "Actor" } }
+});
+
+ComponentEventRegistrar registrar_CollisionComponentEndOverlap({
+    "CollisionComponent", "End Overlap", { { "Other Actor", EventValueType::Object, "Actor" } }
+});
+
 ComponentRegistrar registrar_CollisionComponent({
     "CollisionComponent",
     []() -> Component* { return new CollisionComponent(); },

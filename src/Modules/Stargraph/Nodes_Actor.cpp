@@ -5,7 +5,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/WorldSpawner.h"
-#include "StargraphAssetCache.h"
+#include "Runtime/ActorClassCache.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Runtime/CollisionTrace.h"
 #include "StargraphBehavior.h"
@@ -288,7 +288,7 @@ void RegisterActorNodes() {
             }
         }
         if (!target) return;
-        if (GraphBehavior* behavior = target->GetGraphBehavior()) behavior->OnDestroyed(target);
+        if (ActorBehavior* behavior = target->GetBehavior()) behavior->OnDestroyed(target);
         World::Get().DestroyActor(target);
     };
     NodeRegistry::Get().RegisterNode(destroyActor);
@@ -320,7 +320,7 @@ void RegisterActorNodes() {
             else if (p.name == "Scale") ReadVec3(p, instance.scaleX, instance.scaleY, instance.scaleZ);
         }
 
-        if (!classPath.empty() && !StargraphAssetCache::Get().GetOrLoad(classPath)) {
+        if (!classPath.empty() && !ActorClassCache::Get().GetOrLoad(classPath)) {
             TraceLog(LOG_WARNING, "Spawn Actor: could not load class '%s'", classPath.c_str());
         }
 
@@ -329,7 +329,7 @@ void RegisterActorNodes() {
         size_t dot = filename.find_last_of('.');
         std::string stem = (dot == std::string::npos) ? filename : filename.substr(0, dot);
         instance.name = (stem.empty() ? std::string("Actor") : stem) + "_Instance";
-        instance.graphAssetPath = classPath;
+        instance.classAssetPath = classPath;
 
         Actor* spawned = WorldSpawner::SpawnActorFromInstance(instance);
         if (spawned) {

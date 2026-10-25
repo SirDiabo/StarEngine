@@ -9,6 +9,7 @@
 #include <istream>
 #include <fstream>
 #include "Runtime/ReplicationMode.h"
+#include "Runtime/ComponentDecl.h"
 #include "Core/SectionFileIO.h"
 
 enum class PinType {
@@ -181,31 +182,6 @@ struct Variable {
     std::string DefaultElementText() const;
 };
 
-// Design-time declaration of a component owned by a StarActor class (.staractor asset).
-struct ComponentDecl {
-    std::string componentType = "SceneComponent";
-    std::string name;
-
-    // Name of another component on the same actor this one is parented to.
-    std::string parentName;
-
-    // Transform relative to the parent named above (or the actor's root component if empty).
-    float posX = 0, posY = 0, posZ = 0;
-    float rotX = 0, rotY = 0, rotZ = 0;
-    float scaleX = 1, scaleY = 1, scaleZ = 1;
-
-    std::unordered_map<std::string, std::string> fields;
-    std::unordered_map<std::string, std::vector<std::string>> arrayFields;
-
-    std::string Get(const std::string& key, const std::string& def = "") const {
-        auto it = fields.find(key);
-        return it != fields.end() ? it->second : def;
-    }
-
-    // SaveFileRegistry
-    std::unordered_map<std::string, std::string> savableFields;
-};
-
 struct FunctionDef;
 
 class Stargraph {
@@ -273,6 +249,8 @@ public:
     bool LoadFromStream(std::istream& in);
     std::string SerializeToString() const;
     bool LoadFromString(const std::string& text);
+    void SaveContent(std::ostream& out, const std::string& prefix) const;
+    bool LoadContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix);
     void SaveGraphContent(std::ostream& out, const std::string& prefix) const;
     bool LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix);
 

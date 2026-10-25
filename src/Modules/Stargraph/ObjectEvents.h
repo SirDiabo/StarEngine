@@ -28,8 +28,7 @@ std::string ComponentEventNodeType(const std::string& componentType, const std::
 std::string WidgetElementEventNodeType(const std::string& elementClass);
 const std::vector<std::string>* GetWidgetElementEvents(const std::string& elementClass);
 
-void RaiseComponentEvent(Component* component, const std::string& eventName,
-                         const std::vector<std::pair<std::string, std::string>>& params = {});
+void RegisterCoreComponentEvents();
 
 bool NodeTargetsComponent(Node& node, Actor* owner, Component* component,
                           const std::string& componentType, ExecutionContext& ctx);

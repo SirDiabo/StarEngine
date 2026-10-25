@@ -1,7 +1,7 @@
 #pragma once
 #include "Core/Panel.h"
 #include "Runtime/StarMap.h"
-#include "Modules/Stargraph/Stargraph.h"
+#include "Runtime/ActorAsset.h"
 #include "BasicActorDefs.h"
 #include "GizmoRenderer.h"
 #include "raylib.h"
@@ -42,7 +42,7 @@ public:
     std::function<void()> onMapReplaced;
 
     void SetLogPanel(LogPanel* panel) { logPanel = panel; }
-    void InvalidateClassGraph(const std::string& graphAssetPath);
+    void InvalidateClass(const std::string& classAssetPath);
     void SetPackageCallback(std::function<void()> callback) { onPackageRequested = callback; }
 
     bool isFullscreen = false;
@@ -58,7 +58,7 @@ private:
     void ResetFpsStats();
     void UpdateFpsStats(float dt);
     void HandleMapInteraction(Rectangle client);
-    const Stargraph* GetOrLoadClassGraph(const std::string& graphAssetPath);
+    const ActorAssetData* GetOrLoadClass(const std::string& classAssetPath);
     void DrawInstanceOrMesh(const std::string& meshAssetPath, const std::vector<std::string>& materialAssetPaths,
                              Vector3 pos, Vector3 rot, Vector3 scale, bool selected, Color fallbackColor);
     void DrawActorBillboard(const std::string& iconFile, Vector3 pos, Color tint);

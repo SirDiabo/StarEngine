@@ -60,4 +60,3 @@ private:
     ModelAnimation* GetCurrentAnimation();
 };
 
-void RegisterMeshComponentNodes();

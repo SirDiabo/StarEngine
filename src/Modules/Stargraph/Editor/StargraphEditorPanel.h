@@ -1,7 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "Modules/Stargraph/Stargraph.h"
-#include "Modules/Stargraph/ComponentEditing.h"
+#include "Editor/ComponentEditing.h"
 #include "Modules/Stargraph/GraphExecutor.h"
 #include "GraphCanvas.h"
 #include "Editor/AssetPickerPopup.h"

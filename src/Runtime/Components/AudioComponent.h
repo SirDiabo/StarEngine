@@ -24,4 +24,3 @@ private:
     bool paused = false;
 };
 
-void RegisterAudioComponentNodes();

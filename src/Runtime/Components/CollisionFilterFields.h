@@ -1,5 +1,5 @@
 #pragma once
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include "Core/CollisionLayers.h"
 #include <functional>
 

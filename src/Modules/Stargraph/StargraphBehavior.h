@@ -1,9 +1,9 @@
 #pragma once
-#include "Runtime/GraphBehavior.h"
+#include "Runtime/ActorBehavior.h"
 #include "Runtime/WidgetBehavior.h"
 #include "Stargraph.h"
 
-class StargraphBehavior : public GraphBehavior, public WidgetBehavior {
+class StargraphBehavior : public ActorBehavior, public WidgetBehavior {
 public:
     explicit StargraphBehavior(Stargraph graph);
     ~StargraphBehavior() override;
@@ -20,6 +20,10 @@ public:
     void OnDestroyed(Actor* owner) override;
     void CollectSavableVariables(std::vector<SavableVariable>& out) override;
     void ApplySavedVariable(const SavableVariable& saved) override;
+    void VisitReplicatedVariables(const ReplicatedVariableVisitor& visitor) override;
+    bool FindReplicatedVariable(const std::string& name, ReplicationMode& outMode) override;
+    void SetReplicatedVariable(const std::string& name, const std::string& value) override;
+    bool FindEventReplication(const std::string& eventName, ReplicationMode& outMode) override;
 
     void OnConstruct(Widget* owner) override;
     void OnTick(Widget* owner, float deltaTime) override;

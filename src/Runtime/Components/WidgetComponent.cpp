@@ -1,6 +1,6 @@
 #include "WidgetComponent.h"
 #include "Core/Widgets/WidgetAsset.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 
 WidgetComponent::~WidgetComponent() {

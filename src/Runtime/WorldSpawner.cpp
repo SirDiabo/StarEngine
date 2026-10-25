@@ -2,11 +2,12 @@
 #include "World.h"
 #include "Actor.h"
 #include "Components/SceneComponent.h"
-#include "Modules/Stargraph/StargraphBehavior.h"
-#include "Modules/Stargraph/Stargraph.h"
-#include "Modules/Stargraph/StargraphAssetCache.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "ActorAsset.h"
+#include "ActorBehavior.h"
+#include "ActorClassCache.h"
+#include "Runtime/ComponentRegistry.h"
 #include "Components/MeshComponent.h"
+#include "raylib.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -31,13 +32,17 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     actor->rotation = {inst.rotX, inst.rotY, inst.rotZ};
     actor->scale    = {inst.scaleX, inst.scaleY, inst.scaleZ};
 
-    if (!inst.graphAssetPath.empty()) {
-        actor->SetActorClass(inst.graphAssetPath);
-        if (const Stargraph* cachedGraph = StargraphAssetCache::Get().GetOrLoad(inst.graphAssetPath)) {
-            auto* behavior = new StargraphBehavior(*cachedGraph);
-            actor->SetGraphBehavior(behavior);
+    if (!inst.classAssetPath.empty()) {
+        actor->SetActorClass(inst.classAssetPath);
+        if (const ActorAssetData* classData = ActorClassCache::Get().GetOrLoad(inst.classAssetPath)) {
+            if (ActorBehavior* behavior = ActorAsset::CreateBehavior(*classData)) {
+                actor->SetBehavior(behavior);
+            } else if (!classData->programmingInterface.empty()) {
+                TraceLog(LOG_WARNING, "WorldSpawner: programming interface \"%s\" is unavailable for \"%s\"; actor spawned without logic",
+                         classData->programmingInterface.c_str(), inst.classAssetPath.c_str());
+            }
 
-            const std::vector<ComponentDecl>& decls = behavior->GetGraph().GetComponents();
+            const std::vector<ComponentDecl>& decls = classData->components;
             std::vector<Component*> built;
             built.reserve(decls.size());
             std::unordered_map<std::string, Component*> componentsByName;

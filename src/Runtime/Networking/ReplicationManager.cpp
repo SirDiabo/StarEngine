@@ -2,8 +2,7 @@
 #include "NetworkBackend.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
-#include "Modules/Stargraph/StargraphBehavior.h"
-#include "Modules/Stargraph/Stargraph.h"
+#include "Runtime/ActorBehavior.h"
 #include <mutex>
 
 namespace {
@@ -35,43 +34,39 @@ void ReplicationManager::PreTick() {
     for (const ReplicatedPropertyUpdate& update : props) {
         Actor* actor = Actor::FindByNetId(update.netId);
         if (!actor) continue;
-        auto* sb = dynamic_cast<StargraphBehavior*>(actor->GetGraphBehavior());
-        if (!sb) continue;
+        ActorBehavior* behavior = actor->GetBehavior();
+        if (!behavior) continue;
 
-        for (Variable& var : sb->GetGraph().GetVariables()) {
-            if (var.name != update.variableName) continue;
+        ReplicationMode mode = ReplicationMode::Local;
+        if (!behavior->FindReplicatedVariable(update.variableName, mode)) continue;
+        if (isHost && mode == ReplicationMode::ServerOnly) continue;
 
-            if (isHost && var.replication == ReplicationMode::ServerOnly) break;
+        behavior->SetReplicatedVariable(update.variableName, update.value);
+        {
+            std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
+            lastSyncedValue[SnapshotKey(update.netId, update.variableName)] = update.value;
+        }
 
-            var.value = update.value;
-            {
-                std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
-                lastSyncedValue[SnapshotKey(update.netId, update.variableName)] = update.value;
-            }
-
-            if (isHost && var.replication == ReplicationMode::Replicated) {
-                backend->SendPropertyUpdate(update, true);
-            }
-            break;
+        if (isHost && mode == ReplicationMode::Replicated) {
+            backend->SendPropertyUpdate(update, true);
         }
     }
 
     for (const ReplicatedEventCall& call : events) {
         Actor* actor = Actor::FindByNetId(call.netId);
         if (!actor) continue;
+        ActorBehavior* behavior = actor->GetBehavior();
 
         if (isHost) {
-            auto* sb = dynamic_cast<StargraphBehavior*>(actor->GetGraphBehavior());
-            Node* eventNode = sb ? sb->GetGraph().FindCustomEventByName(call.eventName) : nullptr;
-            if (eventNode && eventNode->eventReplication == ReplicationMode::ServerOnly) continue;
-            if (eventNode && eventNode->eventReplication == ReplicationMode::Replicated) {
+            ReplicationMode eventMode = ReplicationMode::Local;
+            bool known = behavior && behavior->FindEventReplication(call.eventName, eventMode);
+            if (known && eventMode == ReplicationMode::ServerOnly) continue;
+            if (known && eventMode == ReplicationMode::Replicated) {
                 backend->SendEventCall(call, true);
             }
         }
 
-        if (GraphBehavior* behavior = actor->GetGraphBehavior()) {
-            behavior->OnCustomEvent(actor, call.eventName, call.params);
-        }
+        if (behavior) behavior->OnCustomEvent(actor, call.eventName, call.params);
     }
 }
 
@@ -81,33 +76,34 @@ void ReplicationManager::PostTick() {
 
     bool hasAuthority = backend->HasAuthority();
 
+    uint32_t currentNetId = 0;
+    ReplicatedVariableVisitor visitor = [&](const std::string& name, const std::string& value, ReplicationMode mode) {
+        if (mode == ReplicationMode::Local) return;
+        if (mode == ReplicationMode::ServerOnly && !hasAuthority) return;
+
+        std::string key = SnapshotKey(currentNetId, name);
+        {
+            std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
+            auto it = lastSyncedValue.find(key);
+            if (it != lastSyncedValue.end() && it->second == value) return;
+            lastSyncedValue[key] = value;
+        }
+
+        ReplicatedPropertyUpdate update;
+        update.netId = currentNetId;
+        update.variableName = name;
+        update.value = value;
+        backend->SendPropertyUpdate(update, false);
+    };
+
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
         if (actor->GetNetId() == 0) continue;
 
-        auto* sb = dynamic_cast<StargraphBehavior*>(actor->GetGraphBehavior());
-        if (!sb) continue;
+        ActorBehavior* behavior = actor->GetBehavior();
+        if (!behavior) continue;
 
-        for (Variable& var : sb->GetGraph().GetVariables()) {
-            if (var.replication == ReplicationMode::Local) continue;
-            if (var.replication == ReplicationMode::ServerOnly && !hasAuthority) continue;
-
-            std::string key = SnapshotKey(actor->GetNetId(), var.name);
-            bool changed = false;
-            {
-                std::lock_guard<std::mutex> lock(lastSyncedValueMutex);
-                auto it = lastSyncedValue.find(key);
-                if (it != lastSyncedValue.end() && it->second == var.value) continue;
-                lastSyncedValue[key] = var.value;
-                changed = true;
-            }
-            if (!changed) continue;
-
-            ReplicatedPropertyUpdate update;
-            update.netId = actor->GetNetId();
-            update.variableName = var.name;
-            update.value = var.value;
-            backend->SendPropertyUpdate(update, false);
-        }
+        currentNetId = actor->GetNetId();
+        behavior->VisitReplicatedVariables(visitor);
     }
 }

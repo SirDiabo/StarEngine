@@ -11,7 +11,7 @@ static Stargraph* ResolveVariableGraph(Node& node, Stargraph& graph, ExecutionCo
             Actor* target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
             if (!target) return nullptr;
             if (target == ctx.actor) return &graph;
-            auto* behavior = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior());
+            auto* behavior = dynamic_cast<StargraphBehavior*>(target->GetBehavior());
             return behavior ? &behavior->GetGraph() : nullptr;
         }
     }

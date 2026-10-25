@@ -1,9 +1,9 @@
 #include "ActorDetailsBuilder.h"
 #include "Core/CollisionLayers.h"
 #include "Runtime/AssetCache.h"
-#include "Modules/Stargraph/ComponentEditing.h"
+#include "Editor/ComponentEditing.h"
 #include "Core/StarAsset.h"
-#include "Modules/Stargraph/StargraphAssetCache.h"
+#include "Runtime/ActorClassCache.h"
 #include "Core/SafeParse.h"
 #include <filesystem>
 #include <cstdio>
@@ -207,24 +207,24 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
 
 static void BuildClassComponentsRows(const ActorInstance& inst, std::vector<PropertyRow>& rows,
                                       const std::function<void(const std::string&, const std::string&)>& onOpenAsset) {
-    const Stargraph* classGraph = StargraphAssetCache::Get().GetOrLoad(inst.graphAssetPath);
+    const ActorAssetData* classData = ActorClassCache::Get().GetOrLoad(inst.classAssetPath);
 
     PropertyRow classRow;
     classRow.kind = PropertyRowKind::ReadOnlyText;
     classRow.label = "Class";
-    classRow.stringValue = AssetDisplayName(inst.graphAssetPath);
+    classRow.stringValue = AssetDisplayName(inst.classAssetPath);
     rows.push_back(classRow);
 
     PropertyRow editBtn;
     editBtn.kind = PropertyRowKind::Button;
     editBtn.label = "Edit Class";
-    std::string graphPath = inst.graphAssetPath;
+    std::string graphPath = inst.classAssetPath;
     editBtn.onButtonPressed = [onOpenAsset, graphPath]() {
         if (onOpenAsset) onOpenAsset(graphPath, fs::path(graphPath).extension().string());
     };
     rows.push_back(editBtn);
 
-    if (!classGraph) {
+    if (!classData) {
         PropertyRow msg;
         msg.kind = PropertyRowKind::ReadOnlyText;
         msg.label = "";
@@ -233,7 +233,7 @@ static void BuildClassComponentsRows(const ActorInstance& inst, std::vector<Prop
         return;
     }
 
-    const auto& comps = classGraph->GetComponents();
+    const auto& comps = classData->components;
     if (comps.empty()) {
         PropertyRow msg;
         msg.kind = PropertyRowKind::ReadOnlyText;
@@ -319,7 +319,7 @@ std::vector<PropertyRow> BuildActorPropertyRows(
         if (onEdited) onEdited();
     });
 
-    if (!inst.graphAssetPath.empty()) {
+    if (!inst.classAssetPath.empty()) {
         BuildClassComponentsRows(inst, rows, onOpenAsset);
     } else if (inst.hasComponent) {
         BuildInlineComponentRows(inst, rows, currentInstance, onEdited);

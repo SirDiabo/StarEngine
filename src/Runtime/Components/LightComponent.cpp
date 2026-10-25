@@ -1,5 +1,5 @@
 #include "LightComponent.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 
 void LightComponent::GetEditorProperties(PropertyList& outProperties) {

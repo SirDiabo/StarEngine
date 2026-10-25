@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <functional>
 
 class Actor;
 
@@ -44,6 +45,10 @@ public:
     void RequestQuit();
     bool ConsumeQuitRequest();
 
+    using PreTickHook = std::function<void(float deltaTime)>;
+    void AddPreTickHook(const std::string& name, PreTickHook hook);
+    void RemovePreTickHook(const std::string& name);
+
 private:
     std::vector<std::unique_ptr<Actor>> actors;
     std::vector<Actor*> pendingDestroy;
@@ -55,6 +60,12 @@ private:
     std::string pendingLevelPath;
     bool hasPendingLevelLoad = false;
     bool quitRequested = false;
+
+    struct NamedPreTickHook {
+        std::string name;
+        PreTickHook hook;
+    };
+    std::vector<NamedPreTickHook> preTickHooks;
 
     void FlushDestroyQueue();
 };

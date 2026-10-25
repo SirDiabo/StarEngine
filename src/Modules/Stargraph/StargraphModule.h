@@ -11,9 +11,7 @@ public:
 
 private:
     void RegisterDefaultNodes();
-    void RegisterAssetType();
     void RegisterEditorTabs();
-    void RegisterObjectKinds();
 };
 
 void RegisterEventNodes();
@@ -25,4 +23,4 @@ void RegisterVariableNodes();
 void RegisterSaveNodes();
 void RegisterUtilityNodes();
 void RegisterTimerNodes();
-void RegisterArrayNodes();
+void RegisterArrayNodes();

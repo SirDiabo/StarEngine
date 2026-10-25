@@ -38,4 +38,3 @@ private:
     std::vector<CollisionTrace::HitResult> scratchHits;
 };
 
-void RegisterPhysicsComponentNodes();

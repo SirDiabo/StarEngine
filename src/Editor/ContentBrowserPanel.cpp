@@ -319,13 +319,15 @@ void ContentBrowserPanel::BeginCreateFolder() {
     isCreatingNewItem = true;
     isCreatingFolder = true;
     pendingExtension.clear();
+    pendingVariant.clear();
     snprintf(nameBuffer, sizeof(nameBuffer), "NewFolder");
 }
 
-void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info) {
+void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info, const std::string& variantId) {
     isCreatingNewItem = true;
     isCreatingFolder = false;
     pendingExtension = info.extension;
+    pendingVariant = variantId;
     snprintf(nameBuffer, sizeof(nameBuffer), "New%s", info.typeName.c_str());
 }
 
@@ -349,7 +351,8 @@ void ContentBrowserPanel::ConfirmPendingCreate() {
         success = fs::create_directory(target, ec);
     } else {
         const AssetTypeInfo* info = AssetTypeRegistry::Get().FindByExtension(pendingExtension);
-        if (info && info->createAsset) success = info->createAsset(target.string(), typedName);
+        if (info && !pendingVariant.empty() && info->createAssetVariant) success = info->createAssetVariant(target.string(), typedName, pendingVariant);
+        else if (info && info->createAsset) success = info->createAsset(target.string(), typedName);
     }
 
     if (success) isCreatingNewItem = false;
@@ -944,17 +947,43 @@ void ContentBrowserPanel::OpenItemContextMenu(Vector2 pos) {
 
 void ContentBrowserPanel::OpenGridContextMenu(Vector2 pos) {
     gridMenuExtensions.clear();
+    gridMenuVariants.clear();
     std::vector<ChoiceOption> options;
     options.push_back({ "New Folder" });
     gridMenuExtensions.push_back(std::string());
+    gridMenuVariants.push_back(std::string());
 
     for (const AssetTypeInfo& info : AssetTypeRegistry::Get().GetFilteredTypes()) {
+        if (info.listCreateVariants && info.createAssetVariant) {
+            std::vector<AssetCreateVariant> variants = info.listCreateVariants();
+            if (variants.empty()) {
+                ChoiceOption unavailable;
+                unavailable.label = "New " + info.typeName;
+                unavailable.enabled = false;
+                unavailable.disabledReason = "Requires a programming interface module";
+                options.push_back(unavailable);
+                gridMenuExtensions.push_back(std::string());
+                gridMenuVariants.push_back(std::string());
+            } else if (variants.size() == 1) {
+                options.push_back({ "New " + info.typeName });
+                gridMenuExtensions.push_back(info.extension);
+                gridMenuVariants.push_back(variants[0].id);
+            } else {
+                for (const AssetCreateVariant& variant : variants) {
+                    options.push_back({ "New " + info.typeName + " (" + variant.label + ")" });
+                    gridMenuExtensions.push_back(info.extension);
+                    gridMenuVariants.push_back(variant.id);
+                }
+            }
+            continue;
+        }
         if (!info.createAsset) continue;
         options.push_back({ "New " + info.typeName });
         gridMenuExtensions.push_back(info.extension);
+        gridMenuVariants.push_back(std::string());
     }
 
-    gridContextMenu.Open(pos, 150.0f, options);
+    gridContextMenu.Open(pos, 210.0f, options);
 }
 
 void ContentBrowserPanel::Render() {
@@ -1137,9 +1166,9 @@ void ContentBrowserPanel::Render() {
         if (gridChoice >= 0 && gridChoice < (int)gridMenuExtensions.size()) {
             const std::string& chosenExtension = gridMenuExtensions[gridChoice];
             if (chosenExtension.empty()) {
-                BeginCreateFolder();
+                if (gridChoice == 0) BeginCreateFolder();
             } else if (const AssetTypeInfo* chosenInfo = AssetTypeRegistry::Get().FindByExtension(chosenExtension)) {
-                BeginCreateAsset(*chosenInfo);
+                BeginCreateAsset(*chosenInfo, gridMenuVariants[gridChoice]);
             }
         }
     }

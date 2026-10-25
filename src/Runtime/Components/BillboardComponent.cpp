@@ -1,5 +1,5 @@
 #include "BillboardComponent.h"
-#include "Modules/Stargraph/ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 
 void BillboardComponent::GetEditorProperties(PropertyList& outProperties) {

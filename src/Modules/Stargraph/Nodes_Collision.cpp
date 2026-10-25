@@ -7,36 +7,11 @@
 #include "Runtime/Components/MeshComponent.h"
 #include "Runtime/CollisionTrace.h"
 #include "Runtime/DebugDraw.h"
+#include "Runtime/CollisionDebug.h"
 #include "Core/CollisionLayers.h"
 #include "raymath.h"
 #include <cstdio>
 #include <vector>
-
-struct DebugLine { Vector3 start, end; Color color; };
-struct DebugSphere { Vector3 center; float radius; Color color; };
-
-static std::vector<DebugLine> g_DebugLines;
-static std::vector<DebugSphere> g_DebugSpheres;
-static bool s_CollisionDebugEnabled = false;
-
-void SetCollisionDebugEnabled(bool enabled) { s_CollisionDebugEnabled = enabled; }
-bool IsCollisionDebugEnabled() { return s_CollisionDebugEnabled; }
-
-void DrawAndClearCollisionDebug(float viewportHeight) {
-    if (viewportHeight > 1.0f) DebugDraw::viewportHeight = viewportHeight;
-    if (s_CollisionDebugEnabled) {
-        const DebugDraw::View view = DebugDraw::CaptureView();
-        const float width = DebugDraw::lineTraceLineWidth;
-        for (const auto& line : g_DebugLines) {
-            DebugDraw::Line(view, line.start, line.end, width, line.color);
-        }
-        for (const auto& sphere : g_DebugSpheres) {
-            DebugDraw::Sphere(view, sphere.center, sphere.radius, width, sphere.color);
-        }
-    }
-    g_DebugLines.clear();
-    g_DebugSpheres.clear();
-}
 
 void RegisterCollisionNodes() {
     NodeTemplate lineTraceForMesh;
@@ -114,12 +89,12 @@ void RegisterCollisionNodes() {
             }
         }
 
-        if (drawDebug && s_CollisionDebugEnabled) {
+        if (drawDebug && IsCollisionDebugEnabled()) {
             Vector3 lineEnd = hit ? hitLoc : end;
-            g_DebugLines.push_back({start, lineEnd, hit ? RED : GREEN});
+            AddCollisionDebugLine(start, lineEnd, hit ? RED : GREEN);
             if (hit) {
-                g_DebugSpheres.push_back({hitLoc, 3.0f, RED});
-                g_DebugLines.push_back({hitLoc, Vector3Add(hitLoc, Vector3Scale(hitNormal, 20.0f)), BLUE});
+                AddCollisionDebugSphere(hitLoc, 3.0f, RED);
+                AddCollisionDebugLine(hitLoc, Vector3Add(hitLoc, Vector3Scale(hitNormal, 20.0f)), BLUE);
             }
         }
     };

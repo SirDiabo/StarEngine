@@ -1,7 +1,7 @@
 #include "SaveGame.h"
 #include "Actor.h"
 #include "World.h"
-#include "GraphBehavior.h"
+#include "ActorBehavior.h"
 #include "Components/Component.h"
 #include "Property.h"
 #include "Core/SaveFileFormat.h"
@@ -119,7 +119,7 @@ bool Wanted(const std::string& file, const std::string& onlyFile) {
 }
 
 void CollectActor(Actor* actor, const std::string& onlyFile, FileEntries& out) {
-    if (GraphBehavior* behavior = actor->GetGraphBehavior()) {
+    if (ActorBehavior* behavior = actor->GetBehavior()) {
         std::vector<SavableVariable> variables;
         behavior->CollectSavableVariables(variables);
         for (const SavableVariable& v : variables) {
@@ -158,7 +158,7 @@ const EntryMap& EntriesFor(FileEntries& cache, const std::string& file) {
 }
 
 void ApplyActor(Actor* actor, const std::string& onlyFile, FileEntries& cache) {
-    if (GraphBehavior* behavior = actor->GetGraphBehavior()) {
+    if (ActorBehavior* behavior = actor->GetBehavior()) {
         std::vector<SavableVariable> variables;
         behavior->CollectSavableVariables(variables);
         for (const SavableVariable& v : variables) {
@@ -227,9 +227,9 @@ void LoadWorld(const std::string& onlyFile) {
 }
 
 bool SaveVariable(Actor* actor, const std::string& variableName, const std::string& file) {
-    if (!actor || !actor->GetGraphBehavior()) return false;
+    if (!actor || !actor->GetBehavior()) return false;
     std::vector<SavableVariable> variables;
-    actor->GetGraphBehavior()->CollectSavableVariables(variables);
+    actor->GetBehavior()->CollectSavableVariables(variables);
     for (const SavableVariable& v : variables) {
         if (v.name != variableName) continue;
         std::string target = !file.empty() ? file : v.saveFile;
@@ -241,8 +241,8 @@ bool SaveVariable(Actor* actor, const std::string& variableName, const std::stri
 }
 
 bool LoadVariable(Actor* actor, const std::string& variableName, const std::string& file) {
-    if (!actor || !actor->GetGraphBehavior()) return false;
-    GraphBehavior* behavior = actor->GetGraphBehavior();
+    if (!actor || !actor->GetBehavior()) return false;
+    ActorBehavior* behavior = actor->GetBehavior();
     std::vector<SavableVariable> variables;
     behavior->CollectSavableVariables(variables);
     for (const SavableVariable& v : variables) {

@@ -8,7 +8,7 @@
 #include "ObjectPinRef.h"
 
 static StargraphBehavior* ResolveOwner(ExecutionContext& ctx) {
-    if (ctx.actor) return dynamic_cast<StargraphBehavior*>(ctx.actor->GetGraphBehavior());
+    if (ctx.actor) return dynamic_cast<StargraphBehavior*>(ctx.actor->GetBehavior());
     if (ctx.widget) return dynamic_cast<StargraphBehavior*>(ctx.widget->GetBehavior());
     return nullptr;
 }
@@ -33,7 +33,7 @@ static ResolvedTimerTarget ResolveTimerTarget(Node& node, ExecutionContext& ctx)
         result.actor = ctx.actor;
         result.widget = ctx.widget;
     }
-    if (result.actor) result.owner = dynamic_cast<StargraphBehavior*>(result.actor->GetGraphBehavior());
+    if (result.actor) result.owner = dynamic_cast<StargraphBehavior*>(result.actor->GetBehavior());
     else if (result.widget) result.owner = dynamic_cast<StargraphBehavior*>(result.widget->GetBehavior());
     return result;
 }
@@ -201,4 +201,4 @@ void RegisterTimerNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(clearTimer);
-}
+}

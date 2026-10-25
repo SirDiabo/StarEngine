@@ -6,7 +6,6 @@
 #include "Core/SaveFileFormat.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
-#include "Modules/Stargraph/TimerManager.h"
 #include "PrintMessageLog.h"
 #include "raylib.h"
 #include <algorithm>
@@ -97,6 +96,21 @@ void World::LoadGame(const std::string& saveFile) {
     ::SaveGame::LoadWorld(saveFile);
 }
 
+void World::AddPreTickHook(const std::string& name, PreTickHook hook) {
+    for (NamedPreTickHook& existing : preTickHooks) {
+        if (existing.name == name) { existing.hook = std::move(hook); return; }
+    }
+    preTickHooks.push_back({ name, std::move(hook) });
+}
+
+void World::RemovePreTickHook(const std::string& name) {
+    for (size_t i = 0; i < preTickHooks.size(); i++) {
+        if (preTickHooks[i].name != name) continue;
+        preTickHooks.erase(preTickHooks.begin() + (long)i);
+        return;
+    }
+}
+
 void World::BeginPlay() {
     SaveFileFormat::InvalidateCache();
     playing = true;
@@ -117,9 +131,9 @@ void World::Tick(float deltaTime) {
         ReplicationManager::PreTick();
     }
 
-    {
-        PROFILE_SCOPE("Timers");
-        TimerManager::Get().Tick(deltaTime);
+    for (size_t i = 0; i < preTickHooks.size(); i++) {
+        PROFILE_SCOPE_DYN(preTickHooks[i].name);
+        preTickHooks[i].hook(deltaTime);
     }
     {
         PROFILE_SCOPE("Print Message Log");

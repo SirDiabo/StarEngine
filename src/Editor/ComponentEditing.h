@@ -1,5 +1,5 @@
 #pragma once
-#include "ComponentRegistry.h"
+#include "Runtime/ComponentRegistry.h"
 #include <string>
 #include <unordered_map>
 #include <vector>

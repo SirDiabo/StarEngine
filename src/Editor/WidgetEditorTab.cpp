@@ -274,17 +274,17 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         auto hierarchyLeaf = std::make_unique<DockNode>();
         hierarchyLeaf->panelNames = { "Hierarchy" };
 
-        auto stargraphLeaf = std::make_unique<DockNode>();
-        stargraphLeaf->panelNames = { "My Stargraph" };
+        auto listLeaf = std::make_unique<DockNode>();
+        listLeaf->panelNames = { panelSet.listPanelName };
 
         auto leftCol = std::make_unique<DockNode>();
         leftCol->type = DockNode::Type::SplitV;
         leftCol->splitRatio = 0.3144f;
         leftCol->first = std::move(hierarchyLeaf);
-        leftCol->second = std::move(stargraphLeaf);
+        leftCol->second = std::move(listLeaf);
 
         auto graphLeaf = std::make_unique<DockNode>();
-        graphLeaf->panelNames = { "Graph" };
+        graphLeaf->panelNames = { panelSet.mainPanelName };
 
         std::unique_ptr<DockNode> graphCol;
         if (logPanel) {

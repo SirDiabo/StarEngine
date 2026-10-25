@@ -22,8 +22,9 @@
 #include "Runtime/AssetCache.h"
 #include "Runtime/DebugDraw.h"
 #include "Runtime/Components/CameraComponent.h"
-#include "Modules/Stargraph/Nodes_Collision.h"
-#include "Modules/Stargraph/StargraphAssetCache.h"
+#include "Runtime/CollisionDebug.h"
+#include "Runtime/ActorClassCache.h"
+#include "Editor/ActorAssetSupport.h"
 #include "raylib.h"
 #include <filesystem>
 #include <fstream>
@@ -127,19 +128,30 @@ bool Application::Initialize(int argc, char* argv[]) {
     widgetType.typeName = "Widget";
     widgetType.extension = ".starwidget";
     widgetType.category = "UI";
-    widgetType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
+    auto createWidgetAsset = [](const std::string& fullPath, const std::string& assetName, const std::string& interfaceName) {
         WidgetAssetData data;
         data.assetName = assetName;
         data.parentClass = "Widget";
-        const std::vector<ProgrammingInterfaceInfo>& providers = ProgrammingInterfaceRegistry::Get().GetAll();
-        if (providers.size() == 1) {
-            data.programmingInterface = providers[0].name;
-            if (providers[0].createDefaultContent) data.behaviorContent = providers[0].createDefaultContent();
+        if (const ProgrammingInterfaceInfo* provider = ProgrammingInterfaceRegistry::Get().Find(interfaceName)) {
+            data.programmingInterface = provider->name;
+            if (provider->createDefaultContent) data.behaviorContent = provider->createDefaultContent();
         }
         bool saved = WidgetAsset::SaveWidgetAsset(fullPath, data);
         delete data.rootElement;
         delete data.behaviorContent;
         return saved;
+    };
+    widgetType.listCreateVariants = []() {
+        std::vector<AssetCreateVariant> variants;
+        for (const ProgrammingInterfaceInfo* provider : ProgrammingInterfaceRegistry::Get().GetAvailableForWidgets()) {
+            variants.push_back({ provider->name, provider->name });
+        }
+        return variants;
+    };
+    widgetType.createAssetVariant = createWidgetAsset;
+    widgetType.createAsset = [createWidgetAsset](const std::string& fullPath, const std::string& assetName) {
+        std::vector<const ProgrammingInterfaceInfo*> available = ProgrammingInterfaceRegistry::Get().GetAvailableForWidgets();
+        return createWidgetAsset(fullPath, assetName, available.size() == 1 ? available[0]->name : std::string());
     };
     widgetType.renameAsset = [](const std::string& fullPath, const std::string& newAssetName) {
         WidgetAssetData data;
@@ -161,6 +173,14 @@ bool Application::Initialize(int argc, char* argv[]) {
         return tab;
     };
     EditorAssetHandlerRegistry::Get().RegisterHandler(widgetHandler);
+
+    AssetTypeInfo soundType;
+    soundType.typeName = "Sound";
+    soundType.extension = ".starsound";
+    soundType.category = "Audio";
+    AssetTypeRegistry::Get().RegisterType(soundType);
+
+    RegisterActorAssetSupport();
 
     activeLogPanel = editor->GetLogPanel();
     SetTraceLogCallback(ForwardTraceLogToPanel);
@@ -224,7 +244,7 @@ void Application::Run() {
                 editor->CloseAllAssetEditorTabs();
                 UndoManager::Get().Clear();
                 AssetCache::Get().Clear();
-                StargraphAssetCache::Get().Clear();
+                ActorClassCache::Get().Clear();
                 Project::Get().Load(path);
                 ModuleManager::Get().ShutdownAll();
                 ModuleManager::Get().InitializeAll();

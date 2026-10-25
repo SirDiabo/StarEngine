@@ -1,5 +1,5 @@
 #pragma once
-#include "Modules/Stargraph/Stargraph.h"
+#include "ComponentDecl.h"
 #include <istream>
 #include <ostream>
 #include <string>
@@ -8,7 +8,7 @@
 struct ActorInstance {
     std::string name;
     std::string className;
-    std::string graphAssetPath;
+    std::string classAssetPath;
     std::string meshAssetPath;
     std::vector<std::string> materialAssetPaths;
     bool castsShadow = true;

@@ -36,4 +36,3 @@ private:
     std::vector<TriggerOverlapEntry> overlapping;
 };
 
-void RegisterCollisionComponentNodes();

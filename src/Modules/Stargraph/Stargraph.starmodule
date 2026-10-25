@@ -5,5 +5,5 @@ author=StarEngine
 category=Scripting
 enabledByDefault=true
 dependencies=
-assetTypes=.stargraph,.staractor
+assetTypes=.stargraph
 nodeCategories=Events,Flow,Math,Conversions,Variables,Actor,Input

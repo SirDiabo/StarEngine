@@ -130,7 +130,7 @@ void RegisterEventNodes() {
 
         if (target == ctx.actor) {
             GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
-        } else if (GraphBehavior* behavior = target->GetGraphBehavior()) {
+        } else if (ActorBehavior* behavior = target->GetBehavior()) {
             behavior->OnCustomEvent(target, eventName, params);
         }
 
@@ -139,7 +139,7 @@ void RegisterEventNodes() {
             Node* eventDef = nullptr;
             if (target == ctx.actor) {
                 eventDef = graph.FindCustomEventByName(eventName);
-            } else if (auto* targetBehavior = dynamic_cast<StargraphBehavior*>(target->GetGraphBehavior())) {
+            } else if (auto* targetBehavior = dynamic_cast<StargraphBehavior*>(target->GetBehavior())) {
                 eventDef = targetBehavior->GetGraph().FindCustomEventByName(eventName);
             }
             if (eventDef && eventDef->eventReplication != ReplicationMode::Local) {
@@ -157,4 +157,4 @@ void RegisterEventNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(callCustomEvent);
-}
+}

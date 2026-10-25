@@ -5,6 +5,51 @@ ObjectKindRegistry& ObjectKindRegistry::Get() {
     return instance;
 }
 
+ObjectKindRegistry::ObjectKindRegistry() {
+    RegisterBuiltInKinds();
+}
+
+void ObjectKindRegistry::RegisterBuiltInKinds() {
+    RegisterKind("Actor", "");
+    RegisterKind("Component", "");
+    RegisterKind("SceneComponent", "Component");
+    RegisterKind("CameraComponent", "SceneComponent");
+    RegisterKind("AudioComponent", "SceneComponent");
+    RegisterKind("MeshComponent", "SceneComponent");
+    RegisterKind("CollisionComponent", "SceneComponent");
+    RegisterKind("InputComponent", "SceneComponent");
+    RegisterKind("PhysicsComponent", "SceneComponent");
+    RegisterKind("LightComponent", "SceneComponent");
+    RegisterKind("BillboardComponent", "SceneComponent");
+    RegisterKind("WidgetComponent", "SceneComponent");
+    RegisterKind("Widget", "");
+    RegisterKind("WidgetElement", "");
+    RegisterKind("BoxElement", "WidgetElement");
+    RegisterKind("VerticalBoxElement", "BoxElement");
+    RegisterKind("HorizontalBoxElement", "BoxElement");
+    RegisterKind("GridElement", "WidgetElement");
+    RegisterKind("RectangleElement", "WidgetElement");
+    RegisterKind("ButtonElement", "RectangleElement");
+    RegisterKind("TabHeaderButtonElement", "ButtonElement");
+    RegisterKind("TextElement", "WidgetElement");
+    RegisterKind("ImageElement", "WidgetElement");
+    RegisterKind("ProgressBarElement", "WidgetElement");
+    RegisterKind("SpacerElement", "WidgetElement");
+    RegisterKind("SplitBoxElement", "WidgetElement");
+    RegisterKind("TabContainer", "WidgetElement");
+    RegisterKind("Sound", "");
+    RegisterKind("Music", "");
+    RegisterKind("Texture", "");
+    RegisterKind("MeshActor", "Actor");
+    RegisterKind("PointLightActor", "Actor");
+    RegisterKind("SunLightActor", "Actor");
+    RegisterKind("SpotLightActor", "Actor");
+    RegisterKind("RectLightActor", "Actor");
+    RegisterKind("GlobalLightActor", "Actor");
+    RegisterKind("CameraActor", "Actor");
+    RegisterKind("AudioActor", "Actor");
+}
+
 void ObjectKindRegistry::RegisterKind(const std::string& kind, const std::string& parentKind) {
     parents[kind] = parentKind;
 }

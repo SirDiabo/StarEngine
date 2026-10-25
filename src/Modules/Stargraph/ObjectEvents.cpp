@@ -2,7 +2,8 @@
 #include "NodeRegistry.h"
 #include "ObjectPinRef.h"
 #include "Runtime/Actor.h"
-#include "Runtime/GraphBehavior.h"
+#include "Runtime/ActorBehavior.h"
+#include "Runtime/ComponentEvents.h"
 #include "Runtime/Components/Component.h"
 #include <map>
 
@@ -81,14 +82,27 @@ void RegisterWidgetElementEvents(const std::string& elementClass, const std::vec
     NodeRegistry::Get().RegisterNode(nodeTemplate);
 }
 
-void RaiseComponentEvent(Component* component, const std::string& eventName,
-                         const std::vector<std::pair<std::string, std::string>>& params) {
-    if (!component) return;
-    Actor* owner = component->GetOwningActor();
-    if (!owner) return;
-    GraphBehavior* behavior = owner->GetGraphBehavior();
-    if (!behavior) return;
-    behavior->OnComponentEvent(owner, component, eventName, params);
+static PinType PinTypeForEventValue(EventValueType type) {
+    switch (type) {
+        case EventValueType::Bool: return PinType::Boolean;
+        case EventValueType::Int: return PinType::Integer;
+        case EventValueType::Float: return PinType::Float;
+        case EventValueType::Vec3: return PinType::Vec3;
+        case EventValueType::Rotator: return PinType::Rotator;
+        case EventValueType::Object: return PinType::Object;
+        default: return PinType::String;
+    }
+}
+
+void RegisterCoreComponentEvents() {
+    for (const ComponentEventDecl& event : ComponentEventRegistry::Get().GetAll()) {
+        ObjectEventDecl decl;
+        decl.name = event.name;
+        for (const ComponentEventParam& param : event.params) {
+            decl.params.push_back({ param.name, PinTypeForEventValue(param.type), param.objectKind });
+        }
+        RegisterComponentEvent(event.componentType, decl);
+    }
 }
 
 bool NodeTargetsComponent(Node& node, Actor* owner, Component* component,

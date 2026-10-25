@@ -1,6 +1,6 @@
 #pragma once
 #include "Object.h"
-#include "GraphBehavior.h"
+#include "ActorBehavior.h"
 #include "Components/MeshComponent.h"
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
@@ -29,8 +29,8 @@ public:
     void Tick(float deltaTime);
     void EndPlay();
 
-    void SetGraphBehavior(GraphBehavior* behavior);
-    GraphBehavior* GetGraphBehavior() const { return graphBehavior; }
+    void SetBehavior(ActorBehavior* behavior);
+    ActorBehavior* GetBehavior() const { return behavior; }
     void SaveState(const std::string& saveFile = "");
     void LoadState(const std::string& saveFile = "");
     Matrix GetWorldMatrix() const;
@@ -100,7 +100,7 @@ private:
         return nullptr;
     }
 
-    GraphBehavior* graphBehavior = nullptr;
+    ActorBehavior* behavior = nullptr;
     std::string actorClass;
     std::vector<Component*> components;
     Component* rootComponent = nullptr;

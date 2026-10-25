@@ -319,6 +319,7 @@ void Editor::OpenAssetInTab(const std::string& fullPath, const std::string& exte
         services.sharedViewportPanel = levelTab->GetViewport();
 
         EditorTab* tab = handler->createTab(fullPath, services);
+        if (!tab) return;
         tab->Initialize();
         tab->LoadLayout(GetLayoutPath());
         editorTabs.emplace_back(tab);

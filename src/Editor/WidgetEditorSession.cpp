@@ -15,10 +15,10 @@ bool WidgetEditorSession::Open(const std::string& path) {
     lastValidElement = nullptr;
 
     if (data.programmingInterface.empty()) {
-        const std::vector<ProgrammingInterfaceInfo>& providers = ProgrammingInterfaceRegistry::Get().GetAll();
+        std::vector<const ProgrammingInterfaceInfo*> providers = ProgrammingInterfaceRegistry::Get().GetAvailableForWidgets();
         if (providers.size() == 1) {
-            data.programmingInterface = providers[0].name;
-            if (providers[0].createDefaultContent) data.behaviorContent = providers[0].createDefaultContent();
+            data.programmingInterface = providers[0]->name;
+            if (providers[0]->createDefaultContent) data.behaviorContent = providers[0]->createDefaultContent();
             dirty = true;
         }
     }
