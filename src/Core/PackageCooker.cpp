@@ -1,6 +1,7 @@
 #include "PackageCooker.h"
 #include "StarPak.h"
 #include "ObjMtlParser.h"
+#include "Module.h"
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -15,9 +16,15 @@ namespace {
 
 bool IsTextProjectFile(const fs::path& p) {
     std::string ext = p.extension().string();
-    return ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
-           ext == ".staractor" || ext == ".stargraph" || ext == ".startex" ||
-           ext == ".starwidget";
+    if (ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
+        ext == ".staractor" || ext == ".startex" || ext == ".starwidget") return true;
+    for (const ModuleEntry& entry : ModuleManager::Get().GetEntries()) {
+        if (!entry.hasManifest) continue;
+        for (const std::string& declared : entry.manifest.assetTypes) {
+            if (declared == ext) return true;
+        }
+    }
+    return false;
 }
 
 std::vector<uint8_t> ReadBytes(const fs::path& p) {

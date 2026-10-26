@@ -17,10 +17,8 @@ struct ModuleManifest {
     std::string repository;
 
     std::vector<std::string> dependencies;
-    // Asset extensions this module registers (e.g. .stargraph).
+    // Extra asset extensions this module registers, packaged as text assets when cooking.
     std::vector<std::string> assetTypes;
-    // Stargraph node categories this module contributes (e.g. Audio, Physics).
-    std::vector<std::string> nodeCategories;
 
     // Directory containing the manifest file and the module's source.
     std::string sourcePath;

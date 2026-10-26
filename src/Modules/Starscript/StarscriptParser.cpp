@@ -240,7 +240,9 @@ private:
             case Tok::KwWhile: {
                 auto s = MakeStmt(StmtKind::While);
                 Advance();
-                s->conds.push_back(ParseExpr());
+                ExprPtr cond = ParseExpr();
+                if (!cond) { SkipLineKeepBlock(); return nullptr; }
+                s->conds.push_back(std::move(cond));
                 ParseBlock(s->body);
                 return s;
             }
@@ -295,12 +297,16 @@ private:
     StmtPtr ParseIf() {
         auto s = MakeStmt(StmtKind::If);
         Advance();
-        s->conds.push_back(ParseExpr());
+        ExprPtr first = ParseExpr();
+        if (!first) { SkipLineKeepBlock(); return nullptr; }
+        s->conds.push_back(std::move(first));
         s->blocks.emplace_back();
         ParseBlock(s->blocks.back());
         while (At(Tok::KwElif)) {
             Advance();
-            s->conds.push_back(ParseExpr());
+            ExprPtr cond = ParseExpr();
+            if (!cond) { SkipLineKeepBlock(); continue; }
+            s->conds.push_back(std::move(cond));
             s->blocks.emplace_back();
             ParseBlock(s->blocks.back());
         }
@@ -318,6 +324,7 @@ private:
         s->name = Advance().text;
         if (!Expect(Tok::KwIn, "'in'")) { SkipLineKeepBlock(); return nullptr; }
         s->iterable = ParseExpr();
+        if (!s->iterable) { SkipLineKeepBlock(); return nullptr; }
         ParseBlock(s->body);
         return s;
     }

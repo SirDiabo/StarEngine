@@ -43,7 +43,6 @@ bool ModuleManifest::LoadFromFile(const std::string& filePath, ModuleManifest& o
 
     if (data.count("dependencies"))   outManifest.dependencies   = SplitCsv(data["dependencies"]);
     if (data.count("assetTypes"))     outManifest.assetTypes     = SplitCsv(data["assetTypes"]);
-    if (data.count("nodeCategories")) outManifest.nodeCategories = SplitCsv(data["nodeCategories"]);
 
     outManifest.sourcePath = fs::path(filePath).parent_path().string();
     outManifest.hasExternalDependencies = fs::exists(fs::path(outManifest.sourcePath) / "CMakeLists.txt");
@@ -64,6 +63,5 @@ bool ModuleManifest::SaveToFile(const std::string& filePath, const ModuleManifes
     data["requiresRestart"]   = manifest.requiresRestart ? "true" : "false";
     data["dependencies"]      = JoinCsv(manifest.dependencies);
     data["assetTypes"]        = JoinCsv(manifest.assetTypes);
-    data["nodeCategories"]    = JoinCsv(manifest.nodeCategories);
     return LayoutSerializer::Save(filePath, data);
 }

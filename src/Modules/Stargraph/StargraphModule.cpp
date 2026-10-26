@@ -31,8 +31,6 @@
 #include "Core/ObjectKindRegistry.h"
 
 #ifndef STARENGINE_GAME_BUILD
-#include "Core/EditorAssetHandlerRegistry.h"
-#include "Editor/StargraphEditorTab.h"
 #endif
 
 StargraphModule::StargraphModule() {
@@ -64,7 +62,6 @@ bool StargraphModule::Initialize() {
     RegisterWidgetNodes();
     ObjectEvents::RegisterCoreComponentEvents();
 
-    RegisterEditorTabs();
     RegisterStargraphInterface();
     World::Get().AddPreTickHook("Timers", [](float deltaTime) { TimerManager::Get().Tick(deltaTime); });
     return true;
@@ -73,20 +70,5 @@ bool StargraphModule::Initialize() {
 void StargraphModule::Shutdown() {
     World::Get().RemovePreTickHook("Timers");
 }
+
 void StargraphModule::Update(float deltaTime) {}
-
-void StargraphModule::RegisterEditorTabs() {
-#ifndef STARENGINE_GAME_BUILD
-    EditorAssetHandlerInfo handler;
-    handler.moduleName = "Stargraph";
-    handler.createTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
-        auto* tab = new StargraphEditorTab(fullPath);
-        tab->SetSharedLogPanel(services.sharedLogPanel);
-        tab->SetViewportPanel(services.sharedViewportPanel);
-        return tab;
-    };
-
-    handler.extension = ".stargraph";
-    EditorAssetHandlerRegistry::Get().RegisterHandler(handler);
-#endif
-}

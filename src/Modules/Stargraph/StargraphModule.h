@@ -11,7 +11,6 @@ public:
 
 private:
     void RegisterDefaultNodes();
-    void RegisterEditorTabs();
 };
 
 void RegisterEventNodes();

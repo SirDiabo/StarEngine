@@ -6,4 +6,3 @@ category=Scripting
 enabledByDefault=true
 dependencies=
 assetTypes=
-nodeCategories=Events,Flow,Math,Conversions,Variables,Actor,Input

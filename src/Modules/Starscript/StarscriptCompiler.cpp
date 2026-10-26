@@ -276,7 +276,9 @@ private:
 
     bool IsBool(const SType& t) { return t.kind == Kind::Bool; }
 
-    void CheckCondition(Expr& e) {
+    void CheckCondition(Expr* expr) {
+        if (!expr) return;
+        Expr& e = *expr;
         SType t = CheckExpr(e, nullptr);
         if (t.kind != Kind::Bool && t.kind != Kind::Void) Error(e.line, e.column, "Condition must be bool, got " + t.ToString());
     }
@@ -309,6 +311,7 @@ private:
             }
             case StmtKind::Assign: CheckAssign(s); break;
             case StmtKind::ExprStmt: {
+                if (!s.value) break;
                 if (s.value->kind != ExprKind::Call) {
                     Error(s.line, s.column, "This expression has no effect");
                     CheckExpr(*s.value, nullptr);
@@ -318,14 +321,14 @@ private:
                 break;
             }
             case StmtKind::If:
-                for (size_t n = 0; n < s.conds.size(); n++) {
-                    CheckCondition(*s.conds[n]);
+                for (size_t n = 0; n < s.conds.size() && n < s.blocks.size(); n++) {
+                    CheckCondition(s.conds[n].get());
                     CheckBlock(s.blocks[n]);
                 }
                 CheckBlock(s.elseBlock);
                 break;
             case StmtKind::While:
-                CheckCondition(*s.conds[0]);
+                if (!s.conds.empty()) CheckCondition(s.conds[0].get());
                 loopDepth++;
                 CheckBlock(s.body);
                 loopDepth--;
@@ -352,8 +355,9 @@ private:
 
     void CheckFor(Stmt& s) {
         SType loopType = MakeType(Kind::Int);
+        if (!s.iterable) return;
         Expr& it = *s.iterable;
-        if (it.kind == ExprKind::Call && it.a->kind == ExprKind::Ident && it.a->name == "range") {
+        if (it.kind == ExprKind::Call && it.a && it.a->kind == ExprKind::Ident && it.a->name == "range") {
             s.isRange = true;
             if (it.args.empty() || it.args.size() > 3) Error(it.line, it.column, "range() takes 1 to 3 integer arguments");
             for (ExprPtr& arg : it.args) {
