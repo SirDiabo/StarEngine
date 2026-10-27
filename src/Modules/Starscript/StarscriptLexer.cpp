@@ -35,7 +35,7 @@ static const std::unordered_map<std::string, Tok>& Keywords() {
         {"while", Tok::KwWhile}, {"for", Tok::KwFor}, {"in", Tok::KwIn},
         {"return", Tok::KwReturn}, {"break", Tok::KwBreak}, {"continue", Tok::KwContinue},
         {"pass", Tok::KwPass}, {"and", Tok::KwAnd}, {"or", Tok::KwOr}, {"not", Tok::KwNot},
-        {"true", Tok::KwTrue}, {"false", Tok::KwFalse}
+        {"true", Tok::KwTrue}, {"false", Tok::KwFalse}, {"await", Tok::KwAwait}
     };
     return table;
 }
@@ -154,6 +154,8 @@ std::vector<Token> Tokenize(const std::string& source, std::vector<Diagnostic>& 
             char quote = c;
             pos++;
             std::string value;
+            std::string literal;
+            std::vector<StringPart> parts;
             bool closed = false;
             while (pos < source.size() && source[pos] != '\n') {
                 char ch = source[pos];
@@ -161,21 +163,69 @@ std::vector<Token> Tokenize(const std::string& source, std::vector<Diagnostic>& 
                 if (ch == '\\' && pos + 1 < source.size()) {
                     char n = source[pos + 1];
                     pos += 2;
+                    char out = n;
                     switch (n) {
-                        case 'n': value += '\n'; break;
-                        case 't': value += '\t'; break;
-                        case '\\': value += '\\'; break;
-                        case '"': value += '"'; break;
-                        case '\'': value += '\''; break;
-                        default: value += n; break;
+                        case 'n': out = '\n'; break;
+                        case 't': out = '\t'; break;
+                        default: break;
                     }
+                    value += out;
+                    literal += out;
+                    continue;
+                }
+                if (ch == '{' && pos + 1 < source.size() && source[pos + 1] == '{') { value += '{'; literal += '{'; pos += 2; continue; }
+                if (ch == '}' && pos + 1 < source.size() && source[pos + 1] == '}') { value += '}'; literal += '}'; pos += 2; continue; }
+                if (ch == '{') {
+                    size_t scan = pos + 1;
+                    int depth = 1;
+                    bool found = false;
+                    while (scan < source.size() && source[scan] != '\n') {
+                        char sc = source[scan];
+                        if (sc == '"' || sc == '\'') {
+                            char inner = sc;
+                            scan++;
+                            while (scan < source.size() && source[scan] != '\n' && source[scan] != inner) { if (source[scan] == '\\') scan++; scan++; }
+                            if (scan < source.size() && source[scan] == inner) scan++;
+                            continue;
+                        }
+                        if (sc == '{') depth++;
+                        else if (sc == '}') { depth--; if (depth == 0) { found = true; break; } }
+                        scan++;
+                    }
+                    if (!found) {
+                        diagnostics.push_back({ line, (int)(pos - lineStartPos) + 1, "Unterminated '{' in string (use '{{' for a literal brace)" });
+                        value += ch;
+                        literal += ch;
+                        pos++;
+                        continue;
+                    }
+                    std::string exprText = source.substr(pos + 1, scan - pos - 1);
+                    bool blank = exprText.find_first_not_of(" \t") == std::string::npos;
+                    if (blank) {
+                        value += "{" + exprText + "}";
+                        literal += "{" + exprText + "}";
+                        pos = scan + 1;
+                        continue;
+                    }
+                    if (!literal.empty()) { StringPart lit; lit.text = literal; lit.line = line; parts.push_back(lit); literal.clear(); }
+                    StringPart expr;
+                    expr.isExpression = true;
+                    expr.text = exprText;
+                    expr.line = line;
+                    expr.column = (int)(pos + 1 - lineStartPos) + 1;
+                    parts.push_back(expr);
+                    value += "{" + exprText + "}";
+                    pos = scan + 1;
                     continue;
                 }
                 value += ch;
+                literal += ch;
                 pos++;
             }
             if (!closed) diagnostics.push_back({ line, col, "Unterminated string" });
+            if (!parts.empty() && !literal.empty()) { StringPart lit; lit.text = literal; lit.line = line; parts.push_back(lit); }
             push(Tok::String, value, line, col);
+            if (!parts.empty()) tokens.back().parts = std::move(parts);
             continue;
         }
 

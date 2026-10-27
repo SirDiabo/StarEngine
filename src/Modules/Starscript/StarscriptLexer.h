@@ -8,7 +8,7 @@ enum class Tok {
     End, Newline, Indent, Dedent,
     Ident, Int, Float, String,
     KwVar, KwFunc, KwEvent, KwIf, KwElif, KwElse, KwWhile, KwFor, KwIn, KwReturn,
-    KwBreak, KwContinue, KwPass, KwAnd, KwOr, KwNot, KwTrue, KwFalse,
+    KwBreak, KwContinue, KwPass, KwAnd, KwOr, KwNot, KwTrue, KwFalse, KwAwait,
     LParen, RParen, LBracket, RBracket, Comma, Colon, Dot, Arrow, At,
     Assign, ColonAssign, PlusAssign, MinusAssign, StarAssign, SlashAssign,
     Plus, Minus, Star, Slash, Percent,
@@ -16,11 +16,19 @@ enum class Tok {
     Error
 };
 
+struct StringPart {
+    bool isExpression = false;
+    std::string text;
+    int line = 1;
+    int column = 1;
+};
+
 struct Token {
     Tok type = Tok::End;
     std::string text;
     int line = 1;
     int column = 1;
+    std::vector<StringPart> parts;
 };
 
 struct Diagnostic {

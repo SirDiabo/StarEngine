@@ -5,7 +5,7 @@
 
 namespace Starscript {
 
-enum class Kind { Void, Bool, Int, Float, String, Vec3, Actor, Component, Array, Any };
+enum class Kind { Void, Bool, Int, Float, String, Vec3, Actor, Component, Array, Hit, Any };
 
 struct SType {
     Kind kind = Kind::Void;
@@ -24,6 +24,7 @@ struct SType {
 SType MakeType(Kind kind);
 SType MakeObjectType(Kind kind, const std::string& objectKind);
 SType MakeArrayType(Kind elem);
+SType ElementType(Kind elem);
 bool ParseTypeName(const std::string& name, SType& out);
 bool IsAssignable(const SType& to, const SType& from);
 

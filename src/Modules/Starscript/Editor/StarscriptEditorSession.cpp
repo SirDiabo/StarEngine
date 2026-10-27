@@ -8,6 +8,7 @@
 #include "Runtime/ActorAsset.h"
 #include "Runtime/ActorClassCache.h"
 #include "Runtime/ComponentRegistry.h"
+#include "Core/ObjectKindRegistry.h"
 #include "raylib.h"
 #include <algorithm>
 #include <sstream>
@@ -214,7 +215,7 @@ TokenClass StarscriptEditorSession::Classify(const std::string& name, bool after
     return TokenClass::Variable;
 }
 
-bool StarscriptEditorSession::ResolveReceiverKind(const std::string& receiver, int& outKind) const {
+bool StarscriptEditorSession::ResolveReceiverKind(const std::string& receiver, int& outKind, std::string& outObjectKind) const {
     if (receiver.empty()) return false;
     std::vector<std::string> parts;
     std::stringstream ss(receiver);
@@ -223,22 +224,29 @@ bool StarscriptEditorSession::ResolveReceiverKind(const std::string& receiver, i
     if (parts.empty()) return false;
 
     Kind kind = Kind::Void;
-    if (parts[0] == "self") kind = Kind::Actor;
+    std::string objectKind;
+    if (parts[0] == "self") { kind = Kind::Actor; objectKind = "Actor"; }
     else {
         bool found = false;
-        for (const ComponentDecl& c : components) if (c.name == parts[0]) { kind = Kind::Component; found = true; break; }
+        for (const ComponentDecl& c : components) if (c.name == parts[0]) { kind = Kind::Component; objectKind = c.componentType; found = true; break; }
         if (!found && program) {
             auto it = program->varIndex.find(parts[0]);
-            if (it != program->varIndex.end()) { kind = program->vars[(size_t)it->second]->type.kind; found = kind != Kind::Void; }
+            if (it != program->varIndex.end()) {
+                kind = program->vars[(size_t)it->second]->type.kind;
+                objectKind = program->vars[(size_t)it->second]->type.objectKind;
+                found = kind != Kind::Void;
+            }
         }
         if (!found) return false;
     }
     for (size_t i = 1; i < parts.size(); i++) {
-        const PropertyDef* prop = FindProperty(kind, parts[i]);
+        const PropertyDef* prop = FindProperty(kind, parts[i], objectKind);
         if (!prop) return false;
         kind = prop->type.kind;
+        objectKind = prop->type.objectKind;
     }
     outKind = (int)kind;
+    outObjectKind = objectKind;
     return true;
 }
 
@@ -262,19 +270,32 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
 
     if (request.afterDot) {
         int kindInt = 0;
-        bool known = ResolveReceiverKind(request.receiver, kindInt);
+        std::string objectKind;
+        bool known = ResolveReceiverKind(request.receiver, kindInt, objectKind);
         Kind kind = (Kind)kindInt;
+        auto typeMatches = [&](const char* required) {
+            if (!required || !*required || !known || objectKind.empty()) return true;
+            return objectKind == required || ObjectKindRegistry::Get().IsCompatible(objectKind, required);
+        };
         if (known && kind == Kind::Vec3) {
             add("x", "x", "float", CompletionKind::Property);
             add("y", "y", "float", CompletionKind::Property);
             add("z", "z", "float", CompletionKind::Property);
         }
+        if (known && kind == Kind::Component) {
+            if (const ComponentTypeInfo* info = ComponentRegistry::Get().Find(objectKind)) {
+                for (const ComponentFieldDesc& f : info->fields) {
+                    if (f.hiddenInDetails) continue;
+                    add(ComponentFieldIdentifier(f), ComponentFieldIdentifier(f), ComponentFieldScriptType(f).ToString() + " (field)", CompletionKind::Property);
+                }
+            }
+        }
         for (const PropertyDef& p : AllProperties()) {
-            if (known && p.receiver != kind) continue;
+            if (known && (p.receiver != kind || !typeMatches(p.componentType))) continue;
             add(p.name, p.name, p.type.ToString() + (p.set ? "" : " (read-only)"), CompletionKind::Property);
         }
         for (const MethodDef& m : AllMethods()) {
-            if (known && m.receiver != kind) continue;
+            if (known && (m.receiver != kind || !typeMatches(m.componentType))) continue;
             std::string insert = std::string(m.name) + (m.params.empty() ? "()" : "(|)");
             add(m.name, insert, SignatureOf(m.params, m.minArgs, m.ret), CompletionKind::Method);
         }
@@ -307,6 +328,8 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
         add(b.name, insert, SignatureOf(b.params, b.minArgs, b.ret), CompletionKind::Function);
     }
 
+    add("Input", "Input(\"|\"):", "event (key or input mapping)", CompletionKind::Event);
+    add("await", "await ", "keyword", CompletionKind::Keyword);
     add("BeginPlay", "BeginPlay():", "event", CompletionKind::Event);
     add("Tick", "Tick(dt: float):", "event", CompletionKind::Event);
     add("EndPlay", "EndPlay():", "event", CompletionKind::Event);

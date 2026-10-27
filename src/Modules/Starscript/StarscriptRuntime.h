@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,11 +40,63 @@ public:
 
     void ReportError(const std::string& message, int line);
 
+    struct InputSample {
+        bool held = false;
+        bool prevHeld = false;
+        float axis = 0.0f;
+        float prevAxis = 0.0f;
+        float x = 0.0f;
+        float y = 0.0f;
+        long long frame = -1;
+    };
+    const InputSample& QueryInput(const std::string& name);
+
+    void SetTimer(const std::string& target, float interval, bool looping);
+    void ClearTimer(const std::string& target);
+    bool SetTimerPaused(const std::string& target, bool paused);
+    bool IsTimerActive(const std::string& target) const;
+    float TimerRemaining(const std::string& target) const;
+    void CancelAsync();
+
 private:
     struct Frame {
         std::vector<Value> locals;
         Value returnValue;
     };
+
+    struct Level {
+        enum class Type { Plain, While, ForRange, ForArray };
+        Type type = Type::Plain;
+        const Block* block = nullptr;
+        size_t index = 0;
+        const Stmt* stmt = nullptr;
+        long long cur = 0, stop = 0, step = 1;
+        Value array;
+        size_t arrayIndex = 0;
+    };
+
+    struct Coroutine {
+        Frame frame;
+        std::vector<Level> stack;
+        enum class Wait { None, Time, NextFrame } wait = Wait::None;
+        float remaining = 0.0f;
+    };
+
+    struct Timer {
+        std::string target;
+        float interval = 0.0f;
+        float remaining = 0.0f;
+        bool looping = false;
+        bool paused = false;
+    };
+
+    void StartCoroutine(const EventDef& event, std::vector<Value>& args);
+    bool ResumeCoroutine(Coroutine& co);
+    void UpdateCoroutines(float deltaTime);
+    void UpdateTimers(float deltaTime);
+    void FireTimerTarget(const std::string& target);
+    void RefreshInput();
+    void DispatchInputEvents();
 
     enum class Flow { Normal, Break, Continue, Return };
 
@@ -71,6 +124,10 @@ private:
     int currentLine = 0;
     bool initializing = false;
     std::set<std::pair<int, std::string>> reportedErrors;
+    std::vector<std::unique_ptr<Coroutine>> coroutines;
+    std::vector<Timer> timers;
+    std::unordered_map<std::string, InputSample> inputSamples;
+    long long inputFrame = 0;
 };
 
 }

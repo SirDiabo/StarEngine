@@ -1,4 +1,5 @@
 #include "StarscriptRuntime.h"
+#include "StarscriptInput.h"
 #include "Runtime/Actor.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Runtime/Components/Component.h"
@@ -103,6 +104,7 @@ bool Instance::FindCustomEvent(const std::string& name, ReplicationMode& outMode
 }
 
 void Instance::RunEventBody(const EventDef& event, std::vector<Value>& args) {
+    if (event.hasAwait) { StartCoroutine(event, args); return; }
     if (callDepth >= kDepthLimit) throw ScriptError{ "Call depth limit exceeded (runaway recursion?)" };
     Frame frame;
     frame.locals.resize((size_t)std::max(event.numLocals, (int)args.size()));
@@ -135,6 +137,297 @@ Value Instance::CallFunction(const FuncDef& func, std::vector<Value>& args) {
     return Coerce(func.ret, frame.returnValue);
 }
 
+void Instance::StartCoroutine(const EventDef& event, std::vector<Value>& args) {
+    auto co = std::make_unique<Coroutine>();
+    co->frame.locals.resize((size_t)std::max(event.numLocals, (int)args.size()));
+    for (size_t n = 0; n < args.size() && n < event.params.size(); n++) co->frame.locals[n] = Coerce(event.params[n].type, args[n]);
+    Level level;
+    level.type = Level::Type::Plain;
+    level.block = &event.body;
+    co->stack.push_back(level);
+    if (!ResumeCoroutine(*co)) coroutines.push_back(std::move(co));
+}
+
+bool Instance::ResumeCoroutine(Coroutine& co) {
+    Frame& frame = co.frame;
+    co.wait = Coroutine::Wait::None;
+
+    while (!co.stack.empty()) {
+        {
+            Level& lv = co.stack.back();
+            if (lv.index >= lv.block->size()) {
+                switch (lv.type) {
+                    case Level::Type::Plain:
+                        co.stack.pop_back();
+                        break;
+                    case Level::Type::While:
+                        Step();
+                        if (Eval(*lv.stmt->conds[0], frame).b) lv.index = 0;
+                        else co.stack.pop_back();
+                        break;
+                    case Level::Type::ForRange: {
+                        lv.cur += lv.step;
+                        bool more = lv.step > 0 ? lv.cur < lv.stop : lv.cur > lv.stop;
+                        if (more) { frame.locals[(size_t)lv.stmt->slot] = Value::Int(lv.cur); lv.index = 0; }
+                        else co.stack.pop_back();
+                        break;
+                    }
+                    case Level::Type::ForArray: {
+                        lv.arrayIndex++;
+                        if (lv.array.arr && lv.arrayIndex < lv.array.arr->size()) {
+                            frame.locals[(size_t)lv.stmt->slot] = (*lv.array.arr)[lv.arrayIndex];
+                            lv.index = 0;
+                        } else co.stack.pop_back();
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+
+        const Stmt& s = *(*co.stack.back().block)[co.stack.back().index++];
+        Step();
+        currentLine = s.line;
+
+        switch (s.kind) {
+            case StmtKind::VarDecl:
+            case StmtKind::Assign:
+            case StmtKind::ExprStmt:
+            case StmtKind::Pass:
+                ExecStmt(s, frame);
+                break;
+            case StmtKind::Await: {
+                const Expr& call = *s.value;
+                if (call.builtin && call.builtin->asyncKind == 1) {
+                    double seconds = call.args.empty() ? 0.0 : Eval(*call.args[0], frame).AsNumber();
+                    co.wait = Coroutine::Wait::Time;
+                    co.remaining = (float)std::max(0.0, seconds);
+                } else {
+                    co.wait = Coroutine::Wait::NextFrame;
+                }
+                return false;
+            }
+            case StmtKind::If: {
+                bool taken = false;
+                for (size_t n = 0; n < s.conds.size() && !taken; n++) {
+                    if (Eval(*s.conds[n], frame).b) {
+                        Level level;
+                        level.block = &s.blocks[n];
+                        co.stack.push_back(level);
+                        taken = true;
+                    }
+                }
+                if (!taken && !s.elseBlock.empty()) {
+                    Level level;
+                    level.block = &s.elseBlock;
+                    co.stack.push_back(level);
+                }
+                break;
+            }
+            case StmtKind::While: {
+                if (Eval(*s.conds[0], frame).b) {
+                    Level level;
+                    level.type = Level::Type::While;
+                    level.block = &s.body;
+                    level.stmt = &s;
+                    co.stack.push_back(level);
+                }
+                break;
+            }
+            case StmtKind::For: {
+                const Expr& it = *s.iterable;
+                Level level;
+                level.block = &s.body;
+                level.stmt = &s;
+                if (s.isRange) {
+                    long long start = 0, stop = 0, step = 1;
+                    std::vector<long long> a;
+                    for (const ExprPtr& arg : it.args) a.push_back(Eval(*arg, frame).i);
+                    if (a.size() == 1) stop = a[0];
+                    else if (a.size() >= 2) { start = a[0]; stop = a[1]; }
+                    if (a.size() == 3) step = a[2];
+                    if (step == 0) throw ScriptError{ "range() step cannot be 0" };
+                    bool any = step > 0 ? start < stop : start > stop;
+                    if (any) {
+                        level.type = Level::Type::ForRange;
+                        level.cur = start; level.stop = stop; level.step = step;
+                        frame.locals[(size_t)s.slot] = Value::Int(start);
+                        co.stack.push_back(level);
+                    }
+                } else {
+                    Value arr = Eval(it, frame);
+                    if (arr.arr && !arr.arr->empty()) {
+                        level.type = Level::Type::ForArray;
+                        level.array = arr;
+                        level.arrayIndex = 0;
+                        frame.locals[(size_t)s.slot] = (*arr.arr)[0];
+                        co.stack.push_back(level);
+                    }
+                }
+                break;
+            }
+            case StmtKind::Return:
+                co.stack.clear();
+                return true;
+            case StmtKind::Break:
+                while (!co.stack.empty()) {
+                    Level::Type type = co.stack.back().type;
+                    co.stack.pop_back();
+                    if (type != Level::Type::Plain) break;
+                }
+                break;
+            case StmtKind::Continue:
+                while (!co.stack.empty() && co.stack.back().type == Level::Type::Plain) co.stack.pop_back();
+                if (!co.stack.empty()) co.stack.back().index = co.stack.back().block->size();
+                break;
+        }
+    }
+    return true;
+}
+
+void Instance::UpdateCoroutines(float deltaTime) {
+    if (coroutines.empty()) return;
+    std::vector<std::unique_ptr<Coroutine>> current = std::move(coroutines);
+    coroutines.clear();
+    std::vector<std::unique_ptr<Coroutine>> survivors;
+    for (auto& co : current) {
+        bool ready = false;
+        if (co->wait == Coroutine::Wait::NextFrame) ready = true;
+        else if (co->wait == Coroutine::Wait::Time) { co->remaining -= deltaTime; ready = co->remaining <= 0.0f; }
+        if (!ready) { survivors.push_back(std::move(co)); continue; }
+
+        stepCount = 0;
+        bool finished = true;
+        try {
+            finished = ResumeCoroutine(*co);
+        } catch (const ScriptError& error) {
+            ReportError(error.message, currentLine);
+        }
+        if (!finished) survivors.push_back(std::move(co));
+    }
+    for (auto& co : survivors) coroutines.push_back(std::move(co));
+}
+
+void Instance::CancelAsync() {
+    coroutines.clear();
+    timers.clear();
+}
+
+void Instance::SetTimer(const std::string& target, float interval, bool looping) {
+    for (Timer& t : timers) {
+        if (t.target == target) { t.interval = interval; t.remaining = interval; t.looping = looping; t.paused = false; return; }
+    }
+    Timer t;
+    t.target = target;
+    t.interval = interval;
+    t.remaining = interval;
+    t.looping = looping;
+    timers.push_back(t);
+}
+
+void Instance::ClearTimer(const std::string& target) {
+    for (size_t i = 0; i < timers.size(); i++) {
+        if (timers[i].target == target) { timers.erase(timers.begin() + (long)i); return; }
+    }
+}
+
+bool Instance::SetTimerPaused(const std::string& target, bool paused) {
+    for (Timer& t : timers) if (t.target == target) { t.paused = paused; return true; }
+    return false;
+}
+
+bool Instance::IsTimerActive(const std::string& target) const {
+    for (const Timer& t : timers) if (t.target == target && !t.paused) return true;
+    return false;
+}
+
+float Instance::TimerRemaining(const std::string& target) const {
+    for (const Timer& t : timers) if (t.target == target) return std::max(0.0f, t.remaining);
+    return 0.0f;
+}
+
+void Instance::FireTimerTarget(const std::string& target) {
+    if (!program) return;
+    stepCount = 0;
+    ReplicationMode mode;
+    if (FindCustomEvent(target, mode)) { RunCustomEvent(target, {}); return; }
+    auto it = program->funcIndex.find(target);
+    if (it != program->funcIndex.end()) {
+        const FuncDef& f = *program->funcs[(size_t)it->second];
+        if (f.params.empty()) {
+            Guarded([&]() { std::vector<Value> args; CallFunction(f, args); });
+        }
+    }
+}
+
+const Instance::InputSample& Instance::QueryInput(const std::string& name) {
+    InputSample& s = inputSamples[name];
+    if (s.frame == inputFrame) return s;
+    InputReading reading = SampleInput(owner, name);
+    s.prevHeld = s.frame < 0 ? false : s.held;
+    s.prevAxis = s.frame < 0 ? 0.0f : s.axis;
+    s.held = reading.held;
+    s.axis = reading.axis;
+    s.x = reading.x;
+    s.y = reading.y;
+    s.frame = inputFrame;
+    return s;
+}
+
+void Instance::RefreshInput() {
+    inputFrame++;
+    for (auto& kv : inputSamples) {
+        InputSample& s = kv.second;
+        InputReading reading = SampleInput(owner, kv.first);
+        s.prevHeld = s.held;
+        s.prevAxis = s.axis;
+        s.held = reading.held;
+        s.axis = reading.axis;
+        s.x = reading.x;
+        s.y = reading.y;
+        s.frame = inputFrame;
+    }
+}
+
+void Instance::DispatchInputEvents() {
+    for (const auto& e : program->events) {
+        if (e->kind != EventKind::Input) continue;
+        const InputSample& s = QueryInput(e->inputName);
+        bool fire = false;
+        std::vector<Value> args;
+        if (e->params.empty()) {
+            fire = s.held && !s.prevHeld;
+        } else if (e->params[0].type.kind == Kind::Bool) {
+            fire = s.held != s.prevHeld;
+            args.push_back(Value::Bool(s.held));
+        } else {
+            fire = s.axis != 0.0f || s.prevAxis != 0.0f;
+            args.push_back(Value::Float(s.axis));
+        }
+        if (!fire) continue;
+        stepCount = 0;
+        Guarded([&]() { RunEventBody(*e, args); });
+    }
+}
+
+void Instance::UpdateTimers(float deltaTime) {
+    if (timers.empty()) return;
+    std::vector<std::string> due;
+    for (Timer& t : timers) {
+        if (t.paused) continue;
+        t.remaining -= deltaTime;
+        if (t.remaining <= 0.0f) due.push_back(t.target);
+    }
+    for (const std::string& target : due) {
+        size_t index = timers.size();
+        for (size_t i = 0; i < timers.size(); i++) if (timers[i].target == target) { index = i; break; }
+        if (index == timers.size()) continue;
+        if (timers[index].looping && timers[index].interval > 0.0f) timers[index].remaining += timers[index].interval;
+        else timers.erase(timers.begin() + (long)index);
+        FireTimerTarget(target);
+    }
+}
+
 void Instance::RunBeginPlay() {
     if (!program || !program->valid) return;
     stepCount = 0;
@@ -146,6 +439,10 @@ void Instance::RunBeginPlay() {
 
 void Instance::RunTick(float deltaTime) {
     if (!program || !program->valid) return;
+    RefreshInput();
+    UpdateTimers(deltaTime);
+    UpdateCoroutines(deltaTime);
+    DispatchInputEvents();
     for (const auto& e : program->events) {
         if (e->kind != EventKind::Tick) continue;
         stepCount = 0;
@@ -159,6 +456,7 @@ void Instance::RunTick(float deltaTime) {
 
 void Instance::RunEndPlay() {
     if (!program || !program->valid) return;
+    CancelAsync();
     stepCount = 0;
     for (const auto& e : program->events) {
         if (e->kind != EventKind::EndPlay) continue;
@@ -168,6 +466,7 @@ void Instance::RunEndPlay() {
 
 void Instance::RunDestroyed() {
     if (!program || !program->valid) return;
+    CancelAsync();
     stepCount = 0;
     for (const auto& e : program->events) {
         if (e->kind != EventKind::Destroyed) continue;
@@ -339,6 +638,11 @@ void Instance::AssignTo(const Expr& target, const Value& value, Frame& frame) {
                 AssignTo(*target.a, base, frame);
                 return;
             }
+            if (target.resolution == Resolution::ComponentField) {
+                Value base = Eval(*target.a, frame);
+                WriteComponentField(base, target.fieldKey, value);
+                return;
+            }
             if (target.resolution == Resolution::Property && target.property && target.property->set) {
                 Value base = Eval(*target.a, frame);
                 Runtime rt{ owner, this };
@@ -461,6 +765,14 @@ Value Instance::Eval(const Expr& e, Frame& frame) {
             Value r = Eval(*e.b, frame);
             return BinaryOp(e.op, l, r);
         }
+        case ExprKind::Interpolation: {
+            std::string out;
+            for (const ExprPtr& piece : e.args) {
+                if (piece->kind == ExprKind::Literal && piece->literal.kind == Kind::String) out += piece->literal.s;
+                else out += ToDisplayString(Eval(*piece, frame));
+            }
+            return Value::String(out);
+        }
         case ExprKind::ArrayLit: {
             Value arr = Value::Array();
             for (const ExprPtr& item : e.args) arr.arr->push_back(Coerce(MakeType(e.type.elem), Eval(*item, frame)));
@@ -479,6 +791,7 @@ Value Instance::Eval(const Expr& e, Frame& frame) {
         case ExprKind::Member: {
             Value base = Eval(*e.a, frame);
             if (e.resolution == Resolution::VecField) return Value::Float(e.slot == 0 ? base.x : e.slot == 1 ? base.y : base.z);
+            if (e.resolution == Resolution::ComponentField) return ReadComponentField(base, e.fieldKey);
             if (e.resolution == Resolution::Property && e.property) {
                 Runtime rt{ owner, this };
                 return e.property->get(rt, base);

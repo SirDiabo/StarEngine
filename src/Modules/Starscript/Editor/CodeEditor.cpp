@@ -24,13 +24,13 @@ bool IsWordChar(char c) {
 bool IsKeyword(const std::string& w) {
     static const std::unordered_set<std::string> set = {
         "var", "func", "event", "if", "elif", "else", "while", "for", "in", "return",
-        "break", "continue", "pass", "and", "or", "not", "true", "false"
+        "break", "continue", "pass", "and", "or", "not", "true", "false", "await"
     };
     return set.count(w) > 0;
 }
 
 bool IsTypeName(const std::string& w) {
-    static const std::unordered_set<std::string> set = { "bool", "int", "float", "string", "Vec3", "Actor", "Array", "Component" };
+    static const std::unordered_set<std::string> set = { "bool", "int", "float", "string", "Vec3", "Actor", "Array", "Component", "Hit" };
     return set.count(w) > 0;
 }
 
@@ -120,9 +120,35 @@ void CodeEditor::EnsureSpans(Line& line) {
         if (c == '"' || c == '\'') {
             char q = c;
             i++;
-            while (i < s.size() && s[i] != q) { if (s[i] == '\\' && i + 1 < s.size()) i++; i++; }
+            size_t segStart = start;
+            while (i < s.size() && s[i] != q) {
+                if (s[i] == '\\' && i + 1 < s.size()) { i += 2; continue; }
+                if (s[i] == '{') {
+                    if (i + 1 < s.size() && s[i + 1] == '{') { i += 2; continue; }
+                    size_t j = i + 1;
+                    int depth = 1;
+                    while (j < s.size() && depth > 0) {
+                        char cj = s[j];
+                        if (cj == '"' || cj == '\'') {
+                            char inner = cj;
+                            j++;
+                            while (j < s.size() && s[j] != inner) { if (s[j] == '\\') j++; j++; }
+                        } else if (cj == '{') depth++;
+                        else if (cj == '}') depth--;
+                        j++;
+                    }
+                    if (depth == 0) {
+                        if ((int)i > (int)segStart) line.spans.push_back({ (int)segStart, (int)i, TokenClass::String });
+                        line.spans.push_back({ (int)i, (int)j, TokenClass::Variable });
+                        segStart = j;
+                        i = j;
+                        continue;
+                    }
+                }
+                i++;
+            }
             if (i < s.size()) i++;
-            line.spans.push_back({ (int)start, (int)i, TokenClass::String });
+            if ((int)i > (int)segStart) line.spans.push_back({ (int)segStart, (int)i, TokenClass::String });
             afterDot = false;
             prevWord.clear();
             continue;

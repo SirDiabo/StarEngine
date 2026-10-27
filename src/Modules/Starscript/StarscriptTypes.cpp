@@ -20,6 +20,7 @@ std::string SType::ToString() const {
             SType e; e.kind = elem;
             return "Array[" + e.ToString() + "]";
         }
+        case Kind::Hit: return "Hit";
         case Kind::Any: return "any";
     }
     return "?";
@@ -45,12 +46,18 @@ SType MakeArrayType(Kind elem) {
     return t;
 }
 
+SType ElementType(Kind elem) {
+    if (elem == Kind::Actor) return MakeObjectType(Kind::Actor, "Actor");
+    return MakeType(elem);
+}
+
 static bool ParseElemKind(const std::string& name, Kind& out) {
     if (name == "bool") { out = Kind::Bool; return true; }
     if (name == "int") { out = Kind::Int; return true; }
     if (name == "float") { out = Kind::Float; return true; }
     if (name == "string") { out = Kind::String; return true; }
     if (name == "Vec3") { out = Kind::Vec3; return true; }
+    if (name == "Actor") { out = Kind::Actor; return true; }
     return false;
 }
 
@@ -58,6 +65,7 @@ bool ParseTypeName(const std::string& name, SType& out) {
     Kind k;
     if (ParseElemKind(name, k)) { out = MakeType(k); return true; }
     if (name == "Actor") { out = MakeObjectType(Kind::Actor, "Actor"); return true; }
+    if (name == "Hit") { out = MakeType(Kind::Hit); return true; }
     if (name.rfind("Array[", 0) == 0 && name.size() > 7 && name.back() == ']') {
         if (ParseElemKind(name.substr(6, name.size() - 7), k)) { out = MakeArrayType(k); return true; }
         return false;
@@ -71,7 +79,7 @@ bool IsAssignable(const SType& to, const SType& from) {
     if (to.kind != from.kind) return false;
     if (to.kind == Kind::Array) return to.elem == from.elem || to.elem == Kind::Void || from.elem == Kind::Void;
     if (to.kind == Kind::Actor || to.kind == Kind::Component) {
-        if (to.objectKind.empty() || to.objectKind == from.objectKind) return true;
+        if (to.objectKind.empty() || from.objectKind.empty() || to.objectKind == from.objectKind) return true;
         return ObjectKindRegistry::Get().IsCompatible(from.objectKind, to.objectKind);
     }
     return true;
@@ -96,6 +104,17 @@ Value Value::Default(const SType& type) {
         case Kind::Actor:
         case Kind::Component: return Object(type.kind, 0);
         case Kind::Array: { Value v = Array(); return v; }
+        case Kind::Hit: {
+            Value v = Array();
+            v.kind = Kind::Hit;
+            v.arr->push_back(Bool(false));
+            v.arr->push_back(Object(Kind::Actor, 0));
+            v.arr->push_back(Vec3(0, 0, 0));
+            v.arr->push_back(Vec3(0, 1, 0));
+            v.arr->push_back(Float(0.0));
+            v.arr->push_back(Bool(false));
+            return v;
+        }
         default: return Void();
     }
 }
@@ -116,6 +135,7 @@ std::string ToDisplayString(const Value& v) {
         case Kind::Vec3: return "Vec3(" + FormatNumber(v.x) + ", " + FormatNumber(v.y) + ", " + FormatNumber(v.z) + ")";
         case Kind::Actor: return v.objectId ? "Actor#" + std::to_string(v.objectId) : "null";
         case Kind::Component: return v.objectId ? "Component#" + std::to_string(v.objectId) : "null";
+        case Kind::Hit: return (v.arr && !v.arr->empty() && (*v.arr)[0].b) ? "Hit(" + ToDisplayString((*v.arr)[2]) + ")" : "Hit(none)";
         case Kind::Array: {
             std::string out = "[";
             if (v.arr) {

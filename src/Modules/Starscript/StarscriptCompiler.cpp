@@ -1,6 +1,7 @@
 #include "StarscriptCompiler.h"
 #include "StarscriptParser.h"
 #include "StarscriptBuiltins.h"
+#include "StarscriptInput.h"
 #include "Runtime/ComponentEvents.h"
 #include "Runtime/ComponentRegistry.h"
 #include "Core/ObjectKindRegistry.h"
@@ -65,6 +66,8 @@ private:
     SType currentRet;
     int loopDepth = 0;
     bool inInitializer = false;
+    EventDef* currentEvent = nullptr;
+    const Expr* awaitCall = nullptr;
 
     void Error(int line, int column, const std::string& msg) {
         program.diagnostics.push_back({ line, column, msg });
@@ -74,7 +77,7 @@ private:
         if (!ref.present) { if (allowVoid) { out = MakeType(Kind::Void); return true; } return false; }
         if (ref.isArray) {
             SType elem;
-            if (!ParseTypeName(ref.elemName, elem) || elem.kind == Kind::Array || elem.kind == Kind::Actor) {
+            if (!ParseTypeName(ref.elemName, elem) || elem.kind == Kind::Array || elem.kind == Kind::Hit) {
                 Error(ref.line, ref.column, "Unknown array element type '" + ref.elemName + "'");
                 return false;
             }
@@ -120,9 +123,9 @@ private:
             } else if (!v->typeRef.present) {
                 Error(v->line, v->column, "Variable '" + v->name + "' needs a type or an initial value");
             }
-            if (v->replication != ReplicationMode::Local && (v->type.kind == Kind::Array || v->type.kind == Kind::Actor || v->type.kind == Kind::Component))
+            if (v->replication != ReplicationMode::Local && (v->type.kind == Kind::Array || v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Hit))
                 Error(v->line, v->column, "Variables of type " + v->type.ToString() + " cannot be replicated");
-            if (!v->saveFile.empty() && (v->type.kind == Kind::Actor || v->type.kind == Kind::Component))
+            if (!v->saveFile.empty() && (v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Hit || (v->type.kind == Kind::Array && v->type.elem == Kind::Actor)))
                 Error(v->line, v->column, "Variables of type " + v->type.ToString() + " cannot be saved");
         }
         inInitializer = false;
@@ -144,7 +147,7 @@ private:
             ProcessEventAnnotations(*e);
             ValidateEvent(*e);
 
-            std::string key = e->componentName + "." + NormalizeEventName(e->name);
+            std::string key = e->componentName + "." + NormalizeEventName(e->name) + (e->kind == EventKind::Input ? "#" + e->inputName : std::string());
             if (e->kind == EventKind::Custom) {
                 if (taken.count(e->name) || program.varIndex.count(e->name) || program.funcIndex.count(e->name) || FindBuiltin(e->name)) {
                     Error(e->line, e->column, "'" + e->name + "' is already declared");
@@ -192,6 +195,13 @@ private:
                 if (e.params.size() > 1 || (e.params.size() == 1 && e.params[0].type.kind != Kind::Float))
                     Error(e.line, e.column, "Event 'Tick' takes either no parameters or one float (delta time)");
                 break;
+            case EventKind::Input: {
+                if (!IsKnownInputName(e.inputName))
+                    Error(e.line, e.column, "Unknown input '" + e.inputName + "' (not an input mapping or key name)");
+                if (e.params.size() > 1 || (e.params.size() == 1 && e.params[0].type.kind != Kind::Bool && e.params[0].type.kind != Kind::Float))
+                    Error(e.line, e.column, "Input events take no parameter, (pressed: bool), or (value: float)");
+                break;
+            }
             case EventKind::Component: {
                 auto it = componentTypes.find(e.componentName);
                 if (it == componentTypes.end()) {
@@ -260,10 +270,12 @@ private:
     void CheckEvent(EventDef& e) {
         BeginBody();
         currentFunc = nullptr;
+        currentEvent = &e;
         currentRet = MakeType(Kind::Void);
         for (ParamDef& p : e.params) Declare(p.name, p.type, e.line, e.column);
         CheckBlock(e.body);
         e.numLocals = maxSlot;
+        currentEvent = nullptr;
     }
 
     void CheckBlock(Block& block) {
@@ -350,6 +362,23 @@ private:
                 if (loopDepth == 0) Error(s.line, s.column, "'break' and 'continue' can only be used inside a loop");
                 break;
             case StmtKind::Pass: break;
+            case StmtKind::Await: {
+                if (!currentEvent) Error(s.line, s.column, "'await' can only be used inside an event");
+                if (!s.value) break;
+                if (s.value->kind != ExprKind::Call || s.value->a->kind != ExprKind::Ident) {
+                    Error(s.line, s.column, "'await' must be followed by delay(seconds) or next_frame()");
+                    CheckExpr(*s.value, nullptr);
+                    break;
+                }
+                awaitCall = s.value.get();
+                CheckExpr(*s.value, nullptr);
+                awaitCall = nullptr;
+                if (s.value->resolution != Resolution::Builtin || !s.value->builtin || s.value->builtin->asyncKind == 0)
+                    Error(s.line, s.column, "'await' must be followed by delay(seconds) or next_frame()");
+                else if (currentEvent)
+                    currentEvent->hasAwait = true;
+                break;
+            }
         }
     }
 
@@ -370,7 +399,7 @@ private:
             if (t.kind != Kind::Array) {
                 if (t.kind != Kind::Void) Error(it.line, it.column, "Can only loop over range() or an array, got " + t.ToString());
             } else {
-                loopType = MakeType(t.elem);
+                loopType = ElementType(t.elem);
             }
         }
         PushScope();
@@ -390,6 +419,7 @@ private:
             case ExprKind::Member:
                 if (e.resolution == Resolution::VecField) return IsLValue(*e.a) || e.a->resolution == Resolution::Property;
                 if (e.resolution == Resolution::Property) return e.property && e.property->set;
+                if (e.resolution == Resolution::ComponentField) return true;
                 return false;
             default: return false;
         }
@@ -486,6 +516,14 @@ private:
                 if (l.kind == Kind::Void || r.kind == Kind::Void) return MakeType(Kind::Void);
                 return BinaryType(e.op, l, r, e.line, e.column);
             }
+            case ExprKind::Interpolation: {
+                for (ExprPtr& piece : e.args) {
+                    SType t = CheckExpr(*piece, nullptr);
+                    if (t.kind == Kind::Void && piece->kind == ExprKind::Call)
+                        Error(piece->line, piece->column, "This call does not return a value");
+                }
+                return MakeType(Kind::String);
+            }
             case ExprKind::ArrayLit: return CheckArrayLiteral(e, expected);
             case ExprKind::Index: return CheckIndex(e);
             case ExprKind::Member: return CheckMember(e);
@@ -528,7 +566,7 @@ private:
             if (elem == Kind::Void) elem = t.kind;
             else if (!IsAssignable(MakeType(elem), t)) Error(item->line, item->column, "Array element should be " + MakeType(elem).ToString() + ", got " + t.ToString());
         }
-        if (elem == Kind::Actor || elem == Kind::Component || elem == Kind::Array) {
+        if (elem == Kind::Component || elem == Kind::Array || elem == Kind::Hit) {
             Error(e.line, e.column, "Arrays of this element type are not supported");
             elem = Kind::Void;
         }
@@ -539,7 +577,7 @@ private:
         SType base = CheckExpr(*e.a, nullptr);
         SType idx = CheckExpr(*e.b, nullptr);
         if (idx.kind != Kind::Int && idx.kind != Kind::Void) Error(e.b->line, e.b->column, "Index must be int");
-        if (base.kind == Kind::Array) { e.resolution = Resolution::ArrayIndex; return MakeType(base.elem); }
+        if (base.kind == Kind::Array) { e.resolution = Resolution::ArrayIndex; return ElementType(base.elem); }
         if (base.kind == Kind::String) { e.resolution = Resolution::StringIndex; return MakeType(Kind::String); }
         if (base.kind != Kind::Void) Error(e.line, e.column, "Cannot index " + base.ToString());
         return MakeType(Kind::Void);
@@ -553,10 +591,17 @@ private:
             e.slot = e.name[0] - 'x';
             return MakeType(Kind::Float);
         }
-        if (const PropertyDef* prop = FindProperty(base.kind, e.name)) {
+        if (const PropertyDef* prop = FindProperty(base.kind, e.name, base.objectKind)) {
             e.resolution = Resolution::Property;
             e.property = prop;
             return prop->type;
+        }
+        if (base.kind == Kind::Component) {
+            if (const ComponentFieldDesc* field = FindComponentField(base.objectKind, e.name)) {
+                e.resolution = Resolution::ComponentField;
+                e.fieldKey = field->key;
+                return ComponentFieldScriptType(*field);
+            }
         }
         Error(e.line, e.column, base.ToString() + " has no property '" + e.name + "'");
         return MakeType(Kind::Void);
@@ -616,7 +661,7 @@ private:
                 for (ExprPtr& a : e.args) CheckExpr(*a, nullptr);
                 return recv;
             }
-            const MethodDef* m = FindMethod(recv.kind, callee.name);
+            const MethodDef* m = FindMethod(recv.kind, callee.name, recv.objectKind);
             if (!m) {
                 Error(callee.line, callee.column, recv.ToString() + " has no method '" + callee.name + "'");
                 for (ExprPtr& a : e.args) CheckExpr(*a, nullptr);
@@ -629,12 +674,12 @@ private:
                       (m->minArgs == m->params.size() ? "" : "-" + std::to_string(m->params.size())) + " argument(s)");
             for (size_t n = 0; n < e.args.size(); n++) {
                 SType want = n < m->params.size() ? m->params[n] : MakeType(Kind::Any);
-                if (m->elemParam && n == 0) want = MakeType(recv.elem);
+                if (m->elemParam && n == 0) want = ElementType(recv.elem);
                 SType got = CheckExpr(*e.args[n], &want);
                 if (got.kind != Kind::Void && !IsAssignable(want, got))
                     Error(e.args[n]->line, e.args[n]->column, "Argument " + std::to_string(n + 1) + " should be " + want.ToString() + ", got " + got.ToString());
             }
-            if (m->rule == RetRule::ElemType) return MakeType(recv.elem);
+            if (m->rule == RetRule::ElemType) return ElementType(recv.elem);
             return m->ret;
         }
 
@@ -654,6 +699,24 @@ private:
     }
 
     SType CheckBuiltin(Expr& e, const BuiltinDef& b) {
+        if (b.asyncKind != 0 && &e != awaitCall)
+            Error(e.line, e.column, std::string("'") + b.name + "' can only be used as 'await " + b.name + "(...)'");
+        if (std::string(b.name) == "set_timer" && !e.args.empty() && e.args[0]->kind == ExprKind::Literal && e.args[0]->literal.kind == Kind::String) {
+            const std::string& target = e.args[0]->literal.s;
+            bool found = false;
+            auto fit = program.funcIndex.find(target);
+            if (fit != program.funcIndex.end() && program.funcs[fit->second]->params.empty()) found = true;
+            auto eit = customEvents.find(target);
+            if (eit != customEvents.end() && eit->second->params.empty()) found = true;
+            if (!found) Error(e.args[0]->line, e.args[0]->column, "set_timer: no function or event named '" + target + "' that takes no parameters");
+        }
+        {
+            const std::string bname = b.name;
+            if ((bname == "input_pressed" || bname == "input_just_pressed" || bname == "input_just_released" || bname == "input_axis" || bname == "input_axis_2d") &&
+                !e.args.empty() && e.args[0]->kind == ExprKind::Literal && e.args[0]->literal.kind == Kind::String &&
+                !IsKnownInputName(e.args[0]->literal.s))
+                Error(e.args[0]->line, e.args[0]->column, "Unknown input '" + e.args[0]->literal.s + "' (not an input mapping or key name)");
+        }
         size_t maxArgs = b.params.size();
         if (e.args.size() < b.minArgs || (!b.variadic && e.args.size() > maxArgs))
             Error(e.line, e.column, std::string("'") + b.name + "' takes " + std::to_string(b.minArgs) +

@@ -1,5 +1,6 @@
 #include "StarscriptBuiltins.h"
 #include "StarscriptRuntime.h"
+#include "StarscriptInput.h"
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/WorldSpawner.h"
@@ -7,6 +8,14 @@
 #include "Runtime/ActorClassCache.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Runtime/Components/Component.h"
+#include "Runtime/Components/PhysicsComponent.h"
+#include "Runtime/Components/AudioComponent.h"
+#include "Runtime/Components/MeshComponent.h"
+#include "Runtime/ComponentRegistry.h"
+#include "Runtime/CollisionTrace.h"
+#include "Runtime/CollisionDebug.h"
+#include "Core/CollisionLayers.h"
+#include "Core/ObjectKindRegistry.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Core/ObjectRefRegistry.h"
 #include "Core/RotationMath.h"
@@ -249,6 +258,124 @@ Value Fn_send_event(Runtime& rt, std::vector<Value>& a) {
 }
 
 
+Value Fn_set_view_target(Runtime&, std::vector<Value>& a) { World::Get().SetViewTarget(ResolveActor(a[0])); return Value::Void(); }
+Value Fn_get_view_target(Runtime&, std::vector<Value>&) { return MakeActorValue(World::Get().GetViewTarget()); }
+Value Fn_set_input_focus(Runtime&, std::vector<Value>& a) { World::Get().SetInputFocus(ResolveActor(a[0])); return Value::Void(); }
+Value Fn_get_input_focus(Runtime&, std::vector<Value>&) { return MakeActorValue(World::Get().GetInputFocus()); }
+Value Fn_quit_game(Runtime&, std::vector<Value>&) { World::Get().RequestQuit(); return Value::Void(); }
+
+Value Fn_get_actor_of_class(Runtime&, std::vector<Value>& a) {
+    for (const auto& actorPtr : World::Get().GetActors()) {
+        if (ObjectKindRegistry::Get().IsCompatible(actorPtr->GetObjectKind(), a[0].s)) return MakeActorValue(actorPtr.get());
+    }
+    return Value::Object(Kind::Actor, 0);
+}
+
+Value Fn_get_actors_of_class(Runtime&, std::vector<Value>& a) {
+    Value result = Value::Array();
+    for (const auto& actorPtr : World::Get().GetActors()) {
+        if (ObjectKindRegistry::Get().IsCompatible(actorPtr->GetObjectKind(), a[0].s)) result.arr->push_back(MakeActorValue(actorPtr.get()));
+    }
+    return result;
+}
+
+Value Fn_get_all_actors(Runtime&, std::vector<Value>&) {
+    Value result = Value::Array();
+    for (const auto& actorPtr : World::Get().GetActors()) result.arr->push_back(MakeActorValue(actorPtr.get()));
+    return result;
+}
+
+Value Fn_line_trace(Runtime& rt, std::vector<Value>& a) {
+    Vector3 start = ToV3(a[0]), end = ToV3(a[1]);
+    bool ignoreSelf = a.size() > 2 ? a[2].b : true;
+    std::string channel = a.size() > 3 ? a[3].s : std::string();
+    bool includeTriggers = a.size() > 4 ? a[4].b : false;
+    bool drawDebug = a.size() > 5 ? a[5].b : false;
+
+    CollisionTrace::QueryParams params;
+    params.ignoreActor = ignoreSelf ? rt.owner : nullptr;
+    params.shapes = true;
+    params.triggers = includeTriggers ? CollisionTrace::TriggerMode::Include : CollisionTrace::TriggerMode::Ignore;
+    params.layer = channel.empty() || channel == "All" ? -1 : CollisionLayers::IndexOf(channel);
+
+    CollisionTrace::HitResult hit;
+    bool didHit = CollisionTrace::Raycast(start, end, params, hit);
+
+    Value result = Value::Default(MakeType(Kind::Hit));
+    (*result.arr)[0] = Value::Bool(didHit);
+    (*result.arr)[2] = V3(didHit ? hit.point : end);
+    (*result.arr)[4] = Value::Float(didHit ? hit.distance : Vector3Distance(start, end));
+    if (didHit) {
+        (*result.arr)[1] = MakeActorValue(hit.actor);
+        (*result.arr)[3] = V3(hit.normal);
+        (*result.arr)[5] = Value::Bool(hit.isTrigger);
+    }
+    if (drawDebug && IsCollisionDebugEnabled()) {
+        AddCollisionDebugLine(start, didHit ? hit.point : end, didHit ? RED : GREEN);
+        if (didHit) AddCollisionDebugSphere(hit.point, 3.0f, RED);
+    }
+    return result;
+}
+
+Value M_actor_add_movement_input(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireActor(s, "add_movement_input")->AddMovementInput(ToV3(a[0]), a.size() > 1 ? (float)a[1].AsNumber() : 1.0f);
+    return Value::Void();
+}
+Value M_actor_add_yaw(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_yaw_input")->AddControlYawInput((float)a[0].AsNumber()); return Value::Void(); }
+Value M_actor_add_pitch(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_pitch_input")->AddControlPitchInput((float)a[0].AsNumber()); return Value::Void(); }
+Value M_actor_add_roll(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_roll_input")->AddControlRollInput((float)a[0].AsNumber()); return Value::Void(); }
+
+PhysicsComponent* RequirePhysics(const Value& v, const char* what) {
+    PhysicsComponent* p = dynamic_cast<PhysicsComponent*>(RequireComponent(v, what));
+    if (!p) throw ScriptError{ std::string(what) + ": the component is not a PhysicsComponent" };
+    return p;
+}
+AudioComponent* RequireAudio(const Value& v, const char* what) {
+    AudioComponent* c = dynamic_cast<AudioComponent*>(RequireComponent(v, what));
+    if (!c) throw ScriptError{ std::string(what) + ": the component is not an AudioComponent" };
+    return c;
+}
+MeshComponent* RequireMesh(const Value& v, const char* what) {
+    MeshComponent* c = dynamic_cast<MeshComponent*>(RequireComponent(v, what));
+    if (!c) throw ScriptError{ std::string(what) + ": the component is not a MeshComponent" };
+    return c;
+}
+
+Value M_phys_add_impulse(Runtime&, Value& s, std::vector<Value>& a) { RequirePhysics(s, "add_impulse")->AddImpulse(ToV3(a[0])); return Value::Void(); }
+Value M_audio_play(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "play")->Play(); return Value::Void(); }
+Value M_audio_stop(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "stop")->Stop(); return Value::Void(); }
+Value M_audio_pause(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "pause")->Pause(); return Value::Void(); }
+Value M_audio_resume(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "resume")->Resume(); return Value::Void(); }
+Value M_mesh_play_animation(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireMesh(s, "play_animation")->PlayAnimation(a[0].s, a.size() > 1 ? a[1].b : false);
+    return Value::Void();
+}
+Value M_mesh_stop_animation(Runtime&, Value& s, std::vector<Value>&) { RequireMesh(s, "stop_animation")->StopAnimation(); return Value::Void(); }
+Value M_mesh_set_anim_rate(Runtime&, Value& s, std::vector<Value>& a) { RequireMesh(s, "set_anim_rate")->SetAnimPlayRate((float)a[0].AsNumber()); return Value::Void(); }
+
+Instance& RequireInstance(Runtime& rt) {
+    if (!rt.instance) throw ScriptError{ "This function needs a running script" };
+    return *rt.instance;
+}
+Value Fn_async_misuse(Runtime&, std::vector<Value>&) { throw ScriptError{ "delay() and next_frame() can only be used with 'await'" }; }
+Value Fn_set_timer(Runtime& rt, std::vector<Value>& a) {
+    float interval = (float)a[1].AsNumber();
+    if (interval < 0.0f) throw ScriptError{ "set_timer: the time cannot be negative" };
+    RequireInstance(rt).SetTimer(a[0].s, interval, a.size() > 2 ? a[2].b : false);
+    return Value::Void();
+}
+Value Fn_clear_timer(Runtime& rt, std::vector<Value>& a) { RequireInstance(rt).ClearTimer(a[0].s); return Value::Void(); }
+Value Fn_pause_timer(Runtime& rt, std::vector<Value>& a) { RequireInstance(rt).SetTimerPaused(a[0].s, true); return Value::Void(); }
+Value Fn_resume_timer(Runtime& rt, std::vector<Value>& a) { RequireInstance(rt).SetTimerPaused(a[0].s, false); return Value::Void(); }
+Value Fn_is_timer_active(Runtime& rt, std::vector<Value>& a) { return Value::Bool(RequireInstance(rt).IsTimerActive(a[0].s)); }
+Value Fn_timer_remaining(Runtime& rt, std::vector<Value>& a) { return Value::Float(RequireInstance(rt).TimerRemaining(a[0].s)); }
+
+Value Fn_input_pressed(Runtime& rt, std::vector<Value>& a) { return Value::Bool(RequireInstance(rt).QueryInput(a[0].s).held); }
+Value Fn_input_just_pressed(Runtime& rt, std::vector<Value>& a) { const auto& s = RequireInstance(rt).QueryInput(a[0].s); return Value::Bool(s.held && !s.prevHeld); }
+Value Fn_input_just_released(Runtime& rt, std::vector<Value>& a) { const auto& s = RequireInstance(rt).QueryInput(a[0].s); return Value::Bool(!s.held && s.prevHeld); }
+Value Fn_input_axis(Runtime& rt, std::vector<Value>& a) { return Value::Float(RequireInstance(rt).QueryInput(a[0].s).axis); }
+Value Fn_input_axis_2d(Runtime& rt, std::vector<Value>& a) { const auto& s = RequireInstance(rt).QueryInput(a[0].s); return Value::Vec3(s.x, s.y, 0.0f); }
+
 Value M_vec_length(Runtime&, Value& s, std::vector<Value>&) { return Value::Float(std::sqrt(s.x * s.x + s.y * s.y + s.z * s.z)); }
 Value M_vec_normalized(Runtime&, Value& s, std::vector<Value>&) {
     float len = std::sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
@@ -335,6 +462,7 @@ Value M_arr_contains(Runtime&, Value& s, std::vector<Value>& a) {
         else if (e.kind == Kind::Bool) same = e.b == a[0].b;
         else if (e.kind == Kind::String) same = e.s == a[0].s;
         else if (e.kind == Kind::Vec3) same = e.x == a[0].x && e.y == a[0].y && e.z == a[0].z;
+        else if (e.kind == Kind::Actor || e.kind == Kind::Component) same = e.objectId == a[0].objectId;
         if (same) return Value::Bool(true);
     }
     return Value::Bool(false);
@@ -359,6 +487,29 @@ Value P_actor_get_up(Runtime&, const Value& s) {
     Matrix m = ComposeRotationDegrees(RequireActor(s, "up")->rotation);
     return Value::Vec3(m.m4, m.m5, m.m6);
 }
+
+Value P_actor_get_show_cursor(Runtime&, const Value& s) { return Value::Bool(RequireActor(s, "show_mouse_cursor")->showMouseCursor); }
+void P_actor_set_show_cursor(Runtime&, const Value& s, const Value& v) { RequireActor(s, "show_mouse_cursor")->showMouseCursor = v.b; }
+Value P_actor_get_control_rotation(Runtime&, const Value& s) { return V3(RequireActor(s, "control_rotation")->controlRotation); }
+void P_actor_set_control_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "control_rotation")->controlRotation = ToV3(v); }
+Value P_actor_get_movement_speed(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "movement_speed")->MovementSpeed); }
+void P_actor_set_movement_speed(Runtime&, const Value& s, const Value& v) { RequireActor(s, "movement_speed")->MovementSpeed = (float)v.AsNumber(); }
+
+Value P_phys_get_velocity(Runtime&, const Value& s) { return V3(RequirePhysics(s, "velocity")->velocity); }
+void P_phys_set_velocity(Runtime&, const Value& s, const Value& v) { RequirePhysics(s, "velocity")->SetVelocity(ToV3(v)); }
+Value P_phys_get_grounded(Runtime&, const Value& s) { return Value::Bool(RequirePhysics(s, "grounded")->grounded); }
+Value P_phys_get_ground_normal(Runtime&, const Value& s) { return V3(RequirePhysics(s, "ground_normal")->groundNormal); }
+
+Value HitField(const Value& s, size_t index) {
+    if (!s.arr || index >= s.arr->size()) throw ScriptError{ "Invalid Hit value" };
+    return (*s.arr)[index];
+}
+Value P_hit_did_hit(Runtime&, const Value& s) { return HitField(s, 0); }
+Value P_hit_actor(Runtime&, const Value& s) { return HitField(s, 1); }
+Value P_hit_location(Runtime&, const Value& s) { return HitField(s, 2); }
+Value P_hit_normal(Runtime&, const Value& s) { return HitField(s, 3); }
+Value P_hit_distance(Runtime&, const Value& s) { return HitField(s, 4); }
+Value P_hit_is_trigger(Runtime&, const Value& s) { return HitField(s, 5); }
 
 Value P_comp_get_position(Runtime&, const Value& s) { return V3(RequireComponent(s, "position")->position); }
 void P_comp_set_position(Runtime&, const Value& s, const Value& v) { RequireComponent(s, "position")->position = ToV3(v); }
@@ -403,6 +554,30 @@ const std::vector<BuiltinDef>& Builtins() {
         { "spawn_actor", { T(Kind::String), T(Kind::Vec3), T(Kind::Vec3) }, 1, ActorT(), RetRule::Fixed, false, Fn_spawn_actor },
         { "destroy_actor", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_destroy_actor },
         { "send_event", { ActorT(), T(Kind::String), T(Kind::Any) }, 2, T(Kind::Void), RetRule::Fixed, true, Fn_send_event },
+        { "delay", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_async_misuse, 1 },
+        { "next_frame", {}, 0, T(Kind::Void), RetRule::Fixed, false, Fn_async_misuse, 2 },
+        { "set_timer", { T(Kind::String), T(Kind::Float), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_timer },
+        { "clear_timer", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_clear_timer },
+        { "pause_timer", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_pause_timer },
+        { "resume_timer", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_resume_timer },
+        { "is_timer_active", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_is_timer_active },
+        { "timer_remaining", { T(Kind::String) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_timer_remaining },
+        { "input_pressed", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_input_pressed },
+        { "input_just_pressed", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_input_just_pressed },
+        { "input_just_released", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_input_just_released },
+        { "input_axis", { T(Kind::String) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_input_axis },
+        { "input_axis_2d", { T(Kind::String) }, 1, T(Kind::Vec3), RetRule::Fixed, false, Fn_input_axis_2d },
+        { "set_view_target", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_view_target },
+        { "get_view_target", {}, 0, ActorT(), RetRule::Fixed, false, Fn_get_view_target },
+        { "set_input_focus", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_input_focus },
+        { "set_input_target", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_input_focus },
+        { "get_input_focus", {}, 0, ActorT(), RetRule::Fixed, false, Fn_get_input_focus },
+        { "get_input_target", {}, 0, ActorT(), RetRule::Fixed, false, Fn_get_input_focus },
+        { "get_actor_of_class", { T(Kind::String) }, 1, ActorT(), RetRule::Fixed, false, Fn_get_actor_of_class },
+        { "get_actors_of_class", { T(Kind::String) }, 1, MakeArrayType(Kind::Actor), RetRule::Fixed, false, Fn_get_actors_of_class },
+        { "get_all_actors", {}, 0, MakeArrayType(Kind::Actor), RetRule::Fixed, false, Fn_get_all_actors },
+        { "quit_game", {}, 0, T(Kind::Void), RetRule::Fixed, false, Fn_quit_game },
+        { "line_trace", { T(Kind::Vec3), T(Kind::Vec3), T(Kind::Bool), T(Kind::String), T(Kind::Bool), T(Kind::Bool) }, 2, T(Kind::Hit), RetRule::Fixed, false, Fn_line_trace },
     };
     return table;
 }
@@ -411,6 +586,18 @@ const std::vector<MethodDef>& Methods() {
     static const std::vector<MethodDef> table = {
         { Kind::Vec3, "length", {}, 0, T(Kind::Float), RetRule::Fixed, false, M_vec_length },
         { Kind::Vec3, "normalized", {}, 0, T(Kind::Vec3), RetRule::Fixed, false, M_vec_normalized },
+        { Kind::Actor, "add_movement_input", { T(Kind::Vec3), T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_movement_input },
+        { Kind::Actor, "add_control_yaw_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_yaw },
+        { Kind::Actor, "add_control_pitch_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_pitch },
+        { Kind::Actor, "add_control_roll_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_roll },
+        { Kind::Component, "add_impulse", { T(Kind::Vec3) }, 1, T(Kind::Void), RetRule::Fixed, false, M_phys_add_impulse, "PhysicsComponent" },
+        { Kind::Component, "play", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_play, "AudioComponent" },
+        { Kind::Component, "stop", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_stop, "AudioComponent" },
+        { Kind::Component, "pause", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_pause, "AudioComponent" },
+        { Kind::Component, "resume", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_resume, "AudioComponent" },
+        { Kind::Component, "play_animation", { T(Kind::String), T(Kind::Bool) }, 1, T(Kind::Void), RetRule::Fixed, false, M_mesh_play_animation, "MeshComponent" },
+        { Kind::Component, "stop_animation", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_mesh_stop_animation, "MeshComponent" },
+        { Kind::Component, "set_anim_rate", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_mesh_set_anim_rate, "MeshComponent" },
         { Kind::Actor, "is_valid", {}, 0, T(Kind::Bool), RetRule::Fixed, false, M_object_is_valid },
         { Kind::Actor, "destroy", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_actor_destroy },
         { Kind::Component, "is_valid", {}, 0, T(Kind::Bool), RetRule::Fixed, false, M_object_is_valid },
@@ -442,6 +629,18 @@ const std::vector<PropertyDef>& Properties() {
         { Kind::Actor, "forward", T(Kind::Vec3), P_actor_get_forward, nullptr },
         { Kind::Actor, "right", T(Kind::Vec3), P_actor_get_right, nullptr },
         { Kind::Actor, "up", T(Kind::Vec3), P_actor_get_up, nullptr },
+        { Kind::Actor, "show_mouse_cursor", T(Kind::Bool), P_actor_get_show_cursor, P_actor_set_show_cursor },
+        { Kind::Actor, "control_rotation", T(Kind::Vec3), P_actor_get_control_rotation, P_actor_set_control_rotation },
+        { Kind::Actor, "movement_speed", T(Kind::Float), P_actor_get_movement_speed, P_actor_set_movement_speed },
+        { Kind::Component, "velocity", T(Kind::Vec3), P_phys_get_velocity, P_phys_set_velocity, "PhysicsComponent" },
+        { Kind::Component, "grounded", T(Kind::Bool), P_phys_get_grounded, nullptr, "PhysicsComponent" },
+        { Kind::Component, "ground_normal", T(Kind::Vec3), P_phys_get_ground_normal, nullptr, "PhysicsComponent" },
+        { Kind::Hit, "did_hit", T(Kind::Bool), P_hit_did_hit, nullptr },
+        { Kind::Hit, "actor", ActorT(), P_hit_actor, nullptr },
+        { Kind::Hit, "location", T(Kind::Vec3), P_hit_location, nullptr },
+        { Kind::Hit, "normal", T(Kind::Vec3), P_hit_normal, nullptr },
+        { Kind::Hit, "distance", T(Kind::Float), P_hit_distance, nullptr },
+        { Kind::Hit, "is_trigger", T(Kind::Bool), P_hit_is_trigger, nullptr },
         { Kind::Component, "position", T(Kind::Vec3), P_comp_get_position, P_comp_set_position },
         { Kind::Component, "rotation", T(Kind::Vec3), P_comp_get_rotation, P_comp_set_rotation },
         { Kind::Component, "scale", T(Kind::Vec3), P_comp_get_scale, P_comp_set_scale },
@@ -461,14 +660,90 @@ const BuiltinDef* FindBuiltin(const std::string& name) {
     return nullptr;
 }
 
-const MethodDef* FindMethod(Kind receiver, const std::string& name) {
-    for (const MethodDef& m : Methods()) if (m.receiver == receiver && name == m.name) return &m;
+static bool ComponentTypeMatches(const char* required, const std::string& objectKind) {
+    if (!required || !*required) return true;
+    if (objectKind.empty()) return true;
+    return objectKind == required || ObjectKindRegistry::Get().IsCompatible(objectKind, required);
+}
+
+const MethodDef* FindMethod(Kind receiver, const std::string& name, const std::string& objectKind) {
+    for (const MethodDef& m : Methods()) {
+        if (m.receiver == receiver && name == m.name && ComponentTypeMatches(m.componentType, objectKind)) return &m;
+    }
     return nullptr;
 }
 
-const PropertyDef* FindProperty(Kind receiver, const std::string& name) {
-    for (const PropertyDef& p : Properties()) if (p.receiver == receiver && name == p.name) return &p;
+const PropertyDef* FindProperty(Kind receiver, const std::string& name, const std::string& objectKind) {
+    for (const PropertyDef& p : Properties()) {
+        if (p.receiver == receiver && name == p.name && ComponentTypeMatches(p.componentType, objectKind)) return &p;
+    }
     return nullptr;
+}
+
+static std::string NormalizeIdentifier(const std::string& text) {
+    std::string out;
+    for (char c : text) {
+        if (c == ' ' || c == '_') continue;
+        out += (char)tolower((unsigned char)c);
+    }
+    return out;
+}
+
+std::string ComponentFieldIdentifier(const ComponentFieldDesc& field) {
+    std::string out;
+    for (char c : field.label.empty() ? field.key : field.label) {
+        if (c == ' ') out += '_';
+        else out += (char)tolower((unsigned char)c);
+    }
+    return out;
+}
+
+const ComponentFieldDesc* FindComponentField(const std::string& componentType, const std::string& identifier) {
+    const ComponentTypeInfo* info = ComponentRegistry::Get().Find(componentType);
+    if (!info) return nullptr;
+    std::string wanted = NormalizeIdentifier(identifier);
+    for (const ComponentFieldDesc& f : info->fields) {
+        if (NormalizeIdentifier(f.label) == wanted || NormalizeIdentifier(f.key) == wanted) return &f;
+    }
+    return nullptr;
+}
+
+SType ComponentFieldScriptType(const ComponentFieldDesc& field) {
+    if (field.kind == ComponentFieldKind::Float) return MakeType(Kind::Float);
+    if (field.kind == ComponentFieldKind::Bool) return MakeType(Kind::Bool);
+    return MakeType(Kind::String);
+}
+
+static const ComponentFieldDesc* FindFieldByKey(const std::string& componentType, const std::string& key) {
+    const ComponentTypeInfo* info = ComponentRegistry::Get().Find(componentType);
+    if (!info) return nullptr;
+    for (const ComponentFieldDesc& f : info->fields) if (f.key == key) return &f;
+    return nullptr;
+}
+
+Value ReadComponentField(const Value& component, const std::string& fieldKey) {
+    Component* c = RequireComponent(component, "component field");
+    const ComponentFieldDesc* field = FindFieldByKey(c->GetClassName(), fieldKey);
+    if (!field || !field->read) throw ScriptError{ "This component field cannot be read" };
+    std::string text = field->read(*c);
+    switch (field->kind) {
+        case ComponentFieldKind::Float: return Value::Float(text.empty() ? 0.0 : strtod(text.c_str(), nullptr));
+        case ComponentFieldKind::Bool: return Value::Bool(text == "true" || text == "1");
+        default: return Value::String(text);
+    }
+}
+
+void WriteComponentField(const Value& component, const std::string& fieldKey, const Value& value) {
+    Component* c = RequireComponent(component, "component field");
+    const ComponentFieldDesc* field = FindFieldByKey(c->GetClassName(), fieldKey);
+    if (!field || !field->apply) throw ScriptError{ "This component field cannot be written" };
+    ComponentDecl decl;
+    switch (field->kind) {
+        case ComponentFieldKind::Float: decl.fields[fieldKey] = ComponentField::FloatStr((float)value.AsNumber()); break;
+        case ComponentFieldKind::Bool: decl.fields[fieldKey] = ComponentField::BoolStr(value.b); break;
+        default: decl.fields[fieldKey] = value.s; break;
+    }
+    field->apply(*c, decl);
 }
 
 }

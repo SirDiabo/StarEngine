@@ -137,7 +137,9 @@ void StarscriptOutlinePanel::Render() {
         rows.push_back({ "Events", "", -1, true, theme.sectionHeader });
         for (const auto& e : program->events) {
             std::string label = e->kind == EventKind::Component ? e->componentName + "." + e->name : e->name;
-            label += "(";
+            if (e->kind == EventKind::Input) label = "Input(\"" + e->inputName + "\"";
+            else label += "(";
+            if (e->kind == EventKind::Input && !e->params.empty()) label += ", ";
             for (size_t i = 0; i < e->params.size(); i++) { if (i) label += ", "; label += e->params[i].name; }
             label += ")";
             std::string tag;

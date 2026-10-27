@@ -46,7 +46,7 @@ private:
     std::string SerializeDocument();
     void BuildCompletions(const CompletionRequest& request, std::vector<CompletionItem>& out);
     TokenClass Classify(const std::string& name, bool afterDot, bool callFollows) const;
-    bool ResolveReceiverKind(const std::string& receiver, int& outKind) const;
+    bool ResolveReceiverKind(const std::string& receiver, int& outKind, std::string& outObjectKind) const;
 
     std::string filePath;
     std::string assetName;

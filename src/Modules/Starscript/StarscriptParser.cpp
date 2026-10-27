@@ -199,6 +199,26 @@ private:
         Advance();
         if (!At(Tok::Ident)) { Error("Expected an event name"); SkipLineKeepBlock(); return; }
         std::string first = Advance().text;
+        if (first == "Input" && At(Tok::LParen) && pos + 1 < tokens.size() && tokens[pos + 1].type == Tok::String) {
+            Advance();
+            def->kind = EventKind::Input;
+            def->name = "Input";
+            def->inputName = Advance().text;
+            if (Match(Tok::Comma)) {
+                while (!At(Tok::RParen) && !At(Tok::End) && !At(Tok::Newline)) {
+                    ParamDef param;
+                    if (!At(Tok::Ident)) { Error("Expected a parameter name"); break; }
+                    param.name = Advance().text;
+                    if (Expect(Tok::Colon, "':' and a type for the parameter")) param.typeRef = ParseTypeRef();
+                    def->params.push_back(std::move(param));
+                    if (!Match(Tok::Comma)) break;
+                }
+            }
+            Expect(Tok::RParen, "')'");
+            ParseBlock(def->body);
+            program.events.push_back(std::move(def));
+            return;
+        }
         if (Match(Tok::Dot)) {
             def->componentName = first;
             if (!At(Tok::Ident)) { Error("Expected an event name after '.'"); SkipLineKeepBlock(); return; }
@@ -251,6 +271,14 @@ private:
                 auto s = MakeStmt(StmtKind::Return);
                 Advance();
                 if (!At(Tok::Newline) && !At(Tok::End) && !At(Tok::Dedent)) s->value = ParseExpr();
+                EndOfStatement();
+                return s;
+            }
+            case Tok::KwAwait: {
+                auto s = MakeStmt(StmtKind::Await);
+                Advance();
+                s->value = ParseExpr();
+                if (!s->value) { SkipLine(); return nullptr; }
                 EndOfStatement();
                 return s;
             }
@@ -469,6 +497,45 @@ private:
         return expr;
     }
 
+    ExprPtr ParseInterpolation(const Token& tok) {
+        auto node = MakeExpr(ExprKind::Interpolation, tok);
+        std::vector<StringPart> parts = tok.parts;
+        Advance();
+        for (const StringPart& part : parts) {
+            if (!part.isExpression) {
+                auto lit = MakeExpr(ExprKind::Literal, tok);
+                lit->literal = Value::String(part.text);
+                node->args.push_back(std::move(lit));
+                continue;
+            }
+            ExprPtr inner = ParseEmbedded(part);
+            if (!inner) return nullptr;
+            node->args.push_back(std::move(inner));
+        }
+        return node;
+    }
+
+    ExprPtr ParseEmbedded(const StringPart& part) {
+        size_t lead = part.text.find_first_not_of(" \t");
+        std::string text = part.text.substr(lead == std::string::npos ? 0 : lead);
+        int columnOffset = part.column + (lead == std::string::npos ? 0 : (int)lead) - 1;
+
+        std::vector<Diagnostic> lexDiagnostics;
+        std::vector<Token> sub = Tokenize(text, lexDiagnostics);
+        for (Diagnostic& d : lexDiagnostics) program.diagnostics.push_back({ part.line, d.column + columnOffset, d.message });
+        for (Token& t : sub) { t.line = part.line; t.column += columnOffset; }
+
+        Parser nested(std::move(sub), program);
+        ExprPtr expr = nested.ParseExpr();
+        if (!expr) return nullptr;
+        while (nested.At(Tok::Newline)) nested.Advance();
+        if (!nested.At(Tok::End)) {
+            program.diagnostics.push_back({ part.line, nested.Cur().column, "Unexpected text inside '{ }' in string" });
+            return nullptr;
+        }
+        return expr;
+    }
+
     ExprPtr ParsePrimary() {
         const Token& tok = Cur();
         switch (tok.type) {
@@ -485,6 +552,7 @@ private:
                 return e;
             }
             case Tok::String: {
+                if (!tok.parts.empty()) return ParseInterpolation(tok);
                 auto e = MakeExpr(ExprKind::Literal, tok);
                 e->literal = Value::String(tok.text);
                 Advance();

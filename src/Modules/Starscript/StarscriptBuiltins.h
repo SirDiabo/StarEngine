@@ -6,6 +6,7 @@
 
 class Actor;
 class Component;
+struct ComponentFieldDesc;
 
 namespace Starscript {
 
@@ -35,6 +36,7 @@ struct BuiltinDef {
     RetRule rule;
     bool variadic;
     BuiltinFn fn;
+    int asyncKind = 0;
 };
 
 struct MethodDef {
@@ -46,6 +48,7 @@ struct MethodDef {
     RetRule rule;
     bool elemParam;
     MethodFn fn;
+    const char* componentType = "";
 };
 
 struct PropertyDef {
@@ -54,6 +57,7 @@ struct PropertyDef {
     SType type;
     PropertyGetFn get;
     PropertySetFn set;
+    const char* componentType = "";
 };
 
 const std::vector<BuiltinDef>& AllBuiltins();
@@ -61,8 +65,14 @@ const std::vector<MethodDef>& AllMethods();
 const std::vector<PropertyDef>& AllProperties();
 
 const BuiltinDef* FindBuiltin(const std::string& name);
-const MethodDef* FindMethod(Kind receiver, const std::string& name);
-const PropertyDef* FindProperty(Kind receiver, const std::string& name);
+const MethodDef* FindMethod(Kind receiver, const std::string& name, const std::string& objectKind = std::string());
+const PropertyDef* FindProperty(Kind receiver, const std::string& name, const std::string& objectKind = std::string());
+
+const ComponentFieldDesc* FindComponentField(const std::string& componentType, const std::string& identifier);
+SType ComponentFieldScriptType(const ComponentFieldDesc& field);
+std::string ComponentFieldIdentifier(const ComponentFieldDesc& field);
+Value ReadComponentField(const Value& component, const std::string& fieldKey);
+void WriteComponentField(const Value& component, const std::string& fieldKey, const Value& value);
 
 Actor* ResolveActor(const Value& v);
 Component* ResolveComponent(const Value& v);

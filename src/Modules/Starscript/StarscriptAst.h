@@ -24,11 +24,11 @@ struct TypeRef {
     int column = 0;
 };
 
-enum class ExprKind { Literal, Ident, SelfRef, Unary, Binary, Call, Member, Index, ArrayLit };
+enum class ExprKind { Literal, Ident, SelfRef, Unary, Binary, Call, Member, Index, ArrayLit, Interpolation };
 
 enum class Resolution {
     None, Local, Global, Component, UserFunction, EventCall, Builtin, Vec3Constructor,
-    Method, Property, VecField, ArrayIndex, StringIndex
+    Method, Property, VecField, ArrayIndex, StringIndex, ComponentField
 };
 
 struct Expr;
@@ -42,6 +42,7 @@ struct Expr {
 
     Value literal;
     std::string name;
+    std::string fieldKey;
     Tok op = Tok::End;
     ExprPtr a;
     ExprPtr b;
@@ -56,7 +57,7 @@ struct Expr {
     const EventDef* eventDef = nullptr;
 };
 
-enum class StmtKind { VarDecl, Assign, ExprStmt, If, While, For, Return, Break, Continue, Pass };
+enum class StmtKind { VarDecl, Assign, ExprStmt, If, While, For, Return, Break, Continue, Pass, Await };
 
 struct Stmt;
 using StmtPtr = std::unique_ptr<Stmt>;
@@ -123,18 +124,20 @@ struct FuncDef {
     int column = 0;
 };
 
-enum class EventKind { BeginPlay, Tick, EndPlay, Destroyed, Component, Custom };
+enum class EventKind { BeginPlay, Tick, EndPlay, Destroyed, Component, Custom, Input };
 
 struct EventDef {
     EventKind kind = EventKind::Custom;
     std::string name;
     std::string componentName;
+    std::string inputName;
     std::vector<ParamDef> params;
     Block body;
     int numLocals = 0;
     std::vector<Annotation> annotations;
     ReplicationMode replication = ReplicationMode::Local;
     bool reliable = false;
+    bool hasAwait = false;
     int line = 0;
     int column = 0;
 };
