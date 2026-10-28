@@ -60,6 +60,10 @@ struct PropertyDef {
     const char* componentType = "";
 };
 
+const std::vector<BuiltinDef>& ExtraBuiltins();
+const std::vector<MethodDef>& ExtraMethods();
+const std::vector<PropertyDef>& ExtraProperties();
+
 const std::vector<BuiltinDef>& AllBuiltins();
 const std::vector<MethodDef>& AllMethods();
 const std::vector<PropertyDef>& AllProperties();

@@ -651,12 +651,19 @@ const std::vector<PropertyDef>& Properties() {
 
 }
 
-const std::vector<BuiltinDef>& AllBuiltins() { return Builtins(); }
-const std::vector<MethodDef>& AllMethods() { return Methods(); }
-const std::vector<PropertyDef>& AllProperties() { return Properties(); }
+template <typename T>
+static std::vector<T> Merge(const std::vector<T>& a, const std::vector<T>& b) {
+    std::vector<T> out = a;
+    out.insert(out.end(), b.begin(), b.end());
+    return out;
+}
+
+const std::vector<BuiltinDef>& AllBuiltins() { static const std::vector<BuiltinDef> merged = Merge(Builtins(), ExtraBuiltins()); return merged; }
+const std::vector<MethodDef>& AllMethods() { static const std::vector<MethodDef> merged = Merge(Methods(), ExtraMethods()); return merged; }
+const std::vector<PropertyDef>& AllProperties() { static const std::vector<PropertyDef> merged = Merge(Properties(), ExtraProperties()); return merged; }
 
 const BuiltinDef* FindBuiltin(const std::string& name) {
-    for (const BuiltinDef& b : Builtins()) if (name == b.name) return &b;
+    for (const BuiltinDef& b : AllBuiltins()) if (name == b.name) return &b;
     return nullptr;
 }
 
@@ -667,14 +674,14 @@ static bool ComponentTypeMatches(const char* required, const std::string& object
 }
 
 const MethodDef* FindMethod(Kind receiver, const std::string& name, const std::string& objectKind) {
-    for (const MethodDef& m : Methods()) {
+    for (const MethodDef& m : AllMethods()) {
         if (m.receiver == receiver && name == m.name && ComponentTypeMatches(m.componentType, objectKind)) return &m;
     }
     return nullptr;
 }
 
 const PropertyDef* FindProperty(Kind receiver, const std::string& name, const std::string& objectKind) {
-    for (const PropertyDef& p : Properties()) {
+    for (const PropertyDef& p : AllProperties()) {
         if (p.receiver == receiver && name == p.name && ComponentTypeMatches(p.componentType, objectKind)) return &p;
     }
     return nullptr;
