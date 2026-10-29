@@ -15,6 +15,10 @@ public:
                         const std::vector<std::pair<std::string, std::string>>& params) override;
     void OnCustomEvent(Widget* owner, const std::string& eventName,
                         const std::vector<std::pair<std::string, std::string>>& params);
+    bool CallWidgetEvent(Widget* owner, const std::string& eventName, const CallParams& params) override;
+    bool CallWidgetFunction(Widget* owner, const std::string& functionName, const CallParams& args, std::string& result) override;
+    bool SetWidgetVariable(Widget* owner, const std::string& name, const std::string& value) override;
+    bool GetWidgetVariable(Widget* owner, const std::string& name, std::string& value) override;
     void OnComponentEvent(Actor* owner, Component* component, const std::string& eventName,
                            const std::vector<std::pair<std::string, std::string>>& params) override;
     void OnDestroyed(Actor* owner) override;

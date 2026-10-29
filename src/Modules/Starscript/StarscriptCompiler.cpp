@@ -5,6 +5,8 @@
 #include "Runtime/ComponentEvents.h"
 #include "Runtime/ComponentRegistry.h"
 #include "Core/ObjectKindRegistry.h"
+#include "Core/Widgets/WidgetElementEvents.h"
+#include "Core/Widgets/WidgetElementFields.h"
 #include <algorithm>
 #include <unordered_set>
 
@@ -42,8 +44,15 @@ struct LocalVar {
 
 class Compiler {
 public:
-    Compiler(Program& prog, const std::vector<ComponentDecl>& comps) : program(prog), components(comps) {
+    Compiler(Program& prog, const std::vector<ComponentDecl>& comps, const std::vector<WidgetElementInfo>* widgetElements)
+        : program(prog), components(comps), widgetMode(widgetElements != nullptr) {
         for (const ComponentDecl& c : comps) componentTypes[c.name] = c.componentType;
+        if (widgetElements) {
+            for (const WidgetElementInfo& el : *widgetElements) {
+                if (!el.id.empty() && IsIdentifier(el.id)) elementTypes[el.id] = el.className;
+                allElementIds[el.id] = el.className;
+            }
+        }
     }
 
     void Run() {
@@ -57,7 +66,16 @@ private:
     Program& program;
     const std::vector<ComponentDecl>& components;
     std::unordered_map<std::string, std::string> componentTypes;
+    std::unordered_map<std::string, std::string> elementTypes;
+    std::unordered_map<std::string, std::string> allElementIds;
     std::unordered_map<std::string, const EventDef*> customEvents;
+    bool widgetMode = false;
+
+    static bool IsIdentifier(const std::string& text) {
+        if (text.empty() || isdigit((unsigned char)text[0])) return false;
+        for (char c : text) if (!(isalnum((unsigned char)c) || c == '_')) return false;
+        return true;
+    }
 
     std::vector<std::unordered_map<std::string, LocalVar>> scopes;
     int nextSlot = 0;
@@ -89,6 +107,10 @@ private:
             out = MakeObjectType(Kind::Component, ref.name);
             return true;
         }
+        if (ref.name != "WidgetElement" && ObjectKindRegistry::Get().IsCompatible(ref.name, "WidgetElement")) {
+            out = MakeObjectType(Kind::Element, ref.name);
+            return true;
+        }
         Error(ref.line, ref.column, "Unknown type '" + ref.name + "'");
         return false;
     }
@@ -96,6 +118,7 @@ private:
     void ResolveDeclarations() {
         std::unordered_set<std::string> taken;
         for (auto& kv : componentTypes) taken.insert(kv.first);
+        for (auto& kv : elementTypes) taken.insert(kv.first);
 
         for (auto& v : program.vars) {
             if (taken.count(v->name) || program.varIndex.count(v->name)) {
@@ -123,9 +146,13 @@ private:
             } else if (!v->typeRef.present) {
                 Error(v->line, v->column, "Variable '" + v->name + "' needs a type or an initial value");
             }
-            if (v->replication != ReplicationMode::Local && (v->type.kind == Kind::Array || v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Hit))
+            if (widgetMode && v->replication != ReplicationMode::Local)
+                Error(v->line, v->column, "Widget variables cannot be replicated");
+            if (widgetMode && !v->saveFile.empty())
+                Error(v->line, v->column, "Widget variables cannot be saved");
+            if (v->replication != ReplicationMode::Local && (v->type.kind == Kind::Array || v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Element || v->type.kind == Kind::Hit))
                 Error(v->line, v->column, "Variables of type " + v->type.ToString() + " cannot be replicated");
-            if (!v->saveFile.empty() && (v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Hit || (v->type.kind == Kind::Array && v->type.elem == Kind::Actor)))
+            if (!v->saveFile.empty() && (v->type.kind == Kind::Actor || v->type.kind == Kind::Component || v->type.kind == Kind::Element || v->type.kind == Kind::Hit || (v->type.kind == Kind::Array && v->type.elem == Kind::Actor)))
                 Error(v->line, v->column, "Variables of type " + v->type.ToString() + " cannot be saved");
         }
         inInitializer = false;
@@ -180,11 +207,54 @@ private:
             if (a.name == "replicated") e.replication = ReplicationMode::Replicated;
             else if (a.name == "server_only") e.replication = ReplicationMode::ServerOnly;
             else if (a.name == "reliable") e.reliable = true;
+            if (widgetMode && (a.name == "replicated" || a.name == "server_only" || a.name == "reliable"))
+                Error(a.line, a.column, "Widget events cannot be replicated");
             else Error(a.line, a.column, "Unknown event annotation '@" + a.name + "'");
         }
     }
 
-    void ValidateEvent(const EventDef& e) {
+    const std::vector<std::string>* FindElementEvents(const std::string& className) const {
+        std::string current = className;
+        for (int guard = 0; guard < 16 && !current.empty(); guard++) {
+            if (const std::vector<std::string>* events = WidgetElementEvents::Find(current)) return events;
+            current = ObjectKindRegistry::Get().GetParentKind(current);
+        }
+        return nullptr;
+    }
+
+    void ValidateElementEvent(EventDef& e) {
+        std::string className;
+        auto it = elementTypes.find(e.componentName);
+        if (it != elementTypes.end()) className = it->second;
+        else {
+            auto any = allElementIds.find(e.componentName);
+            if (any == allElementIds.end()) { Error(e.line, e.column, "Unknown element '" + e.componentName + "' in this widget"); return; }
+            className = any->second;
+        }
+        const std::vector<std::string>* events = FindElementEvents(className);
+        bool found = false;
+        if (events) for (const std::string& name : *events) if (NormalizeEventName(name) == NormalizeEventName(e.name)) { found = true; break; }
+        if (!found) {
+            std::string available;
+            if (events) for (const std::string& name : *events) available += (available.empty() ? "" : ", ") + name;
+            Error(e.line, e.column, "Element '" + e.componentName + "' (" + className + ") has no event '" + e.name + "'" +
+                  (available.empty() ? std::string(" (this element type raises no events)") : " (available: " + available + ")"));
+            return;
+        }
+        if (!e.params.empty()) Error(e.line, e.column, "Element events take no parameters");
+        e.kind = EventKind::Element;
+    }
+
+    void ValidateEvent(EventDef& e) {
+        if (widgetMode) {
+            if (e.kind == EventKind::BeginPlay && e.name == "BeginPlay") Error(e.line, e.column, "Widgets use 'event Construct()' instead of BeginPlay");
+            if (e.kind == EventKind::EndPlay && e.name == "EndPlay") Error(e.line, e.column, "Widgets use 'event Destruct()' instead of EndPlay");
+            if (e.kind == EventKind::Destroyed) Error(e.line, e.column, "Widgets have no 'Destroyed' event; use 'event Destruct()'");
+            if (e.kind == EventKind::Component) { ValidateElementEvent(e); return; }
+        } else {
+            if (e.kind == EventKind::BeginPlay && e.name == "Construct") Error(e.line, e.column, "'Construct' is a widget event; actors use BeginPlay");
+            if (e.kind == EventKind::EndPlay && e.name == "Destruct") Error(e.line, e.column, "'Destruct' is a widget event; actors use EndPlay");
+        }
         switch (e.kind) {
             case EventKind::BeginPlay:
             case EventKind::EndPlay:
@@ -419,7 +489,7 @@ private:
             case ExprKind::Member:
                 if (e.resolution == Resolution::VecField) return IsLValue(*e.a) || e.a->resolution == Resolution::Property;
                 if (e.resolution == Resolution::Property) return e.property && e.property->set;
-                if (e.resolution == Resolution::ComponentField) return true;
+                if (e.resolution == Resolution::ComponentField || e.resolution == Resolution::ElementField) return true;
                 return false;
             default: return false;
         }
@@ -497,6 +567,10 @@ private:
         switch (e.kind) {
             case ExprKind::Literal: return MakeType(e.literal.kind);
             case ExprKind::SelfRef:
+                if (widgetMode) {
+                    Error(e.line, e.column, "Widgets have no 'self'; use get_parent_actor() to reach the actor that shows this widget");
+                    return MakeType(Kind::Void);
+                }
                 if (inInitializer) Error(e.line, e.column, "'self' is not available in a variable initializer");
                 return MakeObjectType(Kind::Actor, "Actor");
             case ExprKind::Ident: return CheckIdent(e);
@@ -544,6 +618,12 @@ private:
             e.slot = vit->second;
             return program.vars[vit->second]->type;
         }
+        auto elit = elementTypes.find(e.name);
+        if (elit != elementTypes.end() && !componentTypes.count(e.name)) {
+            if (inInitializer) Error(e.line, e.column, "Elements are not available in a variable initializer");
+            e.resolution = Resolution::Element;
+            return MakeObjectType(Kind::Element, elit->second);
+        }
         auto cit = componentTypes.find(e.name);
         if (cit != componentTypes.end()) {
             if (inInitializer) Error(e.line, e.column, "Components are not available in a variable initializer");
@@ -566,7 +646,7 @@ private:
             if (elem == Kind::Void) elem = t.kind;
             else if (!IsAssignable(MakeType(elem), t)) Error(item->line, item->column, "Array element should be " + MakeType(elem).ToString() + ", got " + t.ToString());
         }
-        if (elem == Kind::Component || elem == Kind::Array || elem == Kind::Hit) {
+        if (elem == Kind::Component || elem == Kind::Element || elem == Kind::Array || elem == Kind::Hit) {
             Error(e.line, e.column, "Arrays of this element type are not supported");
             elem = Kind::Void;
         }
@@ -601,6 +681,13 @@ private:
                 e.resolution = Resolution::ComponentField;
                 e.fieldKey = field->key;
                 return ComponentFieldScriptType(*field);
+            }
+        }
+        if (base.kind == Kind::Element) {
+            if (const WidgetElementFieldDesc* field = FindElementField(base.objectKind, e.name)) {
+                e.resolution = Resolution::ElementField;
+                e.fieldKey = field->key;
+                return ElementFieldScriptType(*field);
             }
         }
         Error(e.line, e.column, base.ToString() + " has no property '" + e.name + "'");
@@ -699,6 +786,10 @@ private:
     }
 
     SType CheckBuiltin(Expr& e, const BuiltinDef& b) {
+        if (b.scope == ScopeWidget && !widgetMode)
+            Error(e.line, e.column, std::string("'") + b.name + "' can only be used in widget scripts");
+        if (b.scope == ScopeActor && widgetMode)
+            Error(e.line, e.column, std::string("'") + b.name + "' can only be used in actor scripts");
         if (b.asyncKind != 0 && &e != awaitCall)
             Error(e.line, e.column, std::string("'") + b.name + "' can only be used as 'await " + b.name + "(...)'");
         if (std::string(b.name) == "set_timer" && !e.args.empty() && e.args[0]->kind == ExprKind::Literal && e.args[0]->literal.kind == Kind::String) {
@@ -734,20 +825,37 @@ private:
             }
         }
         if (b.rule == RetRule::Numeric) return MakeType(allInt ? Kind::Int : Kind::Float);
+        if (std::string(b.name) == "get_element" && !e.args.empty() && e.args[0]->kind == ExprKind::Literal && e.args[0]->literal.kind == Kind::String) {
+            auto found = allElementIds.find(e.args[0]->literal.s);
+            if (found == allElementIds.end()) {
+                if (widgetMode) Error(e.args[0]->line, e.args[0]->column, "get_element: no element named '" + e.args[0]->literal.s + "' in this widget");
+            } else {
+                return MakeObjectType(Kind::Element, found->second);
+            }
+        }
         return b.ret;
     }
 };
 
 }
 
-std::shared_ptr<Program> Compile(const std::string& source, const std::vector<ComponentDecl>& components) {
+static std::shared_ptr<Program> RunCompiler(const std::string& source, const std::vector<ComponentDecl>& components, const std::vector<WidgetElementInfo>* elements) {
     std::unique_ptr<Program> program = Parse(source);
-    Compiler compiler(*program, components);
+    Compiler compiler(*program, components, elements);
     compiler.Run();
     std::stable_sort(program->diagnostics.begin(), program->diagnostics.end(),
         [](const Diagnostic& a, const Diagnostic& b) { return a.line < b.line || (a.line == b.line && a.column < b.column); });
     program->valid = program->diagnostics.empty();
     return std::shared_ptr<Program>(std::move(program));
+}
+
+std::shared_ptr<Program> Compile(const std::string& source, const std::vector<ComponentDecl>& components) {
+    return RunCompiler(source, components, nullptr);
+}
+
+std::shared_ptr<Program> CompileWidget(const std::string& source, const std::vector<WidgetElementInfo>& elements) {
+    static const std::vector<ComponentDecl> none;
+    return RunCompiler(source, none, &elements);
 }
 
 }

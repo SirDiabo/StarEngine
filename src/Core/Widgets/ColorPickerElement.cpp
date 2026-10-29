@@ -2,8 +2,11 @@
 #include "SliderElement.h"
 #include "RectangleElement.h"
 #include "Widget.h"
+#include "WidgetElementEvents.h"
 #include <algorithm>
 #include <cmath>
+
+static WidgetElementEventRegistrar colorPickerEvents("ColorPickerElement", { "ColorChanged" });
 
 namespace {
 const float kSwatchHeight = 24.0f;

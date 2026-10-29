@@ -9,6 +9,8 @@
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetObjectElement.h"
 #include "Core/Widgets/ColorPickerElement.h"
+#include "Core/Widgets/WidgetElementEvents.h"
+#include "Runtime/WidgetBehavior.h"
 #include <cstdio>
 #include "StargraphBehavior.h"
 #include "GraphExecutor.h"
@@ -174,8 +176,6 @@ void RegisterWidgetNodes() {
     };
     NodeRegistry::Get().RegisterNode(widgetDestruct);
 
-    ObjectEvents::RegisterWidgetElementEvents("ButtonElement",
-        { "Clicked", "Pressed", "Released", "Hovered", "Unhovered", "Selected", "Deselected" });
 
     NodeTemplate setWidget;
     setWidget.type = "Set_Widget";
@@ -264,7 +264,6 @@ void RegisterWidgetNodes() {
     };
     NodeRegistry::Get().RegisterNode(clearChildren);
 
-    ObjectEvents::RegisterWidgetElementEvents("ColorPickerElement", { "ColorChanged" });
 
     NodeTemplate setPickerColor;
     setPickerColor.type = "Set_Color_Picker_Color";
@@ -335,9 +334,9 @@ void RegisterWidgetNodes() {
         if (targetRef.empty() || eventName.empty()) return;
         WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
         if (!target || !target->GetChildWidget()) return;
-        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        WidgetBehavior* behavior = target->GetChildWidget()->GetBehavior();
         if (!behavior) return;
-        behavior->OnCustomEvent(target->GetChildWidget(), eventName, ParseWidgetCallArgs(paramText));
+        behavior->CallWidgetEvent(target->GetChildWidget(), eventName, ParseWidgetCallArgs(paramText));
     };
     NodeRegistry::Get().RegisterNode(callWidgetEvent);
 
@@ -364,17 +363,12 @@ void RegisterWidgetNodes() {
         if (targetRef.empty() || functionName.empty()) return;
         WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
         if (!target || !target->GetChildWidget()) return;
-        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        WidgetBehavior* behavior = target->GetChildWidget()->GetBehavior();
         if (!behavior) return;
-        ExecutionContext childCtx;
-        childCtx.widget = target->GetChildWidget();
-        childCtx.deltaTime = ctx.deltaTime;
-        childCtx.rootGraph = &behavior->GetGraph();
-        childCtx.callDepth = ctx.callDepth;
-        std::vector<std::pair<std::string, std::string>> results;
-        if (!GraphExecutor::RunFunction(behavior->GetGraph(), functionName, childCtx, ParseWidgetCallArgs(argText), results)) return;
+        std::string result;
+        if (!behavior->CallWidgetFunction(target->GetChildWidget(), functionName, ParseWidgetCallArgs(argText), result)) return;
         for (Pin& p : node.outputs) {
-            if (p.name == "Result") p.defaultValue = results.empty() ? std::string() : results[0].second;
+            if (p.name == "Result") p.defaultValue = result;
         }
     };
     NodeRegistry::Get().RegisterNode(callWidgetFunction);
@@ -401,11 +395,13 @@ void RegisterWidgetNodes() {
         if (targetRef.empty() || variableName.empty()) return;
         WidgetObjectElement* target = ObjectPinRef::ResolveAs<WidgetObjectElement>(node, targetRef, "WidgetObjectElement", ctx);
         if (!target || !target->GetChildWidget()) return;
-        StargraphBehavior* behavior = dynamic_cast<StargraphBehavior*>(target->GetChildWidget()->GetBehavior());
+        WidgetBehavior* behavior = target->GetChildWidget()->GetBehavior();
         if (!behavior) return;
-        for (Variable& v : behavior->GetGraph().GetVariables()) {
-            if (v.name == variableName) { v.value = value; return; }
-        }
+        behavior->SetWidgetVariable(target->GetChildWidget(), variableName, value);
     };
     NodeRegistry::Get().RegisterNode(setWidgetVariable);
+
+    for (const auto& entry : WidgetElementEvents::GetAll()) {
+        ObjectEvents::RegisterWidgetElementEvents(entry.first, entry.second);
+    }
 }

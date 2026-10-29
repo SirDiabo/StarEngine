@@ -37,6 +37,13 @@ void ObjectKindRegistry::RegisterBuiltInKinds() {
     RegisterKind("SpacerElement", "WidgetElement");
     RegisterKind("SplitBoxElement", "WidgetElement");
     RegisterKind("TabContainer", "WidgetElement");
+    RegisterKind("CheckBoxElement", "WidgetElement");
+    RegisterKind("SliderElement", "WidgetElement");
+    RegisterKind("SlotElement", "WidgetElement");
+    RegisterKind("ColorPickerElement", "WidgetElement");
+    RegisterKind("WidgetObjectElement", "WidgetElement");
+    RegisterKind("SearchListElement", "WidgetElement");
+    RegisterKind("TreeListElement", "WidgetElement");
     RegisterKind("Sound", "");
     RegisterKind("Music", "");
     RegisterKind("Texture", "");

@@ -1,4 +1,7 @@
 #include "ButtonElement.h"
+#include "WidgetElementEvents.h"
+
+static WidgetElementEventRegistrar buttonEvents("ButtonElement", { "Clicked", "Pressed", "Released", "Hovered", "Unhovered", "Selected", "Deselected" });
 
 void ButtonElement::OnDrawSelf(Rectangle rect, float uiScale) {
     switch (interactionState) {

@@ -8,6 +8,7 @@
 #include "TimerManager.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetElement.h"
+#include <cstdlib>
 #include <utility>
 
 StargraphBehavior::StargraphBehavior(Stargraph graph) : graph(std::move(graph)) {
@@ -54,6 +55,68 @@ void StargraphBehavior::OnCustomEvent(Widget* owner, const std::string& eventNam
     ctx.widget = owner;
     ctx.deltaTime = 0.0f;
     GraphExecutor::RunCustomEvent(graph, eventName, ctx, params);
+}
+
+namespace {
+
+WidgetBehavior::CallParams MapPositionalParams(const WidgetBehavior::CallParams& params, const std::vector<Pin>& pins) {
+    std::vector<std::string> dataNames;
+    for (const Pin& p : pins) {
+        if (p.type != PinType::Exec) dataNames.push_back(p.name);
+    }
+    WidgetBehavior::CallParams mapped;
+    for (const auto& param : params) {
+        const std::string& key = param.first;
+        bool positional = key.size() >= 2 && key[0] == 'p';
+        for (size_t i = 1; positional && i < key.size(); i++) positional = key[i] >= '0' && key[i] <= '9';
+        if (positional) {
+            size_t index = (size_t)atoi(key.c_str() + 1);
+            if (index < dataNames.size()) { mapped.emplace_back(dataNames[index], param.second); continue; }
+        }
+        mapped.push_back(param);
+    }
+    return mapped;
+}
+
+}
+
+bool StargraphBehavior::CallWidgetEvent(Widget* owner, const std::string& eventName, const CallParams& params) {
+    Node* eventNode = graph.FindCustomEventByName(eventName);
+    if (!eventNode) return false;
+    OnCustomEvent(owner, eventName, MapPositionalParams(params, eventNode->outputs));
+    return true;
+}
+
+bool StargraphBehavior::CallWidgetFunction(Widget* owner, const std::string& functionName, const CallParams& args, std::string& result) {
+    static int depth = 0;
+    if (depth >= 64) return false;
+    struct DepthScope { DepthScope() { depth++; } ~DepthScope() { depth--; } } scope;
+    ExecutionContext ctx;
+    ctx.widget = owner;
+    ctx.deltaTime = 0.0f;
+    ctx.rootGraph = &graph;
+    std::vector<std::pair<std::string, std::string>> results;
+    FunctionDef* function = graph.FindFunction(functionName);
+    if (!function) return false;
+    Node* entry = function->graph.FindNodeByType("Function_Entry");
+    if (!entry) return false;
+    if (!GraphExecutor::RunFunction(graph, functionName, ctx, MapPositionalParams(args, entry->outputs), results)) return false;
+    result = results.empty() ? std::string() : results[0].second;
+    return true;
+}
+
+bool StargraphBehavior::SetWidgetVariable(Widget*, const std::string& name, const std::string& value) {
+    for (Variable& v : graph.GetVariables()) {
+        if (v.name == name) { v.value = value; return true; }
+    }
+    return false;
+}
+
+bool StargraphBehavior::GetWidgetVariable(Widget*, const std::string& name, std::string& value) {
+    for (const Variable& v : graph.GetVariables()) {
+        if (v.name == name) { value = v.value; return true; }
+    }
+    return false;
 }
 
 void StargraphBehavior::OnDestroyed(Actor* owner) {

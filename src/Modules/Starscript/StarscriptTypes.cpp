@@ -16,6 +16,7 @@ std::string SType::ToString() const {
         case Kind::Vec3: return "Vec3";
         case Kind::Actor: return objectKind.empty() ? "Actor" : objectKind;
         case Kind::Component: return objectKind.empty() ? "Component" : objectKind;
+        case Kind::Element: return objectKind.empty() || objectKind == "WidgetElement" ? "Element" : objectKind;
         case Kind::Array: {
             SType e; e.kind = elem;
             return "Array[" + e.ToString() + "]";
@@ -66,6 +67,7 @@ bool ParseTypeName(const std::string& name, SType& out) {
     if (ParseElemKind(name, k)) { out = MakeType(k); return true; }
     if (name == "Actor") { out = MakeObjectType(Kind::Actor, "Actor"); return true; }
     if (name == "Hit") { out = MakeType(Kind::Hit); return true; }
+    if (name == "Element") { out = MakeObjectType(Kind::Element, "WidgetElement"); return true; }
     if (name.rfind("Array[", 0) == 0 && name.size() > 7 && name.back() == ']') {
         if (ParseElemKind(name.substr(6, name.size() - 7), k)) { out = MakeArrayType(k); return true; }
         return false;
@@ -78,7 +80,7 @@ bool IsAssignable(const SType& to, const SType& from) {
     if (to.kind == Kind::Float && from.kind == Kind::Int) return true;
     if (to.kind != from.kind) return false;
     if (to.kind == Kind::Array) return to.elem == from.elem || to.elem == Kind::Void || from.elem == Kind::Void;
-    if (to.kind == Kind::Actor || to.kind == Kind::Component) {
+    if (to.kind == Kind::Actor || to.kind == Kind::Component || to.kind == Kind::Element) {
         if (to.objectKind.empty() || from.objectKind.empty() || to.objectKind == from.objectKind) return true;
         return ObjectKindRegistry::Get().IsCompatible(from.objectKind, to.objectKind);
     }
@@ -102,6 +104,7 @@ Value Value::Default(const SType& type) {
         case Kind::String: return String("");
         case Kind::Vec3: return Vec3(0, 0, 0);
         case Kind::Actor:
+        case Kind::Element:
         case Kind::Component: return Object(type.kind, 0);
         case Kind::Array: { Value v = Array(); return v; }
         case Kind::Hit: {
@@ -135,6 +138,7 @@ std::string ToDisplayString(const Value& v) {
         case Kind::Vec3: return "Vec3(" + FormatNumber(v.x) + ", " + FormatNumber(v.y) + ", " + FormatNumber(v.z) + ")";
         case Kind::Actor: return v.objectId ? "Actor#" + std::to_string(v.objectId) : "null";
         case Kind::Component: return v.objectId ? "Component#" + std::to_string(v.objectId) : "null";
+        case Kind::Element: return v.objectId ? "Element#" + std::to_string(v.objectId) : "null";
         case Kind::Hit: return (v.arr && !v.arr->empty() && (*v.arr)[0].b) ? "Hit(" + ToDisplayString((*v.arr)[2]) + ")" : "Hit(none)";
         case Kind::Array: {
             std::string out = "[";
@@ -158,6 +162,7 @@ std::string Serialize(const Value& v) {
         case Kind::String: return v.s;
         case Kind::Vec3: return FormatNumber(v.x) + "," + FormatNumber(v.y) + "," + FormatNumber(v.z);
         case Kind::Actor:
+        case Kind::Element:
         case Kind::Component: return v.objectId ? std::to_string(v.objectId) : std::string();
         default: return std::string();
     }
@@ -175,6 +180,7 @@ Value Deserialize(const SType& type, const std::string& text) {
             return Value::Vec3(x, y, z);
         }
         case Kind::Actor:
+        case Kind::Element:
         case Kind::Component: {
             size_t sep = text.find(':');
             std::string idText = sep == std::string::npos ? text : text.substr(sep + 1);

@@ -1,4 +1,6 @@
 #include "StarscriptRuntime.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
 #include "StarscriptInput.h"
 #include "Runtime/Actor.h"
 #include "Runtime/PrintMessageLog.h"
@@ -16,7 +18,7 @@ constexpr int kStepLimit = 5000000;
 constexpr int kDepthLimit = 200;
 
 std::string SerializeArg(const Value& v) {
-    if (v.kind == Kind::Actor || v.kind == Kind::Component) {
+    if (v.kind == Kind::Actor || v.kind == Kind::Component || v.kind == Kind::Element) {
         if (v.objectId == 0) return std::string();
         if (Object* obj = ObjectRefRegistry::Get().Resolve(v.objectId))
             return ObjectRefRegistry::Encode(obj->GetObjectKind(), v.objectId);
@@ -363,7 +365,7 @@ void Instance::FireTimerTarget(const std::string& target) {
 const Instance::InputSample& Instance::QueryInput(const std::string& name) {
     InputSample& s = inputSamples[name];
     if (s.frame == inputFrame) return s;
-    InputReading reading = SampleInput(owner, name);
+    InputReading reading = SampleInput(owner, name, widget != nullptr);
     s.prevHeld = s.frame < 0 ? false : s.held;
     s.prevAxis = s.frame < 0 ? 0.0f : s.axis;
     s.held = reading.held;
@@ -378,7 +380,7 @@ void Instance::RefreshInput() {
     inputFrame++;
     for (auto& kv : inputSamples) {
         InputSample& s = kv.second;
-        InputReading reading = SampleInput(owner, kv.first);
+        InputReading reading = SampleInput(owner, kv.first, widget != nullptr);
         s.prevHeld = s.held;
         s.prevAxis = s.axis;
         s.held = reading.held;
@@ -518,6 +520,66 @@ bool Instance::RunComponentEvent(Component* component, const std::string& eventN
     return ran;
 }
 
+bool Instance::RunElementEvent(WidgetElement* target, const std::string& eventName) {
+    if (!program || !program->valid || !target) return false;
+    std::string wantedName = NormalizeParamName(eventName);
+    bool ran = false;
+    for (const auto& e : program->events) {
+        if (e->kind != EventKind::Element || e->componentName != target->elementId) continue;
+        if (NormalizeParamName(e->name) != wantedName) continue;
+        stepCount = 0;
+        std::vector<Value> args;
+        Guarded([&]() { RunEventBody(*e, args); });
+        ran = true;
+    }
+    return ran;
+}
+
+bool Instance::CallFunctionByName(const std::string& name, const EventParams& params, std::string& result) {
+    if (!program || !program->valid) return false;
+    auto it = program->funcIndex.find(name);
+    if (it == program->funcIndex.end()) return false;
+    const FuncDef& func = *program->funcs[(size_t)it->second];
+    std::vector<Value> args;
+    for (size_t n = 0; n < func.params.size(); n++) {
+        const std::string wanted = NormalizeParamName(func.params[n].name);
+        const std::string* text = nullptr;
+        for (const auto& p : params) {
+            if (NormalizeParamName(p.first) == wanted) { text = &p.second; break; }
+        }
+        if (!text && n < params.size()) text = &params[n].second;
+        args.push_back(text ? Deserialize(func.params[n].type, *text) : Value::Default(func.params[n].type));
+    }
+    stepCount = 0;
+    Value ret;
+    bool ok = false;
+    Guarded([&]() { ret = CallFunction(func, args); ok = true; });
+    result = ok ? Serialize(ret) : std::string();
+    return true;
+}
+
+static WidgetElement* SearchElementTree(WidgetElement* root, const std::string& id) {
+    if (!root) return nullptr;
+    if (root->elementId == id) return root;
+    for (WidgetElement* child : root->GetAuthoredChildren()) {
+        if (WidgetElement* found = SearchElementTree(child, id)) return found;
+    }
+    return nullptr;
+}
+
+WidgetElement* Instance::FindElementByName(const std::string& id) {
+    if (!widget) return nullptr;
+    auto it = elementCache.find(id);
+    if (it != elementCache.end()) {
+        WidgetElement* cached = dynamic_cast<WidgetElement*>(ObjectRefRegistry::Get().Resolve(it->second));
+        if (cached && cached->owningWidget == widget && cached->elementId == id) return cached;
+        elementCache.erase(it);
+    }
+    WidgetElement* found = SearchElementTree(widget->rootElement, id);
+    if (found) elementCache[id] = found->GetObjectId();
+    return found;
+}
+
 void Instance::CallEventFromScript(const EventDef& event, std::vector<Value>& args) {
     RunEventBody(event, args);
 
@@ -643,6 +705,11 @@ void Instance::AssignTo(const Expr& target, const Value& value, Frame& frame) {
                 WriteComponentField(base, target.fieldKey, value);
                 return;
             }
+            if (target.resolution == Resolution::ElementField) {
+                Value base = Eval(*target.a, frame);
+                WriteElementField(base, target.fieldKey, value);
+                return;
+            }
             if (target.resolution == Resolution::Property && target.property && target.property->set) {
                 Value base = Eval(*target.a, frame);
                 Runtime rt{ owner, this };
@@ -663,7 +730,7 @@ Value Instance::BinaryOp(Tok op, const Value& l, const Value& r) {
         else if (l.kind == Kind::Bool) eq = l.b == r.b;
         else if (l.kind == Kind::String) eq = l.s == r.s;
         else if (l.kind == Kind::Vec3) eq = l.x == r.x && l.y == r.y && l.z == r.z;
-        else if (l.kind == Kind::Actor || l.kind == Kind::Component) eq = l.objectId == r.objectId;
+        else if (l.kind == Kind::Actor || l.kind == Kind::Component || l.kind == Kind::Element) eq = l.objectId == r.objectId;
         return Value::Bool(op == Tok::Eq ? eq : !eq);
     }
 
@@ -742,6 +809,11 @@ Value Instance::Eval(const Expr& e, Frame& frame) {
                 if (!c) throw ScriptError{ "Component '" + e.name + "' does not exist on this actor" };
                 return MakeComponentValue(c);
             }
+            if (e.resolution == Resolution::Element) {
+                WidgetElement* element = FindElementByName(e.name);
+                if (!element) throw ScriptError{ "Element '" + e.name + "' does not exist in this widget" };
+                return MakeElementValue(element);
+            }
             throw ScriptError{ "Unresolved name '" + e.name + "'" };
         case ExprKind::Unary: {
             Value v = Eval(*e.a, frame);
@@ -792,6 +864,7 @@ Value Instance::Eval(const Expr& e, Frame& frame) {
             Value base = Eval(*e.a, frame);
             if (e.resolution == Resolution::VecField) return Value::Float(e.slot == 0 ? base.x : e.slot == 1 ? base.y : base.z);
             if (e.resolution == Resolution::ComponentField) return ReadComponentField(base, e.fieldKey);
+            if (e.resolution == Resolution::ElementField) return ReadElementField(base, e.fieldKey);
             if (e.resolution == Resolution::Property && e.property) {
                 Runtime rt{ owner, this };
                 return e.property->get(rt, base);

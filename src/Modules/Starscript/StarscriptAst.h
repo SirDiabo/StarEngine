@@ -28,7 +28,7 @@ enum class ExprKind { Literal, Ident, SelfRef, Unary, Binary, Call, Member, Inde
 
 enum class Resolution {
     None, Local, Global, Component, UserFunction, EventCall, Builtin, Vec3Constructor,
-    Method, Property, VecField, ArrayIndex, StringIndex, ComponentField
+    Method, Property, VecField, ArrayIndex, StringIndex, ComponentField, Element, ElementField
 };
 
 struct Expr;
@@ -124,7 +124,7 @@ struct FuncDef {
     int column = 0;
 };
 
-enum class EventKind { BeginPlay, Tick, EndPlay, Destroyed, Component, Custom, Input };
+enum class EventKind { BeginPlay, Tick, EndPlay, Destroyed, Component, Element, Custom, Input };
 
 struct EventDef {
     EventKind kind = EventKind::Custom;

@@ -36,6 +36,20 @@ void StarscriptScriptPanel::Render() {
     Rectangle codeArea = { bounds.x, bounds.y, bounds.width, bounds.height - kStatusHeight };
     session->GetCode().Render(codeArea);
 
+    if (session->IsElementDragActive()) {
+        Vector2 mp = GetMousePosition();
+        std::string label = "Insert: " + session->ElementDragName();
+        float w = MeasureTextEx(font, label.c_str(), 12, 1.2f).x + 14;
+        Rectangle ghost = { mp.x + 12, mp.y - 4, w, 20 };
+        DrawRectangleRec(ghost, theme.buttonBg);
+        DrawRectangleLinesEx(ghost, 1, theme.buttonBorder);
+        DrawTextEx(font, label.c_str(), { ghost.x + 7, ghost.y + 4 }, 12, 1.2f, theme.textPrimary);
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) || !IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            if (CheckCollisionPointRec(mp, codeArea)) session->InsertElementReference(mp);
+            session->EndElementDrag();
+        }
+    }
+
     Rectangle status = { bounds.x, bounds.y + bounds.height - kStatusHeight, bounds.width, kStatusHeight };
     DrawRectangleRec(status, theme.tabBar);
     DrawLine((int)status.x, (int)status.y, (int)(status.x + status.width), (int)status.y, theme.panelBorder);
@@ -136,7 +150,7 @@ void StarscriptOutlinePanel::Render() {
         }
         rows.push_back({ "Events", "", -1, true, theme.sectionHeader });
         for (const auto& e : program->events) {
-            std::string label = e->kind == EventKind::Component ? e->componentName + "." + e->name : e->name;
+            std::string label = (e->kind == EventKind::Component || e->kind == EventKind::Element) ? e->componentName + "." + e->name : e->name;
             if (e->kind == EventKind::Input) label = "Input(\"" + e->inputName + "\"";
             else label += "(";
             if (e->kind == EventKind::Input && !e->params.empty()) label += ", ";

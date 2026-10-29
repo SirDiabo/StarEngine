@@ -11,6 +11,8 @@
 
 class Actor;
 class Component;
+class Widget;
+class WidgetElement;
 
 namespace Starscript {
 
@@ -22,6 +24,9 @@ public:
 
     void SetOwner(Actor* actor) { owner = actor; }
     Actor* GetOwner() const { return owner; }
+    void SetWidget(Widget* newWidget) { widget = newWidget; elementCache.clear(); }
+    Widget* GetWidget() const { return widget; }
+    WidgetElement* FindElementByName(const std::string& id);
     const Program& GetProgram() const { return *program; }
 
     void RunBeginPlay();
@@ -30,6 +35,8 @@ public:
     void RunDestroyed();
     bool RunCustomEvent(const std::string& name, const EventParams& params);
     bool RunComponentEvent(Component* component, const std::string& eventName, const EventParams& params);
+    bool RunElementEvent(WidgetElement* target, const std::string& eventName);
+    bool CallFunctionByName(const std::string& name, const EventParams& args, std::string& result);
 
     void CallEventFromScript(const EventDef& event, std::vector<Value>& args);
     bool FindCustomEvent(const std::string& name, ReplicationMode& outMode) const;
@@ -118,6 +125,8 @@ private:
 
     std::shared_ptr<Program> program;
     Actor* owner = nullptr;
+    Widget* widget = nullptr;
+    std::unordered_map<std::string, unsigned> elementCache;
     std::vector<Value> globals;
     int stepCount = 0;
     int callDepth = 0;

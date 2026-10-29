@@ -3,6 +3,8 @@
 #include "Editor/ActorClassEditor.h"
 #include "../StarscriptAst.h"
 #include "Runtime/ComponentDecl.h"
+#include "Core/ProgrammingInterfaceRegistry.h"
+#include "../StarscriptCompiler.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -10,12 +12,22 @@
 
 class FunctionUndoDocument;
 
+namespace Starscript { class StarscriptContent; }
+
 class StarscriptEditorSession {
 public:
     StarscriptEditorSession();
     ~StarscriptEditorSession();
 
     bool Open(const std::string& path);
+    bool OpenEmbeddedWidget(Starscript::StarscriptContent* content, const ProgrammingInterfaceContext& context);
+    void SyncToContent();
+    bool IsWidgetMode() const { return widgetMode; }
+    void BeginElementDrag(const std::string& elementName, const std::string& elementClass);
+    bool IsElementDragActive() const { return elementDragActive; }
+    const std::string& ElementDragName() const { return elementDragName; }
+    void EndElementDrag() { elementDragActive = false; }
+    void InsertElementReference(Vector2 point);
     void Close();
     bool IsOpen() const { return isOpen; }
     bool IsDirty() const { return isDirty; }
@@ -41,6 +53,8 @@ public:
 
 private:
     void Compile();
+    void RefreshElementList();
+    void NotifyDirty();
     void CaptureUndoState(std::string& content, std::string& selection);
     void RestoreUndoState(const std::string& content, const std::string& selection);
     std::string SerializeDocument();
@@ -63,6 +77,18 @@ private:
     int compiledCodeVersion = -1;
     int compiledComponentsRevision = -1;
     float compileTimer = 0.0f;
+
+    bool widgetMode = false;
+    Starscript::StarscriptContent* widgetContent = nullptr;
+    std::function<std::vector<std::pair<std::string, std::string>>()> listElements;
+    std::function<void()> onContentDirtied;
+    std::function<void()> onSaveRequestedHook;
+    std::vector<Starscript::WidgetElementInfo> elements;
+    std::string elementSignature;
+    float elementPollTimer = 0.0f;
+    bool elementDragActive = false;
+    std::string elementDragName;
+    std::string elementDragClass;
 
     FunctionUndoDocument* undoDocument = nullptr;
     std::function<void()> undoReveal;

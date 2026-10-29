@@ -6,7 +6,9 @@
 
 class Actor;
 class Component;
+class WidgetElement;
 struct ComponentFieldDesc;
+struct WidgetElementFieldDesc;
 
 namespace Starscript {
 
@@ -23,6 +25,8 @@ struct Runtime {
 
 enum class RetRule { Fixed, Numeric, ElemType };
 
+enum BuiltinScope { ScopeAny = 0, ScopeWidget = 1, ScopeActor = 2 };
+
 using BuiltinFn = Value (*)(Runtime& rt, std::vector<Value>& args);
 using MethodFn = Value (*)(Runtime& rt, Value& self, std::vector<Value>& args);
 using PropertyGetFn = Value (*)(Runtime& rt, const Value& self);
@@ -37,6 +41,7 @@ struct BuiltinDef {
     bool variadic;
     BuiltinFn fn;
     int asyncKind = 0;
+    int scope = 0;
 };
 
 struct MethodDef {
@@ -64,6 +69,11 @@ const std::vector<BuiltinDef>& ExtraBuiltins();
 const std::vector<MethodDef>& ExtraMethods();
 const std::vector<PropertyDef>& ExtraProperties();
 
+const std::vector<MethodDef>& ComponentMethods();
+const std::vector<BuiltinDef>& WidgetBuiltins();
+const std::vector<MethodDef>& WidgetMethods();
+const std::vector<PropertyDef>& WidgetProperties();
+
 const std::vector<BuiltinDef>& AllBuiltins();
 const std::vector<MethodDef>& AllMethods();
 const std::vector<PropertyDef>& AllProperties();
@@ -77,6 +87,15 @@ SType ComponentFieldScriptType(const ComponentFieldDesc& field);
 std::string ComponentFieldIdentifier(const ComponentFieldDesc& field);
 Value ReadComponentField(const Value& component, const std::string& fieldKey);
 void WriteComponentField(const Value& component, const std::string& fieldKey, const Value& value);
+
+const WidgetElementFieldDesc* FindElementField(const std::string& elementClass, const std::string& identifier);
+SType ElementFieldScriptType(const WidgetElementFieldDesc& field);
+std::string ElementFieldIdentifier(const WidgetElementFieldDesc& field);
+Value ReadElementField(const Value& element, const std::string& fieldKey);
+void WriteElementField(const Value& element, const std::string& fieldKey, const Value& value);
+
+WidgetElement* ResolveElement(const Value& v);
+Value MakeElementValue(WidgetElement* element);
 
 Actor* ResolveActor(const Value& v);
 Component* ResolveComponent(const Value& v);

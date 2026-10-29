@@ -13,6 +13,6 @@ struct InputReading {
 };
 
 bool IsKnownInputName(const std::string& name);
-InputReading SampleInput(Actor* owner, const std::string& name);
+InputReading SampleInput(Actor* owner, const std::string& name, bool widgetScope = false);
 
 }

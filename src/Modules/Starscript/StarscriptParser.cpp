@@ -197,8 +197,13 @@ private:
         def->annotations = std::move(pendingAnnotations);
         pendingAnnotations.clear();
         Advance();
-        if (!At(Tok::Ident)) { Error("Expected an event name"); SkipLineKeepBlock(); return; }
-        std::string first = Advance().text;
+        std::string first;
+        if (At(Tok::String) && pos + 1 < tokens.size() && tokens[pos + 1].type == Tok::Dot) {
+            first = Advance().text;
+        } else {
+            if (!At(Tok::Ident)) { Error("Expected an event name"); SkipLineKeepBlock(); return; }
+            first = Advance().text;
+        }
         if (first == "Input" && At(Tok::LParen) && pos + 1 < tokens.size() && tokens[pos + 1].type == Tok::String) {
             Advance();
             def->kind = EventKind::Input;
@@ -226,9 +231,9 @@ private:
             def->kind = EventKind::Component;
         } else {
             def->name = first;
-            if (first == "BeginPlay") def->kind = EventKind::BeginPlay;
+            if (first == "BeginPlay" || first == "Construct") def->kind = EventKind::BeginPlay;
             else if (first == "Tick") def->kind = EventKind::Tick;
-            else if (first == "EndPlay") def->kind = EventKind::EndPlay;
+            else if (first == "EndPlay" || first == "Destruct") def->kind = EventKind::EndPlay;
             else if (first == "Destroyed") def->kind = EventKind::Destroyed;
             else def->kind = EventKind::Custom;
         }

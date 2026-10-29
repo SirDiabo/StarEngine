@@ -658,9 +658,9 @@ static std::vector<T> Merge(const std::vector<T>& a, const std::vector<T>& b) {
     return out;
 }
 
-const std::vector<BuiltinDef>& AllBuiltins() { static const std::vector<BuiltinDef> merged = Merge(Builtins(), ExtraBuiltins()); return merged; }
-const std::vector<MethodDef>& AllMethods() { static const std::vector<MethodDef> merged = Merge(Methods(), ExtraMethods()); return merged; }
-const std::vector<PropertyDef>& AllProperties() { static const std::vector<PropertyDef> merged = Merge(Properties(), ExtraProperties()); return merged; }
+const std::vector<BuiltinDef>& AllBuiltins() { static const std::vector<BuiltinDef> merged = Merge(Merge(Builtins(), ExtraBuiltins()), WidgetBuiltins()); return merged; }
+const std::vector<MethodDef>& AllMethods() { static const std::vector<MethodDef> merged = Merge(Merge(Merge(Methods(), ExtraMethods()), ComponentMethods()), WidgetMethods()); return merged; }
+const std::vector<PropertyDef>& AllProperties() { static const std::vector<PropertyDef> merged = Merge(Merge(Properties(), ExtraProperties()), WidgetProperties()); return merged; }
 
 const BuiltinDef* FindBuiltin(const std::string& name) {
     for (const BuiltinDef& b : AllBuiltins()) if (name == b.name) return &b;

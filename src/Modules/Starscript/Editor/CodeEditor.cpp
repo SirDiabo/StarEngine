@@ -343,6 +343,16 @@ void CodeEditor::SelectRange(int line, int column, int length) {
     desiredX = XForCol(caret.line, caret.col);
 }
 
+bool CodeEditor::InsertTextAtPoint(Vector2 point, const std::string& text) {
+    if (!CheckCollisionPointRec(point, lastTextArea)) return false;
+    Pos target = PosAtPoint(point);
+    caret = target;
+    anchor = target;
+    InsertText(text);
+    revealCaretNext = true;
+    return true;
+}
+
 int CodeEditor::SelectionLength() const {
     if (!HasSelection()) return 0;
     return (int)TextInRange(SelStart(), SelEnd()).size();
@@ -906,6 +916,10 @@ void CodeEditor::UpdateCompletion(bool forceOpen, bool afterDot) {
             while (begin > 0 && (IsWordChar(s[(size_t)begin - 1]) || s[(size_t)begin - 1] == '.')) begin--;
             completionRequest.receiver = s.substr((size_t)begin, (size_t)(end - begin));
         }
+        {
+            size_t first = s.find_first_not_of(" \t");
+            completionRequest.inEventHeader = first != std::string::npos && s.compare(first, 6, "event ") == 0;
+        }
         completionAfterDot = completionRequest.afterDot;
         completionAll.clear();
         completionProvider(completionRequest, completionAll);
@@ -1143,7 +1157,7 @@ void CodeEditor::Render(Rectangle area) {
 
 void CodeEditor::DrawCompletionPopup(Rectangle area) {
     if (completionVisible.empty()) return;
-    int rows = std::min(8, (int)completionVisible.size());
+    int rows = std::min(12, (int)completionVisible.size());
     float rowH = lineHeight + 2.0f;
     float width = 120.0f;
     for (size_t i = 0; i < completionVisible.size() && i < 60; i++) {

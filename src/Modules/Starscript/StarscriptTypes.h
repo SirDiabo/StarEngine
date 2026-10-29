@@ -5,7 +5,7 @@
 
 namespace Starscript {
 
-enum class Kind { Void, Bool, Int, Float, String, Vec3, Actor, Component, Array, Hit, Any };
+enum class Kind { Void, Bool, Int, Float, String, Vec3, Actor, Component, Array, Hit, Element, Any };
 
 struct SType {
     Kind kind = Kind::Void;

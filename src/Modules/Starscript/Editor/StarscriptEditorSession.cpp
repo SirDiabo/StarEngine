@@ -2,6 +2,9 @@
 #include "../StarscriptBuiltins.h"
 #include "../StarscriptCompiler.h"
 #include "../StarscriptInterface.h"
+#include "Core/Widgets/WidgetElementEvents.h"
+#include "Core/Widgets/WidgetElementFields.h"
+#include "Runtime/ComponentEvents.h"
 #include "Editor/EditorUndo.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -23,8 +26,11 @@ StarscriptEditorSession::StarscriptEditorSession() {
     host.onComponentSelected = []() {};
     actorEditor.SetHost(std::move(host));
 
-    code.onTextChanged = [this]() { isDirty = true; compileTimer = 0.35f; };
-    code.onSaveRequested = [this]() { if (isDirty) Save(); };
+    code.onTextChanged = [this]() { isDirty = true; compileTimer = 0.35f; NotifyDirty(); };
+    code.onSaveRequested = [this]() {
+        if (widgetMode) { if (onSaveRequestedHook) onSaveRequestedHook(); return; }
+        if (isDirty) Save();
+    };
     code.completionProvider = [this](const CompletionRequest& request, std::vector<CompletionItem>& out) { BuildCompletions(request, out); };
     code.classifyIdentifier = [this](const std::string& name, bool afterDot, bool callFollows) { return Classify(name, afterDot, callFollows); };
 
@@ -89,9 +95,72 @@ void StarscriptEditorSession::Close() {
     isDirty = false;
     filePath.clear();
     actorEditor.ResetPickers();
+    widgetContent = nullptr;
+}
+
+void StarscriptEditorSession::NotifyDirty() {
+    if (widgetMode && onContentDirtied) onContentDirtied();
+}
+
+bool StarscriptEditorSession::OpenEmbeddedWidget(StarscriptContent* content, const ProgrammingInterfaceContext& context) {
+    if (!content) return false;
+    widgetMode = true;
+    widgetContent = content;
+    listElements = context.listElements;
+    onContentDirtied = context.onContentDirtied;
+    onSaveRequestedHook = context.onSaveRequested;
+    SetUndoOwner(context.revealOwnerTab, context.isOwnerTabActive);
+
+    components.clear();
+    filePath.clear();
+    code.SetText(content->source);
+    code.GotoLine(0, 0);
+
+    isOpen = true;
+    isDirty = false;
+    elementSignature.clear();
+    RefreshElementList();
+    Compile();
+    UndoManager::Get().ResetBaseline(undoDocument);
+    return true;
+}
+
+void StarscriptEditorSession::SyncToContent() {
+    if (!widgetMode || !widgetContent) return;
+    widgetContent->source = code.GetText();
+    widgetContent->compiled.reset();
+    widgetContent->widgetCache.reset();
+    isDirty = false;
+}
+
+void StarscriptEditorSession::BeginElementDrag(const std::string& elementName, const std::string& elementClass) {
+    elementDragName = elementName;
+    elementDragClass = elementClass;
+    elementDragActive = true;
+}
+
+void StarscriptEditorSession::InsertElementReference(Vector2 point) {
+    bool plain = !elementDragName.empty() && !isdigit((unsigned char)elementDragName[0]);
+    for (char ch : elementDragName) if (!(isalnum((unsigned char)ch) || ch == '_')) plain = false;
+    std::string text = plain ? elementDragName : "get_element(\"" + elementDragName + "\")";
+    code.InsertTextAtPoint(point, text);
+}
+
+void StarscriptEditorSession::RefreshElementList() {
+    if (!widgetMode) return;
+    std::vector<std::pair<std::string, std::string>> listed;
+    if (listElements) listed = listElements();
+    std::string signature;
+    for (const auto& el : listed) signature += el.first + ":" + el.second + ";";
+    if (signature == elementSignature) return;
+    elementSignature = signature;
+    elements.clear();
+    for (const auto& el : listed) elements.push_back({ el.first, el.second });
+    componentsRevision++;
 }
 
 std::string StarscriptEditorSession::SerializeDocument() {
+    if (widgetMode) return code.GetText();
     ActorAssetData data;
     data.assetName = assetName;
     data.parentClass = parentClass;
@@ -107,6 +176,10 @@ std::string StarscriptEditorSession::SerializeDocument() {
 
 bool StarscriptEditorSession::Save() {
     if (!isOpen) return false;
+    if (widgetMode) {
+        SyncToContent();
+        return true;
+    }
     ActorAssetData data;
     data.assetName = assetName;
     data.parentClass = parentClass;
@@ -133,7 +206,17 @@ void StarscriptEditorSession::CaptureUndoState(std::string& content, std::string
 }
 
 void StarscriptEditorSession::RestoreUndoState(const std::string& content, const std::string& selection) {
-    if (!isOpen || content.empty()) return;
+    if (!isOpen) return;
+    if (widgetMode) {
+        code.SetText(content);
+        code.SetViewState(selection);
+        isDirty = true;
+        undoCacheCodeVersion = -1;
+        NotifyDirty();
+        Compile();
+        return;
+    }
+    if (content.empty()) return;
     ActorAssetData data;
     std::istringstream in(content);
     if (!ActorAsset::Read(in, data)) return;
@@ -152,6 +235,13 @@ void StarscriptEditorSession::RestoreUndoState(const std::string& content, const
 
 void StarscriptEditorSession::Tick() {
     if (!isOpen) return;
+    if (widgetMode) {
+        elementPollTimer -= GetFrameTime();
+        if (elementPollTimer <= 0.0f) {
+            elementPollTimer = 0.4f;
+            RefreshElementList();
+        }
+    }
     if (compileTimer > 0.0f) {
         compileTimer -= GetFrameTime();
         if (compileTimer <= 0.0f) Compile();
@@ -161,7 +251,7 @@ void StarscriptEditorSession::Tick() {
 
 void StarscriptEditorSession::Compile() {
     compileTimer = 0.0f;
-    program = Starscript::Compile(code.GetText(), components);
+    program = widgetMode ? Starscript::CompileWidget(code.GetText(), elements) : Starscript::Compile(code.GetText(), components);
     compiledCodeVersion = code.GetVersion();
     compiledComponentsRevision = componentsRevision;
 
@@ -184,6 +274,7 @@ std::string StarscriptEditorSession::UniqueName(const std::string& base) const {
         for (const auto& e : program->events) taken.insert(e->name);
     }
     for (const ComponentDecl& c : components) taken.insert(c.name);
+    for (const WidgetElementInfo& el : elements) taken.insert(el.id);
     if (!taken.count(base)) return base;
     for (int n = 2;; n++) {
         std::string candidate = base + "_" + std::to_string(n);
@@ -208,6 +299,7 @@ TokenClass StarscriptEditorSession::Classify(const std::string& name, bool after
     if (afterDot) return callFollows ? TokenClass::Function : TokenClass::Variable;
     if (FindBuiltin(name) || name == "Vec3" || name == "range") return TokenClass::Builtin;
     for (const ComponentDecl& c : components) if (c.name == name) return TokenClass::Component;
+    if (widgetMode) for (const WidgetElementInfo& el : elements) if (el.id == name) return TokenClass::Component;
     if (program) {
         if (program->funcIndex.count(name)) return TokenClass::Function;
         for (const auto& e : program->events) if (e->kind == EventKind::Custom && e->name == name) return TokenClass::Function;
@@ -229,6 +321,11 @@ bool StarscriptEditorSession::ResolveReceiverKind(const std::string& receiver, i
     else {
         bool found = false;
         for (const ComponentDecl& c : components) if (c.name == parts[0]) { kind = Kind::Component; objectKind = c.componentType; found = true; break; }
+        if (!found && widgetMode) {
+            for (const WidgetElementInfo& el : elements) {
+                if (el.id == parts[0]) { kind = Kind::Element; objectKind = el.className; found = true; break; }
+            }
+        }
         if (!found && program) {
             auto it = program->varIndex.find(parts[0]);
             if (it != program->varIndex.end()) {
@@ -282,6 +379,50 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
             add("y", "y", "float", CompletionKind::Property);
             add("z", "z", "float", CompletionKind::Property);
         }
+
+        if (request.inEventHeader && known && (kind == Kind::Component || kind == Kind::Element)) {
+            if (kind == Kind::Component) {
+                for (const ComponentEventDecl& d : ComponentEventRegistry::Get().GetAll()) {
+                    if (d.componentType != objectKind && !ObjectKindRegistry::Get().IsCompatible(objectKind, d.componentType)) continue;
+                    std::string params;
+                    for (size_t i = 0; i < d.params.size(); i++) {
+                        if (i) params += ", ";
+                        SType t;
+                        switch (d.params[i].type) {
+                            case EventValueType::Bool: t = MakeType(Kind::Bool); break;
+                            case EventValueType::Int: t = MakeType(Kind::Int); break;
+                            case EventValueType::Float: t = MakeType(Kind::Float); break;
+                            case EventValueType::Vec3:
+                            case EventValueType::Rotator: t = MakeType(Kind::Vec3); break;
+                            case EventValueType::Object: t = d.params[i].objectKind.empty() || d.params[i].objectKind == "Actor" ? MakeObjectType(Kind::Actor, "Actor") : MakeObjectType(Kind::Component, d.params[i].objectKind); break;
+                            default: t = MakeType(Kind::String); break;
+                        }
+                        params += d.params[i].name + ": " + t.ToString();
+                    }
+                    add(d.name, d.name + "(" + params + "):", "component event", CompletionKind::Event);
+                }
+            } else {
+                std::string current = objectKind;
+                for (int guard = 0; guard < 16 && !current.empty(); guard++) {
+                    if (const std::vector<std::string>* events = WidgetElementEvents::Find(current)) {
+                        for (const std::string& name : *events) add(name, name + "():", "element event", CompletionKind::Event);
+                        break;
+                    }
+                    current = ObjectKindRegistry::Get().GetParentKind(current);
+                }
+            }
+            return;
+        }
+
+        for (const MethodDef& m : AllMethods()) {
+            if (known && (m.receiver != kind || !typeMatches(m.componentType))) continue;
+            std::string insert = std::string(m.name) + (m.params.empty() ? "()" : "(|)");
+            add(m.name, insert, SignatureOf(m.params, m.minArgs, m.ret), CompletionKind::Method);
+        }
+        for (const PropertyDef& p : AllProperties()) {
+            if (known && (p.receiver != kind || !typeMatches(p.componentType))) continue;
+            add(p.name, p.name, p.type.ToString() + (p.set ? "" : " (read-only)"), CompletionKind::Property);
+        }
         if (known && kind == Kind::Component) {
             if (const ComponentTypeInfo* info = ComponentRegistry::Get().Find(objectKind)) {
                 for (const ComponentFieldDesc& f : info->fields) {
@@ -290,14 +431,12 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
                 }
             }
         }
-        for (const PropertyDef& p : AllProperties()) {
-            if (known && (p.receiver != kind || !typeMatches(p.componentType))) continue;
-            add(p.name, p.name, p.type.ToString() + (p.set ? "" : " (read-only)"), CompletionKind::Property);
-        }
-        for (const MethodDef& m : AllMethods()) {
-            if (known && (m.receiver != kind || !typeMatches(m.componentType))) continue;
-            std::string insert = std::string(m.name) + (m.params.empty() ? "()" : "(|)");
-            add(m.name, insert, SignatureOf(m.params, m.minArgs, m.ret), CompletionKind::Method);
+        if (known && kind == Kind::Element) {
+            for (const WidgetElementFieldDesc& f : GetWidgetElementFields()) {
+                if (!f.elementType) continue;
+                if (objectKind != f.elementType && !ObjectKindRegistry::Get().IsCompatible(objectKind, f.elementType)) continue;
+                add(ElementFieldIdentifier(f), ElementFieldIdentifier(f), ElementFieldScriptType(f).ToString() + " (field)", CompletionKind::Property);
+            }
         }
         if (!known) {
             add("x", "x", "float", CompletionKind::Property);
@@ -308,9 +447,12 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
     }
 
     static const char* keywords[] = { "var", "func", "event", "if", "elif", "else", "while", "for", "in", "return", "break", "continue", "pass", "and", "or", "not", "true", "false", "self" };
-    for (const char* k : keywords) add(k, k, "", CompletionKind::Keyword);
+    for (const char* k : keywords) {
+        if (widgetMode && std::string(k) == "self") continue;
+        add(k, k, "", CompletionKind::Keyword);
+    }
 
-    static const char* types[] = { "bool", "int", "float", "string", "Vec3", "Actor", "Array[float]", "Array[int]", "Array[string]" };
+    static const char* types[] = { "bool", "int", "float", "string", "Vec3", "Actor", "Element", "Array[float]", "Array[int]", "Array[string]" };
     for (const char* t : types) add(t, t, "type", CompletionKind::Type);
 
     static const char* annotations[] = { "@replicated", "@server_only", "@save(\"|\")", "@reliable" };
@@ -324,18 +466,33 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
     add("range", "range(|)", "(int, int?, int?) for loops", CompletionKind::Function);
     add("Vec3", "Vec3(|)", "(float, float, float) -> Vec3", CompletionKind::Function);
     for (const BuiltinDef& b : AllBuiltins()) {
+        if (b.scope == ScopeWidget && !widgetMode) continue;
+        if (b.scope == ScopeActor && widgetMode) continue;
         std::string insert = std::string(b.name) + (b.params.empty() ? "()" : "(|)");
         add(b.name, insert, SignatureOf(b.params, b.minArgs, b.ret), CompletionKind::Function);
     }
 
     add("Input", "Input(\"|\"):", "event (key or input mapping)", CompletionKind::Event);
     add("await", "await ", "keyword", CompletionKind::Keyword);
-    add("BeginPlay", "BeginPlay():", "event", CompletionKind::Event);
-    add("Tick", "Tick(dt: float):", "event", CompletionKind::Event);
-    add("EndPlay", "EndPlay():", "event", CompletionKind::Event);
-    add("Destroyed", "Destroyed():", "event", CompletionKind::Event);
+    if (widgetMode) {
+        add("Construct", "Construct():", "event", CompletionKind::Event);
+        add("Tick", "Tick(dt: float):", "event", CompletionKind::Event);
+        add("Destruct", "Destruct():", "event", CompletionKind::Event);
+    } else {
+        add("BeginPlay", "BeginPlay():", "event", CompletionKind::Event);
+        add("Tick", "Tick(dt: float):", "event", CompletionKind::Event);
+        add("EndPlay", "EndPlay():", "event", CompletionKind::Event);
+        add("Destroyed", "Destroyed():", "event", CompletionKind::Event);
+    }
 
     for (const ComponentDecl& c : components) add(c.name, c.name, c.componentType, CompletionKind::Component);
+    if (widgetMode) {
+        for (const WidgetElementInfo& el : elements) {
+            bool plain = !el.id.empty() && !isdigit((unsigned char)el.id[0]);
+            for (char ch : el.id) if (!(isalnum((unsigned char)ch) || ch == '_')) plain = false;
+            if (plain) add(el.id, el.id, el.className, CompletionKind::Component);
+        }
+    }
 
     if (program) {
         for (const auto& v : program->vars) add(v->name, v->name, v->type.ToString(), CompletionKind::Variable);

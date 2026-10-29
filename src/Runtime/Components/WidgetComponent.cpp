@@ -27,8 +27,9 @@ void WidgetComponent::Update(float deltaTime) {
 
 void WidgetComponent::RebuildWidgetFromAsset() {
     loadedWidgetAssetPath = widgetAssetPath;
-    Widget* newWidget = widgetAssetPath.empty() ? nullptr : WidgetAsset::InstantiateWidget(widgetAssetPath);
+    Widget* newWidget = widgetAssetPath.empty() ? nullptr : WidgetAsset::InstantiateWidget(widgetAssetPath, false);
     SetWidget(newWidget);
+    if (newWidget) WidgetAsset::AttachWidgetBehavior(newWidget, widgetAssetPath);
 }
 
 void WidgetComponent::SetWidget(Widget* newWidget) {

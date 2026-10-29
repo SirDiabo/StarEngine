@@ -239,6 +239,8 @@ bool WidgetEditorTab::ApplyGraphLayout() {
         ctx.sharedViewportPanel = viewportPanel;
         ctx.revealOwnerTab = [this]() { EditorUndo::RevealTab(this); };
         ctx.isOwnerTabActive = [this]() { return EditorUndo::IsTabActive(this); };
+        ctx.onContentDirtied = [this]() { if (session) session->MarkDirty(); };
+        ctx.onSaveRequested = [this]() { Save(); };
         ctx.listElements = [this]() {
             std::vector<std::pair<std::string, std::string>> elements;
             std::function<void(WidgetElement*)> walk = [&](WidgetElement* element) {

@@ -29,12 +29,15 @@ bool IsKnownInputName(const std::string& name) {
     return IsKeyName(name);
 }
 
-InputReading SampleInput(Actor* owner, const std::string& name) {
+InputReading SampleInput(Actor* owner, const std::string& name, bool widgetScope) {
     InputReading reading;
-    if (!owner || owner != World::Get().GetInputFocus()) return reading;
+    if (widgetScope) owner = World::Get().GetInputFocus();
+    else if (!owner || owner != World::Get().GetInputFocus()) return reading;
 
     std::string device = "Keyboard+Mouse";
-    if (InputComponent* ic = owner->GetInputComponent()) device = ic->device;
+    if (owner) {
+        if (InputComponent* ic = owner->GetInputComponent()) device = ic->device;
+    }
 
     const InputMapping* mapping = InputMappingRegistry::Get().Find(name);
     if (mapping) {

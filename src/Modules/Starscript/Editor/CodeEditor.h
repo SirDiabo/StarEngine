@@ -21,6 +21,7 @@ struct CompletionItem {
 
 struct CompletionRequest {
     bool afterDot = false;
+    bool inEventHeader = false;
     std::string receiver;
 };
 
@@ -45,6 +46,7 @@ public:
     int CaretLine() const { return caret.line; }
     int CaretColumn() const { return caret.col; }
     int SelectionLength() const;
+    bool InsertTextAtPoint(Vector2 point, const std::string& text);
 
     void SetDiagnostics(std::vector<CodeDiagnostic> newDiagnostics);
     const std::vector<CodeDiagnostic>& GetDiagnostics() const { return diagnostics; }
