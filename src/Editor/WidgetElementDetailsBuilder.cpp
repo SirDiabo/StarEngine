@@ -38,10 +38,21 @@ std::vector<PropertyRow> BuildWidgetElementPropertyRows(
     idRow.kind = PropertyRowKind::String;
     idRow.label = "Element Id";
     idRow.stringValue = element.elementId;
+    idRow.commitOnly = true;
     idRow.setString = [currentElement, onEdited](const std::string& v) {
         WidgetElement* e = currentElement();
         if (!e) return;
-        e->elementId = v;
+        WidgetElement* root = e;
+        while (root->parent) root = root->parent;
+        bool blank = v.find_first_not_of(" \t") == std::string::npos;
+        bool taken = false;
+        std::function<void(WidgetElement*)> scan = [&](WidgetElement* node) {
+            if (!node || taken) return;
+            if (node != e && node->elementId == v) { taken = true; return; }
+            for (WidgetElement* child : node->GetAuthoredChildren()) scan(child);
+        };
+        if (!blank) scan(root);
+        if (!blank && !taken) e->elementId = v;
         if (onEdited) onEdited();
     };
     rows.push_back(idRow);
