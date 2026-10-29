@@ -13,6 +13,7 @@
 #include "Core/ExecutablePath.h"
 #include "Core/SafeProcess.h"
 #include "Core/Widgets/WidgetAsset.h"
+#include "Core/Widgets/WidgetElement.h"
 #include "Core/EditorAssetHandlerRegistry.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "Editor/WidgetEditorTab.h"

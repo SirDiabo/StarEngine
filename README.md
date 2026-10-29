@@ -2,7 +2,7 @@
 
 > **StarEngine is very early in development!** APIs, file formats and editor behavior are subject to change, and projects made with one version may need migrating for the next.
 
-StarEngine is an indie-first game engine for games in the style of the fifth console generation.
+StarEngine is an indie game engine for 3D games with simple graphics.
 
 It is built on [raylib](https://github.com/raysan5/raylib) for windowing, input, audio and rendering.
 

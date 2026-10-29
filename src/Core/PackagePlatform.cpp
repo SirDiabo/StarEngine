@@ -53,7 +53,7 @@ std::vector<PackagePlatformInfo> GetAvailablePackagePlatforms() {
         linuxInfo.unavailableReason = "Requires the Linux build tools (g++, make, cmake). "
             "Install them, e.g. \"sudo apt install build-essential cmake\" on Debian/Ubuntu.";
     }
-#else
+#elif defined(_WIN32)
     if (!CommandExists("wsl")) {
         linuxInfo.available = false;
         linuxInfo.unavailableReason = "WSL (Windows Subsystem for Linux) is not installed. "
@@ -65,6 +65,9 @@ std::vector<PackagePlatformInfo> GetAvailablePackagePlatforms() {
     } else {
         linuxInfo.available = true;
     }
+#else
+    linuxInfo.available = false;
+    linuxInfo.unavailableReason = "Packaging for Linux from this platform is not supported yet.";
 #endif
     list.push_back(linuxInfo);
 
