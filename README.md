@@ -64,6 +64,7 @@ A node based visual scripting system.
 A small, Python-like text language with its own code editor, including completion, diagnostics and undo.
 
 ```
+# My Player Actor
 var speed = 250.0
 var jumps: int = 0
 var grounded = true
@@ -76,12 +77,11 @@ event Input("Jump"):
         Physics.add_impulse(Vec3(0, 5, 0))
         jumps += 1
 
-event Tick():
-    if  input_pressed("W")
-        self.position += self.forward * speed * 1
-    if  input_pressed("S")
-        self.position += self.forward * speed * -1
-    
+event Tick(dt: float):
+    if input_pressed("W"):
+        self.position += self.forward * speed * dt
+    if input_pressed("S"):
+        self.position += self.forward * speed * -dt
 ```
 
 Widgets can be scripted the same way, reacting to element events such as `event StartButton.Clicked():`.

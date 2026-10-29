@@ -1,6 +1,7 @@
 name: Build
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -9,6 +10,7 @@ on:
       - 'src/**'
       - 'Assets/**'
       - '.gitmodules'
+      - '.github/workflows/build.yml'
   pull_request:
     branches: [main]
     paths:
@@ -161,7 +163,7 @@ jobs:
       - name: Install macOS Dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install glfw3 openal-soft libvorbis
+          brew install glfw openal-soft libvorbis
 
       # CMake Build Cache
       - name: Cache CMake Build
