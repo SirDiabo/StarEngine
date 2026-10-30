@@ -13,6 +13,8 @@
 #include "NativeFileDialog.h"
 #include "ImportDetailsPanel.h"
 #include "AssetImporter.h"
+#include "ImportReportPanel.h"
+#include "Core/ImportHandlerRegistry.h"
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -386,6 +388,17 @@ void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     std::string ext = fs::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
+    if (const ImportHandler* handler = ImportHandlerRegistry::Get().Find(ext)) {
+        ImportResult result = ImportHandlerRegistry::Get().Import(path, GetCurrentFolderPath());
+        importStatus = result.summary;
+        tilesDirty = true;
+        if (result.showReport || result.HasProblems()) {
+            std::string label = handler->label.empty() ? std::string("Import") : handler->label;
+            ImportReportPanel::Get().Open(label + " Import Report", result.messages);
+        }
+        return;
+    }
+
     std::string actualPath = path;
     const SourceFormatConverter* converter = SourceFormatConverterRegistry::Get().FindAvailable(ext);
     if (converter) {
@@ -443,6 +456,12 @@ void ContentBrowserPanel::ImportAssetAuto() {
         std::string extNoDot = converter.extension.empty() ? "" : converter.extension.substr(1);
         description.insert(description.size() - 1, ", " + extNoDot);
         filter += ";*" + converter.extension;
+    }
+
+    for (const ImportHandler& handler : ImportHandlerRegistry::Get().GetAll()) {
+        std::string extNoDot = handler.extension.empty() ? "" : handler.extension.substr(1);
+        description.insert(description.size() - 1, ", " + extNoDot);
+        filter += ";*" + handler.extension;
     }
 
     std::string path = NativeFileDialog::OpenFile("Import Asset", "", description, filter);
