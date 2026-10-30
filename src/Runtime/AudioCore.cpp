@@ -1,7 +1,15 @@
 #include "AudioCore.h"
 #include "Audio/AudioMixer.h"
+#include "Core/AudioBusRegistry.h"
 #include "raylib.h"
 #include <vector>
+
+AudioCore::AudioCore() {
+    for (int i = 0; i < kMaxMixerBuses; i++) {
+        busVolume[i] = 1.0f;
+        busMuted[i] = false;
+    }
+}
 
 AudioCore& AudioCore::Get() {
     static AudioCore instance;
@@ -52,13 +60,15 @@ void AudioCore::ClearSampleCache() {
     sampleCache.clear();
 }
 
-int AudioCore::PlayAsset(const std::string& assetPath, float volume, float pitch, bool looping) {
+int AudioCore::PlayAsset(const std::string& assetPath, float volume, float pitch, bool looping, const std::string& busName) {
     std::unique_ptr<AudioSource> source = AudioSourceRegistry::Get().Create(assetPath);
     if (!source) return 0;
 
     source->SetVolume(volume);
     source->SetPitch(pitch);
     source->SetLooping(looping);
+    int bus = ResolveBus(source->DefaultBusName(), busName);
+    source->SetBus(bus < 0 ? 0 : bus);
     source->Play();
     if (!source->IsPlaying()) return 0;
 
@@ -80,4 +90,58 @@ void AudioCore::StopAll() {
     for (auto& kv : instances) kv.second->Stop();
     instances.clear();
     AudioMixer::Get().StopAllVoices();
+}
+
+void AudioCore::ApplyBus(int index) {
+    if (index < 0 || index >= kMaxMixerBuses) return;
+    AudioMixer::Get().SetBusGain(index, busMuted[index] ? 0.0f : busVolume[index]);
+}
+
+bool AudioCore::SetBusVolume(const std::string& busName, float volume) {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0) return false;
+    busVolume[index] = volume < 0.0f ? 0.0f : volume;
+    ApplyBus(index);
+    return true;
+}
+
+bool AudioCore::GetBusVolume(const std::string& busName, float& volume) const {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0) return false;
+    volume = busVolume[index];
+    return true;
+}
+
+bool AudioCore::SetBusMuted(const std::string& busName, bool muted) {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0) return false;
+    busMuted[index] = muted;
+    ApplyBus(index);
+    return true;
+}
+
+bool AudioCore::IsBusMuted(const std::string& busName, bool& muted) const {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0) return false;
+    muted = busMuted[index];
+    return true;
+}
+
+void AudioCore::ResetBuses() {
+    for (int i = 0; i < kMaxMixerBuses; i++) {
+        busVolume[i] = 1.0f;
+        busMuted[i] = false;
+        ApplyBus(i);
+    }
+}
+
+int AudioCore::ResolveBus(const std::string& defaultBusName, const std::string& overrideName) const {
+    const AudioBusRegistry& registry = AudioBusRegistry::Get();
+    if (!overrideName.empty() && overrideName != AudioBusRegistry::AssetDefaultLabel()) {
+        int index = registry.IndexOf(overrideName);
+        if (index >= 0) return index;
+        TraceLog(LOG_WARNING, "Audio: unknown bus '%s', using the asset default", overrideName.c_str());
+    }
+    int index = registry.IndexOf(defaultBusName);
+    return index < 0 ? 0 : index;
 }

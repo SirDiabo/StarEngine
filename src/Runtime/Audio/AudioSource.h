@@ -41,6 +41,7 @@ public:
     virtual void SetLooping(bool looping) = 0;
     virtual void SetBus(int bus) = 0;
     virtual void SetPan(float pan) { (void)pan; }
+    virtual std::string DefaultBusName() const { return std::string(); }
 
     virtual void SetTempo(float tempo) { (void)tempo; }
     virtual bool SupportsTempo() const { return false; }

@@ -2,6 +2,7 @@
 #include "Runtime/AudioCore.h"
 #include "Core/StarAsset.h"
 #include "Core/CookedFile.h"
+#include "Core/AudioBusRegistry.h"
 #include "raylib.h"
 #include <algorithm>
 #include <filesystem>
@@ -20,7 +21,14 @@ SoundLoadMode ParseSoundLoadMode(const std::string& text) {
     return SoundLoadMode::Auto;
 }
 
-SoundAudioSource::SoundAudioSource(const std::string& path) : assetPath(path) {}
+SoundAudioSource::SoundAudioSource(const std::string& path) : assetPath(path) {
+    StarAsset header;
+    if (!path.empty() && StarAsset::LoadFromFile(path, header) && header.assetType == "Sound") defaultBus = header.soundBus;
+}
+
+std::string SoundAudioSource::DefaultBusName() const {
+    return AudioBusRegistry::Get().EffectiveDefaultBus(defaultBus);
+}
 
 SoundAudioSource::~SoundAudioSource() {
     if (voice) voice->stopRequested.store(true);

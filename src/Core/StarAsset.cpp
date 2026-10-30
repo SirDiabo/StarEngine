@@ -19,7 +19,10 @@ bool StarAsset::SaveToFile(const std::string& path) const {
     out << "Type=" << assetType << "\n";
     out << "Source=" << sourcePath << "\n";
     out << "VendoredSource=" << vendoredSourcePath << "\n";
-    if (assetType == "Sound") out << "LoadMode=" << soundLoadMode << "\n";
+    if (assetType == "Sound") {
+        out << "LoadMode=" << soundLoadMode << "\n";
+        if (!soundBus.empty()) out << "Bus=" << soundBus << "\n";
+    }
     out << "PosX=" << importPosX << "\n";
     out << "PosY=" << importPosY << "\n";
     out << "PosZ=" << importPosZ << "\n";
@@ -82,6 +85,7 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
         else if (key == "Source") outAsset.sourcePath = value;
         else if (key == "VendoredSource") outAsset.vendoredSourcePath = value;
         else if (key == "LoadMode") outAsset.soundLoadMode = value;
+        else if (key == "Bus") outAsset.soundBus = value;
         else if (key == "PosX") outAsset.importPosX = SafeParse::ToFloat(value);
         else if (key == "PosY") outAsset.importPosY = SafeParse::ToFloat(value);
         else if (key == "PosZ") outAsset.importPosZ = SafeParse::ToFloat(value);

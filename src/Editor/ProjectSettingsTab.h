@@ -25,6 +25,7 @@ private:
     void RenderMapsCategory(Rectangle area);
     void RenderRenderingCategory(Rectangle area);
     void RenderSaveFilesCategory(Rectangle area);
+    void RenderAudioCategory(Rectangle area);
     void RenderCollisionLayersCategory(Rectangle area);
     void RebuildLayerFields();
     void RenderMigrationSection(Rectangle area, float fx, float& fy, float fw);
@@ -55,6 +56,9 @@ private:
     TextElement* renderScaleField = nullptr;
     Widget* newSaveNameChrome = nullptr;
     TextElement* newSaveNameField = nullptr;
+    Widget* newBusChrome = nullptr;
+    TextElement* newBusField = nullptr;
+    std::string newBusName;
 
     std::vector<SaveMigration::MigrationStep> migrationSteps;
     int migrationVersion = 1;

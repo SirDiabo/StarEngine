@@ -29,6 +29,7 @@ public:
     void SetLooping(bool value) override;
     void SetBus(int value) override;
     void SetPan(float value) override;
+    std::string DefaultBusName() const override;
 
     void Seek(double seconds) override;
     double GetPosition() const override;
@@ -40,6 +41,7 @@ private:
     bool Prepare();
 
     std::string assetPath;
+    std::string defaultBus;
     bool prepared = false;
     bool failed = false;
     bool streaming = false;

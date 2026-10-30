@@ -17,6 +17,7 @@
 #include "Core/EditorAssetHandlerRegistry.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "Editor/WidgetEditorTab.h"
+#include "Editor/SoundPreviewTab.h"
 #include "Runtime/StarMap.h"
 #include "Runtime/World.h"
 #include "Runtime/AudioCore.h"
@@ -180,6 +181,13 @@ bool Application::Initialize(int argc, char* argv[]) {
     soundType.extension = ".starsound";
     soundType.category = "Audio";
     AssetTypeRegistry::Get().RegisterType(soundType);
+
+    EditorAssetHandlerInfo soundHandler;
+    soundHandler.extension = ".starsound";
+    soundHandler.createTab = [](const std::string& fullPath, const EditorServices&) -> EditorTab* {
+        return new SoundPreviewTab(fullPath);
+    };
+    EditorAssetHandlerRegistry::Get().RegisterHandler(soundHandler);
 
     RegisterActorAssetSupport();
 

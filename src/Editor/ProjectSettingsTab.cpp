@@ -8,6 +8,7 @@
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/CollisionLayers.h"
+#include "Core/AudioBusRegistry.h"
 #include "Core/IconBuilder.h"
 #include "Core/EmbeddedAssets.h"
 #include "NativeFileDialog.h"
@@ -53,7 +54,7 @@ ProjectSettingsTab::~ProjectSettingsTab() {
 void ProjectSettingsTab::Initialize() {
     title     = "Project Settings";
     permanent = false;
-    switcher.SetCategories({ "General", "Maps", "Rendering", "Save Files", "Collision" });
+    switcher.SetCategories({ "General", "Maps", "Rendering", "Save Files", "Collision", "Audio" });
     RefreshFromProject();
 }
 
@@ -84,6 +85,7 @@ void ProjectSettingsTab::Render(float x, float y, float width, float height) {
         case 2: RenderRenderingCategory(content);  break;
         case 3: RenderSaveFilesCategory(content);  break;
         case 4: RenderCollisionLayersCategory(content); break;
+        case 5: RenderAudioCategory(content); break;
         default: break;
     }
 }
@@ -413,6 +415,67 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
     fy += 30;
 
     RenderMigrationSection(area, fx, fy, fw);
+}
+
+void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
+    const UIPalette& theme = UITheme::Get();
+    float fx = area.x + 16;
+    float fy = area.y + 16;
+    float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
+
+    DrawText("Audio Buses", (int)fx, (int)fy, 14, theme.sectionHeader);
+    fy += 24;
+    DrawText("Sounds and sequences play through a bus. Games can change a bus volume at runtime.",
+              (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 18;
+
+    Rectangle masterCol = {fx, fy, fw, 20};
+    DrawRectangleRec(masterCol, theme.fieldBg);
+    DrawRectangleLinesEx(masterCol, 1, theme.fieldBorder);
+    DrawText(AudioBusRegistry::MasterName(), (int)masterCol.x + 6, (int)masterCol.y + 4, 12, theme.textSecondary);
+    DrawText("always present", (int)(masterCol.x + masterCol.width - 92), (int)masterCol.y + 5, 10, theme.textSecondary);
+    fy += 22;
+
+    std::string removeName;
+    for (const std::string& busName : AudioBusRegistry::Get().CustomNames()) {
+        Rectangle nameCol = {fx, fy, fw - 26, 20};
+        Rectangle delBtn  = {fx + fw - 20, fy, 20, 20};
+        DrawRectangleRec(nameCol, theme.fieldBg);
+        DrawRectangleLinesEx(nameCol, 1, theme.fieldBorder);
+        DrawText(busName.c_str(), (int)nameCol.x + 6, (int)nameCol.y + 4, 12, theme.textPrimary);
+        if (InlineButton(delBtn, "x")) removeName = busName;
+        fy += 22;
+    }
+    if (!removeName.empty()) AudioBusRegistry::Get().Remove(removeName);
+
+    Rectangle newNameRow = {fx, fy, fw - 60, 20};
+    Rectangle addBtn     = {fx + fw - 56, fy, 56, 20};
+    if (!newBusChrome) {
+        newBusChrome = new Widget();
+        auto* root = new WidgetElement();
+        newBusChrome->SetRoot(root);
+        newBusField = new TextElement();
+        newBusField->editable = true;
+        newBusField->fontSize = 12.0f;
+        newBusField->placeholder = "New bus name";
+        newBusField->backgroundColor = theme.fieldBg;
+        newBusField->borderColor = theme.fieldBorder;
+        newBusField->editingBorderColor = theme.accent;
+        newBusField->onTextChanged = [this](const std::string& text) { newBusName = text; };
+        root->AddChild(newBusField);
+    }
+    newBusField->size = { newNameRow.width, newNameRow.height };
+    newBusField->offset = { newNameRow.x, newNameRow.y };
+    float dt = GetFrameTime();
+    newBusChrome->Tick(dt, {0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    WidgetInput::ProcessInput(newBusChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+    newBusChrome->Draw({0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    if (InlineButton(addBtn, "+ Add") && !newBusName.empty()) {
+        if (AudioBusRegistry::Get().Add(newBusName)) {
+            newBusName.clear();
+            newBusField->text.clear();
+        }
+    }
 }
 
 void ProjectSettingsTab::RebuildLayerFields() {

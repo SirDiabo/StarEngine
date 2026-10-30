@@ -4,6 +4,7 @@
 #include "Runtime/World.h"
 #include "Runtime/SaveGame.h"
 #include "Runtime/AudioCore.h"
+#include "Core/AudioBusRegistry.h"
 #include "Runtime/Components/Component.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Core/InputKeyNames.h"
@@ -247,7 +248,8 @@ Value Fn_play_sound(Runtime&, std::vector<Value>& a) {
     float volume = a.size() > 1 ? (float)a[1].AsNumber() : 1.0f;
     float pitch = a.size() > 2 ? (float)a[2].AsNumber() : 1.0f;
     bool looping = a.size() > 3 ? a[3].b : false;
-    return Value::Int(AudioCore::Get().PlayAsset(a[0].s, volume, pitch, looping));
+    std::string bus = a.size() > 4 ? a[4].s : std::string();
+    return Value::Int(AudioCore::Get().PlayAsset(a[0].s, volume, pitch, looping, bus));
 }
 Value Fn_stop_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Stop(); return Value::Void(); }
 Value Fn_pause_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Pause(); return Value::Void(); }
@@ -259,7 +261,25 @@ Value Fn_set_sound_tempo(Runtime&, std::vector<Value>& a) { AudioSource* s = Fin
 Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
-Value Fn_set_master_volume(Runtime&, std::vector<Value>& a) { SetMasterVolume((float)a[0].AsNumber()); return Value::Void(); }
+Value Fn_set_master_volume(Runtime&, std::vector<Value>& a) { AudioCore::Get().SetBusVolume(AudioBusRegistry::MasterName(), (float)a[0].AsNumber()); return Value::Void(); }
+Value Fn_set_bus_volume(Runtime&, std::vector<Value>& a) {
+    if (!AudioCore::Get().SetBusVolume(a[0].s, (float)a[1].AsNumber())) throw ScriptError{ "Unknown audio bus '" + a[0].s + "'" };
+    return Value::Void();
+}
+Value Fn_get_bus_volume(Runtime&, std::vector<Value>& a) {
+    float volume = 1.0f;
+    if (!AudioCore::Get().GetBusVolume(a[0].s, volume)) throw ScriptError{ "Unknown audio bus '" + a[0].s + "'" };
+    return Value::Float(volume);
+}
+Value Fn_set_bus_muted(Runtime&, std::vector<Value>& a) {
+    if (!AudioCore::Get().SetBusMuted(a[0].s, a[1].b)) throw ScriptError{ "Unknown audio bus '" + a[0].s + "'" };
+    return Value::Void();
+}
+Value Fn_is_bus_muted(Runtime&, std::vector<Value>& a) {
+    bool muted = false;
+    if (!AudioCore::Get().IsBusMuted(a[0].s, muted)) throw ScriptError{ "Unknown audio bus '" + a[0].s + "'" };
+    return Value::Bool(muted);
+}
 
 }
 
@@ -322,7 +342,7 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "copy_save_slot", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_copy_save_slot },
         { "save_slot_count", {}, 0, T(Kind::Int), RetRule::Fixed, false, Fn_save_slot_count },
         { "save_slot_name", { T(Kind::Int) }, 1, T(Kind::String), RetRule::Fixed, false, Fn_save_slot_name },
-        { "play_sound", { T(Kind::String), T(Kind::Float), T(Kind::Float), T(Kind::Bool) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound },
+        { "play_sound", { T(Kind::String), T(Kind::Float), T(Kind::Float), T(Kind::Bool), T(Kind::String) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound },
         { "stop_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_stop_sound },
         { "pause_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_pause_sound },
         { "resume_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_resume_sound },
@@ -333,6 +353,10 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "seek_sound", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_seek_sound },
         { "sound_position", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_position },
         { "sound_duration", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_duration },
+        { "set_bus_volume", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_bus_volume },
+        { "get_bus_volume", { T(Kind::String) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_get_bus_volume },
+        { "set_bus_muted", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_bus_muted },
+        { "is_bus_muted", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_is_bus_muted },
         { "set_master_volume", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_master_volume },
     };
     return table;

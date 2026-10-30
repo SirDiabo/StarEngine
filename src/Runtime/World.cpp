@@ -200,6 +200,7 @@ void World::EndPlay() {
     viewTarget = nullptr;
     ShowCursor();
     AudioCore::Get().StopAll();
+    AudioCore::Get().ResetBuses();
     PrintMessageLog::Get().Clear();
 }
 

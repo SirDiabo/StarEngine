@@ -9,6 +9,7 @@
 #include "Core/SaveFileRegistry.h"
 #include "Core/SafeParse.h"
 #include "Core/CollisionLayers.h"
+#include "Core/AudioBusRegistry.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -692,6 +693,21 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
                     layerPicker.OpenList({ r.x, r.y + r.height }, CollisionLayers::Names(), "All");
                 })
             }));
+        } else if (pin.name == "Bus" && (node->type == "Play_Sound" || node->type == "Set_Bus_Volume" || node->type == "Get_Bus_Volume" ||
+                                          node->type == "Set_Bus_Muted" || node->type == "Is_Bus_Muted")) {
+            int pinId = pin.id;
+            bool allowDefault = node->type == "Play_Sound";
+            std::vector<std::string> options;
+            if (allowDefault) options.push_back(AudioBusRegistry::AssetDefaultLabel());
+            for (const std::string& busName : AudioBusRegistry::Get().Names()) options.push_back(busName);
+            std::string shown = value.empty() ? (allowDefault ? std::string(AudioBusRegistry::AssetDefaultLabel()) : std::string(AudioBusRegistry::MasterName())) : value;
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, shown, options,
+                [this, pinId, allowDefault](const std::string& v) {
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) {
+                        p->defaultValue = (allowDefault && v == AudioBusRegistry::AssetDefaultLabel()) ? std::string() : v;
+                        isDirty = true;
+                    }
+                }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

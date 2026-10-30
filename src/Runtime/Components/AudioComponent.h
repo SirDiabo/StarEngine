@@ -12,6 +12,7 @@ public:
     float volume = 1.0f;
     float pitch = 1.0f;
     float tempo = 1.0f;
+    std::string bus;
 
     AudioComponent();
     ~AudioComponent() override;
@@ -35,6 +36,7 @@ private:
 
     std::unique_ptr<AudioSource> source;
     std::string sourcePath;
+    std::string appliedBusKey;
     bool wantsPlaying = false;
     bool paused = false;
 };

@@ -3,6 +3,7 @@
 #include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
 #include "Core/CookedFile.h"
+#include "Core/AudioBusRegistry.h"
 #include "Runtime/Audio/WavFile.h"
 #include "PropertyRowBuilders.h"
 #include "Core/Project.h"
@@ -33,6 +34,7 @@ void ImportDetailsPanel::LoadFromAsset() {
     skeletonBoneCount = (int)asset.skeleton.size();
 
     soundLoadMode = asset.soundLoadMode.empty() ? "Auto" : asset.soundLoadMode;
+    soundBus = asset.soundBus;
     soundInfoText.clear();
     if (asset.assetType == "Sound") {
         WavInfo info;
@@ -57,7 +59,10 @@ void ImportDetailsPanel::SaveToAsset() {
     asset.importRotX = rotX; asset.importRotY = rotY; asset.importRotZ = rotZ;
     asset.importScaleX = scaleX; asset.importScaleY = scaleY; asset.importScaleZ = scaleZ;
     asset.materialSlots = materialSlots;
-    if (asset.assetType == "Sound") asset.soundLoadMode = soundLoadMode;
+    if (asset.assetType == "Sound") {
+        asset.soundLoadMode = soundLoadMode;
+        asset.soundBus = soundBus;
+    }
 
     std::string before, after;
     bool track = !pendingImport;
@@ -226,6 +231,13 @@ std::vector<PropertyRow> ImportDetailsPanel::BuildRows(bool modal) {
         rows.push_back(PropertyRows::EnumRow("loadmode", "Load Mode", soundLoadMode, { "Auto", "Memory", "Stream" },
             [this, modal](const std::string& value) {
                 soundLoadMode = value;
+                if (!modal) SaveToAsset();
+            }));
+
+        rows.push_back(PropertyRows::EnumRow("defaultbus", "Default Bus", AudioBusRegistry::Get().EffectiveDefaultBus(soundBus),
+            AudioBusRegistry::Get().Names(),
+            [this, modal](const std::string& value) {
+                soundBus = value;
                 if (!modal) SaveToAsset();
             }));
 

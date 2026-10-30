@@ -74,3 +74,12 @@ bool NamedListRegistry::HasEntry(const std::string& category, const std::string&
     const auto& entries = GetList(category);
     return std::find(entries.begin(), entries.end(), name) != entries.end();
 }
+
+bool NamedListRegistry::HasCategory(const std::string& category) const {
+    return lists.find(category) != lists.end();
+}
+
+void NamedListRegistry::SetList(const std::string& category, const std::vector<std::string>& names) {
+    lists[category] = names;
+    Save();
+}

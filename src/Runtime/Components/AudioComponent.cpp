@@ -2,7 +2,8 @@
 #include "Runtime/ComponentRegistry.h"
 #include "Core/SafeParse.h"
 #include "Runtime/AudioCore.h"
-#include "raylib.h"
+#include "Core/AudioBusRegistry.h"
+#include "Runtime/AudioCore.h"
 #include <cstdlib>
 
 AudioComponent::AudioComponent() = default;
@@ -16,6 +17,7 @@ void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Volume", &volume);
     outProperties.AddFloat("Pitch", &pitch);
     outProperties.AddFloat("Tempo", &tempo);
+    outProperties.AddString("Bus", &bus);
 }
 
 AudioSource* AudioComponent::EnsureSource() {
@@ -27,6 +29,7 @@ AudioSource* AudioComponent::EnsureSource() {
     if (!source || sourcePath != soundPath) {
         source = AudioSourceRegistry::Get().Create(soundPath);
         sourcePath = soundPath;
+        appliedBusKey.clear();
     }
     return source.get();
 }
@@ -37,6 +40,13 @@ void AudioComponent::SyncSource() {
     source->SetPitch(pitch);
     source->SetLooping(looping);
     if (source->SupportsTempo()) source->SetTempo(tempo);
+
+    std::string key = sourcePath + "|" + bus;
+    if (key != appliedBusKey) {
+        appliedBusKey = key;
+        int index = AudioCore::Get().ResolveBus(source->DefaultBusName(), bus);
+        source->SetBus(index < 0 ? 0 : index);
+    }
 }
 
 void AudioComponent::Update(float deltaTime) {
@@ -82,6 +92,25 @@ void AudioComponent::SetParameter(const std::string& path, const AudioParamValue
 }
 
 namespace {
+
+ComponentFieldDesc BusField() {
+    ComponentFieldDesc d = ComponentField::Enm("Bus", "Bus", {}, AudioBusRegistry::AssetDefaultLabel(),
+        [](Component& c, const ComponentDecl& decl) {
+            std::string value = decl.Get("Bus", AudioBusRegistry::AssetDefaultLabel());
+            static_cast<AudioComponent&>(c).bus = value == AudioBusRegistry::AssetDefaultLabel() ? std::string() : value;
+        },
+        [](const Component& c) -> std::string {
+            const std::string& value = static_cast<const AudioComponent&>(c).bus;
+            return value.empty() ? std::string(AudioBusRegistry::AssetDefaultLabel()) : value;
+        });
+    d.enumProvider = []() {
+        std::vector<std::string> options = { AudioBusRegistry::AssetDefaultLabel() };
+        for (const std::string& name : AudioBusRegistry::Get().Names()) options.push_back(name);
+        return options;
+    };
+    return d;
+}
+
 ComponentRegistrar registrar_AudioComponent({
     "AudioComponent",
     []() -> Component* { return new AudioComponent(); },
@@ -94,6 +123,7 @@ ComponentRegistrar registrar_AudioComponent({
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = SafeParse::ToFloat(d.Get("Pitch", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).pitch); }),
         ComponentField::Flt("Tempo", "Tempo", 1.0f,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).tempo = SafeParse::ToFloat(d.Get("Tempo", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).tempo); }),
+        BusField(),
         ComponentField::Bln("AutoPlay", "Auto Play", false,
             [](Component& c, const ComponentDecl& d) {
                 auto& ac = static_cast<AudioComponent&>(c);

@@ -20,6 +20,7 @@ struct StarAsset {
     std::string sourcePath;
 
     std::string soundLoadMode = "Auto";
+    std::string soundBus;
 
     std::string vendoredSourcePath;
 

@@ -14,6 +14,8 @@ public:
     bool AddEntry(const std::string& category, const std::string& name);
     bool RemoveEntry(const std::string& category, const std::string& name);
     bool HasEntry(const std::string& category, const std::string& name) const;
+    bool HasCategory(const std::string& category) const;
+    void SetList(const std::string& category, const std::vector<std::string>& names);
 
 private:
     std::string filePath;
