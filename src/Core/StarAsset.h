@@ -19,6 +19,8 @@ struct StarAsset {
     std::string assetType;
     std::string sourcePath;
 
+    std::string soundLoadMode = "Auto";
+
     std::string vendoredSourcePath;
 
     float importPosX = 0.0f, importPosY = 0.0f, importPosZ = 0.0f;

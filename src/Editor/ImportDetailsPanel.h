@@ -46,6 +46,9 @@ private:
     bool hasSkeleton = false;
     int skeletonBoneCount = 0;
 
+    std::string soundLoadMode = "Auto";
+    std::string soundInfoText;
+
     bool pendingImport = false;
     std::string pendingSrcPath;
     std::string pendingExtension;

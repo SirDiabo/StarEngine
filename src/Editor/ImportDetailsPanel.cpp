@@ -2,6 +2,9 @@
 #include "ContentUndo.h"
 #include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
+#include "Core/CookedFile.h"
+#include "Runtime/Audio/WavFile.h"
+#include "PropertyRowBuilders.h"
 #include "Core/Project.h"
 #include "AssetImporter.h"
 #include "UITheme.h"
@@ -28,6 +31,22 @@ void ImportDetailsPanel::LoadFromAsset() {
     materialSlots = asset.materialSlots;
     hasSkeleton = asset.hasSkeleton;
     skeletonBoneCount = (int)asset.skeleton.size();
+
+    soundLoadMode = asset.soundLoadMode.empty() ? "Auto" : asset.soundLoadMode;
+    soundInfoText.clear();
+    if (asset.assetType == "Sound") {
+        WavInfo info;
+        std::string error;
+        std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
+        if (!resolved.empty() && WavFile::ReadInfo(resolved, info, error)) {
+            char buf[160];
+            snprintf(buf, sizeof(buf), "%.2f s, %d Hz, %s, %d-bit", info.DurationSeconds(), info.sampleRate,
+                     info.channels >= 2 ? "stereo" : "mono", info.bitsPerSample);
+            soundInfoText = buf;
+        } else {
+            soundInfoText = "Unreadable: " + error;
+        }
+    }
 }
 
 void ImportDetailsPanel::SaveToAsset() {
@@ -38,6 +57,7 @@ void ImportDetailsPanel::SaveToAsset() {
     asset.importRotX = rotX; asset.importRotY = rotY; asset.importRotZ = rotZ;
     asset.importScaleX = scaleX; asset.importScaleY = scaleY; asset.importScaleZ = scaleZ;
     asset.materialSlots = materialSlots;
+    if (asset.assetType == "Sound") asset.soundLoadMode = soundLoadMode;
 
     std::string before, after;
     bool track = !pendingImport;
@@ -195,7 +215,27 @@ std::vector<PropertyRow> ImportDetailsPanel::BuildRows(bool modal) {
     std::vector<PropertyRow> rows;
     bool isMesh = (assetType == "StaticMesh");
 
-    if (!isMesh) {
+    if (assetType == "Sound") {
+        PropertyRow info;
+        info.id = "soundinfo";
+        info.kind = PropertyRowKind::ReadOnlyText;
+        info.label = "Format";
+        info.stringValue = soundInfoText;
+        rows.push_back(info);
+
+        rows.push_back(PropertyRows::EnumRow("loadmode", "Load Mode", soundLoadMode, { "Auto", "Memory", "Stream" },
+            [this, modal](const std::string& value) {
+                soundLoadMode = value;
+                if (!modal) SaveToAsset();
+            }));
+
+        PropertyRow hint;
+        hint.id = "loadmodehint";
+        hint.kind = PropertyRowKind::ReadOnlyText;
+        hint.label = "";
+        hint.stringValue = "Auto streams sounds longer than 10 seconds.";
+        rows.push_back(hint);
+    } else if (!isMesh) {
         PropertyRow r;
         r.id = "none";
         r.kind = PropertyRowKind::ReadOnlyText;

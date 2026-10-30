@@ -1,7 +1,7 @@
 #include "AudioCore.h"
-#include "Core/StarAsset.h"
-#include "Core/CookedFile.h"
-#include <algorithm>
+#include "Audio/AudioMixer.h"
+#include "raylib.h"
+#include <vector>
 
 AudioCore& AudioCore::Get() {
     static AudioCore instance;
@@ -11,96 +11,73 @@ AudioCore& AudioCore::Get() {
 void AudioCore::InitDevice() {
     if (deviceInitialized) return;
     InitAudioDevice();
+    AudioMixer::Get().Start();
     deviceInitialized = true;
 }
 
 void AudioCore::CloseDevice() {
     if (!deviceInitialized) return;
-    StopAndClearMusic();
-    for (auto& kv : soundCache) UnloadSound(kv.second);
-    soundCache.clear();
-    for (auto& kv : cookedSoundCache) UnloadSound(kv.second);
-    cookedSoundCache.clear();
+    instances.clear();
+    AudioMixer::Get().StopAllVoices();
+    AudioMixer::Get().Shutdown();
+    sampleCache.clear();
     CloseAudioDevice();
     deviceInitialized = false;
 }
 
-Sound* AudioCore::GetOrLoadSound(const std::string& path) {
-    auto it = soundCache.find(path);
-    if (it != soundCache.end()) return &it->second;
-
-    if (path.empty() || !FileExists(path.c_str())) return nullptr;
-    Sound loaded = LoadSound(path.c_str());
-    if (loaded.frameCount == 0) return nullptr;
-
-    auto inserted = soundCache.emplace(path, loaded);
-    return &inserted.first->second;
-}
-
-Sound* AudioCore::GetOrLoadCookedSound(const std::string& soundAssetPath) {
-    auto it = cookedSoundCache.find(soundAssetPath);
-    if (it != cookedSoundCache.end()) return &it->second;
-
-    StarAsset asset;
-    if (!StarAsset::LoadFromFile(soundAssetPath, asset) || asset.assetType != "Sound") return nullptr;
-
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
-
-    Sound loaded = LoadSound(resolved.c_str());
-    if (loaded.frameCount == 0) return nullptr;
-
-    auto inserted = cookedSoundCache.emplace(soundAssetPath, loaded);
-    return &inserted.first->second;
-}
-
-Music* AudioCore::LoadMusicHandle(const std::string& path) {
-    if (path.empty() || !FileExists(path.c_str())) return nullptr;
-    Music loaded = LoadMusicStream(path.c_str());
-    if (loaded.frameCount == 0) return nullptr;
-
-    Music* music = new Music(loaded);
-    activeMusic.push_back(music);
-    return music;
-}
-
-Music* AudioCore::GetOrLoadCookedMusic(const std::string& musicAssetPath) {
-    StarAsset asset;
-    if (!StarAsset::LoadFromFile(musicAssetPath, asset) || asset.assetType != "Sound") return nullptr;
-
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
-    Music loaded = LoadMusicStream(resolved.c_str());
-    if (loaded.frameCount == 0) return nullptr;
-
-    Music* music = new Music(loaded);
-    activeMusic.push_back(music);
-    return music;
-}
-
-void AudioCore::UnloadMusicHandle(Music* music) {
-    if (!music) return;
-    activeMusic.erase(std::remove(activeMusic.begin(), activeMusic.end(), music), activeMusic.end());
-    UnloadMusicStream(*music);
-    delete music;
-}
-
-void AudioCore::TickMusicStreams() {
-    for (Music* music : activeMusic) {
-        UpdateMusicStream(*music);
+void AudioCore::Tick(float deltaTime) {
+    std::vector<int> finished;
+    for (auto& kv : instances) {
+        kv.second->Tick(deltaTime);
+        if (!kv.second->IsPlaying() && !kv.second->IsPaused()) finished.push_back(kv.first);
     }
+    for (int handle : finished) instances.erase(handle);
 }
 
-void AudioCore::StopAndClearMusic() {
-    for (Music* music : activeMusic) {
-        StopMusicStream(*music);
-        UnloadMusicStream(*music);
-        delete music;
+std::shared_ptr<const SampleData> AudioCore::GetSampleData(const std::string& resolvedWavPath) {
+    auto it = sampleCache.find(resolvedWavPath);
+    if (it != sampleCache.end()) return it->second;
+
+    std::string error;
+    std::shared_ptr<SampleData> loaded = WavFile::LoadAll(resolvedWavPath, error);
+    if (!loaded) {
+        TraceLog(LOG_ERROR, "Audio: could not load '%s': %s", resolvedWavPath.c_str(), error.c_str());
+        return nullptr;
     }
-    activeMusic.clear();
+    sampleCache[resolvedWavPath] = loaded;
+    return loaded;
 }
 
-void AudioCore::StopAllSounds() {
-    for (auto& kv : soundCache) StopSound(kv.second);
-    for (auto& kv : cookedSoundCache) StopSound(kv.second);
+void AudioCore::ClearSampleCache() {
+    sampleCache.clear();
+}
+
+int AudioCore::PlayAsset(const std::string& assetPath, float volume, float pitch, bool looping) {
+    std::unique_ptr<AudioSource> source = AudioSourceRegistry::Get().Create(assetPath);
+    if (!source) return 0;
+
+    source->SetVolume(volume);
+    source->SetPitch(pitch);
+    source->SetLooping(looping);
+    source->Play();
+    if (!source->IsPlaying()) return 0;
+
+    int handle = nextHandle++;
+    instances[handle] = std::move(source);
+    return handle;
+}
+
+AudioSource* AudioCore::FindInstance(int handle) {
+    auto it = instances.find(handle);
+    return it == instances.end() ? nullptr : it->second.get();
+}
+
+void AudioCore::StopInstance(int handle) {
+    if (AudioSource* source = FindInstance(handle)) source->Stop();
+}
+
+void AudioCore::StopAll() {
+    for (auto& kv : instances) kv.second->Stop();
+    instances.clear();
+    AudioMixer::Get().StopAllVoices();
 }

@@ -10,7 +10,7 @@
 std::string StargraphPinAssetExtension(const Pin& pin) {
     if (pin.type != PinType::String) return "";
     if (pin.objectKind == "Map") return ".starmap";
-    if (pin.objectKind == "Sound") return ".starsound";
+    if (pin.objectKind == "Sound") return "@audio";
     if (pin.objectKind == "Widget") return ".starwidget";
     return "";
 }

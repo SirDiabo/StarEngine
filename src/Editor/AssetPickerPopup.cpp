@@ -1,4 +1,7 @@
 #include "AssetPickerPopup.h"
+#include "Runtime/Audio/AudioSource.h"
+#include <algorithm>
+#include <sstream>
 #include "Core/Project.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
@@ -25,11 +28,24 @@ void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
         contentPaths.push_back(extra.second);
     }
 
+    std::vector<std::string> accepted;
+    {
+        std::stringstream filterStream(extension);
+        std::string part;
+        while (std::getline(filterStream, part, ';')) {
+            if (part == "@audio") {
+                for (const std::string& audioExt : AudioSourceRegistry::Get().GetExtensions()) accepted.push_back(audioExt);
+            } else if (!part.empty()) {
+                accepted.push_back(part);
+            }
+        }
+    }
+
     fs::path contentRoot = fs::path(Project::Get().GetRootPath()) / "Content";
     if (fs::exists(contentRoot)) {
         for (const auto& entry : fs::recursive_directory_iterator(contentRoot)) {
             if (entry.is_directory()) continue;
-            if (entry.path().extension().string() != extension) continue;
+            if (std::find(accepted.begin(), accepted.end(), entry.path().extension().string()) == accepted.end()) continue;
 
             fs::path relative = fs::relative(entry.path(), contentRoot);
             displayNames.push_back(relative.stem().string());

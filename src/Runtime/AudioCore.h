@@ -1,8 +1,9 @@
 #pragma once
-#include "raylib.h"
+#include "Audio/AudioSource.h"
+#include "Audio/WavFile.h"
+#include <memory>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 class AudioCore {
 public:
@@ -11,20 +12,19 @@ public:
     void InitDevice();
     void CloseDevice();
 
-    Sound* GetOrLoadSound(const std::string& path);
-    Sound* GetOrLoadCookedSound(const std::string& soundAssetPath);
+    void Tick(float deltaTime);
 
-    Music* LoadMusicHandle(const std::string& path);
-    Music* GetOrLoadCookedMusic(const std::string& musicAssetPath);
-    void UnloadMusicHandle(Music* music);
+    std::shared_ptr<const SampleData> GetSampleData(const std::string& resolvedWavPath);
+    void ClearSampleCache();
 
-    void TickMusicStreams();
-    void StopAndClearMusic();
-    void StopAllSounds();
+    int PlayAsset(const std::string& assetPath, float volume = 1.0f, float pitch = 1.0f, bool looping = false);
+    AudioSource* FindInstance(int handle);
+    void StopInstance(int handle);
+    void StopAll();
 
 private:
     bool deviceInitialized = false;
-    std::unordered_map<std::string, Sound> soundCache;
-    std::unordered_map<std::string, Sound> cookedSoundCache;
-    std::vector<Music*> activeMusic;
+    int nextHandle = 1;
+    std::unordered_map<std::string, std::shared_ptr<const SampleData>> sampleCache;
+    std::unordered_map<int, std::unique_ptr<AudioSource>> instances;
 };

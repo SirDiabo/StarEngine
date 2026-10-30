@@ -1,5 +1,7 @@
 #pragma once
 #include "SceneComponent.h"
+#include "Runtime/Audio/AudioSource.h"
+#include <memory>
 #include <string>
 
 class AudioComponent : public SceneComponent {
@@ -9,6 +11,10 @@ public:
     bool looping = false;
     float volume = 1.0f;
     float pitch = 1.0f;
+    float tempo = 1.0f;
+
+    AudioComponent();
+    ~AudioComponent() override;
 
     const char* GetClassName() const override { return "AudioComponent"; }
     void GetEditorProperties(PropertyList& outProperties) override;
@@ -19,7 +25,16 @@ public:
     void Pause();
     void Resume();
 
+    bool IsPlaying() const;
+    AudioSource* GetSource() { return source.get(); }
+    AudioSource* EnsureSource();
+    void SetParameter(const std::string& path, const AudioParamValue& value);
+
 private:
+    void SyncSource();
+
+    std::unique_ptr<AudioSource> source;
+    std::string sourcePath;
     bool wantsPlaying = false;
     bool paused = false;
 };

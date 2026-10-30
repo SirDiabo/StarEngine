@@ -117,6 +117,33 @@ void RegisterAudioComponentNodes() {
     };
     NodeRegistry::Get().RegisterNode(setPitch);
 
+    NodeTemplate setTempo;
+    setTempo.type = "Set_Tempo";
+    setTempo.category = "Audio";
+    setTempo.moduleName = "Stargraph";
+    setTempo.hideFromContextMenu = true;
+    setTempo.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
+        node->inputs.push_back({"Tempo", PinType::Float, true, false, 0, "1.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setTempo.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        float tempo = 1.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
+            }
+            if (p.name == "Tempo" && !p.defaultValue.empty()) tempo = p.defaultValue.AsFloat();
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->tempo = tempo;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setTempo);
+
     NodeTemplate playAudio;
     playAudio.type = "Play_Audio";
     playAudio.category = "Audio";

@@ -241,40 +241,25 @@ Value Fn_save_slot_name(Runtime&, std::vector<Value>& a) {
     return Value::String(slots[(size_t)a[0].i].name);
 }
 
-std::unordered_map<int, Sound*>& SoundTable() { static std::unordered_map<int, Sound*> t; return t; }
-std::unordered_map<int, Music*>& MusicTable() { static std::unordered_map<int, Music*> t; return t; }
-int NextHandle() { static int next = 1; return next++; }
-
-template <typename T>
-int HandleFor(std::unordered_map<int, T*>& table, T* ptr) {
-    if (!ptr) return 0;
-    for (const auto& kv : table) if (kv.second == ptr) return kv.first;
-    int id = NextHandle();
-    table[id] = ptr;
-    return id;
-}
-
-Sound* FindSound(const Value& v) { auto it = SoundTable().find((int)v.i); return it == SoundTable().end() ? nullptr : it->second; }
-Music* FindMusic(const Value& v) { auto it = MusicTable().find((int)v.i); return it == MusicTable().end() ? nullptr : it->second; }
+AudioSource* FindSound(const Value& v) { return AudioCore::Get().FindInstance((int)v.i); }
 
 Value Fn_play_sound(Runtime&, std::vector<Value>& a) {
-    Sound* snd = AudioCore::Get().GetOrLoadCookedSound(a[0].s);
-    if (snd) PlaySound(*snd);
-    return Value::Int(HandleFor(SoundTable(), snd));
+    float volume = a.size() > 1 ? (float)a[1].AsNumber() : 1.0f;
+    float pitch = a.size() > 2 ? (float)a[2].AsNumber() : 1.0f;
+    bool looping = a.size() > 3 ? a[3].b : false;
+    return Value::Int(AudioCore::Get().PlayAsset(a[0].s, volume, pitch, looping));
 }
-Value Fn_stop_sound(Runtime&, std::vector<Value>& a) { if (Sound* s = FindSound(a[0])) StopSound(*s); return Value::Void(); }
-Value Fn_pause_sound(Runtime&, std::vector<Value>& a) { if (Sound* s = FindSound(a[0])) PauseSound(*s); return Value::Void(); }
-Value Fn_resume_sound(Runtime&, std::vector<Value>& a) { if (Sound* s = FindSound(a[0])) ResumeSound(*s); return Value::Void(); }
-Value Fn_is_sound_playing(Runtime&, std::vector<Value>& a) { Sound* s = FindSound(a[0]); return Value::Bool(s && IsSoundPlaying(*s)); }
+Value Fn_stop_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Stop(); return Value::Void(); }
+Value Fn_pause_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Pause(); return Value::Void(); }
+Value Fn_resume_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Resume(); return Value::Void(); }
+Value Fn_is_sound_playing(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Bool(s && s->IsPlaying()); }
+Value Fn_set_sound_volume(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetVolume((float)a[1].AsNumber()); return Value::Void(); }
+Value Fn_set_sound_pitch(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetPitch((float)a[1].AsNumber()); return Value::Void(); }
+Value Fn_set_sound_tempo(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); if (s && s->SupportsTempo()) s->SetTempo((float)a[1].AsNumber()); return Value::Void(); }
+Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
+Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
+Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
 Value Fn_set_master_volume(Runtime&, std::vector<Value>& a) { SetMasterVolume((float)a[0].AsNumber()); return Value::Void(); }
-Value Fn_load_music(Runtime&, std::vector<Value>& a) { return Value::Int(HandleFor(MusicTable(), AudioCore::Get().GetOrLoadCookedMusic(a[0].s))); }
-Value Fn_unload_music(Runtime&, std::vector<Value>& a) {
-    if (Music* m = FindMusic(a[0])) { AudioCore::Get().UnloadMusicHandle(m); MusicTable().erase((int)a[0].i); }
-    return Value::Void();
-}
-Value Fn_play_music(Runtime&, std::vector<Value>& a) { if (Music* m = FindMusic(a[0])) PlayMusicStream(*m); return Value::Void(); }
-Value Fn_set_music_volume(Runtime&, std::vector<Value>& a) { if (Music* m = FindMusic(a[0])) SetMusicVolume(*m, (float)a[1].AsNumber()); return Value::Void(); }
-Value Fn_seek_music(Runtime&, std::vector<Value>& a) { if (Music* m = FindMusic(a[0])) SeekMusicStream(*m, (float)a[1].AsNumber()); return Value::Void(); }
 
 }
 
@@ -337,17 +322,18 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "copy_save_slot", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_copy_save_slot },
         { "save_slot_count", {}, 0, T(Kind::Int), RetRule::Fixed, false, Fn_save_slot_count },
         { "save_slot_name", { T(Kind::Int) }, 1, T(Kind::String), RetRule::Fixed, false, Fn_save_slot_name },
-        { "play_sound", { T(Kind::String) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound },
+        { "play_sound", { T(Kind::String), T(Kind::Float), T(Kind::Float), T(Kind::Bool) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound },
         { "stop_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_stop_sound },
         { "pause_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_pause_sound },
         { "resume_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_resume_sound },
         { "is_sound_playing", { T(Kind::Int) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_is_sound_playing },
+        { "set_sound_volume", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_volume },
+        { "set_sound_pitch", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_pitch },
+        { "set_sound_tempo", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_tempo },
+        { "seek_sound", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_seek_sound },
+        { "sound_position", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_position },
+        { "sound_duration", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_duration },
         { "set_master_volume", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_master_volume },
-        { "load_music", { T(Kind::String) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_load_music },
-        { "unload_music", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_unload_music },
-        { "play_music", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_play_music },
-        { "set_music_volume", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_music_volume },
-        { "seek_music", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_seek_music },
     };
     return table;
 }

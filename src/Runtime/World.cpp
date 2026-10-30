@@ -154,8 +154,8 @@ void World::Tick(float deltaTime) {
     }
 
     {
-        PROFILE_SCOPE("Audio Music Streams");
-        AudioCore::Get().TickMusicStreams();
+        PROFILE_SCOPE("Audio");
+        AudioCore::Get().Tick(deltaTime);
     }
 
     {
@@ -199,8 +199,7 @@ void World::EndPlay() {
     Profiler::NotifyPlayState(false);
     viewTarget = nullptr;
     ShowCursor();
-    AudioCore::Get().StopAndClearMusic();
-    AudioCore::Get().StopAllSounds();
+    AudioCore::Get().StopAll();
     PrintMessageLog::Get().Clear();
 }
 
