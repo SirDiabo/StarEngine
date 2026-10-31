@@ -22,8 +22,19 @@ SoundLoadMode ParseSoundLoadMode(const std::string& text) {
 }
 
 SoundAudioSource::SoundAudioSource(const std::string& path) : assetPath(path) {
+    ReloadAssetSettings();
+}
+
+void SoundAudioSource::ReloadAssetSettings() {
     StarAsset header;
-    if (!path.empty() && StarAsset::LoadFromFile(path, header) && header.assetType == "Sound") defaultBus = header.soundBus;
+    if (assetPath.empty() || !StarAsset::LoadFromFile(assetPath, header) || header.assetType != "Sound") return;
+    defaultBus = header.soundBus;
+    assetVolume = std::clamp(header.soundVolume, 0.0f, 4.0f);
+    assetPitch = std::clamp(header.soundPitch, 0.05f, 4.0f);
+    if (voice) {
+        voice->volume.store(volume * assetVolume);
+        voice->pitch.store(pitch * assetPitch);
+    }
 }
 
 std::string SoundAudioSource::DefaultBusName() const {
@@ -78,8 +89,8 @@ void SoundAudioSource::Play() {
     if (voice) voice->stopRequested.store(true);
 
     VoiceStart start;
-    start.volume = volume;
-    start.pitch = pitch;
+    start.volume = volume * assetVolume;
+    start.pitch = pitch * assetPitch;
     start.pan = pan;
     start.looping = looping;
     start.bus = bus;
@@ -114,12 +125,12 @@ bool SoundAudioSource::IsPaused() const {
 
 void SoundAudioSource::SetVolume(float value) {
     volume = std::max(0.0f, value);
-    if (voice) voice->volume.store(volume);
+    if (voice) voice->volume.store(volume * assetVolume);
 }
 
 void SoundAudioSource::SetPitch(float value) {
     pitch = std::max(0.0f, value);
-    if (voice) voice->pitch.store(pitch);
+    if (voice) voice->pitch.store(pitch * assetPitch);
 }
 
 void SoundAudioSource::SetLooping(bool value) {

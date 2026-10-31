@@ -31,4 +31,5 @@ private:
     double duration = 0.0;
     bool looping = false;
     bool draggingPlayhead = false;
+    int appliedRevision = 0;
 };

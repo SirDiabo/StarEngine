@@ -12,6 +12,13 @@ class ImportDetailsPanel {
 public:
     static ImportDetailsPanel& Get();
 
+    int SettingsRevision() const { return settingsRevision; }
+
+    bool IsPendingImport() const { return pendingImport; }
+    bool IsShowingInline(const std::string& path) const { return open && inlinePanel && !pendingImport && assetPath == path; }
+    void EnsureInline(const std::string& path, const std::string& type);
+    void ReleaseInline(const std::string& path);
+
     void Open(const std::string& assetPath, const std::string& assetType, bool inlinePanel = false);
     void OpenForImport(const std::string& srcPath, const std::string& assetType, const std::string& extension,
                         const std::string& targetFolder);
@@ -30,6 +37,7 @@ private:
     void ApplyPanelTheme();
     void ApplyImportOrSave();
 
+    int settingsRevision = 0;
     bool open = false;
     bool inlinePanel = false;
     std::string assetPath;
@@ -48,6 +56,8 @@ private:
 
     std::string soundLoadMode = "Auto";
     std::string soundBus;
+    float soundVolume = 1.0f;
+    float soundPitch = 1.0f;
     std::string soundInfoText;
 
     bool pendingImport = false;

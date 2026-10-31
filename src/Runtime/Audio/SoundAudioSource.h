@@ -30,6 +30,7 @@ public:
     void SetBus(int value) override;
     void SetPan(float value) override;
     std::string DefaultBusName() const override;
+    void ReloadAssetSettings() override;
 
     void Seek(double seconds) override;
     double GetPosition() const override;
@@ -42,6 +43,8 @@ private:
 
     std::string assetPath;
     std::string defaultBus;
+    float assetVolume = 1.0f;
+    float assetPitch = 1.0f;
     bool prepared = false;
     bool failed = false;
     bool streaming = false;

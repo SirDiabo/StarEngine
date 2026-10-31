@@ -22,7 +22,7 @@ AssetPreviewTab::AssetPreviewTab(const std::string& path)
 }
 
 AssetPreviewTab::~AssetPreviewTab() {
-    ImportDetailsPanel::Get().Close();
+    ImportDetailsPanel::Get().ReleaseInline(assetPath);
 }
 
 void AssetPreviewTab::Initialize() {
@@ -33,10 +33,12 @@ void AssetPreviewTab::Initialize() {
     viewport.Initialize();
     viewport.SetAsset(assetPath);
 
-    ImportDetailsPanel::Get().Open(assetPath, assetType, true);
+    ImportDetailsPanel::Get().EnsureInline(assetPath, assetType);
 }
 
 void AssetPreviewTab::Render(float x, float y, float width, float height) {
+    ImportDetailsPanel::Get().EnsureInline(assetPath, assetType);
+
     Rectangle top = {x, y, width, PREVIEW_TOP_H};
     DrawRectangleRec(top, PREVIEW_TOP_COL);
     DrawLine((int)top.x, (int)(top.y + top.height), (int)(top.x + top.width),

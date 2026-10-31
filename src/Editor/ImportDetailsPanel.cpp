@@ -1,4 +1,5 @@
 #include "ImportDetailsPanel.h"
+#include <algorithm>
 #include "ContentUndo.h"
 #include "Runtime/AssetCache.h"
 #include "Core/StarAsset.h"
@@ -35,6 +36,8 @@ void ImportDetailsPanel::LoadFromAsset() {
 
     soundLoadMode = asset.soundLoadMode.empty() ? "Auto" : asset.soundLoadMode;
     soundBus = asset.soundBus;
+    soundVolume = asset.soundVolume;
+    soundPitch = asset.soundPitch;
     soundInfoText.clear();
     if (asset.assetType == "Sound") {
         WavInfo info;
@@ -62,12 +65,15 @@ void ImportDetailsPanel::SaveToAsset() {
     if (asset.assetType == "Sound") {
         asset.soundLoadMode = soundLoadMode;
         asset.soundBus = soundBus;
+        asset.soundVolume = soundVolume;
+        asset.soundPitch = soundPitch;
     }
 
     std::string before, after;
     bool track = !pendingImport;
     if (track) ContentUndo::ReadFileBytes(assetPath, before);
     asset.SaveToFile(assetPath);
+    settingsRevision++;
     AssetCache::Get().InvalidateMeshSource(assetPath);
     if (track) {
         ContentUndo::ReadFileBytes(assetPath, after);
@@ -151,6 +157,15 @@ void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::st
     }
 
     open = true;
+}
+
+void ImportDetailsPanel::EnsureInline(const std::string& path, const std::string& type) {
+    if (pendingImport || IsShowingInline(path)) return;
+    Open(path, type, true);
+}
+
+void ImportDetailsPanel::ReleaseInline(const std::string& path) {
+    if (IsShowingInline(path)) Close();
 }
 
 void ImportDetailsPanel::Close() {
@@ -238,6 +253,17 @@ std::vector<PropertyRow> ImportDetailsPanel::BuildRows(bool modal) {
             AudioBusRegistry::Get().Names(),
             [this, modal](const std::string& value) {
                 soundBus = value;
+                if (!modal) SaveToAsset();
+            }));
+
+        rows.push_back(PropertyRows::FloatRow("soundvolume", "Volume", soundVolume, false,
+            [this, modal](float value) {
+                soundVolume = std::clamp(value, 0.0f, 4.0f);
+                if (!modal) SaveToAsset();
+            }));
+        rows.push_back(PropertyRows::FloatRow("soundpitch", "Pitch (speed)", soundPitch, false,
+            [this, modal](float value) {
+                soundPitch = std::clamp(value, 0.05f, 4.0f);
                 if (!modal) SaveToAsset();
             }));
 

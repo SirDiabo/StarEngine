@@ -39,12 +39,12 @@ SoundPreviewTab::SoundPreviewTab(const std::string& path) : assetPath(path) {
 
 SoundPreviewTab::~SoundPreviewTab() {
     StopPlayback();
-    ImportDetailsPanel::Get().Close();
+    ImportDetailsPanel::Get().ReleaseInline(assetPath);
 }
 
 void SoundPreviewTab::Initialize() {
     BuildWaveform();
-    ImportDetailsPanel::Get().Open(assetPath, "Sound", true);
+    ImportDetailsPanel::Get().EnsureInline(assetPath, "Sound");
 }
 
 void SoundPreviewTab::BuildWaveform() {
@@ -106,11 +106,18 @@ void SoundPreviewTab::OnDeactivated() {
 
 void SoundPreviewTab::Render(float x, float y, float width, float height) {
     const UIPalette& theme = UITheme::Get();
+    ImportDetailsPanel::Get().EnsureInline(assetPath, "Sound");
 
     Rectangle top = {x, y, width, kTopBarHeight};
     DrawRectangleRec(top, {36, 36, 40, 255});
     DrawLine((int)top.x, (int)(top.y + top.height), (int)(top.x + top.width), (int)(top.y + top.height), {60, 60, 65, 255});
     DrawText(title.c_str(), (int)x + 6, (int)y + 8, 13, WHITE);
+
+    int revision = ImportDetailsPanel::Get().SettingsRevision();
+    if (revision != appliedRevision) {
+        appliedRevision = revision;
+        if (source) source->ReloadAssetSettings();
+    }
 
     float contentY = y + kTopBarHeight;
     float contentH = height - kTopBarHeight;
