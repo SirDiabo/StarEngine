@@ -169,6 +169,20 @@ void RegisterAudioNodes() {
     };
     NodeRegistry::Get().RegisterNode(setSoundTempo);
 
+    NodeTemplate setSoundPan;
+    setSoundPan.type = "Set_Sound_Pan";
+    setSoundPan.category = "Audio";
+    setSoundPan.moduleName = "Stargraph";
+    setSoundPan.createPins = [](Node* node) {
+        AddSoundPins(node, true);
+        node->inputs.push_back({"Pan", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setSoundPan.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->SetPan(ReadFloat(node, "Pan", 0.0f));
+    };
+    NodeRegistry::Get().RegisterNode(setSoundPan);
+
     NodeTemplate seekSound;
     seekSound.type = "Seek_Sound";
     seekSound.category = "Audio";

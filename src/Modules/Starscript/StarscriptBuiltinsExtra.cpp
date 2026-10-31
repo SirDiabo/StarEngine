@@ -258,6 +258,7 @@ Value Fn_is_sound_playing(Runtime&, std::vector<Value>& a) { AudioSource* s = Fi
 Value Fn_set_sound_volume(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetVolume((float)a[1].AsNumber()); return Value::Void(); }
 Value Fn_set_sound_pitch(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetPitch((float)a[1].AsNumber()); return Value::Void(); }
 Value Fn_set_sound_tempo(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); if (s && s->SupportsTempo()) s->SetTempo((float)a[1].AsNumber()); return Value::Void(); }
+Value Fn_set_sound_pan(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetPan((float)a[1].AsNumber()); return Value::Void(); }
 Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
@@ -350,6 +351,7 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "set_sound_volume", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_volume },
         { "set_sound_pitch", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_pitch },
         { "set_sound_tempo", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_tempo },
+        { "set_sound_pan", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_pan },
         { "seek_sound", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_seek_sound },
         { "sound_position", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_position },
         { "sound_duration", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_duration },

@@ -144,6 +144,33 @@ void RegisterAudioComponentNodes() {
     };
     NodeRegistry::Get().RegisterNode(setTempo);
 
+    NodeTemplate setPan;
+    setPan.type = "Set_Pan";
+    setPan.category = "Audio";
+    setPan.moduleName = "Stargraph";
+    setPan.hideFromContextMenu = true;
+    setPan.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
+        node->inputs.push_back({"Pan", PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setPan.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Component* target = nullptr;
+        float pan = 0.0f;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Target" && !p.defaultValue.empty()) {
+                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
+            }
+            if (p.name == "Pan" && !p.defaultValue.empty()) pan = p.defaultValue.AsFloat();
+        }
+        if (!target) return;
+        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
+            ac->pan = pan;
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setPan);
+
     NodeTemplate playAudio;
     playAudio.type = "Play_Audio";
     playAudio.category = "Audio";

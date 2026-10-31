@@ -12,6 +12,7 @@ public:
     float volume = 1.0f;
     float pitch = 1.0f;
     float tempo = 1.0f;
+    float pan = 0.0f;
     std::string bus;
 
     AudioComponent();

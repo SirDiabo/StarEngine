@@ -17,6 +17,7 @@ void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Volume", &volume);
     outProperties.AddFloat("Pitch", &pitch);
     outProperties.AddFloat("Tempo", &tempo);
+    outProperties.AddFloat("Pan", &pan);
     outProperties.AddString("Bus", &bus);
 }
 
@@ -39,6 +40,7 @@ void AudioComponent::SyncSource() {
     source->SetVolume(volume);
     source->SetPitch(pitch);
     source->SetLooping(looping);
+    source->SetPan(pan);
     if (source->SupportsTempo()) source->SetTempo(tempo);
 
     std::string key = sourcePath + "|" + bus;
@@ -123,6 +125,8 @@ ComponentRegistrar registrar_AudioComponent({
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pitch = SafeParse::ToFloat(d.Get("Pitch", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).pitch); }),
         ComponentField::Flt("Tempo", "Tempo", 1.0f,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).tempo = SafeParse::ToFloat(d.Get("Tempo", "1")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).tempo); }),
+        ComponentField::Flt("Pan", "Pan", 0.0f,
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).pan = SafeParse::ToFloat(d.Get("Pan", "0")); }, [](const Component& c) { return ComponentField::FloatStr(static_cast<const AudioComponent&>(c).pan); }),
         BusField(),
         ComponentField::Bln("AutoPlay", "Auto Play", false,
             [](Component& c, const ComponentDecl& d) {
