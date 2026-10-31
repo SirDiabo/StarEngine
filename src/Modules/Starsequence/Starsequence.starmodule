@@ -1,0 +1,8 @@
+name=Starsequence
+version=1.0
+description=Sequenced music: .starseq files with layers, instruments built from starsound samples, and an audio-thread sampler with independent tempo and pitch.
+author=StarEngine
+category=Audio
+enabledByDefault=true
+dependencies=
+assetTypes=.starseq
