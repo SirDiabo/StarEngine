@@ -1,6 +1,7 @@
 #include "SequenceEditorTab.h"
 #include "SequenceEditorSession.h"
 #include "SequencePanels.h"
+#include "SequenceDetailsPanel.h"
 #include "PianoRollView.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
@@ -42,6 +43,8 @@ SequenceEditorTab::SequenceEditorTab(const std::string& path) : assetPath(path) 
 SequenceEditorTab::~SequenceEditorTab() {
     delete pianoRollPanel;
     delete layersPanel;
+    delete instrumentsPanel;
+    delete detailsPanel;
     delete session;
 }
 
@@ -52,12 +55,18 @@ void SequenceEditorTab::Initialize() {
 
     pianoRollPanel = new PianoRollPanel();
     layersPanel = new SequenceLayersPanel();
+    instrumentsPanel = new SequenceInstrumentsPanel();
+    detailsPanel = new SequenceDetailsPanel();
     pianoRollPanel->Initialize();
     layersPanel->Initialize();
+    instrumentsPanel->Initialize();
+    detailsPanel->Initialize();
     pianoRollPanel->SetSession(session);
     layersPanel->SetSession(session);
+    instrumentsPanel->SetSession(session);
+    detailsPanel->SetSession(session);
 
-    std::vector<Panel*> panels = { pianoRollPanel, layersPanel };
+    std::vector<Panel*> panels = { pianoRollPanel, layersPanel, instrumentsPanel, detailsPanel };
     if (logPanel) panels.push_back(logPanel);
     dockArea.SetPanels(panels);
 
@@ -65,30 +74,40 @@ void SequenceEditorTab::Initialize() {
 }
 
 void SequenceEditorTab::BuildDefaultLayout() {
-    auto layersLeaf = std::make_unique<DockNode>();
-    layersLeaf->panelNames = { "Layers" };
+    auto leaf = [](const char* panelName) {
+        auto node = std::make_unique<DockNode>();
+        node->panelNames = { panelName };
+        return node;
+    };
 
-    auto rollLeaf = std::make_unique<DockNode>();
-    rollLeaf->panelNames = { "Piano Roll" };
+    auto leftColumn = std::make_unique<DockNode>();
+    leftColumn->type = DockNode::Type::SplitV;
+    leftColumn->splitRatio = 0.55f;
+    leftColumn->first = leaf("Layers");
+    leftColumn->second = leaf("Instruments");
 
-    std::unique_ptr<DockNode> mainSide;
+    std::unique_ptr<DockNode> center;
     if (logPanel) {
-        auto logsLeaf = std::make_unique<DockNode>();
-        logsLeaf->panelNames = { "Logs" };
-        mainSide = std::make_unique<DockNode>();
-        mainSide->type = DockNode::Type::SplitV;
-        mainSide->splitRatio = 0.8f;
-        mainSide->first = std::move(rollLeaf);
-        mainSide->second = std::move(logsLeaf);
+        center = std::make_unique<DockNode>();
+        center->type = DockNode::Type::SplitV;
+        center->splitRatio = 0.8f;
+        center->first = leaf("Piano Roll");
+        center->second = leaf("Logs");
     } else {
-        mainSide = std::move(rollLeaf);
+        center = leaf("Piano Roll");
     }
+
+    auto centerAndDetails = std::make_unique<DockNode>();
+    centerAndDetails->type = DockNode::Type::SplitH;
+    centerAndDetails->splitRatio = 0.78f;
+    centerAndDetails->first = std::move(center);
+    centerAndDetails->second = leaf("Details");
 
     auto root = std::make_unique<DockNode>();
     root->type = DockNode::Type::SplitH;
-    root->splitRatio = 0.22f;
-    root->first = std::move(layersLeaf);
-    root->second = std::move(mainSide);
+    root->splitRatio = 0.15f;
+    root->first = std::move(leftColumn);
+    root->second = std::move(centerAndDetails);
 
     dockArea.SetDefaultLayout(std::move(root));
 }
@@ -112,6 +131,15 @@ void SequenceEditorTab::RenderToolbar(Rectangle area) {
 
     if (ToolbarButton({ x, y, 54, h }, "Loop", session->loopEnabled)) session->loopEnabled = !session->loopEnabled;
     x += 66.0f;
+
+    {
+        char snapText[32];
+        snprintf(snapText, sizeof(snapText), "Snap %s", session->SnapLabel());
+        Rectangle snapRect = { x, y, 84, h };
+        if (ToolbarButton(snapRect, snapText, false)) session->CycleSnap(1);
+        else if (!WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), snapRect) && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) session->CycleSnap(-1);
+        x += 96.0f;
+    }
 
     const Starsequence::Sequence& seq = session->GetSequence();
     double tick = session->PlayheadTick();
@@ -148,6 +176,8 @@ void SequenceEditorTab::BuildMenus(MenuBar* menuBar) {
     std::vector<bool> windowChecked = {
         dockArea.IsPanelVisible("Piano Roll"),
         dockArea.IsPanelVisible("Layers"),
+        dockArea.IsPanelVisible("Instruments"),
+        dockArea.IsPanelVisible("Details"),
         dockArea.IsPanelVisible("Logs"),
         false, false,
     };
@@ -155,7 +185,7 @@ void SequenceEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "Save", "Save All" } },
         { "Asset",  { "Find in Content Browser" } },
-        { "Window", { "Piano Roll", "Layers", "Logs", "---", "Reset Layout" }, windowChecked },
+        { "Window", { "Piano Roll", "Layers", "Instruments", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });
 }
@@ -173,7 +203,7 @@ bool SequenceEditorTab::IsDirty() const {
 }
 
 void SequenceEditorTab::ResetLayout() {
-    for (const std::string& name : { "Piano Roll", "Layers", "Logs" })
+    for (const std::string& name : { "Piano Roll", "Layers", "Instruments", "Details", "Logs" })
         dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
 }
@@ -186,12 +216,12 @@ void SequenceEditorTab::TogglePanelVisible(const std::string& name) {
 void SequenceEditorTab::SaveLayout(const std::string& filePath) const {
     std::unordered_map<std::string, std::string> data;
     LayoutSerializer::Load(filePath, data);
-    dockArea.SaveLayout(data, "starsequence");
+    dockArea.SaveLayout(data, "starsequence_v2");
     LayoutSerializer::Save(filePath, data);
 }
 
 void SequenceEditorTab::LoadLayout(const std::string& filePath) {
     std::unordered_map<std::string, std::string> data;
     if (LayoutSerializer::Load(filePath, data))
-        dockArea.LoadLayout(data, "starsequence");
+        dockArea.LoadLayout(data, "starsequence_v2");
 }

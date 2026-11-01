@@ -1,8 +1,10 @@
 #pragma once
 #include "Modules/Starsequence/SequenceData.h"
 #include "Modules/Starsequence/SequenceAudioSource.h"
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -24,15 +26,48 @@ public:
     int StructureRevision() const { return structureRevision; }
     void MarkDirty() { dirty = true; }
     void MarkStructureChanged();
+    void NotesEdited();
 
     int SelectedLayer() const { return selectedLayer; }
     void SelectLayer(int index);
+    Starsequence::Layer* ActiveLayer();
+    const Starsequence::Layer* ActiveLayer() const;
 
     bool IsLayerSolo(int layer) const;
     void SetLayerSolo(int layer, bool value);
     void SetLayerMuted(int layer, bool value);
     void SetLayerVolume(int layer, float value);
     void SetLayerPan(int layer, float value);
+    int AddLayer();
+    bool RemoveSelectedLayer();
+    void DuplicateSelectedLayer();
+    void RenameLayer(int index, const std::string& name);
+
+    int CurrentInstrument() const { return currentInstrument; }
+    void SetCurrentInstrument(int index);
+    int SelectedSet() const { return selectedSet; }
+    void SetSelectedSet(int index) { selectedSet = index < 0 ? 0 : index; }
+    int AddInstrument();
+    bool RemoveInstrument(int index);
+    void RenameInstrument(int index, const std::string& name);
+
+    const std::set<uint32_t>& SelectedNotes() const { return selectedNotes; }
+    void SetSelectedNotes(const std::set<uint32_t>& notes) { selectedNotes = notes; }
+    void ClearNoteSelection() { selectedNotes.clear(); }
+    void SelectAllNotes();
+    uint32_t AddNoteAt(int64_t tick, int key, int64_t length);
+    bool DeleteSelectedNotes();
+    void CopySelection();
+    bool CutSelection();
+    void Paste();
+    void DuplicateSelection();
+
+    int SnapIndex() const { return snapIndex; }
+    void CycleSnap(int direction);
+    const char* SnapLabel() const;
+    int64_t SnapTicks() const;
+    int64_t SnapTick(double tick, bool bypass) const;
+    int defaultVelocity = 100;
 
     bool loopEnabled = false;
 
@@ -44,13 +79,16 @@ public:
     double PlayheadTick() const;
     double CursorTick() const { return cursorTick; }
     void SetCursorTick(double tick);
+    void AuditionNote(int instrument, int key, int velocity);
 
     void Update();
     void SetUndoOwner(std::function<void()> reveal, std::function<bool()> isActive);
 
 private:
     void EnsureSource();
+    void PlayFrom(double tick);
     void ApplyLive(const std::string& path, float value);
+    void GrowLengthToContent();
     void CaptureUndoState(std::string& content, std::string& selection) const;
     void RestoreUndoState(const std::string& content, const std::string& selection);
 
@@ -60,10 +98,18 @@ private:
     bool dirty = false;
     int structureRevision = 0;
     int selectedLayer = 0;
+    int currentInstrument = 0;
+    int selectedSet = 0;
+    int snapIndex = 5;
     double cursorTick = 0.0;
+    uint32_t nextUid = 1;
+    std::set<uint32_t> selectedNotes;
 
     std::unique_ptr<Starsequence::SequenceAudioSource> source;
+    std::vector<std::unique_ptr<Starsequence::SequenceAudioSource>> auditions;
     int sourceRevision = -1;
+    int watchedRevision = -1;
+    double watchedSince = 0.0;
     std::vector<bool> solo;
 
     FunctionUndoDocument* undoDocument = nullptr;

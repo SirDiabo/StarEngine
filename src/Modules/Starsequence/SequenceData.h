@@ -51,6 +51,7 @@ struct Note {
     int64_t length = 0;
     int key = 60;
     int velocity = 100;
+    uint32_t uid = 0;
 };
 
 enum class ControllerType { Volume, Expression, Pan, Bend, Sustain, ReverbSend, ChorusSend };

@@ -6,6 +6,8 @@
 class SequenceEditorSession;
 class PianoRollPanel;
 class SequenceLayersPanel;
+class SequenceInstrumentsPanel;
+class SequenceDetailsPanel;
 class LogPanel;
 class MenuBar;
 
@@ -40,6 +42,8 @@ private:
     SequenceEditorSession* session = nullptr;
     PianoRollPanel* pianoRollPanel = nullptr;
     SequenceLayersPanel* layersPanel = nullptr;
+    SequenceInstrumentsPanel* instrumentsPanel = nullptr;
+    SequenceDetailsPanel* detailsPanel = nullptr;
     LogPanel* logPanel = nullptr;
     bool opened = false;
 };

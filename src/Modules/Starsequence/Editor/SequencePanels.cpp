@@ -1,6 +1,7 @@
 #include "SequencePanels.h"
 #include "SequenceEditorSession.h"
 #include "Editor/UITheme.h"
+#include "Core/KeyLayout.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/WidgetFont.h"
 #include <algorithm>
@@ -14,9 +15,13 @@ namespace {
 
 constexpr float kRulerHeight = 24.0f;
 constexpr float kKeyboardWidth = 62.0f;
+constexpr float kLaneHeight = 76.0f;
+constexpr float kMinHeightForLane = 260.0f;
 constexpr float kFontSize = 11.0f;
 constexpr float kFontSpacing = 1.0f;
 constexpr float kLayerRowHeight = 50.0f;
+constexpr float kInstrumentRowHeight = 24.0f;
+constexpr float kHeaderHeight = 28.0f;
 
 bool Hover(Rectangle r) {
     const void* scope = WidgetInput::GetInputScope();
@@ -42,6 +47,7 @@ Color InstrumentColor(int instrument, float value) {
 bool ModifierCtrl() { return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL); }
 bool ModifierShift() { return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT); }
 bool ModifierAlt() { return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT); }
+bool KeyRepeat(int key) { return IsKeyPressed(key) || IsKeyPressedRepeat(key); }
 
 bool SmallButton(Rectangle r, const char* label, bool active, Color activeColor) {
     const UIPalette& theme = UITheme::Get();
@@ -57,6 +63,17 @@ bool SmallButton(Rectangle r, const char* label, bool active, Color activeColor)
 
 void PianoRollPanel::Initialize() {
     name = "Piano Roll";
+}
+
+PianoRollPanel::Layout PianoRollPanel::ComputeLayout() const {
+    Layout l;
+    l.hasLane = bounds.height >= kMinHeightForLane;
+    float laneHeight = l.hasLane ? kLaneHeight : 0.0f;
+    l.ruler = { bounds.x + kKeyboardWidth, bounds.y, bounds.width - kKeyboardWidth, kRulerHeight };
+    l.keyboard = { bounds.x, bounds.y + kRulerHeight, kKeyboardWidth, bounds.height - kRulerHeight - laneHeight };
+    l.grid = { bounds.x + kKeyboardWidth, bounds.y + kRulerHeight, bounds.width - kKeyboardWidth, bounds.height - kRulerHeight - laneHeight };
+    l.lane = { bounds.x + kKeyboardWidth, bounds.y + bounds.height - laneHeight, bounds.width - kKeyboardWidth, laneHeight };
+    return l;
 }
 
 void PianoRollPanel::FitInitialView(float viewHeight) {
@@ -82,9 +99,10 @@ void PianoRollPanel::FitInitialView(float viewHeight) {
     view.ClampVertical(viewHeight);
 }
 
-void PianoRollPanel::HandleInput(const Rectangle& ruler, const Rectangle& grid, bool hover) {
+void PianoRollPanel::HandleNavigation(const Layout& layout, bool hover) {
     Vector2 mouse = GetMousePosition();
     float wheel = GetMouseWheelMove();
+    const Rectangle& grid = layout.grid;
 
     if (hover && wheel != 0.0f) {
         if (ModifierCtrl()) {
@@ -112,14 +130,262 @@ void PianoRollPanel::HandleInput(const Rectangle& ruler, const Rectangle& grid, 
         }
     }
 
-    if (Hover(ruler) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) scrubbing = true;
+    if (Hover(layout.ruler) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && drag == DragMode::None) scrubbing = true;
     if (scrubbing) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             double tick = view.TickOfX(mouse.x, grid.x);
-            session->SetCursorTick(std::round(std::max(0.0, tick)));
+            session->SetCursorTick((double)session->SnapTick(tick, ModifierAlt()));
         } else {
             scrubbing = false;
         }
+    }
+}
+
+uint32_t PianoRollPanel::HitNote(const Rectangle& grid, Vector2 mouse, bool& onEdge) const {
+    onEdge = false;
+    const Layer* layer = session->ActiveLayer();
+    if (!layer) return 0;
+    int key = view.KeyOfY(mouse.y, grid.y);
+    for (size_t i = layer->notes.size(); i-- > 0;) {
+        const Note& n = layer->notes[i];
+        if (n.key != key) continue;
+        float x0 = view.XOfTick((double)n.tick, grid.x);
+        float x1 = view.XOfTick((double)(n.tick + n.length), grid.x);
+        if (x1 - x0 < 3.0f) x1 = x0 + 3.0f;
+        if (mouse.x < x0 || mouse.x > x1) continue;
+        float edge = std::clamp((x1 - x0) * 0.4f, 3.0f, 7.0f);
+        onEdge = mouse.x >= x1 - edge;
+        return n.uid;
+    }
+    return 0;
+}
+
+void PianoRollPanel::HandleGridInput(const Layout& layout, bool hover) {
+    Layer* layer = session->ActiveLayer();
+    if (!layer) return;
+    const Rectangle& grid = layout.grid;
+    Vector2 mouse = GetMousePosition();
+    const bool bypassSnap = ModifierAlt();
+    const bool snapOn = session->SnapIndex() != 0 && !bypassSnap;
+    const int64_t step = std::max<int64_t>(1, session->SnapTicks());
+    const double mouseTick = view.TickOfX(mouse.x, grid.x);
+    const int mouseKey = std::clamp(view.KeyOfY(mouse.y, grid.y), 0, 127);
+
+    if (drag == DragMode::None) {
+        if (!(hover && Hover(grid))) return;
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            bool edge = false;
+            uint32_t uid = HitNote(grid, mouse, edge);
+            if (uid) {
+                if (!session->SelectedNotes().count(uid)) session->SetSelectedNotes({ uid });
+                session->DeleteSelectedNotes();
+            }
+            return;
+        }
+
+        if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || panning || scrubbing) return;
+
+        bool onEdge = false;
+        uint32_t uid = HitNote(grid, mouse, onEdge);
+        if (uid) {
+            std::set<uint32_t> selection = session->SelectedNotes();
+            if (ModifierCtrl()) {
+                if (selection.count(uid)) selection.erase(uid); else selection.insert(uid);
+                session->SetSelectedNotes(selection);
+                return;
+            }
+            if (!selection.count(uid)) {
+                selection = { uid };
+                session->SetSelectedNotes(selection);
+            }
+            const Note* note = FindNote(*layer, uid);
+            if (!note) return;
+            dragSnapshots = SnapshotNotes(*layer, session->SelectedNotes());
+            dragNote = uid;
+            dragRefTick = note->tick;
+            dragRefLength = note->length;
+            dragRefKey = note->key;
+            dragInstrument = note->instrument;
+            dragStartTick = mouseTick;
+            dragStartKey = mouseKey;
+            lastTickDelta = 0;
+            lastKeyDelta = 0;
+            lastLengthDelta = 0;
+            drag = onEdge ? DragMode::Resize : DragMode::Move;
+            if (!onEdge) session->AuditionNote(note->instrument, note->key, note->velocity);
+            return;
+        }
+
+        if (ModifierShift()) {
+            drag = DragMode::Box;
+            boxStart = mouse;
+            boxBase = ModifierCtrl() ? session->SelectedNotes() : std::set<uint32_t>();
+            if (!ModifierCtrl()) session->ClearNoteSelection();
+            return;
+        }
+
+        int64_t tick = snapOn ? (int64_t)std::floor(std::max(0.0, mouseTick) / (double)step) * step : session->SnapTick(mouseTick, true);
+        int64_t length = snapOn ? step : std::max<int64_t>(1, session->GetSequence().resolution / 4);
+        uint32_t created = session->AddNoteAt(tick, mouseKey, length);
+        if (!created) return;
+        session->SetSelectedNotes({ created });
+        const Note* note = FindNote(*layer, created);
+        if (!note) return;
+        dragSnapshots = SnapshotNotes(*layer, { created });
+        dragNote = created;
+        dragRefTick = note->tick;
+        dragRefLength = note->length;
+        dragRefKey = note->key;
+        dragInstrument = note->instrument;
+        dragStartTick = mouseTick;
+        dragStartKey = mouseKey;
+        lastTickDelta = 0;
+        lastKeyDelta = 0;
+        lastLengthDelta = 0;
+        drag = DragMode::Create;
+        session->AuditionNote(note->instrument, note->key, note->velocity);
+        return;
+    }
+
+    if (drag == DragMode::Velocity) return;
+
+    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        drag = DragMode::None;
+        dragSnapshots.clear();
+        return;
+    }
+
+    if (drag == DragMode::Move) {
+        int64_t newTick = session->SnapTick((double)dragRefTick + (mouseTick - dragStartTick), bypassSnap);
+        int64_t tickDelta = newTick - dragRefTick;
+        int keyDelta = mouseKey - dragStartKey;
+        if (tickDelta != lastTickDelta || keyDelta != lastKeyDelta) {
+            ApplyMove(*layer, dragSnapshots, tickDelta, keyDelta);
+            session->NotesEdited();
+            if (keyDelta != lastKeyDelta) session->AuditionNote(dragInstrument, std::clamp(dragRefKey + keyDelta, 0, 127), session->defaultVelocity);
+            lastTickDelta = tickDelta;
+            lastKeyDelta = keyDelta;
+        }
+    } else if (drag == DragMode::Resize || drag == DragMode::Create) {
+        int64_t refEnd = dragRefTick + dragRefLength;
+        int64_t newEnd;
+        if (drag == DragMode::Create && snapOn) newEnd = (int64_t)std::ceil(std::max(0.0, mouseTick) / (double)step) * step;
+        else newEnd = session->SnapTick(mouseTick, bypassSnap);
+        int64_t lengthDelta = newEnd - refEnd;
+        if (lengthDelta != lastLengthDelta) {
+            ApplyResize(*layer, dragSnapshots, lengthDelta, snapOn ? step : 1);
+            session->NotesEdited();
+            lastLengthDelta = lengthDelta;
+        }
+    } else if (drag == DragMode::Box) {
+        Rectangle box = {
+            std::min(boxStart.x, mouse.x), std::min(boxStart.y, mouse.y),
+            std::fabs(mouse.x - boxStart.x), std::fabs(mouse.y - boxStart.y)
+        };
+        std::set<uint32_t> selection = boxBase;
+        for (const Note& n : layer->notes) {
+            float x0 = view.XOfTick((double)n.tick, grid.x);
+            float x1 = std::max(x0 + 2.0f, view.XOfTick((double)(n.tick + n.length), grid.x));
+            float y0 = view.YOfKey(n.key, grid.y);
+            Rectangle nr = { x0, y0, x1 - x0, view.keyHeight };
+            if (CheckCollisionRecs(box, nr)) selection.insert(n.uid);
+        }
+        session->SetSelectedNotes(selection);
+    }
+}
+
+void PianoRollPanel::HandleLaneInput(const Layout& layout, bool hover) {
+    if (!layout.hasLane) return;
+    Layer* layer = session->ActiveLayer();
+    if (!layer) return;
+    Vector2 mouse = GetMousePosition();
+    const float usable = layout.lane.height - 10.0f;
+    const float bottom = layout.lane.y + layout.lane.height - 4.0f;
+
+    if (drag == DragMode::Velocity) {
+        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            drag = DragMode::None;
+            velocityTargets.clear();
+            return;
+        }
+        int velocity = (int)std::lround((double)(bottom - mouse.y) / (double)usable * 127.0);
+        velocity = std::clamp(velocity, 1, 127);
+        ApplyVelocity(*layer, velocityTargets, velocity);
+        session->defaultVelocity = velocity;
+        session->MarkStructureChanged();
+        return;
+    }
+
+    if (drag != DragMode::None || !hover || !Hover(layout.lane) || !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
+
+    uint32_t best = 0;
+    float bestDistance = 7.0f;
+    for (const Note& n : layer->notes) {
+        float x = view.XOfTick((double)n.tick, layout.lane.x);
+        float distance = std::fabs(x - mouse.x);
+        if (distance <= bestDistance) {
+            bestDistance = distance;
+            best = n.uid;
+        }
+    }
+    if (!best) return;
+    std::set<uint32_t> selection = session->SelectedNotes();
+    if (!selection.count(best)) {
+        selection = { best };
+        session->SetSelectedNotes(selection);
+    }
+    velocityTargets = selection;
+    drag = DragMode::Velocity;
+}
+
+void PianoRollPanel::HandleKeyboardColumn(const Layout& layout, bool hover) {
+    if (!hover || drag != DragMode::None || !Hover(layout.keyboard) || !IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
+    int key = std::clamp(view.KeyOfY(GetMousePosition().y, layout.keyboard.y), 0, 127);
+    session->AuditionNote(session->CurrentInstrument(), key, session->defaultVelocity);
+}
+
+void PianoRollPanel::HandleShortcuts(bool hover) {
+    if (!hover || drag != DragMode::None) return;
+    if (WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice)) return;
+    Layer* layer = session->ActiveLayer();
+    if (!layer) return;
+
+    const bool ctrl = ModifierCtrl();
+    if (ctrl) {
+        if (KeyLayout::Pressed('a')) session->SelectAllNotes();
+        else if (KeyLayout::Pressed('c')) session->CopySelection();
+        else if (KeyLayout::Pressed('x')) session->CutSelection();
+        else if (KeyLayout::Pressed('v')) session->Paste();
+        else if (KeyLayout::Pressed('d')) session->DuplicateSelection();
+        return;
+    }
+
+    if (IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) {
+        session->DeleteSelectedNotes();
+        return;
+    }
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        session->ClearNoteSelection();
+        return;
+    }
+    if (session->SelectedNotes().empty()) return;
+
+    int64_t tickDelta = 0;
+    int keyDelta = 0;
+    const int64_t step = std::max<int64_t>(1, session->SnapTicks());
+    if (KeyRepeat(KEY_LEFT)) tickDelta = -step;
+    else if (KeyRepeat(KEY_RIGHT)) tickDelta = step;
+    else if (KeyRepeat(KEY_UP)) keyDelta = ModifierShift() ? 12 : 1;
+    else if (KeyRepeat(KEY_DOWN)) keyDelta = ModifierShift() ? -12 : -1;
+    if (tickDelta == 0 && keyDelta == 0) return;
+
+    std::vector<NoteSnapshot> snapshots = SnapshotNotes(*layer, session->SelectedNotes());
+    ApplyMove(*layer, snapshots, tickDelta, keyDelta);
+    session->NotesEdited();
+    if (keyDelta != 0 && !snapshots.empty()) {
+        const Note* n = FindNote(*layer, snapshots.front().uid);
+        if (n) session->AuditionNote(n->instrument, n->key, n->velocity);
     }
 }
 
@@ -127,9 +393,8 @@ void PianoRollPanel::DrawNotes(const Rectangle& grid, double tickStart, double t
     const Sequence& seq = session->GetSequence();
     const int selected = session->SelectedLayer();
     for (size_t l = 0; l < seq.layers.size(); l++) {
+        if ((int)l == selected) continue;
         const Layer& layer = seq.layers[l];
-        const bool isSelected = (int)l == selected;
-        if (isSelected) continue;
         for (const Note& n : layer.notes) {
             if ((double)n.tick > tickEnd) break;
             if ((double)(n.tick + n.length) < tickStart) continue;
@@ -143,6 +408,7 @@ void PianoRollPanel::DrawNotes(const Rectangle& grid, double tickStart, double t
     }
     if (selected < 0 || (size_t)selected >= seq.layers.size()) return;
     const Layer& layer = seq.layers[(size_t)selected];
+    const std::set<uint32_t>& selection = session->SelectedNotes();
     for (const Note& n : layer.notes) {
         if ((double)n.tick > tickEnd) break;
         if ((double)(n.tick + n.length) < tickStart) continue;
@@ -154,7 +420,44 @@ void PianoRollPanel::DrawNotes(const Rectangle& grid, double tickStart, double t
         Rectangle r = { x0, y + 1.0f, std::max(2.0f, x1 - x0), std::max(2.0f, view.keyHeight - 2.0f) };
         Color c = InstrumentColor(n.instrument, value);
         DrawRectangleRec(r, layer.muted ? Fade(c, 0.5f) : c);
-        DrawRectangleLinesEx(r, 1, Fade(BLACK, 0.45f));
+        bool isSelected = selection.count(n.uid) > 0;
+        DrawRectangleLinesEx(r, isSelected ? 2.0f : 1.0f, isSelected ? WHITE : Fade(BLACK, 0.45f));
+        if (r.width > 10.0f) DrawRectangleRec({ r.x + r.width - 3.0f, r.y, 3.0f, r.height }, Fade(BLACK, 0.25f));
+    }
+}
+
+void PianoRollPanel::DrawVelocityLane(const Layout& layout, double tickStart, double tickEnd) {
+    if (!layout.hasLane) return;
+    const UIPalette& theme = UITheme::Get();
+    const Rectangle& lane = layout.lane;
+    DrawRectangleRec(lane, ColorBrightness(theme.panelBg, -0.1f));
+    DrawLineEx({ lane.x, lane.y }, { lane.x + lane.width, lane.y }, 1.0f, theme.panelBorder);
+    DrawRectangleRec({ bounds.x, lane.y, kKeyboardWidth, lane.height }, theme.panelBg);
+    Text("Velocity", bounds.x + 6.0f, lane.y + 6.0f, theme.textSecondary);
+    DrawLineEx({ lane.x, lane.y }, { lane.x, lane.y + lane.height }, 1.0f, theme.panelBorder);
+
+    for (const GridLine& line : gridLines) {
+        if (line.kind == 0) continue;
+        float x = view.XOfTick((double)line.tick, lane.x);
+        if (x < lane.x || x > lane.x + lane.width) continue;
+        DrawLineEx({ x, lane.y }, { x, lane.y + lane.height }, 1.0f, Fade(theme.textSecondary, line.kind == 2 ? 0.35f : 0.15f));
+    }
+
+    const Layer* layer = session->ActiveLayer();
+    if (!layer) return;
+    const float usable = lane.height - 10.0f;
+    const float bottom = lane.y + lane.height - 4.0f;
+    const std::set<uint32_t>& selection = session->SelectedNotes();
+    for (const Note& n : layer->notes) {
+        if ((double)n.tick > tickEnd) break;
+        if ((double)(n.tick + n.length) < tickStart) continue;
+        float x = view.XOfTick((double)n.tick, lane.x);
+        if (x < lane.x - 4.0f || x > lane.x + lane.width + 4.0f) continue;
+        float h = usable * (float)n.velocity / 127.0f;
+        bool isSelected = selection.count(n.uid) > 0;
+        Color c = InstrumentColor(n.instrument, 0.9f);
+        DrawRectangleRec({ x - 1.0f, bottom - h, 3.0f, h }, isSelected ? WHITE : Fade(c, 0.85f));
+        DrawCircleV({ x + 0.5f, bottom - h }, 3.5f, isSelected ? WHITE : c);
     }
 }
 
@@ -163,9 +466,10 @@ void PianoRollPanel::Render() {
     const UIPalette& theme = UITheme::Get();
     const Sequence& seq = session->GetSequence();
 
-    Rectangle ruler = { bounds.x + kKeyboardWidth, bounds.y, bounds.width - kKeyboardWidth, kRulerHeight };
-    Rectangle keyboard = { bounds.x, bounds.y + kRulerHeight, kKeyboardWidth, bounds.height - kRulerHeight };
-    Rectangle grid = { bounds.x + kKeyboardWidth, bounds.y + kRulerHeight, bounds.width - kKeyboardWidth, bounds.height - kRulerHeight };
+    Layout layout = ComputeLayout();
+    const Rectangle& ruler = layout.ruler;
+    const Rectangle& keyboard = layout.keyboard;
+    const Rectangle& grid = layout.grid;
     if (grid.width < 8 || grid.height < 8) return;
 
     if (!viewFitted) {
@@ -176,7 +480,11 @@ void PianoRollPanel::Render() {
     view.ClampVertical(grid.height);
 
     bool hover = Hover(bounds);
-    HandleInput(ruler, grid, hover);
+    HandleNavigation(layout, hover);
+    HandleLaneInput(layout, hover);
+    HandleGridInput(layout, hover);
+    HandleKeyboardColumn(layout, hover);
+    HandleShortcuts(hover);
 
     const double playhead = session->PlayheadTick();
     if (session->IsPlaying() && !scrubbing) {
@@ -198,6 +506,7 @@ void PianoRollPanel::Render() {
     for (int key = firstKey; key >= lastKey; key--) {
         float y = view.YOfKey(key, grid.y);
         Color row = IsBlackKey(key) ? ColorBrightness(theme.panelBg, -0.18f) : ColorBrightness(theme.panelBg, 0.04f);
+        if (key == view.KeyOfY(GetMousePosition().y, grid.y) && Hover(grid)) row = ColorBrightness(row, 0.12f);
         DrawRectangleRec({ grid.x, y, grid.width, view.keyHeight }, row);
         if (key % 12 == 0) DrawLineEx({ grid.x, y + view.keyHeight }, { grid.x + grid.width, y + view.keyHeight }, 1.0f, Fade(theme.textSecondary, 0.35f));
     }
@@ -224,6 +533,13 @@ void PianoRollPanel::Render() {
         float x = view.XOfTick((double)m.tick, grid.x);
         if (x < grid.x || x > grid.x + grid.width) continue;
         DrawLineEx({ x, grid.y }, { x, grid.y + grid.height }, 1.0f, Fade(theme.success, 0.6f));
+    }
+
+    if (drag == DragMode::Box) {
+        Vector2 mouse = GetMousePosition();
+        Rectangle box = { std::min(boxStart.x, mouse.x), std::min(boxStart.y, mouse.y), std::fabs(mouse.x - boxStart.x), std::fabs(mouse.y - boxStart.y) };
+        DrawRectangleRec(box, Fade(theme.accent, 0.2f));
+        DrawRectangleLinesEx(box, 1, theme.accent);
     }
 
     DrawRectangleRec(ruler, ColorBrightness(theme.panelBg, -0.08f));
@@ -281,6 +597,8 @@ void PianoRollPanel::Render() {
     DrawRectangleLinesEx({ bounds.x, bounds.y, kKeyboardWidth, kRulerHeight }, 1, theme.panelBorder);
     DrawLineEx({ keyboard.x + kKeyboardWidth, keyboard.y }, { keyboard.x + kKeyboardWidth, keyboard.y + keyboard.height }, 1.0f, theme.panelBorder);
 
+    DrawVelocityLane(layout, tickStart, tickEnd);
+
     EndScissorMode();
 }
 
@@ -296,9 +614,20 @@ void SequenceLayersPanel::Render() {
     DrawRectangleRec(bounds, theme.panelBg);
     BeginScissorMode((int)bounds.x, (int)bounds.y, (int)bounds.width, (int)bounds.height);
 
+    float buttonWidth = (bounds.width - 16.0f - 8.0f) / 3.0f;
+    Rectangle addBtn = { bounds.x + 4.0f, bounds.y + 4.0f, buttonWidth, kHeaderHeight - 8.0f };
+    Rectangle dupBtn = { addBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
+    Rectangle delBtn = { dupBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
+    bool headerClicked = false;
+    if (SmallButton(addBtn, "+ Layer", false, theme.accent)) { session->AddLayer(); headerClicked = true; }
+    if (SmallButton(dupBtn, "Duplicate", false, theme.accent)) { session->DuplicateSelectedLayer(); headerClicked = true; }
+    if (SmallButton(delBtn, "Remove", false, theme.danger)) { session->RemoveSelectedLayer(); headerClicked = true; }
+    DrawLineEx({ bounds.x, bounds.y + kHeaderHeight }, { bounds.x + bounds.width, bounds.y + kHeaderHeight }, 1.0f, theme.panelBorder);
+
+    Rectangle listArea = { bounds.x, bounds.y + kHeaderHeight, bounds.width, bounds.height - kHeaderHeight };
     float contentHeight = (float)seq.layers.size() * kLayerRowHeight;
-    float maxScroll = std::max(0.0f, contentHeight - bounds.height);
-    if (Hover(bounds)) scroll -= GetMouseWheelMove() * 30.0f;
+    float maxScroll = std::max(0.0f, contentHeight - listArea.height);
+    if (Hover(listArea)) scroll -= GetMouseWheelMove() * 30.0f;
     scroll = std::clamp(scroll, 0.0f, maxScroll);
 
     Vector2 mouse = GetMousePosition();
@@ -307,16 +636,17 @@ void SequenceLayersPanel::Render() {
     for (size_t l = 0; l < seq.layers.size(); l++) {
         const Layer& layer = seq.layers[l];
         const int index = (int)l;
-        Rectangle row = { bounds.x, bounds.y + (float)l * kLayerRowHeight - scroll, bounds.width, kLayerRowHeight };
-        if (row.y + row.height < bounds.y || row.y > bounds.y + bounds.height) continue;
+        Rectangle row = { listArea.x, listArea.y + (float)l * kLayerRowHeight - scroll, listArea.width, kLayerRowHeight };
+        if (row.y + row.height < listArea.y || row.y > listArea.y + listArea.height) continue;
+        bool rowHover = Hover(row) && Hover(listArea);
 
         bool selected = index == session->SelectedLayer();
-        DrawRectangleRec(row, selected ? theme.surfaceSelected : (Hover(row) ? theme.surfaceHover : theme.panelBg));
+        DrawRectangleRec(row, selected ? theme.surfaceSelected : (rowHover ? theme.surfaceHover : theme.panelBg));
         DrawLineEx({ row.x, row.y + row.height }, { row.x + row.width, row.y + row.height }, 1.0f, theme.panelBorder);
 
-        int firstInstrument = -1;
+        int firstInstrument = 0;
         for (const Note& n : layer.notes) { firstInstrument = n.instrument; break; }
-        DrawRectangleRec({ row.x, row.y, 4.0f, row.height }, InstrumentColor(std::max(0, firstInstrument), 0.85f));
+        DrawRectangleRec({ row.x, row.y, 4.0f, row.height }, InstrumentColor(firstInstrument, 0.85f));
 
         Rectangle muteBtn = { row.x + row.width - 46.0f, row.y + 5.0f, 20.0f, 18.0f };
         Rectangle soloBtn = { row.x + row.width - 24.0f, row.y + 5.0f, 20.0f, 18.0f };
@@ -335,8 +665,8 @@ void SequenceLayersPanel::Render() {
         Rectangle volHit = { volTrack.x, row.y + 28.0f, volTrack.width, 18.0f };
         Rectangle panHit = { panTrack.x, row.y + 28.0f, panTrack.width, 18.0f };
 
-        if (Hover(volHit) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { dragLayer = index; dragKind = 1; clickedButton = true; }
-        if (Hover(panHit) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { dragLayer = index; dragKind = 2; clickedButton = true; }
+        if (Hover(volHit) && Hover(listArea) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { dragLayer = index; dragKind = 1; clickedButton = true; }
+        if (Hover(panHit) && Hover(listArea) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { dragLayer = index; dragKind = 2; clickedButton = true; }
         if (dragLayer == index) {
             if (dragKind == 1) session->SetLayerVolume(index, std::clamp((mouse.x - volTrack.x) / volTrack.width, 0.0f, 1.0f) * 2.0f);
             else session->SetLayerPan(index, std::clamp((mouse.x - panTrack.x) / panTrack.width, 0.0f, 1.0f) * 2.0f - 1.0f);
@@ -355,7 +685,65 @@ void SequenceLayersPanel::Render() {
         snprintf(info, sizeof(info), "%d notes", (int)layer.notes.size());
         Text(info, row.x + 12.0f, row.y + 19.0f, theme.textSecondary);
 
-        if (!clickedButton && Hover(row) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) session->SelectLayer(index);
+        if (!clickedButton && !headerClicked && rowHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) session->SelectLayer(index);
+    }
+
+    EndScissorMode();
+}
+
+void SequenceInstrumentsPanel::Initialize() {
+    name = "Instruments";
+}
+
+void SequenceInstrumentsPanel::Render() {
+    if (!session || !session->IsOpen()) return;
+    const UIPalette& theme = UITheme::Get();
+    const Sequence& seq = session->GetSequence();
+
+    DrawRectangleRec(bounds, theme.panelBg);
+    BeginScissorMode((int)bounds.x, (int)bounds.y, (int)bounds.width, (int)bounds.height);
+
+    float buttonWidth = (bounds.width - 12.0f - 4.0f) / 2.0f;
+    Rectangle addBtn = { bounds.x + 4.0f, bounds.y + 4.0f, buttonWidth, kHeaderHeight - 8.0f };
+    Rectangle delBtn = { addBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
+    bool headerClicked = false;
+    if (SmallButton(addBtn, "+ Instrument", false, theme.accent)) { session->AddInstrument(); headerClicked = true; }
+    if (SmallButton(delBtn, "Remove", false, theme.danger)) { session->RemoveInstrument(session->CurrentInstrument()); headerClicked = true; }
+    DrawLineEx({ bounds.x, bounds.y + kHeaderHeight }, { bounds.x + bounds.width, bounds.y + kHeaderHeight }, 1.0f, theme.panelBorder);
+
+    Rectangle listArea = { bounds.x, bounds.y + kHeaderHeight, bounds.width, bounds.height - kHeaderHeight };
+    float contentHeight = (float)seq.instruments.size() * kInstrumentRowHeight;
+    float maxScroll = std::max(0.0f, contentHeight - listArea.height);
+    if (Hover(listArea)) scroll -= GetMouseWheelMove() * 30.0f;
+    scroll = std::clamp(scroll, 0.0f, maxScroll);
+
+    for (size_t i = 0; i < seq.instruments.size(); i++) {
+        const Instrument& inst = seq.instruments[i];
+        const int index = (int)i;
+        Rectangle row = { listArea.x, listArea.y + (float)i * kInstrumentRowHeight - scroll, listArea.width, kInstrumentRowHeight };
+        if (row.y + row.height < listArea.y || row.y > listArea.y + listArea.height) continue;
+        bool rowHover = Hover(row) && Hover(listArea);
+        bool selected = index == session->CurrentInstrument();
+        DrawRectangleRec(row, selected ? theme.surfaceSelected : (rowHover ? theme.surfaceHover : theme.panelBg));
+        DrawLineEx({ row.x, row.y + row.height }, { row.x + row.width, row.y + row.height }, 1.0f, theme.panelBorder);
+        DrawRectangleRec({ row.x, row.y, 4.0f, row.height }, InstrumentColor(index, 0.85f));
+
+        int zones = 0;
+        for (const SampleSet& set : inst.sets) zones += (int)set.zones.size();
+        char count[32];
+        snprintf(count, sizeof(count), "%d", zones);
+        float countWidth = TextWidth(count);
+        Text(count, row.x + row.width - countWidth - 8.0f, row.y + (row.height - kFontSize) / 2.0f, zones == 0 ? theme.danger : theme.textSecondary);
+
+        std::string label = std::to_string(index) + "  " + inst.name;
+        float nameMax = row.width - countWidth - 28.0f;
+        while (label.size() > 1 && TextWidth(label) > nameMax) label.pop_back();
+        Text(label, row.x + 12.0f, row.y + (row.height - kFontSize) / 2.0f, theme.textPrimary);
+
+        if (!headerClicked && rowHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            session->SetCurrentInstrument(index);
+            session->AuditionNote(index, 60, session->defaultVelocity);
+        }
     }
 
     EndScissorMode();
