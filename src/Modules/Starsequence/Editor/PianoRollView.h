@@ -100,6 +100,37 @@ inline bool IsBlackKey(int key) {
     return n == 1 || n == 3 || n == 6 || n == 8 || n == 10;
 }
 
+struct ViewPoint {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
+inline int64_t BrushIndex(double tick, int64_t firstTick, int64_t spacing) {
+    return (int64_t)std::floor((tick - (double)firstTick) / (double)std::max<int64_t>(1, spacing));
+}
+
+inline void BrushIndicesBetween(int64_t lastIndex, int64_t currentIndex, std::vector<int64_t>& out) {
+    out.clear();
+    if (currentIndex > lastIndex) {
+        for (int64_t i = lastIndex + 1; i <= currentIndex && out.size() < 4096; i++) out.push_back(i);
+    } else if (currentIndex < lastIndex) {
+        for (int64_t i = lastIndex - 1; i >= currentIndex && out.size() < 4096; i--) out.push_back(i);
+    }
+}
+
+inline void SegmentSamples(ViewPoint a, ViewPoint b, float step, std::vector<ViewPoint>& out) {
+    out.clear();
+    float dx = b.x - a.x;
+    float dy = b.y - a.y;
+    float length = std::sqrt(dx * dx + dy * dy);
+    int count = length <= 0.0f ? 1 : (int)std::ceil(length / std::max(0.5f, step));
+    count = std::min(count, 2048);
+    for (int i = 0; i <= count; i++) {
+        float t = count == 0 ? 1.0f : (float)i / (float)count;
+        out.push_back({ a.x + dx * t, a.y + dy * t });
+    }
+}
+
 struct PianoRollView {
     static constexpr double kMinPixelsPerBeat = 6.0;
     static constexpr double kMaxPixelsPerBeat = 1200.0;

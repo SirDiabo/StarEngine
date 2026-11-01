@@ -77,11 +77,13 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
         setCount = (int)inst.sets.size();
         if ((size_t)setIndex < inst.sets.size()) zoneCount = (int)inst.sets[(size_t)setIndex].zones.size();
     }
-    const std::string key = "L" + std::to_string(layerIndex) + "/" + std::to_string(seq.layers.size()) +
+    const DetailsContext context = s->GetDetailsContext();
+    const std::string key = "C" + std::to_string((int)context) + "L" + std::to_string(layerIndex) + "/" + std::to_string(seq.layers.size()) +
         "I" + std::to_string(instrumentIndex) + "/" + std::to_string(seq.instruments.size()) +
         "S" + std::to_string(setIndex) + "/" + std::to_string(setCount) +
         "Z" + std::to_string(zoneCount);
 
+    if (context == DetailsContext::Sequence) {
     rows.push_back(HeaderRow("h.seq", "Sequence"));
     rows.push_back(StringRow("seq.name", "Name", seq.name, [s](const std::string& v) {
         s->GetSequence().name = v;
@@ -133,7 +135,9 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
     rows.push_back(ReadOnlyRow("seq.tempoCount", "Tempo Points", std::to_string(seq.tempo.size())));
     rows.push_back(ReadOnlyRow("seq.resolution", "Resolution", std::to_string(seq.resolution) + " ticks/beat"));
 
-    if (layerIndex >= 0 && (size_t)layerIndex < seq.layers.size()) {
+    }
+
+    if (context == DetailsContext::Layer && layerIndex >= 0 && (size_t)layerIndex < seq.layers.size()) {
         const Layer& layer = seq.layers[(size_t)layerIndex];
         rows.push_back(HeaderRow("h.layer", "Layer"));
         rows.push_back(StringRow("layer.name", "Name", layer.name, [s, layerIndex](const std::string& v) {
@@ -151,7 +155,7 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
         rows.push_back(ReadOnlyRow("layer.notes", "Notes", std::to_string(layer.notes.size())));
     }
 
-    if (instrumentIndex >= 0 && (size_t)instrumentIndex < seq.instruments.size()) {
+    if (context == DetailsContext::Instrument && instrumentIndex >= 0 && (size_t)instrumentIndex < seq.instruments.size()) {
         const Instrument& inst = seq.instruments[(size_t)instrumentIndex];
         rows.push_back(HeaderRow("h.inst", "Instrument " + std::to_string(instrumentIndex)));
         rows.push_back(StringRow("inst.name", "Name", inst.name, [s, instrumentIndex](const std::string& v) {

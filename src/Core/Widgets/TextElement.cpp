@@ -2,6 +2,7 @@
 #include "WidgetFont.h"
 #include "Core/Utf8.h"
 #include "WidgetInput.h"
+#include "ScissorStack.h"
 #include "raylib.h"
 #include <cstdio>
 #include <cstdlib>
@@ -221,7 +222,7 @@ void TextElement::OnDrawSelf(Rectangle rect, float uiScale) {
     DrawRectangleLinesEx(rect, 1.0f, border);
 
     float padding = 4.0f * uiScale;
-    BeginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+    ScissorStack::Push(rect);
 
     if (text.empty() && !isEditing && !placeholder.empty()) {
         DrawTextEx(font, placeholder.c_str(), {rect.x + padding, rect.y + (rect.height - scaledSize) * 0.5f},
@@ -238,5 +239,5 @@ void TextElement::OnDrawSelf(Rectangle rect, float uiScale) {
         DrawLineEx({cursorX, rect.y + 3.0f * uiScale}, {cursorX, rect.y + rect.height - 3.0f * uiScale}, 1.0f, color);
     }
 
-    EndScissorMode();
+    ScissorStack::Pop();
 }

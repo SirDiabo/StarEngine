@@ -296,6 +296,34 @@ void SequenceEditorSession::DuplicateSelection() {
     NotesEdited();
 }
 
+int64_t SequenceEditorSession::NoteLength() const {
+    if (noteLength > 0) return noteLength;
+    return std::max<int64_t>(1, (int64_t)sequence.resolution / 4);
+}
+
+void SequenceEditorSession::SetNoteLength(int64_t length) {
+    noteLength = std::max<int64_t>(1, length);
+}
+
+bool SequenceEditorSession::NoteExistsAt(int64_t tick, int key) const {
+    const Layer* layer = ActiveLayer();
+    if (!layer) return false;
+    for (const Note& n : layer->notes) {
+        if (n.tick > tick) break;
+        if (n.tick == tick && n.key == key && n.instrument == currentInstrument) return true;
+    }
+    return false;
+}
+
+int SequenceEditorSession::EraseNotes(const std::set<uint32_t>& uids) {
+    Layer* layer = ActiveLayer();
+    if (!layer || uids.empty()) return 0;
+    int removed = Starsequence::DeleteNotes(*layer, uids);
+    for (uint32_t uid : uids) selectedNotes.erase(uid);
+    if (removed > 0) MarkStructureChanged();
+    return removed;
+}
+
 void SequenceEditorSession::CycleSnap(int direction) {
     snapIndex = ((snapIndex + direction) % kSnapCount + kSnapCount) % kSnapCount;
 }

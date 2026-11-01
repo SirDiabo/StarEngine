@@ -16,7 +16,7 @@ public:
     void SetSession(SequenceEditorSession* s) { session = s; }
 
 private:
-    enum class DragMode { None, Create, Move, Resize, Box, Velocity };
+    enum class DragMode { None, Create, Move, Resize, Box, SelectOrPlace, Brush, Velocity };
 
     struct Layout {
         Rectangle ruler{};
@@ -33,6 +33,10 @@ private:
     void HandleLaneInput(const Layout& layout, bool hover);
     void HandleKeyboardColumn(const Layout& layout, bool hover);
     void HandleShortcuts(bool hover);
+    void FinishDrag();
+    void StampBrush(const Rectangle& grid, double mouseTick, int mouseKey, int64_t step, bool snapOn);
+    void EraseAlong(const Rectangle& grid, Vector2 from, Vector2 to);
+    void BeginNoteDrag(uint32_t uid, double mouseTick, int mouseKey, DragMode mode);
     uint32_t HitNote(const Rectangle& grid, Vector2 mouse, bool& onEdge) const;
     void DrawNotes(const Rectangle& grid, double tickStart, double tickEnd);
     void DrawVelocityLane(const Layout& layout, double tickStart, double tickEnd);
@@ -58,6 +62,16 @@ private:
     int lastKeyDelta = 0;
     int64_t lastLengthDelta = 0;
     Vector2 boxStart = { 0, 0 };
+    bool createMoved = false;
+    bool boxMoved = false;
+    int64_t brushFirstTick = 0;
+    int64_t brushSpacing = 120;
+    int64_t brushLength = 120;
+    int64_t brushLastIndex = 0;
+    int brushKey = 60;
+    int brushLastKey = 60;
+    bool erasing = false;
+    Vector2 eraseLast = { 0, 0 };
     std::set<uint32_t> boxBase;
     std::set<uint32_t> velocityTargets;
 };

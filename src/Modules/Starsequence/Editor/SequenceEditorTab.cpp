@@ -141,6 +141,16 @@ void SequenceEditorTab::RenderToolbar(Rectangle area) {
         x += 96.0f;
     }
 
+    {
+        struct ToolButton { const char* label; EditTool tool; };
+        const ToolButton tools[] = { { "Select", EditTool::Select }, { "Pencil", EditTool::Pencil }, { "Brush", EditTool::Brush } };
+        for (const ToolButton& tb : tools) {
+            if (ToolbarButton({ x, y, 58, h }, tb.label, session->tool == tb.tool)) session->tool = tb.tool;
+            x += 62.0f;
+        }
+        x += 12.0f;
+    }
+
     const Starsequence::Sequence& seq = session->GetSequence();
     double tick = session->PlayheadTick();
     int bar = 1, beat = 1;

@@ -10,6 +10,9 @@
 
 class FunctionUndoDocument;
 
+enum class EditTool { Select, Pencil, Brush };
+enum class DetailsContext { Sequence, Layer, Instrument };
+
 class SequenceEditorSession {
 public:
     SequenceEditorSession();
@@ -69,6 +72,14 @@ public:
     int64_t SnapTick(double tick, bool bypass) const;
     int defaultVelocity = 100;
 
+    EditTool tool = EditTool::Brush;
+    DetailsContext GetDetailsContext() const { return detailsContext; }
+    void SetDetailsContext(DetailsContext context) { detailsContext = context; }
+    int64_t NoteLength() const;
+    void SetNoteLength(int64_t length);
+    bool NoteExistsAt(int64_t tick, int key) const;
+    int EraseNotes(const std::set<uint32_t>& uids);
+
     bool loopEnabled = false;
 
     void Play();
@@ -101,6 +112,8 @@ private:
     int currentInstrument = 0;
     int selectedSet = 0;
     int snapIndex = 5;
+    int64_t noteLength = 0;
+    DetailsContext detailsContext = DetailsContext::Sequence;
     double cursorTick = 0.0;
     uint32_t nextUid = 1;
     std::set<uint32_t> selectedNotes;

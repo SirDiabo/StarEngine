@@ -1,4 +1,5 @@
 #include "BoxElement.h"
+#include "ScissorStack.h"
 #include <algorithm>
 
 float BoxElement::GetSlotExtent(const WidgetElement* element, float uiScale) const {
@@ -44,9 +45,9 @@ void BoxElement::Draw(Rectangle rect, float uiScale) {
     if (backgroundColor.a > 0) DrawRectangleRec(rect, backgroundColor);
 
     if (scrollEnabled) {
-        BeginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+        ScissorStack::Push(rect);
         DrawChildren(rect, uiScale);
-        EndScissorMode();
+        ScissorStack::Pop();
         return;
     }
 
