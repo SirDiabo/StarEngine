@@ -48,6 +48,24 @@ bool RemoveZone(SampleSet& set, int index);
 
 bool SetBpm(Sequence& sequence, double bpm);
 bool SetMeter(Sequence& sequence, int numerator, int denominator);
+enum class EventKind { Marker, Tempo, Meter };
+
+struct EventRef {
+    EventKind kind = EventKind::Marker;
+    int index = -1;
+    bool Valid() const { return index >= 0; }
+};
+
+int64_t BarStartTick(const Sequence& sequence, int64_t tick);
+int64_t EventTick(const Sequence& sequence, EventRef ref);
+bool IsAnchorEvent(const Sequence& sequence, EventRef ref);
+std::string UniqueMarkerName(const Sequence& sequence, const std::string& base);
+EventRef AddMarker(Sequence& sequence, int64_t tick, const std::string& name);
+EventRef AddTempoPoint(Sequence& sequence, int64_t tick, double bpm);
+EventRef AddMeterPoint(Sequence& sequence, int64_t tick, int numerator, int denominator);
+bool RemoveEvent(Sequence& sequence, EventRef ref);
+EventRef MoveEvent(Sequence& sequence, EventRef ref, int64_t newTick);
+
 int64_t BarsToTicks(const Sequence& sequence, double bars);
 double TicksToBars(const Sequence& sequence, int64_t ticks);
 

@@ -81,7 +81,8 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
     const std::string key = "C" + std::to_string((int)context) + "L" + std::to_string(layerIndex) + "/" + std::to_string(seq.layers.size()) +
         "I" + std::to_string(instrumentIndex) + "/" + std::to_string(seq.instruments.size()) +
         "S" + std::to_string(setIndex) + "/" + std::to_string(setCount) +
-        "Z" + std::to_string(zoneCount);
+        "Z" + std::to_string(zoneCount) +
+        "E" + std::to_string((int)s->SelectedEvent().kind) + "/" + std::to_string(s->SelectedEvent().index);
 
     if (context == DetailsContext::Sequence) {
     rows.push_back(HeaderRow("h.seq", "Sequence"));
@@ -280,6 +281,44 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
                 s->MarkStructureChanged();
             }
         }));
+    }
+
+    if (context == DetailsContext::Event && s->SelectedEvent().Valid()) {
+        const EventRef ref = s->SelectedEvent();
+        const bool anchor = IsAnchorEvent(seq, ref);
+        const int64_t tick = EventTick(seq, ref);
+        if (ref.kind == EventKind::Marker && (size_t)ref.index < seq.markers.size()) {
+            rows.push_back(HeaderRow("h.event", "Marker"));
+            rows.push_back(StringRow("ev.name", "Name", seq.markers[(size_t)ref.index].name, [s](const std::string& v) { s->RenameSelectedMarker(v); }));
+        } else if (ref.kind == EventKind::Tempo && (size_t)ref.index < seq.tempo.size()) {
+            rows.push_back(HeaderRow("h.event", "Tempo Change"));
+            rows.push_back(FloatRow("ev.bpm", "BPM", (float)seq.tempo[(size_t)ref.index].bpm, false, [s, ref](float v) {
+                Sequence& q = s->GetSequence();
+                if ((size_t)ref.index < q.tempo.size() && v >= 1.0f && v <= 999.0f) {
+                    q.tempo[(size_t)ref.index].bpm = (double)v;
+                    s->EventsEdited();
+                }
+            }));
+        } else if (ref.kind == EventKind::Meter && (size_t)ref.index < seq.meter.size()) {
+            const MeterPoint& m = seq.meter[(size_t)ref.index];
+            rows.push_back(HeaderRow("h.event", "Meter Change"));
+            rows.push_back(StringRow("ev.meter", "Meter", std::to_string(m.numerator) + "/" + std::to_string(m.denominator), [s, ref](const std::string& v) {
+                int n = 0, dn = 0;
+                Sequence& q = s->GetSequence();
+                if (std::sscanf(v.c_str(), "%d/%d", &n, &dn) != 2 || (size_t)ref.index >= q.meter.size()) return;
+                bool validDenominator = dn == 1 || dn == 2 || dn == 4 || dn == 8 || dn == 16 || dn == 32;
+                if (!validDenominator || n < 1 || n > 32) return;
+                q.meter[(size_t)ref.index].numerator = n;
+                q.meter[(size_t)ref.index].denominator = dn;
+                s->EventsEdited();
+            }));
+        }
+        if (!anchor) {
+            rows.push_back(FloatRow("ev.tick", "Position (ticks)", (float)tick, true, [s](float v) { s->MoveSelectedEvent((int64_t)std::max(0.0f, v)); }));
+            rows.push_back(ButtonRow("ev.delete", "Delete", [s]() { s->DeleteSelectedEvent(); }));
+        } else {
+            rows.push_back(ReadOnlyRow("ev.anchor", "Position", "Start of sequence"));
+        }
     }
 
     for (PropertyRow& row : rows) row.id = key + "|" + row.id;

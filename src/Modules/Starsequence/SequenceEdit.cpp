@@ -284,6 +284,160 @@ bool SetMeter(Sequence& sequence, int numerator, int denominator) {
     return true;
 }
 
+int64_t BarStartTick(const Sequence& sequence, int64_t tick) {
+    tick = std::max<int64_t>(0, tick);
+    const int resolution = std::max(1, sequence.resolution);
+    std::vector<MeterPoint> meters = sequence.meter;
+    if (meters.empty() || meters.front().tick != 0) meters.insert(meters.begin(), MeterPoint{ 0, 4, 4 });
+    for (size_t m = 0; m < meters.size(); m++) {
+        const int numerator = std::max(1, meters[m].numerator);
+        const int denominator = std::max(1, meters[m].denominator);
+        const int64_t barTicks = std::max<int64_t>(1, (int64_t)resolution * 4 / denominator * numerator);
+        const bool last = m + 1 == meters.size();
+        if (last || tick < meters[m + 1].tick) {
+            return meters[m].tick + ((tick - meters[m].tick) / barTicks) * barTicks;
+        }
+    }
+    return tick;
+}
+
+int64_t EventTick(const Sequence& sequence, EventRef ref) {
+    if (!ref.Valid()) return 0;
+    const size_t i = (size_t)ref.index;
+    switch (ref.kind) {
+        case EventKind::Marker: return i < sequence.markers.size() ? sequence.markers[i].tick : 0;
+        case EventKind::Tempo: return i < sequence.tempo.size() ? sequence.tempo[i].tick : 0;
+        case EventKind::Meter: return i < sequence.meter.size() ? sequence.meter[i].tick : 0;
+    }
+    return 0;
+}
+
+bool IsAnchorEvent(const Sequence& sequence, EventRef ref) {
+    if (ref.kind == EventKind::Marker) return false;
+    return ref.index == 0 && EventTick(sequence, ref) == 0;
+}
+
+std::string UniqueMarkerName(const Sequence& sequence, const std::string& base) {
+    std::vector<std::string> names;
+    for (const Marker& m : sequence.markers) names.push_back(m.name);
+    std::string clean = base;
+    std::replace(clean.begin(), clean.end(), '\n', ' ');
+    std::replace(clean.begin(), clean.end(), '\r', ' ');
+    return UniqueName(names, clean, -1);
+}
+
+EventRef AddMarker(Sequence& sequence, int64_t tick, const std::string& name) {
+    Marker marker;
+    marker.tick = std::max<int64_t>(0, tick);
+    marker.name = UniqueMarkerName(sequence, name.empty() ? "Marker" : name);
+    auto position = std::upper_bound(sequence.markers.begin(), sequence.markers.end(), marker,
+        [](const Marker& a, const Marker& b) { return a.tick < b.tick; });
+    int index = (int)(position - sequence.markers.begin());
+    sequence.markers.insert(position, marker);
+    return { EventKind::Marker, index };
+}
+
+EventRef AddTempoPoint(Sequence& sequence, int64_t tick, double bpm) {
+    if (!(bpm >= 1.0 && bpm <= 999.0)) return {};
+    tick = std::max<int64_t>(0, tick);
+    for (size_t i = 0; i < sequence.tempo.size(); i++) {
+        if (sequence.tempo[i].tick == tick) {
+            sequence.tempo[i].bpm = bpm;
+            return { EventKind::Tempo, (int)i };
+        }
+    }
+    TempoPoint point{ tick, bpm };
+    auto position = std::upper_bound(sequence.tempo.begin(), sequence.tempo.end(), point,
+        [](const TempoPoint& a, const TempoPoint& b) { return a.tick < b.tick; });
+    int index = (int)(position - sequence.tempo.begin());
+    sequence.tempo.insert(position, point);
+    return { EventKind::Tempo, index };
+}
+
+EventRef AddMeterPoint(Sequence& sequence, int64_t tick, int numerator, int denominator) {
+    bool validDenominator = denominator == 1 || denominator == 2 || denominator == 4 || denominator == 8 || denominator == 16 || denominator == 32;
+    if (!validDenominator || numerator < 1 || numerator > 32) return {};
+    tick = BarStartTick(sequence, tick);
+    for (size_t i = 0; i < sequence.meter.size(); i++) {
+        if (sequence.meter[i].tick == tick) {
+            sequence.meter[i].numerator = numerator;
+            sequence.meter[i].denominator = denominator;
+            return { EventKind::Meter, (int)i };
+        }
+    }
+    MeterPoint point{ tick, numerator, denominator };
+    auto position = std::upper_bound(sequence.meter.begin(), sequence.meter.end(), point,
+        [](const MeterPoint& a, const MeterPoint& b) { return a.tick < b.tick; });
+    int index = (int)(position - sequence.meter.begin());
+    sequence.meter.insert(position, point);
+    return { EventKind::Meter, index };
+}
+
+bool RemoveEvent(Sequence& sequence, EventRef ref) {
+    if (!ref.Valid() || IsAnchorEvent(sequence, ref)) return false;
+    const size_t i = (size_t)ref.index;
+    switch (ref.kind) {
+        case EventKind::Marker:
+            if (i >= sequence.markers.size()) return false;
+            sequence.markers.erase(sequence.markers.begin() + ref.index);
+            return true;
+        case EventKind::Tempo:
+            if (i >= sequence.tempo.size()) return false;
+            sequence.tempo.erase(sequence.tempo.begin() + ref.index);
+            return true;
+        case EventKind::Meter:
+            if (i >= sequence.meter.size()) return false;
+            sequence.meter.erase(sequence.meter.begin() + ref.index);
+            return true;
+    }
+    return false;
+}
+
+EventRef MoveEvent(Sequence& sequence, EventRef ref, int64_t newTick) {
+    if (!ref.Valid() || IsAnchorEvent(sequence, ref)) return ref;
+    newTick = std::max<int64_t>(0, newTick);
+    const size_t i = (size_t)ref.index;
+    if (ref.kind == EventKind::Marker) {
+        if (i >= sequence.markers.size()) return ref;
+        Marker marker = sequence.markers[i];
+        sequence.markers.erase(sequence.markers.begin() + ref.index);
+        marker.tick = newTick;
+        auto position = std::upper_bound(sequence.markers.begin(), sequence.markers.end(), marker,
+            [](const Marker& a, const Marker& b) { return a.tick < b.tick; });
+        int index = (int)(position - sequence.markers.begin());
+        sequence.markers.insert(position, marker);
+        return { EventKind::Marker, index };
+    }
+    if (ref.kind == EventKind::Tempo) {
+        if (i >= sequence.tempo.size() || newTick == 0) return ref;
+        for (size_t k = 0; k < sequence.tempo.size(); k++) if (k != i && sequence.tempo[k].tick == newTick) return ref;
+        TempoPoint point = sequence.tempo[i];
+        sequence.tempo.erase(sequence.tempo.begin() + ref.index);
+        point.tick = newTick;
+        auto position = std::upper_bound(sequence.tempo.begin(), sequence.tempo.end(), point,
+            [](const TempoPoint& a, const TempoPoint& b) { return a.tick < b.tick; });
+        int index = (int)(position - sequence.tempo.begin());
+        sequence.tempo.insert(position, point);
+        return { EventKind::Tempo, index };
+    }
+    if (i >= sequence.meter.size()) return ref;
+    MeterPoint point = sequence.meter[i];
+    sequence.meter.erase(sequence.meter.begin() + ref.index);
+    int64_t aligned = BarStartTick(sequence, newTick);
+    bool taken = aligned == 0;
+    for (const MeterPoint& m : sequence.meter) if (m.tick == aligned) taken = true;
+    if (taken) {
+        sequence.meter.insert(sequence.meter.begin() + ref.index, point);
+        return ref;
+    }
+    point.tick = aligned;
+    auto position = std::upper_bound(sequence.meter.begin(), sequence.meter.end(), point,
+        [](const MeterPoint& a, const MeterPoint& b) { return a.tick < b.tick; });
+    int index = (int)(position - sequence.meter.begin());
+    sequence.meter.insert(position, point);
+    return { EventKind::Meter, index };
+}
+
 int64_t BarsToTicks(const Sequence& sequence, double bars) {
     return (int64_t)std::llround(std::max(0.0, bars) * (double)sequence.BarTicksAt(0));
 }

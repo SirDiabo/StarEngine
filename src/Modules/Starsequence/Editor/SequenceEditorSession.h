@@ -1,6 +1,7 @@
 #pragma once
 #include "Modules/Starsequence/SequenceData.h"
 #include "Modules/Starsequence/SequenceAudioSource.h"
+#include "Modules/Starsequence/SequenceEdit.h"
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -11,7 +12,7 @@
 class FunctionUndoDocument;
 
 enum class EditTool { Select, Pencil, Brush };
-enum class DetailsContext { Sequence, Layer, Instrument };
+enum class DetailsContext { Sequence, Layer, Instrument, Event };
 
 class SequenceEditorSession {
 public:
@@ -75,6 +76,14 @@ public:
     EditTool tool = EditTool::Brush;
     DetailsContext GetDetailsContext() const { return detailsContext; }
     void SetDetailsContext(DetailsContext context) { detailsContext = context; }
+    Starsequence::EventRef SelectedEvent() const { return selectedEvent; }
+    void SelectEvent(Starsequence::EventRef ref);
+    void ClearEventSelection() { selectedEvent = {}; }
+    Starsequence::EventRef AddEventAt(Starsequence::EventKind kind, int64_t tick);
+    bool DeleteSelectedEvent();
+    void MoveSelectedEvent(int64_t tick);
+    void RenameSelectedMarker(const std::string& name);
+    void EventsEdited() { MarkStructureChanged(); }
     int64_t NoteLength() const;
     void SetNoteLength(int64_t length);
     bool NoteExistsAt(int64_t tick, int key) const;
@@ -113,6 +122,7 @@ private:
     int selectedSet = 0;
     int snapIndex = 5;
     int64_t noteLength = 0;
+    Starsequence::EventRef selectedEvent;
     DetailsContext detailsContext = DetailsContext::Sequence;
     double cursorTick = 0.0;
     uint32_t nextUid = 1;

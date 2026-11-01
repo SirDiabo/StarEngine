@@ -296,6 +296,63 @@ void SequenceEditorSession::DuplicateSelection() {
     NotesEdited();
 }
 
+void SequenceEditorSession::SelectEvent(EventRef ref) {
+    selectedEvent = ref;
+    if (ref.Valid()) detailsContext = DetailsContext::Event;
+}
+
+EventRef SequenceEditorSession::AddEventAt(EventKind kind, int64_t tick) {
+    EventRef ref;
+    if (kind == EventKind::Marker) {
+        ref = AddMarker(sequence, tick, "Marker");
+    } else if (kind == EventKind::Tempo) {
+        ref = AddTempoPoint(sequence, tick, sequence.BpmAt(tick));
+    } else {
+        int numerator = 4, denominator = 4;
+        for (const MeterPoint& m : sequence.meter) {
+            if (m.tick <= tick) { numerator = m.numerator; denominator = m.denominator; }
+        }
+        ref = AddMeterPoint(sequence, tick, numerator, denominator);
+    }
+    if (ref.Valid()) {
+        SelectEvent(ref);
+        MarkStructureChanged();
+    }
+    return ref;
+}
+
+bool SequenceEditorSession::DeleteSelectedEvent() {
+    if (!selectedEvent.Valid()) return false;
+    bool removed = RemoveEvent(sequence, selectedEvent);
+    if (removed) {
+        selectedEvent = {};
+        if (detailsContext == DetailsContext::Event) detailsContext = DetailsContext::Sequence;
+        MarkStructureChanged();
+    }
+    return removed;
+}
+
+void SequenceEditorSession::MoveSelectedEvent(int64_t tick) {
+    if (!selectedEvent.Valid()) return;
+    EventRef moved = MoveEvent(sequence, selectedEvent, tick);
+    bool changed = moved.index != selectedEvent.index || EventTick(sequence, moved) != tick;
+    selectedEvent = moved;
+    if (changed) MarkStructureChanged();
+}
+
+void SequenceEditorSession::RenameSelectedMarker(const std::string& name) {
+    if (!selectedEvent.Valid() || selectedEvent.kind != EventKind::Marker) return;
+    if ((size_t)selectedEvent.index >= sequence.markers.size() || name.empty()) return;
+    std::string clean = name;
+    std::replace(clean.begin(), clean.end(), '\n', ' ');
+    std::replace(clean.begin(), clean.end(), '\r', ' ');
+    for (size_t i = 0; i < sequence.markers.size(); i++) {
+        if ((int)i != selectedEvent.index && sequence.markers[i].name == clean) return;
+    }
+    sequence.markers[(size_t)selectedEvent.index].name = clean;
+    MarkStructureChanged();
+}
+
 int64_t SequenceEditorSession::NoteLength() const {
     if (noteLength > 0) return noteLength;
     return std::max<int64_t>(1, (int64_t)sequence.resolution / 4);
@@ -454,6 +511,8 @@ void SequenceEditorSession::RestoreUndoState(const std::string& content, const s
     AssignNoteUids(sequence, nextUid);
     solo.resize(sequence.layers.size(), false);
     selectedNotes.clear();
+    selectedEvent = {};
+    if (detailsContext == DetailsContext::Event) detailsContext = DetailsContext::Sequence;
     int layerIndex = 0, instrumentIndex = 0;
     size_t comma = selection.find(',');
     try {

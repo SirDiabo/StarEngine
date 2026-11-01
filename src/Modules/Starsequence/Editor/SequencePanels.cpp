@@ -17,6 +17,10 @@ namespace {
 constexpr float kRulerHeight = 24.0f;
 constexpr float kKeyboardWidth = 62.0f;
 constexpr float kLaneHeight = 76.0f;
+constexpr float kStripRowHeight = 14.0f;
+constexpr float kStripHeight = kStripRowHeight * 3.0f;
+constexpr float kMinHeightForStrip = 220.0f;
+constexpr float kLoopBandHeight = 8.0f;
 constexpr float kMinHeightForLane = 260.0f;
 constexpr float kFontSize = 11.0f;
 constexpr float kFontSpacing = 1.0f;
@@ -71,9 +75,13 @@ PianoRollPanel::Layout PianoRollPanel::ComputeLayout() const {
     Layout l;
     l.hasLane = bounds.height >= kMinHeightForLane;
     float laneHeight = l.hasLane ? kLaneHeight : 0.0f;
+    l.hasStrip = bounds.height >= kMinHeightForStrip;
+    float stripHeight = l.hasStrip ? kStripHeight : 0.0f;
     l.ruler = { bounds.x + kKeyboardWidth, bounds.y, bounds.width - kKeyboardWidth, kRulerHeight };
-    l.keyboard = { bounds.x, bounds.y + kRulerHeight, kKeyboardWidth, bounds.height - kRulerHeight - laneHeight };
-    l.grid = { bounds.x + kKeyboardWidth, bounds.y + kRulerHeight, bounds.width - kKeyboardWidth, bounds.height - kRulerHeight - laneHeight };
+    l.strip = { bounds.x + kKeyboardWidth, bounds.y + kRulerHeight, bounds.width - kKeyboardWidth, stripHeight };
+    float bodyTop = bounds.y + kRulerHeight + stripHeight;
+    l.keyboard = { bounds.x, bodyTop, kKeyboardWidth, bounds.height - kRulerHeight - stripHeight - laneHeight };
+    l.grid = { bounds.x + kKeyboardWidth, bodyTop, bounds.width - kKeyboardWidth, bounds.height - kRulerHeight - stripHeight - laneHeight };
     l.lane = { bounds.x + kKeyboardWidth, bounds.y + bounds.height - laneHeight, bounds.width - kKeyboardWidth, laneHeight };
     return l;
 }
@@ -132,7 +140,10 @@ void PianoRollPanel::HandleNavigation(const Layout& layout, bool hover) {
         }
     }
 
-    if (Hover(layout.ruler) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && drag == DragMode::None) scrubbing = true;
+    if (hover && rulerDrag == RulerDrag::None && drag == DragMode::None && (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))) {
+        if (!BeginRulerDrag(layout) && Hover(layout.ruler) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) scrubbing = true;
+    }
+    UpdateRulerDrag(layout);
     if (scrubbing) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             double tick = view.TickOfX(mouse.x, grid.x);
@@ -403,6 +414,197 @@ void PianoRollPanel::HandleGridInput(const Layout& layout, bool hover) {
     }
 }
 
+bool PianoRollPanel::BeginRulerDrag(const Layout& layout) {
+    if (!Hover(layout.ruler)) return false;
+    Sequence& seq = session->GetSequence();
+    const Vector2 mouse = GetMousePosition();
+    const float bandTop = layout.ruler.y + layout.ruler.height - kLoopBandHeight;
+    const bool explicitLoop = seq.loopEnd > seq.loopStart;
+    const int64_t a = explicitLoop ? seq.loopStart : 0;
+    const int64_t b = explicitLoop ? seq.loopEnd : seq.length;
+    const float x0 = view.XOfTick((double)a, layout.grid.x);
+    const float x1 = view.XOfTick((double)b, layout.grid.x);
+    const float endX = view.XOfTick((double)seq.length, layout.grid.x);
+
+    if (mouse.y >= bandTop) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            if (explicitLoop) {
+                seq.loopStart = 0;
+                seq.loopEnd = 0;
+                session->MarkStructureChanged();
+            }
+            return true;
+        }
+        if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return false;
+        const double tick = view.TickOfX(mouse.x, layout.grid.x);
+        if (std::fabs(mouse.x - x0) <= 5.0f) rulerDrag = RulerDrag::LoopStart;
+        else if (std::fabs(mouse.x - x1) <= 5.0f) rulerDrag = RulerDrag::LoopEnd;
+        else if (mouse.x > x0 && mouse.x < x1) {
+            rulerDrag = RulerDrag::LoopMove;
+            rulerDragOffset = (int64_t)std::llround(tick) - a;
+        } else return false;
+        return true;
+    }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && std::fabs(mouse.x - endX) <= 4.0f) {
+        rulerDrag = RulerDrag::Length;
+        return true;
+    }
+    return false;
+}
+
+void PianoRollPanel::UpdateRulerDrag(const Layout& layout) {
+    if (rulerDrag == RulerDrag::None) return;
+    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        rulerDrag = RulerDrag::None;
+        return;
+    }
+    Sequence& q = session->GetSequence();
+    const int64_t tick = session->SnapTick(view.TickOfX(GetMousePosition().x, layout.grid.x), ModifierAlt());
+    const int64_t minLength = std::max<int64_t>(1, q.resolution / 4);
+    const bool explicitLoop = q.loopEnd > q.loopStart;
+    const int64_t effStart = explicitLoop ? q.loopStart : 0;
+    const int64_t effEnd = explicitLoop ? q.loopEnd : q.length;
+    bool changed = false;
+
+    auto applyLoop = [&](int64_t start, int64_t end) {
+        if (start == effStart && end == effEnd) return;
+        q.loopStart = start;
+        q.loopEnd = end;
+        changed = true;
+    };
+
+    if (rulerDrag == RulerDrag::LoopStart) {
+        applyLoop(std::clamp<int64_t>(tick, 0, std::max<int64_t>(0, effEnd - minLength)), effEnd);
+    } else if (rulerDrag == RulerDrag::LoopEnd) {
+        applyLoop(effStart, std::clamp<int64_t>(tick, std::min(effStart + minLength, q.length), q.length));
+    } else if (rulerDrag == RulerDrag::LoopMove) {
+        int64_t length = effEnd - effStart;
+        int64_t start = std::clamp<int64_t>(tick - rulerDragOffset, 0, std::max<int64_t>(0, q.length - length));
+        applyLoop(start, start + length);
+    } else if (rulerDrag == RulerDrag::Length) {
+        int64_t bar = std::max<int64_t>(1, q.BarTicksAt(0));
+        int64_t newLength = std::max<int64_t>(bar, ((tick + bar / 2) / bar) * bar);
+        if (newLength != q.length) {
+            q.length = newLength;
+            if (q.loopEnd > newLength) q.loopEnd = newLength;
+            if (q.loopEnd <= q.loopStart) { q.loopStart = 0; q.loopEnd = 0; }
+            changed = true;
+        }
+    }
+    if (changed) session->MarkStructureChanged();
+}
+
+std::string PianoRollPanel::EventLabel(EventKind kind, int index) const {
+    const Sequence& seq = session->GetSequence();
+    const size_t i = (size_t)index;
+    char buffer[48];
+    if (kind == EventKind::Marker) return i < seq.markers.size() ? seq.markers[i].name : std::string();
+    if (kind == EventKind::Tempo) {
+        if (i >= seq.tempo.size()) return std::string();
+        snprintf(buffer, sizeof(buffer), "%g", seq.tempo[i].bpm);
+        return buffer;
+    }
+    if (i >= seq.meter.size()) return std::string();
+    snprintf(buffer, sizeof(buffer), "%d/%d", seq.meter[i].numerator, seq.meter[i].denominator);
+    return buffer;
+}
+
+EventRef PianoRollPanel::HitEvent(const Layout& layout, EventKind kind, Vector2 mouse) const {
+    const Sequence& seq = session->GetSequence();
+    const int row = kind == EventKind::Marker ? 0 : (kind == EventKind::Tempo ? 1 : 2);
+    const float rowY = layout.strip.y + (float)row * kStripRowHeight;
+    if (mouse.y < rowY || mouse.y > rowY + kStripRowHeight) return {};
+    size_t count = kind == EventKind::Marker ? seq.markers.size() : (kind == EventKind::Tempo ? seq.tempo.size() : seq.meter.size());
+    for (size_t n = count; n-- > 0;) {
+        int64_t tick = EventTick(seq, { kind, (int)n });
+        float x = view.XOfTick((double)tick, layout.grid.x);
+        float width = 8.0f + TextWidth(EventLabel(kind, (int)n));
+        if (mouse.x >= x - 3.0f && mouse.x <= x + width) return { kind, (int)n };
+    }
+    return {};
+}
+
+void PianoRollPanel::HandleStripInput(const Layout& layout, bool hover) {
+    if (!layout.hasStrip) return;
+    const Vector2 mouse = GetMousePosition();
+
+    if (stripDragging) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            int64_t tick = session->SnapTick(view.TickOfX(mouse.x, layout.grid.x), ModifierAlt());
+            if (tick != stripLastTick) {
+                session->MoveSelectedEvent(tick);
+                stripLastTick = tick;
+            }
+        } else {
+            stripDragging = false;
+        }
+        return;
+    }
+
+    if (!hover || drag != DragMode::None || !Hover(layout.strip)) return;
+    const int row = std::clamp((int)((mouse.y - layout.strip.y) / kStripRowHeight), 0, 2);
+    const EventKind kind = row == 0 ? EventKind::Marker : (row == 1 ? EventKind::Tempo : EventKind::Meter);
+    const EventRef hit = HitEvent(layout, kind, mouse);
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && hit.Valid()) {
+        session->SelectEvent(hit);
+        session->DeleteSelectedEvent();
+        return;
+    }
+    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
+
+    if (hit.Valid()) {
+        session->SelectEvent(hit);
+        stripDragging = !IsAnchorEvent(session->GetSequence(), hit);
+        stripLastTick = EventTick(session->GetSequence(), hit);
+        return;
+    }
+    const double now = GetTime();
+    const float dx = mouse.x - lastClickPos.x, dy = mouse.y - lastClickPos.y;
+    const bool doubleClick = (now - lastClickTime) < 0.35 && dx * dx + dy * dy < 36.0f;
+    lastClickTime = now;
+    lastClickPos = mouse;
+    if (doubleClick) {
+        int64_t tick = session->SnapTick(view.TickOfX(mouse.x, layout.grid.x), ModifierAlt());
+        session->AddEventAt(kind, tick);
+        lastClickTime = -10.0;
+    }
+}
+
+void PianoRollPanel::DrawStrip(const Layout& layout) {
+    if (!layout.hasStrip) return;
+    const UIPalette& theme = UITheme::Get();
+    const Sequence& seq = session->GetSequence();
+    const Rectangle& strip = layout.strip;
+    DrawRectangleRec(strip, ColorBrightness(theme.panelBg, -0.14f));
+    const char* names[3] = { "Markers", "Tempo", "Meter" };
+    const EventKind kinds[3] = { EventKind::Marker, EventKind::Tempo, EventKind::Meter };
+    const Color colors[3] = { theme.success, { 232, 160, 64, 255 }, { 96, 168, 232, 255 } };
+    const EventRef selected = session->SelectedEvent();
+
+    DrawRectangleRec({ bounds.x, strip.y, kKeyboardWidth, strip.height }, theme.panelBg);
+    for (int row = 0; row < 3; row++) {
+        const float rowY = strip.y + (float)row * kStripRowHeight;
+        Text(names[row], bounds.x + 6.0f, rowY + (kStripRowHeight - kFontSize) / 2.0f, theme.textSecondary);
+        DrawLineEx({ bounds.x, rowY + kStripRowHeight }, { strip.x + strip.width, rowY + kStripRowHeight }, 1.0f, Fade(theme.panelBorder, 0.7f));
+        const EventKind kind = kinds[row];
+        const size_t count = kind == EventKind::Marker ? seq.markers.size() : (kind == EventKind::Tempo ? seq.tempo.size() : seq.meter.size());
+        for (size_t n = 0; n < count; n++) {
+            int64_t tick = EventTick(seq, { kind, (int)n });
+            float x = view.XOfTick((double)tick, strip.x);
+            std::string label = EventLabel(kind, (int)n);
+            float width = 8.0f + TextWidth(label);
+            if (x + width < strip.x || x > strip.x + strip.width) continue;
+            bool isSelected = selected.Valid() && selected.kind == kind && selected.index == (int)n;
+            DrawRectangleRec({ x, rowY + 1.0f, 3.0f, kStripRowHeight - 2.0f }, colors[row]);
+            Text(label, x + 6.0f, rowY + (kStripRowHeight - kFontSize) / 2.0f, isSelected ? WHITE : colors[row]);
+            if (isSelected) DrawRectangleLinesEx({ x - 1.0f, rowY, width + 2.0f, kStripRowHeight }, 1.0f, WHITE);
+        }
+    }
+    DrawLineEx({ strip.x, strip.y }, { strip.x, strip.y + strip.height }, 1.0f, theme.panelBorder);
+    DrawLineEx({ bounds.x, strip.y + strip.height }, { strip.x + strip.width, strip.y + strip.height }, 1.0f, theme.panelBorder);
+}
+
 void PianoRollPanel::HandleLaneInput(const Layout& layout, bool hover) {
     if (!layout.hasLane) return;
     Layer* layer = session->ActiveLayer();
@@ -475,7 +677,8 @@ void PianoRollPanel::HandleShortcuts(bool hover) {
     }
 
     if (IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) {
-        session->DeleteSelectedNotes();
+        if (!session->SelectedNotes().empty()) session->DeleteSelectedNotes();
+        else if (session->GetDetailsContext() == DetailsContext::Event) session->DeleteSelectedEvent();
         return;
     }
     if (IsKeyPressed(KEY_ESCAPE)) {
@@ -594,6 +797,7 @@ void PianoRollPanel::Render() {
 
     bool hover = Hover(bounds);
     HandleNavigation(layout, hover);
+    HandleStripInput(layout, hover);
     HandleLaneInput(layout, hover);
     HandleGridInput(layout, hover);
     HandleKeyboardColumn(layout, hover);
@@ -661,7 +865,15 @@ void PianoRollPanel::Render() {
     {
         float x0 = std::max(ruler.x, view.XOfTick((double)loopA, grid.x));
         float x1 = std::min(ruler.x + ruler.width, view.XOfTick((double)loopB, grid.x));
-        if (x1 > x0) DrawRectangleRec({ x0, ruler.y + ruler.height - 5.0f, x1 - x0, 5.0f }, Fade(theme.accent, session->loopEnabled ? 0.85f : 0.35f));
+        if (x1 > x0) {
+            DrawRectangleRec({ x0, ruler.y + ruler.height - kLoopBandHeight, x1 - x0, kLoopBandHeight }, Fade(theme.accent, session->loopEnabled ? 0.85f : 0.35f));
+            DrawRectangleRec({ x0, ruler.y + ruler.height - kLoopBandHeight, 3.0f, kLoopBandHeight }, WHITE);
+            DrawRectangleRec({ x1 - 3.0f, ruler.y + ruler.height - kLoopBandHeight, 3.0f, kLoopBandHeight }, WHITE);
+        }
+    }
+    {
+        float lx = view.XOfTick((double)seq.length, grid.x);
+        if (lx >= ruler.x && lx <= ruler.x + ruler.width) DrawRectangleRec({ lx - 2.0f, ruler.y + 2.0f, 4.0f, 11.0f }, theme.danger);
     }
     for (const GridLine& line : gridLines) {
         if (line.kind == 0) continue;
@@ -710,6 +922,7 @@ void PianoRollPanel::Render() {
     DrawRectangleLinesEx({ bounds.x, bounds.y, kKeyboardWidth, kRulerHeight }, 1, theme.panelBorder);
     DrawLineEx({ keyboard.x + kKeyboardWidth, keyboard.y }, { keyboard.x + kKeyboardWidth, keyboard.y + keyboard.height }, 1.0f, theme.panelBorder);
 
+    DrawStrip(layout);
     DrawVelocityLane(layout, tickStart, tickEnd);
 
     ScissorStack::Pop();

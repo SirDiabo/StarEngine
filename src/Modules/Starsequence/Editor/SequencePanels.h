@@ -22,8 +22,10 @@ private:
         Rectangle ruler{};
         Rectangle keyboard{};
         Rectangle grid{};
+        Rectangle strip{};
         Rectangle lane{};
         bool hasLane = false;
+        bool hasStrip = false;
     };
 
     Layout ComputeLayout() const;
@@ -34,6 +36,12 @@ private:
     void HandleKeyboardColumn(const Layout& layout, bool hover);
     void HandleShortcuts(bool hover);
     void FinishDrag();
+    void HandleStripInput(const Layout& layout, bool hover);
+    bool BeginRulerDrag(const Layout& layout);
+    void UpdateRulerDrag(const Layout& layout);
+    Starsequence::EventRef HitEvent(const Layout& layout, Starsequence::EventKind kind, Vector2 mouse) const;
+    std::string EventLabel(Starsequence::EventKind kind, int index) const;
+    void DrawStrip(const Layout& layout);
     void StampBrush(const Rectangle& grid, double mouseTick, int mouseKey, int64_t step, bool snapOn);
     void EraseAlong(const Rectangle& grid, Vector2 from, Vector2 to);
     void BeginNoteDrag(uint32_t uid, double mouseTick, int mouseKey, DragMode mode);
@@ -48,6 +56,14 @@ private:
     bool scrubbing = false;
     bool panning = false;
     Vector2 lastMouse = { 0, 0 };
+
+    enum class RulerDrag { None, LoopStart, LoopEnd, LoopMove, Length };
+    RulerDrag rulerDrag = RulerDrag::None;
+    int64_t rulerDragOffset = 0;
+    bool stripDragging = false;
+    int64_t stripLastTick = -1;
+    double lastClickTime = -10.0;
+    Vector2 lastClickPos = { 0, 0 };
 
     DragMode drag = DragMode::None;
     std::vector<Starsequence::NoteSnapshot> dragSnapshots;
