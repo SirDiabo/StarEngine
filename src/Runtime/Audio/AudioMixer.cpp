@@ -70,6 +70,7 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayMemory(const std::shared_ptr<const
     if (!data || data->frameCount == 0) return nullptr;
 
     auto voice = std::make_shared<Voice>();
+    voice->epoch = stopEpoch.load();
     voice->control = std::make_shared<VoiceControl>();
     voice->data = data;
     voice->sourceRate = data->sampleRate;
@@ -94,6 +95,7 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayStream(const std::shared_ptr<Strea
     if (!feed || !feed->IsOpen()) return nullptr;
 
     auto voice = std::make_shared<Voice>();
+    voice->epoch = stopEpoch.load();
     voice->control = std::make_shared<VoiceControl>();
     voice->feed = feed;
     voice->sourceRate = feed->Info().sampleRate;
@@ -117,7 +119,7 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayStream(const std::shared_ptr<Strea
 
 void AudioMixer::AddRenderer(const std::shared_ptr<AudioRenderer>& renderer) {
     if (!renderer) return;
-    rendererQueue.Push({ true, renderer });
+    rendererQueue.Push({ true, renderer, stopEpoch.load() });
 }
 
 void AudioMixer::RemoveRenderer(const std::shared_ptr<AudioRenderer>& renderer) {
@@ -136,7 +138,7 @@ float AudioMixer::GetBusGain(int bus) const {
 }
 
 void AudioMixer::StopAllVoices() {
-    stopAll.store(true);
+    stopEpoch.fetch_add(1);
 }
 
 void AudioMixer::DrainQueues() {
@@ -155,6 +157,7 @@ void AudioMixer::DrainQueues() {
             ActiveRenderer entry;
             entry.renderer = command.renderer;
             entry.lastGain = command.renderer->gain.load();
+            entry.epoch = command.epoch;
             renderers.push_back(std::move(entry));
         } else {
             renderers.erase(std::remove_if(renderers.begin(), renderers.end(),
@@ -294,9 +297,15 @@ void AudioMixer::Render(float* out, int frames) {
     std::fill(out, out + (size_t)frames * 2, 0.0f);
     DrainQueues();
 
-    if (stopAll.exchange(false)) {
-        for (auto& voice : voices) voice->control->stopRequested.store(true);
-        for (auto& r : renderers) r.renderer->gain.store(0.0f);
+    uint64_t currentStopEpoch = stopEpoch.load();
+    if (currentStopEpoch != handledStopEpoch) {
+        handledStopEpoch = currentStopEpoch;
+        for (auto& voice : voices) {
+            if (voice->epoch < currentStopEpoch) voice->control->stopRequested.store(true);
+        }
+        for (auto& r : renderers) {
+            if (r.epoch < currentStopEpoch) r.renderer->gain.store(0.0f);
+        }
     }
 
     for (size_t i = 0; i < voices.size();) {

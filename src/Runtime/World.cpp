@@ -198,6 +198,7 @@ void World::EndPlay() {
     playing = false;
     Profiler::NotifyPlayState(false);
     viewTarget = nullptr;
+    inputFocus = nullptr;
     ShowCursor();
     AudioCore::Get().StopAll();
     AudioCore::Get().ResetBuses();
@@ -216,6 +217,8 @@ void World::FlushDestroyQueue() {
 
     for (Actor* actor : toDestroy) {
         if (actor->hasBegunPlay) actor->EndPlay();
+        if (viewTarget == actor) viewTarget = nullptr;
+        if (inputFocus == actor) inputFocus = nullptr;
         actors.erase(std::remove_if(actors.begin(), actors.end(),
             [actor](const std::unique_ptr<Actor>& a) { return a.get() == actor; }),
             actors.end());

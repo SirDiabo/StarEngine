@@ -109,16 +109,19 @@ private:
         uint64_t loopStart = 0;
         uint64_t loopEnd = 0;
         int sourceRate = kMixerSampleRate;
+        uint64_t epoch = 0;
     };
 
     struct RendererCommand {
         bool add = true;
         std::shared_ptr<AudioRenderer> renderer;
+        uint64_t epoch = 0;
     };
 
     struct ActiveRenderer {
         std::shared_ptr<AudioRenderer> renderer;
         float lastGain = 1.0f;
+        uint64_t epoch = 0;
     };
 
     static void StreamCallback(void* buffer, unsigned int frames);
@@ -127,7 +130,8 @@ private:
     bool MixVoice(Voice& voice, float* out, int frames);
 
     std::atomic<bool> running{false};
-    std::atomic<bool> stopAll{false};
+    std::atomic<uint64_t> stopEpoch{0};
+    uint64_t handledStopEpoch = 0;
     std::atomic<int> activeVoices{0};
     std::atomic<float> busGains[kMaxMixerBuses];
     bool streamCreated = false;
