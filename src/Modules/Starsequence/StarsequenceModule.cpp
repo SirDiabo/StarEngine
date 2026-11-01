@@ -4,6 +4,10 @@
 #include "Core/AssetTypeRegistry.h"
 #include "Runtime/Audio/AudioSource.h"
 #include <filesystem>
+#ifndef STARENGINE_GAME_BUILD
+#include "Core/EditorAssetHandlerRegistry.h"
+#include "Editor/SequenceEditorTab.h"
+#endif
 
 StarsequenceModule::StarsequenceModule() {
     name = "Starsequence";
@@ -42,6 +46,18 @@ bool StarsequenceModule::Initialize() {
         return Starsequence::SaveSequenceFile(fullPath, parsed.sequence, error);
     };
     AssetTypeRegistry::Get().RegisterType(assetType);
+
+#ifndef STARENGINE_GAME_BUILD
+    EditorAssetHandlerInfo handler;
+    handler.extension = ".starseq";
+    handler.moduleName = "Starsequence";
+    handler.createTab = [](const std::string& fullPath, const EditorServices& services) -> EditorTab* {
+        auto* tab = new SequenceEditorTab(fullPath);
+        tab->SetSharedLogPanel(services.sharedLogPanel);
+        return tab;
+    };
+    EditorAssetHandlerRegistry::Get().RegisterHandler(handler);
+#endif
     return true;
 }
 

@@ -14,6 +14,7 @@ void DescribeSequenceParameters(const Sequence& sequence, std::vector<AudioParam
 class SequenceAudioSource : public AudioSource {
 public:
     explicit SequenceAudioSource(const std::string& assetPath, SampleLoader loader = LoadStarsoundSample);
+    explicit SequenceAudioSource(const Sequence& source, SampleLoader loader = LoadStarsoundSample);
     ~SequenceAudioSource() override;
 
     void Play() override;
@@ -34,6 +35,7 @@ public:
 
     void Seek(double seconds) override;
     double GetPosition() const override;
+    double GetPositionTick() const;
     double GetDuration() const override;
 
     void GetParameters(std::vector<AudioParamInfo>& out) const override;
@@ -45,6 +47,7 @@ public:
 
 private:
     bool Prepare();
+    void InitControl();
     void CopyControl(const SequenceControl& from, SequenceControl& to) const;
 
     std::string assetPath;

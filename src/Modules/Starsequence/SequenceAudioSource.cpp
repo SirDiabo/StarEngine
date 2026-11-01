@@ -115,6 +115,17 @@ SequenceAudioSource::SequenceAudioSource(const std::string& path, SampleLoader s
         return;
     }
     sequence = parsed.sequence;
+    InitControl();
+}
+
+SequenceAudioSource::SequenceAudioSource(const Sequence& source, SampleLoader sampleLoader)
+    : loader(std::move(sampleLoader)), sequence(source) {
+    sequence.Normalize();
+    valid = true;
+    InitControl();
+}
+
+void SequenceAudioSource::InitControl() {
     control = std::make_shared<SequenceControl>((int)sequence.layers.size(), (int)sequence.instruments.size());
     control->layerFade.store(sequence.layerFade);
     for (size_t l = 0; l < sequence.layers.size(); l++) {
@@ -231,6 +242,10 @@ void SequenceAudioSource::Seek(double seconds) {
 double SequenceAudioSource::GetPosition() const {
     if (!control) return 0.0;
     return sequence.TickToSeconds(control->positionTick.load());
+}
+
+double SequenceAudioSource::GetPositionTick() const {
+    return control ? control->positionTick.load() : 0.0;
 }
 
 double SequenceAudioSource::GetDuration() const {
