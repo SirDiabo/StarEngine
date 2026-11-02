@@ -46,6 +46,8 @@ bool RemoveSampleSet(Instrument& instrument, int index);
 int AddZone(SampleSet& set, const std::string& assetPath);
 bool RemoveZone(SampleSet& set, int index);
 
+int ApplyImportedSet(Sequence& sequence, int instrumentIndex, SampleSet set);
+
 bool SetBpm(Sequence& sequence, double bpm);
 bool SetMeter(Sequence& sequence, int numerator, int denominator);
 enum class EventKind { Marker, Tempo, Meter };

@@ -266,6 +266,26 @@ bool RemoveZone(SampleSet& set, int index) {
     return true;
 }
 
+int ApplyImportedSet(Sequence& sequence, int instrumentIndex, SampleSet set) {
+    if (instrumentIndex < 0 || (size_t)instrumentIndex >= sequence.instruments.size()) return -1;
+    Instrument& instrument = sequence.instruments[(size_t)instrumentIndex];
+    int target = -1;
+    for (size_t i = 0; i < instrument.sets.size(); i++) {
+        if (instrument.sets[i].zones.empty()) { target = (int)i; break; }
+    }
+    std::vector<std::string> names;
+    for (size_t i = 0; i < instrument.sets.size(); i++) {
+        if ((int)i != target) names.push_back(instrument.sets[i].name);
+    }
+    set.name = UniqueName(names, set.name.empty() ? std::string("Set") : set.name, -1);
+    if (target >= 0) {
+        instrument.sets[(size_t)target] = set;
+        return target;
+    }
+    instrument.sets.push_back(set);
+    return (int)instrument.sets.size() - 1;
+}
+
 bool SetBpm(Sequence& sequence, double bpm) {
     if (!(bpm >= 1.0 && bpm <= 999.0)) return false;
     if (sequence.tempo.empty() || sequence.tempo.front().tick != 0) sequence.tempo.insert(sequence.tempo.begin(), TempoPoint{ 0, bpm });

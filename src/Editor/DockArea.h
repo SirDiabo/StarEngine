@@ -40,6 +40,7 @@ public:
     void LoadLayout(const std::unordered_map<std::string, std::string>& in, const std::string& prefix);
 
     void SetPanelVisible(const std::string& name, bool visible);
+    void OpenFloating(const std::string& name, Vector2 size);
     bool IsPanelVisible(const std::string& name) const;
 
     void SetMaximizedPanel(const std::string& name) { maximizedPanelName = name; }

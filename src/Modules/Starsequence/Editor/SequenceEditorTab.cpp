@@ -2,6 +2,7 @@
 #include "SequenceEditorSession.h"
 #include "SequencePanels.h"
 #include "SequenceDetailsPanel.h"
+#include "Sf2ImportPanel.h"
 #include "PianoRollView.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
@@ -45,6 +46,7 @@ SequenceEditorTab::~SequenceEditorTab() {
     delete layersPanel;
     delete instrumentsPanel;
     delete detailsPanel;
+    delete sf2Panel;
     delete session;
 }
 
@@ -65,12 +67,20 @@ void SequenceEditorTab::Initialize() {
     layersPanel->SetSession(session);
     instrumentsPanel->SetSession(session);
     detailsPanel->SetSession(session);
+    sf2Panel = new Sf2ImportPanel();
+    sf2Panel->Initialize();
+    sf2Panel->SetSession(session);
+    instrumentsPanel->SetOnImportSoundFont([this]() {
+        sf2Panel->Open();
+        dockArea.OpenFloating("SoundFont Import", { 640.0f, 560.0f });
+    });
 
-    std::vector<Panel*> panels = { pianoRollPanel, layersPanel, instrumentsPanel, detailsPanel };
+    std::vector<Panel*> panels = { pianoRollPanel, layersPanel, instrumentsPanel, detailsPanel, sf2Panel };
     if (logPanel) panels.push_back(logPanel);
     dockArea.SetPanels(panels);
 
     BuildDefaultLayout();
+    sf2Panel->SetVisible(false);
 }
 
 void SequenceEditorTab::BuildDefaultLayout() {
@@ -166,7 +176,8 @@ void SequenceEditorTab::Render(float x, float y, float width, float height) {
     if (!session || !session->IsOpen()) return;
 
     bool active = EditorUndo::IsTabActive(this);
-    bool typing = WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice);
+    session->typingInPopup = sf2Panel && sf2Panel->WantsKeyboard();
+    bool typing = WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice) || session->typingInPopup;
     if (active && !typing) {
         bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
         if (ctrl && KeyLayout::Pressed('s')) session->Save();
@@ -216,6 +227,7 @@ void SequenceEditorTab::ResetLayout() {
     for (const std::string& name : { "Piano Roll", "Layers", "Instruments", "Details", "Logs" })
         dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
+    dockArea.SetPanelVisible("SoundFont Import", false);
 }
 
 void SequenceEditorTab::TogglePanelVisible(const std::string& name) {

@@ -657,7 +657,7 @@ void PianoRollPanel::HandleKeyboardColumn(const Layout& layout, bool hover) {
 
 void PianoRollPanel::HandleShortcuts(bool hover) {
     if (!hover || drag != DragMode::None) return;
-    if (WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice)) return;
+    if (WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice) || session->typingInPopup) return;
     Layer* layer = session->ActiveLayer();
     if (!layer) return;
 
@@ -1042,11 +1042,13 @@ void SequenceInstrumentsPanel::Render() {
     DrawRectangleRec(bounds, theme.panelBg);
     ScissorStack::Push(bounds);
 
-    float buttonWidth = (bounds.width - 12.0f - 4.0f) / 2.0f;
+    float buttonWidth = (bounds.width - 16.0f - 8.0f) / 3.0f;
     Rectangle addBtn = { bounds.x + 4.0f, bounds.y + 4.0f, buttonWidth, kHeaderHeight - 8.0f };
-    Rectangle delBtn = { addBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
+    Rectangle sfBtn = { addBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
+    Rectangle delBtn = { sfBtn.x + buttonWidth + 4.0f, addBtn.y, buttonWidth, addBtn.height };
     bool headerClicked = false;
-    if (SmallButton(addBtn, "+ Instrument", false, theme.accent)) { session->AddInstrument(); session->SetDetailsContext(DetailsContext::Instrument); headerClicked = true; }
+    if (SmallButton(addBtn, "+ New", false, theme.accent)) { session->AddInstrument(); session->SetDetailsContext(DetailsContext::Instrument); headerClicked = true; }
+    if (SmallButton(sfBtn, "SF2...", false, theme.accent)) { if (onImportSoundFont) onImportSoundFont(); headerClicked = true; }
     if (SmallButton(delBtn, "Remove", false, theme.danger)) { session->RemoveInstrument(session->CurrentInstrument()); headerClicked = true; }
     DrawLineEx({ bounds.x, bounds.y + kHeaderHeight }, { bounds.x + bounds.width, bounds.y + kHeaderHeight }, 1.0f, theme.panelBorder);
 

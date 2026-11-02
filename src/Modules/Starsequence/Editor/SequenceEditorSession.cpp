@@ -217,6 +217,26 @@ int SequenceEditorSession::AddInstrument() {
     return index;
 }
 
+int SequenceEditorSession::ImportSampleSet(int instrument, SampleSet set) {
+    int index = Starsequence::ApplyImportedSet(sequence, instrument, std::move(set));
+    if (index < 0) return -1;
+    SetCurrentInstrument(instrument);
+    selectedSet = index;
+    MarkStructureChanged();
+    return index;
+}
+
+int SequenceEditorSession::AddInstrumentFromSet(const std::string& name, SampleSet set) {
+    int instrument = Starsequence::AddInstrument(sequence);
+    if (instrument < 0) return -1;
+    Starsequence::RenameInstrument(sequence, instrument, name);
+    int index = Starsequence::ApplyImportedSet(sequence, instrument, std::move(set));
+    SetCurrentInstrument(instrument);
+    selectedSet = std::max(0, index);
+    MarkStructureChanged();
+    return instrument;
+}
+
 bool SequenceEditorSession::RemoveInstrument(int index) {
     if (!Starsequence::RemoveInstrument(sequence, index)) return false;
     selectedNotes.clear();

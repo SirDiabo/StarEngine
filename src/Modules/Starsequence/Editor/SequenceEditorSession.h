@@ -52,6 +52,8 @@ public:
     int SelectedSet() const { return selectedSet; }
     void SetSelectedSet(int index) { selectedSet = index < 0 ? 0 : index; }
     int AddInstrument();
+    int ImportSampleSet(int instrument, Starsequence::SampleSet set);
+    int AddInstrumentFromSet(const std::string& name, Starsequence::SampleSet set);
     bool RemoveInstrument(int index);
     void RenameInstrument(int index, const std::string& name);
 
@@ -72,6 +74,7 @@ public:
     int64_t SnapTicks() const;
     int64_t SnapTick(double tick, bool bypass) const;
     int defaultVelocity = 100;
+    bool typingInPopup = false;
 
     EditTool tool = EditTool::Brush;
     DetailsContext GetDetailsContext() const { return detailsContext; }

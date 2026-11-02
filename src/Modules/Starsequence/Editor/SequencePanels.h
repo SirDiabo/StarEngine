@@ -4,6 +4,7 @@
 #include "Modules/Starsequence/SequenceEdit.h"
 #include "raylib.h"
 #include <cstdint>
+#include <functional>
 #include <set>
 #include <vector>
 
@@ -110,8 +111,10 @@ public:
     void Initialize() override;
     void Render() override;
     void SetSession(SequenceEditorSession* s) { session = s; }
+    void SetOnImportSoundFont(std::function<void()> callback) { onImportSoundFont = std::move(callback); }
 
 private:
     SequenceEditorSession* session = nullptr;
+    std::function<void()> onImportSoundFont;
     float scroll = 0.0f;
 };

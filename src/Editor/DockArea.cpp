@@ -619,6 +619,21 @@ void DockArea::SetPanelVisible(const std::string& name, bool visible) {
     }
 }
 
+void DockArea::OpenFloating(const std::string& name, Vector2 size) {
+    Panel* p = GetPanel(name);
+    if (!p) return;
+    p->SetVisible(true);
+    if (FindNodeContaining(name)) return;
+    for (const FloatingPanel& fp : floating) if (fp.panel == p) return;
+
+    Rectangle area = lastArea;
+    if (area.width <= 0.0f || area.height <= 0.0f) area = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+    FloatingPanel fp;
+    fp.panel = p;
+    fp.bounds = { area.x + (area.width - size.x) * 0.5f, area.y + (area.height - size.y) * 0.5f, size.x, size.y };
+    floating.push_back(fp);
+}
+
 bool DockArea::IsPanelVisible(const std::string& name) const {
     Panel* p = GetPanel(name);
     return p && p->IsVisible();
