@@ -23,6 +23,7 @@
 #include "Core/Widgets/WidgetInput.h"
 #include "Core/Widgets/DragDropController.h"
 #include "ImportDetailsPanel.h"
+#include "ImportOptionsDialog.h"
 #include "ImportReportPanel.h"
 #include "AboutPanel.h"
 #include "LoadingPanel.h"
@@ -159,6 +160,7 @@ void Editor::Render() {
 
     // Layer 6: import details popup (above everything but asset picker dropdowns).
     ImportDetailsPanel::Get().Render();
+    ImportOptionsDialog::Get().Render();
     ImportReportPanel::Get().Render();
 
     // Layer 7: about panel (floating modal).

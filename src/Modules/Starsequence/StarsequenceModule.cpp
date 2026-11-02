@@ -7,6 +7,7 @@
 #ifndef STARENGINE_GAME_BUILD
 #include "Core/EditorAssetHandlerRegistry.h"
 #include "Editor/SequenceEditorTab.h"
+#include "Editor/MidiImportHandler.h"
 #endif
 
 StarsequenceModule::StarsequenceModule() {
@@ -57,6 +58,7 @@ bool StarsequenceModule::Initialize() {
         return tab;
     };
     EditorAssetHandlerRegistry::Get().RegisterHandler(handler);
+    Starsequence::RegisterMidiImportHandlers();
 #endif
     return true;
 }

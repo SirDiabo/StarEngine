@@ -15,6 +15,7 @@
 #include "AssetImporter.h"
 #include "ImportReportPanel.h"
 #include "Core/ImportHandlerRegistry.h"
+#include "ImportOptionsDialog.h"
 #include "UITheme.h"
 #include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -389,13 +390,19 @@ void ContentBrowserPanel::ImportPathAuto(const std::string& path) {
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     if (const ImportHandler* handler = ImportHandlerRegistry::Get().Find(ext)) {
-        ImportResult result = ImportHandlerRegistry::Get().Import(path, GetCurrentFolderPath());
-        importStatus = result.summary;
-        tilesDirty = true;
-        if (result.showReport || result.HasProblems()) {
-            std::string label = handler->label.empty() ? std::string("Import") : handler->label;
-            ImportReportPanel::Get().Open(label + " Import Report", result.messages);
-        }
+        ImportHandler handlerCopy = *handler;
+        std::string targetFolder = GetCurrentFolderPath();
+        auto runImport = [this, path, handlerCopy, targetFolder](const std::map<std::string, std::string>& options) {
+            ImportResult result = ImportHandlerRegistry::Get().Import(path, targetFolder, options);
+            importStatus = result.summary;
+            tilesDirty = true;
+            if (result.showReport || result.HasProblems()) {
+                std::string label = handlerCopy.label.empty() ? std::string("Import") : handlerCopy.label;
+                ImportReportPanel::Get().Open(label + " Import Report", result.messages);
+            }
+        };
+        if (handlerCopy.options.empty()) runImport({});
+        else ImportOptionsDialog::Get().Enqueue(handlerCopy, path, runImport);
         return;
     }
 

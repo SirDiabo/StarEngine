@@ -16,6 +16,29 @@ std::string LowerExtension(const std::string& path) {
 
 }
 
+std::string ImportContext::GetString(const std::string& id, const std::string& fallback) const {
+    auto it = options.find(id);
+    return it == options.end() ? fallback : it->second;
+}
+
+bool ImportContext::GetBool(const std::string& id, bool fallback) const {
+    auto it = options.find(id);
+    if (it == options.end()) return fallback;
+    return it->second == "true" || it->second == "1";
+}
+
+int ImportContext::GetInt(const std::string& id, int fallback) const {
+    auto it = options.find(id);
+    if (it == options.end()) return fallback;
+    try { return std::stoi(it->second); } catch (...) { return fallback; }
+}
+
+float ImportContext::GetFloat(const std::string& id, float fallback) const {
+    auto it = options.find(id);
+    if (it == options.end()) return fallback;
+    try { return std::stof(it->second); } catch (...) { return fallback; }
+}
+
 bool ImportResult::HasProblems() const {
     for (const ImportMessage& m : messages) {
         if (m.level != ImportMessageLevel::Info) return true;
@@ -47,7 +70,14 @@ const ImportHandler* ImportHandlerRegistry::Find(const std::string& extension) c
     return nullptr;
 }
 
-ImportResult ImportHandlerRegistry::Import(const std::string& sourcePath, const std::string& targetFolder) const {
+std::map<std::string, std::string> ImportHandlerRegistry::DefaultOptions(const ImportHandler& handler) {
+    std::map<std::string, std::string> defaults;
+    for (const ImportOptionDef& option : handler.options) defaults[option.id] = option.defaultValue;
+    return defaults;
+}
+
+ImportResult ImportHandlerRegistry::Import(const std::string& sourcePath, const std::string& targetFolder,
+                                           const std::map<std::string, std::string>& options) const {
     ImportResult result;
     const ImportHandler* handler = Find(LowerExtension(sourcePath));
     if (!handler || !handler->import) {
@@ -68,6 +98,8 @@ ImportResult ImportHandlerRegistry::Import(const std::string& sourcePath, const 
     context.sourcePath = sourcePath;
     context.targetFolder = targetFolder;
     context.baseName = fs::path(sourcePath).stem().string();
+    context.options = DefaultOptions(*handler);
+    for (const auto& entry : options) context.options[entry.first] = entry.second;
 
     try {
         result = handler->import(context);
