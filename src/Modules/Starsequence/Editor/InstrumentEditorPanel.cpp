@@ -1,6 +1,7 @@
 #include "InstrumentEditorPanel.h"
 #include "SequenceEditorSession.h"
 #include "Modules/Starsequence/SequenceEdit.h"
+#include "Modules/Starsequence/SequenceAudioSource.h"
 #include "Editor/UITheme.h"
 #include "Core/Widgets/ScissorStack.h"
 #include "Core/Widgets/WidgetFont.h"
@@ -90,6 +91,171 @@ void InstrumentEditorPanel::Open() {
     scroll = 0.0f;
     activeField.clear();
     selectedZone = -1;
+    waveCache.clear();
+    loopDragId.clear();
+    if (loopPreviewHeld && session) session->EndHeldAudition();
+    loopPreviewHeld = false;
+}
+
+const InstrumentEditorPanel::ZoneWave* InstrumentEditorPanel::GetWave(const std::string& assetPath) {
+    if (assetPath.empty()) return nullptr;
+    auto found = waveCache.find(assetPath);
+    if (found != waveCache.end()) {
+        double now = GetTime();
+        double interval = found->second.ok ? 0.5 : 1.0;
+        if (now - found->second.checkedAt > interval) {
+            found->second.checkedAt = now;
+            std::error_code ec;
+            auto stamp = std::filesystem::last_write_time(assetPath, ec);
+            if (!found->second.ok || (!ec && stamp != found->second.stamp)) {
+                waveCache.erase(found);
+                found = waveCache.end();
+            }
+        }
+    }
+    if (found != waveCache.end()) return found->second.ok ? &found->second : nullptr;
+    if (wavesBuiltThisFrame >= 2) return nullptr;
+    wavesBuiltThisFrame++;
+
+    ZoneWave wave;
+    {
+        std::error_code ec;
+        wave.stamp = std::filesystem::last_write_time(assetPath, ec);
+        wave.checkedAt = GetTime();
+    }
+    Starsequence::LoadedSample loaded;
+    if (Starsequence::LoadStarsoundSample(assetPath, loaded) && loaded.data && loaded.data->frameCount > 0) {
+        const SampleData& data = *loaded.data;
+        const int buckets = 1024;
+        const size_t channels = (size_t)std::max(1, data.channels);
+        wave.frames = data.frameCount;
+        wave.peakMin.assign((size_t)buckets, 0.0f);
+        wave.peakMax.assign((size_t)buckets, 0.0f);
+        for (int b = 0; b < buckets; b++) {
+            uint64_t start = data.frameCount * (uint64_t)b / (uint64_t)buckets;
+            uint64_t end = data.frameCount * (uint64_t)(b + 1) / (uint64_t)buckets;
+            if (end <= start) end = std::min<uint64_t>(start + 1, data.frameCount);
+            float lo = 0.0f, hi = 0.0f;
+            for (uint64_t f = start; f < end; f++) {
+                size_t base = (size_t)f * channels;
+                if (base + channels > data.frames.size()) break;
+                for (size_t c = 0; c < channels; c++) {
+                    float v = data.frames[base + c];
+                    lo = std::min(lo, v);
+                    hi = std::max(hi, v);
+                }
+            }
+            wave.peakMin[(size_t)b] = lo;
+            wave.peakMax[(size_t)b] = hi;
+        }
+        wave.hasLoop = data.hasLoop;
+        wave.wavLoopStart = data.loopStart;
+        wave.wavLoopEnd = data.loopEnd;
+        wave.ok = true;
+    }
+    auto inserted = waveCache.emplace(assetPath, std::move(wave));
+    return inserted.first->second.ok ? &inserted.first->second : nullptr;
+}
+
+bool InstrumentEditorPanel::DrawZoneWave(Rectangle r, Starsequence::SampleZone& z, int zoneIndex, const std::string& id, int instrument, int setIndex) {
+    const UIPalette& theme = UITheme::Get();
+    bool edited = false;
+    DrawRectangleRec(r, theme.fieldBg);
+    DrawRectangleLinesEx(r, 1, theme.fieldBorder);
+
+    const ZoneWave* wave = GetWave(z.assetPath);
+    if (!wave) {
+        const char* msg = z.assetPath.empty() ? "No sound selected" : (waveCache.count(z.assetPath) ? "Could not load sound" : "Loading waveform...");
+        Text(msg, r.x + 8.0f, r.y + (r.height - kSmallFontSize) * 0.5f, theme.textSecondary, kSmallFontSize);
+        return false;
+    }
+
+    const float midY = r.y + r.height * 0.5f;
+    const float halfH = r.height * 0.5f - 3.0f;
+    auto frameToX = [&](uint64_t frame) { return r.x + r.width * (float)((double)std::min<uint64_t>(frame, wave->frames) / (double)wave->frames); };
+
+    bool regionMode = z.loop == Starsequence::LoopMode::Region;
+    uint64_t loopA = 0, loopB = 0;
+    bool showLoop = false;
+    if (z.loop == Starsequence::LoopMode::Whole) { loopA = 0; loopB = wave->frames; showLoop = true; }
+    else if (regionMode) { loopA = z.loopStart; loopB = std::min<uint64_t>(z.loopEnd, wave->frames); showLoop = loopA < loopB; }
+    else if (z.loop == Starsequence::LoopMode::Wav && wave->hasLoop && wave->wavLoopStart < wave->wavLoopEnd) { loopA = wave->wavLoopStart; loopB = std::min<uint64_t>(wave->wavLoopEnd, wave->frames); showLoop = loopA < loopB; }
+    if (showLoop) {
+        float ax = frameToX(loopA), bx = frameToX(loopB);
+        DrawRectangleRec({ ax, r.y + 1.0f, std::max(1.0f, bx - ax), r.height - 2.0f }, Fade(theme.accent, regionMode ? 0.22f : 0.14f));
+    }
+
+    DrawLine((int)r.x + 1, (int)midY, (int)(r.x + r.width) - 1, (int)midY, Fade(theme.textSecondary, 0.35f));
+    const int buckets = (int)wave->peakMin.size();
+    Color waveColor = ZoneColor(zoneIndex);
+    int cols = std::max(1, (int)r.width - 2);
+    for (int px = 0; px < cols; px++) {
+        int b0 = px * buckets / cols;
+        int b1 = std::max(b0 + 1, (px + 1) * buckets / cols);
+        float lo = 0.0f, hi = 0.0f;
+        for (int b = b0; b < b1 && b < buckets; b++) {
+            lo = std::min(lo, wave->peakMin[(size_t)b]);
+            hi = std::max(hi, wave->peakMax[(size_t)b]);
+        }
+        float x = r.x + 1.0f + (float)px;
+        float y0 = midY - std::clamp(hi, -1.0f, 1.0f) * halfH;
+        float y1 = midY - std::clamp(lo, -1.0f, 1.0f) * halfH;
+        if (y1 - y0 < 1.0f) y1 = y0 + 1.0f;
+        DrawLineV({ x, y0 }, { x, y1 }, waveColor);
+    }
+
+    if (regionMode) {
+        Vector2 m = GetMousePosition();
+        const std::string dragKey = id;
+        auto xToFrame = [&](float mx) {
+            double t = std::clamp((double)(mx - r.x) / (double)r.width, 0.0, 1.0);
+            return (uint64_t)(t * (double)wave->frames);
+        };
+
+        if (loopDragId == dragKey) {
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                uint64_t f = xToFrame(m.x);
+                if (loopDragWhich == 0) {
+                    uint64_t end = z.loopEnd > 0 ? std::min<uint64_t>(z.loopEnd, wave->frames) : wave->frames;
+                    f = std::min<uint64_t>(f, end > 1 ? end - 1 : 0);
+                    if ((uint32_t)f != z.loopStart) { z.loopStart = (uint32_t)f; loopDragChanged = true; }
+                } else {
+                    f = std::max<uint64_t>(f, (uint64_t)z.loopStart + 1);
+                    f = std::min<uint64_t>(f, wave->frames);
+                    if ((uint32_t)f != z.loopEnd) { z.loopEnd = (uint32_t)f; loopDragChanged = true; }
+                }
+            } else {
+                loopDragId.clear();
+                if (loopDragChanged) { loopDragChanged = false; edited = true; }
+            }
+        } else if (loopDragId.empty() && Hot(r) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            float ax = frameToX(z.loopStart);
+            float bx = frameToX(z.loopEnd > 0 ? z.loopEnd : wave->frames);
+            float da = std::fabs(m.x - ax), db = std::fabs(m.x - bx);
+            if (std::min(da, db) <= 7.0f) {
+                loopDragWhich = da <= db ? 0 : 1;
+                if (z.loopEnd == 0) { z.loopEnd = (uint32_t)std::min<uint64_t>(wave->frames, 4294967000ull); loopDragChanged = true; }
+                loopDragId = dragKey;
+            } else if (session) {
+                int key = std::clamp(z.rootKey, z.keyLow, z.keyHigh);
+                session->BeginHeldAudition(instrument, key, std::clamp((z.velLow + z.velHigh) / 2, 1, 127), setIndex);
+                loopPreviewHeld = true;
+            }
+        }
+
+        float ax = frameToX(z.loopStart);
+        float bx = frameToX(z.loopEnd > 0 ? z.loopEnd : wave->frames);
+        bool hot = Hot(r) || loopDragId == dragKey;
+        for (int which = 0; which < 2; which++) {
+            float x = which == 0 ? ax : bx;
+            bool active = loopDragId == dragKey && loopDragWhich == which;
+            Color c = active ? WHITE : (hot ? theme.accent : Fade(theme.accent, 0.85f));
+            DrawLineEx({ x, r.y + 1.0f }, { x, r.y + r.height - 1.0f }, 2.0f, c);
+            float hx = which == 0 ? x : x - 7.0f;
+            DrawRectangleRec({ hx, r.y + 1.0f, 7.0f, 9.0f }, c);
+        }
+    }
+    return edited;
 }
 
 bool InstrumentEditorPanel::Hot(Rectangle r) const {
@@ -293,6 +459,11 @@ void InstrumentEditorPanel::Render() {
     DrawRectangleRec(bounds, theme.panelBg);
     ScissorStack::Push(bounds);
     pendingField.clear();
+    wavesBuiltThisFrame = 0;
+    if (loopPreviewHeld && !IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        session->EndHeldAudition();
+        loopPreviewHeld = false;
+    }
 
     const int cur = session->CurrentInstrument();
     if (cur < 0 || (size_t)cur >= seq.instruments.size()) {
@@ -431,7 +602,7 @@ void InstrumentEditorPanel::Render() {
     for (size_t zi = 0; zi < set.zones.size(); zi++) {
         SampleZone& z = set.zones[zi];
         const int idx = (int)zi;
-        const float cardHeight = 112.0f;
+        const float cardHeight = 168.0f;
         Rectangle card = { x, y, w, cardHeight };
         bool isSelected = idx == selectedZone;
         DrawRectangleRec(card, ColorBrightness(theme.panelBg, 0.06f));
@@ -500,13 +671,27 @@ void InstrumentEditorPanel::Render() {
         DrawRectangleRec(loopBtn, loopHover ? theme.buttonHover : theme.buttonBg);
         DrawRectangleLinesEx(loopBtn, 1, theme.buttonBorder);
         Text(LoopLabel(z.loop), loopBtn.x + 8.0f, loopBtn.y + 4.0f, theme.textPrimary);
-        if (loopHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { z.loop = NextLoop(z.loop); edited = true; }
+        if (loopHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            z.loop = NextLoop(z.loop);
+            if (z.loop == LoopMode::Region && z.loopEnd == 0) {
+                const ZoneWave* seed = GetWave(z.assetPath);
+                if (seed) {
+                    bool useWav = seed->hasLoop && seed->wavLoopStart < seed->wavLoopEnd;
+                    z.loopStart = useWav ? seed->wavLoopStart : 0;
+                    z.loopEnd = useWav ? seed->wavLoopEnd : (uint32_t)std::min<uint64_t>(seed->frames, 4294967000ull);
+                }
+            }
+            edited = true;
+        }
         if (z.loop == LoopMode::Region) {
             float ls = (float)z.loopStart, le = (float)z.loopEnd;
             Text("Loop start", cx + 276.0f, ry + 4.0f, theme.textSecondary, kSmallFontSize);
             if (NumberField(zid + "ls", { cx + 336.0f, ry, 84.0f, 20.0f }, ls, 0, 0.0f, 4294967000.0f, true)) { z.loopStart = (uint32_t)ls; edited = true; }
             Text("end", cx + 430.0f, ry + 4.0f, theme.textSecondary, kSmallFontSize);
             if (NumberField(zid + "le", { cx + 456.0f, ry, 84.0f, 20.0f }, le, 0, 0.0f, 4294967000.0f, true)) { z.loopEnd = (uint32_t)le; edited = true; }
+        }
+        if (CheckCollisionRecs(card, bounds) || loopDragId == zid + "wave") {
+            if (DrawZoneWave({ cx, ry + 28.0f, card.width - 28.0f, 52.0f }, z, idx, zid + "wave", cur, setIdx)) edited = true;
         }
         y += cardHeight + 8.0f;
     }
@@ -539,6 +724,7 @@ void InstrumentEditorPanel::Render() {
     std::string picked;
     if (picker.Render(picked) && pickerZone >= 0 && (size_t)pickerZone < set.zones.size()) {
         set.zones[(size_t)pickerZone].assetPath = picked;
+        waveCache.erase(picked);
         session->MarkStructureChanged();
     }
 }

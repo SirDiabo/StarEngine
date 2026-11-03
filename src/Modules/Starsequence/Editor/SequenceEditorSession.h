@@ -105,6 +105,8 @@ public:
     double CursorTick() const { return cursorTick; }
     void SetCursorTick(double tick);
     void AuditionNote(int instrument, int key, int velocity, int setIndex = -1);
+    void BeginHeldAudition(int instrument, int key, int velocity, int setIndex = -1);
+    void EndHeldAudition();
 
     void Update();
     void SetUndoOwner(std::function<void()> reveal, std::function<bool()> isActive);
@@ -135,6 +137,8 @@ private:
 
     std::unique_ptr<Starsequence::SequenceAudioSource> source;
     std::vector<std::unique_ptr<Starsequence::SequenceAudioSource>> auditions;
+    std::unique_ptr<Starsequence::SequenceAudioSource> heldAudition;
+    std::unique_ptr<Starsequence::SequenceAudioSource> BuildAudition(int instrument, int key, int velocity, int setIndex, int64_t lengthTicks);
     int sourceRevision = -1;
     int watchedRevision = -1;
     double watchedSince = 0.0;

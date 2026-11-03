@@ -39,6 +39,7 @@ SequenceEditorSession::SequenceEditorSession() {
 
 SequenceEditorSession::~SequenceEditorSession() {
     Stop();
+    heldAudition.reset();
     auditions.clear();
     if (undoDocument) {
         UndoManager::Get().UnregisterDocument(undoDocument);
@@ -473,8 +474,8 @@ void SequenceEditorSession::SetCursorTick(double tick) {
     if (IsPlaying()) source->Seek(sequence.TickToSeconds(cursorTick));
 }
 
-void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity, int setIndex) {
-    if (!isOpen || instrument < 0 || (size_t)instrument >= sequence.instruments.size()) return;
+std::unique_ptr<SequenceAudioSource> SequenceEditorSession::BuildAudition(int instrument, int key, int velocity, int setIndex, int64_t lengthTicks) {
+    if (!isOpen || instrument < 0 || (size_t)instrument >= sequence.instruments.size()) return nullptr;
     Sequence a;
     a.name = "Audition";
     a.bus = sequence.bus;
@@ -489,18 +490,37 @@ void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity, 
     n.instrument = instrument;
     n.key = std::clamp(key, 0, 127);
     n.velocity = std::clamp(velocity, 1, 127);
-    n.length = a.resolution / 2;
+    n.length = (int)(lengthTicks > 0 ? lengthTicks : a.resolution / 2);
     layer.notes.push_back(n);
     a.layers.push_back(layer);
-    a.length = (int64_t)a.resolution * 4;
+    a.length = std::max<int64_t>((int64_t)a.resolution * 4, (int64_t)n.length + a.resolution);
     auto audition = std::make_unique<SequenceAudioSource>(a);
-    if (!audition->IsValid()) return;
+    if (!audition->IsValid()) return nullptr;
     if (setIndex >= 0 && a.instruments[(size_t)instrument].sets.size() > 1) {
         audition->SetParameter("Instruments/" + a.instruments[(size_t)instrument].name + "/Set", AudioParamValue::FromNumber((float)setIndex));
     }
+    return audition;
+}
+
+void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity, int setIndex) {
+    std::unique_ptr<SequenceAudioSource> audition = BuildAudition(instrument, key, velocity, setIndex, 0);
+    if (!audition) return;
     audition->Play();
     if (auditions.size() >= kMaxAuditions) auditions.erase(auditions.begin());
     auditions.push_back(std::move(audition));
+}
+
+void SequenceEditorSession::BeginHeldAudition(int instrument, int key, int velocity, int setIndex) {
+    EndHeldAudition();
+    heldAudition = BuildAudition(instrument, key, velocity, setIndex, (int64_t)sequence.resolution * 64);
+    if (heldAudition) heldAudition->Play();
+}
+
+void SequenceEditorSession::EndHeldAudition() {
+    if (!heldAudition) return;
+    heldAudition->Stop();
+    if (auditions.size() >= kMaxAuditions) auditions.erase(auditions.begin());
+    auditions.push_back(std::move(heldAudition));
 }
 
 void SequenceEditorSession::Update() {
