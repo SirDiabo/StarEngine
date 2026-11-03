@@ -9,6 +9,7 @@ class SequenceLayersPanel;
 class SequenceInstrumentsPanel;
 class SequenceDetailsPanel;
 class Sf2ImportPanel;
+class InstrumentEditorPanel;
 class LogPanel;
 class MenuBar;
 
@@ -46,6 +47,7 @@ private:
     SequenceInstrumentsPanel* instrumentsPanel = nullptr;
     SequenceDetailsPanel* detailsPanel = nullptr;
     Sf2ImportPanel* sf2Panel = nullptr;
+    InstrumentEditorPanel* instrumentEditorPanel = nullptr;
     LogPanel* logPanel = nullptr;
     bool opened = false;
 };

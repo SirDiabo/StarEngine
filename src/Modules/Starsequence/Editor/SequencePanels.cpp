@@ -901,7 +901,7 @@ void PianoRollPanel::Render() {
     float playX = view.XOfTick(playhead, grid.x);
     if (playX >= grid.x && playX <= grid.x + grid.width) {
         DrawLineEx({ playX, ruler.y }, { playX, grid.y + grid.height }, 2.0f, theme.accent);
-        DrawTriangle({ playX - 5.0f, ruler.y }, { playX + 5.0f, ruler.y }, { playX, ruler.y + 8.0f }, theme.accent);
+        DrawTriangle({ playX - 5.0f, ruler.y }, { playX, ruler.y + 8.0f }, { playX + 5.0f, ruler.y }, theme.accent);
     }
 
     DrawRectangleRec(keyboard, theme.panelBg);
@@ -1082,9 +1082,18 @@ void SequenceInstrumentsPanel::Render() {
         Text(label, row.x + 12.0f, row.y + (row.height - kFontSize) / 2.0f, theme.textPrimary);
 
         if (!headerClicked && rowHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            const double now = GetTime();
+            const bool doubleClick = lastClickIndex == index && now - lastClickTime < 0.35;
+            lastClickIndex = index;
+            lastClickTime = now;
             session->SetCurrentInstrument(index);
             session->SetDetailsContext(DetailsContext::Instrument);
-            session->AuditionNote(index, 60, session->defaultVelocity);
+            if (doubleClick) {
+                lastClickTime = -10.0;
+                if (onEditInstrument) onEditInstrument();
+            } else {
+                session->AuditionNote(index, 60, session->defaultVelocity);
+            }
         }
     }
 

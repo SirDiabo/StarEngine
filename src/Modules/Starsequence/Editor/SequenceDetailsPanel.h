@@ -11,7 +11,6 @@ public:
 
 private:
     std::vector<PropertyRow> BuildRows();
-    void OnAssetPickedForRow(const std::string& fullRowId, const std::string& pickedPath);
 
     SequenceEditorSession* session = nullptr;
 };

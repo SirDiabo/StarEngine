@@ -112,9 +112,13 @@ public:
     void Render() override;
     void SetSession(SequenceEditorSession* s) { session = s; }
     void SetOnImportSoundFont(std::function<void()> callback) { onImportSoundFont = std::move(callback); }
+    void SetOnEditInstrument(std::function<void()> callback) { onEditInstrument = std::move(callback); }
 
 private:
     SequenceEditorSession* session = nullptr;
     std::function<void()> onImportSoundFont;
+    std::function<void()> onEditInstrument;
+    int lastClickIndex = -1;
+    double lastClickTime = -10.0;
     float scroll = 0.0f;
 };

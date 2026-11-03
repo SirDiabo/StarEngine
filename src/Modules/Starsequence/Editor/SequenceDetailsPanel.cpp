@@ -8,56 +8,9 @@
 
 using namespace Starsequence;
 
-namespace {
-
-const char* LoopName(LoopMode mode) {
-    switch (mode) {
-        case LoopMode::Whole: return "Whole";
-        case LoopMode::Region: return "Region";
-        case LoopMode::Wav: return "Wav";
-        default: return "None";
-    }
-}
-
-LoopMode LoopFromName(const std::string& name) {
-    if (name == "Whole") return LoopMode::Whole;
-    if (name == "Region") return LoopMode::Region;
-    if (name == "Wav") return LoopMode::Wav;
-    return LoopMode::None;
-}
-
-SampleSet* FindSet(SequenceEditorSession* s, int instrument, int set) {
-    Sequence& seq = s->GetSequence();
-    if (instrument < 0 || (size_t)instrument >= seq.instruments.size()) return nullptr;
-    Instrument& inst = seq.instruments[(size_t)instrument];
-    if (set < 0 || (size_t)set >= inst.sets.size()) return nullptr;
-    return &inst.sets[(size_t)set];
-}
-
-SampleZone* FindZone(SequenceEditorSession* s, int instrument, int set, int zone) {
-    SampleSet* sampleSet = FindSet(s, instrument, set);
-    if (!sampleSet || zone < 0 || (size_t)zone >= sampleSet->zones.size()) return nullptr;
-    return &sampleSet->zones[(size_t)zone];
-}
-
-}
-
 void SequenceDetailsPanel::SetSession(SequenceEditorSession* s) {
     session = s;
     buildRows = [this]() { return BuildRows(); };
-    onAssetPicked = [this](const std::string& rowId, const std::string& path) { OnAssetPickedForRow(rowId, path); };
-}
-
-void SequenceDetailsPanel::OnAssetPickedForRow(const std::string& fullRowId, const std::string& pickedPath) {
-    if (!session) return;
-    size_t separator = fullRowId.rfind('|');
-    std::string rowId = separator == std::string::npos ? fullRowId : fullRowId.substr(separator + 1);
-    int zoneIndex = -1;
-    if (std::sscanf(rowId.c_str(), "z%d.sample", &zoneIndex) != 1) return;
-    SampleZone* zone = FindZone(session, session->CurrentInstrument(), session->SelectedSet(), zoneIndex);
-    if (!zone) return;
-    zone->assetPath = pickedPath;
-    session->MarkStructureChanged();
 }
 
 std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
@@ -163,124 +116,11 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
             s->RenameInstrument(instrumentIndex, v);
         }));
 
-        if ((size_t)setIndex >= inst.sets.size()) {
-            s->SetSelectedSet(0);
-            for (PropertyRow& row : rows) row.id = key + "|" + row.id;
-            return rows;
-        }
-        const SampleSet& set = inst.sets[(size_t)setIndex];
-
-        std::vector<std::string> setNames;
-        for (const SampleSet& st : inst.sets) setNames.push_back(st.name);
-        rows.push_back(EnumRow("inst.set", "Sample Set", set.name, setNames, [s, instrumentIndex](const std::string& v) {
-            Sequence& q = s->GetSequence();
-            if (instrumentIndex < 0 || (size_t)instrumentIndex >= q.instruments.size()) return;
-            const Instrument& i = q.instruments[(size_t)instrumentIndex];
-            for (size_t n = 0; n < i.sets.size(); n++) {
-                if (i.sets[n].name == v) { s->SetSelectedSet((int)n); return; }
-            }
-        }));
-        rows.push_back(ButtonRow("inst.addSet", "Add Sample Set", [s, instrumentIndex]() {
-            Sequence& q = s->GetSequence();
-            if (instrumentIndex < 0 || (size_t)instrumentIndex >= q.instruments.size()) return;
-            int added = AddSampleSet(q.instruments[(size_t)instrumentIndex]);
-            s->SetSelectedSet(added);
-            s->MarkStructureChanged();
-        }));
-        if (inst.sets.size() > 1) {
-            rows.push_back(ButtonRow("inst.removeSet", "Remove Sample Set", [s, instrumentIndex, setIndex]() {
-                Sequence& q = s->GetSequence();
-                if (instrumentIndex < 0 || (size_t)instrumentIndex >= q.instruments.size()) return;
-                if (RemoveSampleSet(q.instruments[(size_t)instrumentIndex], setIndex)) {
-                    s->SetSelectedSet(0);
-                    s->MarkStructureChanged();
-                }
-            }));
-        }
-        rows.push_back(StringRow("set.name", "Set Name", set.name, [s, instrumentIndex, setIndex](const std::string& v) {
-            SampleSet* st = FindSet(s, instrumentIndex, setIndex);
-            if (!st || v.empty()) return;
-            Instrument& i = s->GetSequence().instruments[(size_t)instrumentIndex];
-            for (size_t n = 0; n < i.sets.size(); n++) {
-                if ((int)n != setIndex && i.sets[n].name == v) return;
-            }
-            st->name = v;
-            s->MarkStructureChanged();
-        }));
-        rows.push_back(FloatRow("set.volume", "Volume", set.volume, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->volume = std::clamp(v, 0.0f, 4.0f); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.pan", "Pan", set.pan, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->pan = std::clamp(v, -1.0f, 1.0f); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.bend", "Bend Range", (float)set.bendRange, true, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->bendRange = std::clamp((int)v, 0, 48); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.attack", "Attack (s)", set.attack, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->attack = std::max(0.0f, v); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.decay", "Decay (s)", set.decay, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->decay = std::max(0.0f, v); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.sustain", "Sustain", set.sustain, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->sustain = std::clamp(v, 0.0f, 1.0f); s->MarkStructureChanged(); }
-        }));
-        rows.push_back(FloatRow("set.release", "Release (s)", set.release, false, [s, instrumentIndex, setIndex](float v) {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) { st->release = std::max(0.0f, v); s->MarkStructureChanged(); }
-        }));
-
-        rows.push_back(HeaderRow("h.samples", "Samples"));
-        for (size_t z = 0; z < set.zones.size(); z++) {
-            const SampleZone& zone = set.zones[z];
-            const int zi = (int)z;
-            const std::string p = "z" + std::to_string(zi) + ".";
-            rows.push_back(HeaderRow(p + "h", "Sample " + std::to_string(zi + 1)));
-            rows.push_back(AssetRow(p + "sample", "Sound", ".starsound", StemOrNone(zone.assetPath)));
-            auto zoneInt = [s, instrumentIndex, setIndex, zi](int SampleZone::*field, int lo, int hi) {
-                return [=](float v) {
-                    if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->*field = std::clamp((int)v, lo, hi); s->MarkStructureChanged(); }
-                };
-            };
-            auto zoneFloat = [s, instrumentIndex, setIndex, zi](float SampleZone::*field, float lo, float hi) {
-                return [=](float v) {
-                    if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->*field = std::clamp(v, lo, hi); s->MarkStructureChanged(); }
-                };
-            };
-            rows.push_back(FloatRow(p + "keyLow", "Key Low", (float)zone.keyLow, true, zoneInt(&SampleZone::keyLow, 0, 127)));
-            rows.push_back(FloatRow(p + "keyHigh", "Key High", (float)zone.keyHigh, true, zoneInt(&SampleZone::keyHigh, 0, 127)));
-            rows.push_back(FloatRow(p + "root", "Root Key", (float)zone.rootKey, true, zoneInt(&SampleZone::rootKey, 0, 127)));
-            rows.push_back(FloatRow(p + "velLow", "Velocity Low", (float)zone.velLow, true, zoneInt(&SampleZone::velLow, 1, 127)));
-            rows.push_back(FloatRow(p + "velHigh", "Velocity High", (float)zone.velHigh, true, zoneInt(&SampleZone::velHigh, 1, 127)));
-            rows.push_back(BoolRow(p + "pitched", "Pitched", zone.pitched, [s, instrumentIndex, setIndex, zi](bool v) {
-                if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->pitched = v; s->MarkStructureChanged(); }
-            }));
-            rows.push_back(FloatRow(p + "tune", "Tune (cents)", zone.tuneCents, false, zoneFloat(&SampleZone::tuneCents, -2400.0f, 2400.0f)));
-            rows.push_back(FloatRow(p + "gain", "Gain (dB)", zone.gainDb, false, zoneFloat(&SampleZone::gainDb, -48.0f, 24.0f)));
-            rows.push_back(FloatRow(p + "pan", "Pan", zone.pan, false, zoneFloat(&SampleZone::pan, -1.0f, 1.0f)));
-            rows.push_back(EnumRow(p + "loop", "Loop", LoopName(zone.loop), { "None", "Whole", "Region", "Wav" },
-                [s, instrumentIndex, setIndex, zi](const std::string& v) {
-                    if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->loop = LoopFromName(v); s->MarkStructureChanged(); }
-                }));
-            if (zone.loop == LoopMode::Region) {
-                rows.push_back(FloatRow(p + "loopStart", "Loop Start", (float)zone.loopStart, true, [s, instrumentIndex, setIndex, zi](float v) {
-                    if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->loopStart = (uint32_t)std::max(0.0f, v); s->MarkStructureChanged(); }
-                }));
-                rows.push_back(FloatRow(p + "loopEnd", "Loop End", (float)zone.loopEnd, true, [s, instrumentIndex, setIndex, zi](float v) {
-                    if (SampleZone* zn = FindZone(s, instrumentIndex, setIndex, zi)) { zn->loopEnd = (uint32_t)std::max(0.0f, v); s->MarkStructureChanged(); }
-                }));
-            }
-            rows.push_back(ButtonRow(p + "remove", "Remove Sample", [s, instrumentIndex, setIndex, zi]() {
-                if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) {
-                    if (RemoveZone(*st, zi)) s->MarkStructureChanged();
-                }
-            }));
-        }
-        rows.push_back(ButtonRow("zone.add", "Add Sample", [s, instrumentIndex, setIndex]() {
-            if (SampleSet* st = FindSet(s, instrumentIndex, setIndex)) {
-                AddZone(*st, "");
-                s->MarkStructureChanged();
-            }
-        }));
+        int zoneTotal = 0;
+        for (const SampleSet& st : inst.sets) zoneTotal += (int)st.zones.size();
+        rows.push_back(ReadOnlyRow("inst.sets", "Sample Sets", std::to_string(inst.sets.size())));
+        rows.push_back(ReadOnlyRow("inst.zones", "Samples", std::to_string(zoneTotal)));
+        rows.push_back(ButtonRow("inst.edit", "Edit Instrument...", [s]() { s->RequestInstrumentEditor(); }));
     }
 
     if (context == DetailsContext::Event && s->SelectedEvent().Valid()) {

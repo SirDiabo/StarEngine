@@ -75,6 +75,8 @@ public:
     int64_t SnapTick(double tick, bool bypass) const;
     int defaultVelocity = 100;
     bool typingInPopup = false;
+    std::function<void()> onOpenInstrumentEditor;
+    void RequestInstrumentEditor() { if (onOpenInstrumentEditor) onOpenInstrumentEditor(); }
 
     EditTool tool = EditTool::Brush;
     DetailsContext GetDetailsContext() const { return detailsContext; }
@@ -102,7 +104,7 @@ public:
     double PlayheadTick() const;
     double CursorTick() const { return cursorTick; }
     void SetCursorTick(double tick);
-    void AuditionNote(int instrument, int key, int velocity);
+    void AuditionNote(int instrument, int key, int velocity, int setIndex = -1);
 
     void Update();
     void SetUndoOwner(std::function<void()> reveal, std::function<bool()> isActive);

@@ -473,7 +473,7 @@ void SequenceEditorSession::SetCursorTick(double tick) {
     if (IsPlaying()) source->Seek(sequence.TickToSeconds(cursorTick));
 }
 
-void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity) {
+void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity, int setIndex) {
     if (!isOpen || instrument < 0 || (size_t)instrument >= sequence.instruments.size()) return;
     Sequence a;
     a.name = "Audition";
@@ -495,6 +495,9 @@ void SequenceEditorSession::AuditionNote(int instrument, int key, int velocity) 
     a.length = (int64_t)a.resolution * 4;
     auto audition = std::make_unique<SequenceAudioSource>(a);
     if (!audition->IsValid()) return;
+    if (setIndex >= 0 && a.instruments[(size_t)instrument].sets.size() > 1) {
+        audition->SetParameter("Instruments/" + a.instruments[(size_t)instrument].name + "/Set", AudioParamValue::FromNumber((float)setIndex));
+    }
     audition->Play();
     if (auditions.size() >= kMaxAuditions) auditions.erase(auditions.begin());
     auditions.push_back(std::move(audition));

@@ -3,6 +3,7 @@
 #include "SequencePanels.h"
 #include "SequenceDetailsPanel.h"
 #include "Sf2ImportPanel.h"
+#include "InstrumentEditorPanel.h"
 #include "PianoRollView.h"
 #include "Editor/LogPanel.h"
 #include "Editor/MenuBar.h"
@@ -47,6 +48,7 @@ SequenceEditorTab::~SequenceEditorTab() {
     delete instrumentsPanel;
     delete detailsPanel;
     delete sf2Panel;
+    delete instrumentEditorPanel;
     delete session;
 }
 
@@ -75,12 +77,23 @@ void SequenceEditorTab::Initialize() {
         dockArea.OpenFloating("SoundFont Import", { 640.0f, 560.0f });
     });
 
-    std::vector<Panel*> panels = { pianoRollPanel, layersPanel, instrumentsPanel, detailsPanel, sf2Panel };
+    instrumentEditorPanel = new InstrumentEditorPanel();
+    instrumentEditorPanel->Initialize();
+    instrumentEditorPanel->SetSession(session);
+    auto openInstrumentEditor = [this]() {
+        instrumentEditorPanel->Open();
+        dockArea.OpenFloating("Instrument Editor", { 820.0f, 700.0f });
+    };
+    instrumentsPanel->SetOnEditInstrument(openInstrumentEditor);
+    session->onOpenInstrumentEditor = openInstrumentEditor;
+
+    std::vector<Panel*> panels = { pianoRollPanel, layersPanel, instrumentsPanel, detailsPanel, sf2Panel, instrumentEditorPanel };
     if (logPanel) panels.push_back(logPanel);
     dockArea.SetPanels(panels);
 
     BuildDefaultLayout();
     sf2Panel->SetVisible(false);
+    instrumentEditorPanel->SetVisible(false);
 }
 
 void SequenceEditorTab::BuildDefaultLayout() {
@@ -176,7 +189,7 @@ void SequenceEditorTab::Render(float x, float y, float width, float height) {
     if (!session || !session->IsOpen()) return;
 
     bool active = EditorUndo::IsTabActive(this);
-    session->typingInPopup = sf2Panel && sf2Panel->WantsKeyboard();
+    session->typingInPopup = (sf2Panel && sf2Panel->WantsKeyboard()) || (instrumentEditorPanel && instrumentEditorPanel->WantsKeyboard());
     bool typing = WidgetInput::IsKeyboardCaptured() || WidgetInput::HasModal(WidgetInput::kEditorDevice) || session->typingInPopup;
     if (active && !typing) {
         bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
@@ -228,6 +241,7 @@ void SequenceEditorTab::ResetLayout() {
         dockArea.SetPanelVisible(name, true);
     BuildDefaultLayout();
     dockArea.SetPanelVisible("SoundFont Import", false);
+    dockArea.SetPanelVisible("Instrument Editor", false);
 }
 
 void SequenceEditorTab::TogglePanelVisible(const std::string& name) {

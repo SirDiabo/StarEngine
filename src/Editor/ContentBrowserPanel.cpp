@@ -44,7 +44,7 @@ namespace {
 
 void CollectVendorDirForAsset(const fs::path& assetFile, const fs::path& contentRoot, std::set<fs::path>& outDirs) {
     std::string ext = assetFile.extension().string();
-    if (ext != ".starasset" && ext != ".startex" && ext != ".staranim") return;
+    if (ext != ".starasset" && ext != ".startex" && ext != ".staranim" && ext != ".starsound") return;
 
     StarAsset asset;
     if (!StarAsset::LoadFromFile(assetFile.string(), asset) || asset.vendoredSourcePath.empty()) return;
