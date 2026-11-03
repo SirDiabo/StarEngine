@@ -57,12 +57,26 @@ void CollectVendorDirForAsset(const fs::path& assetFile, const fs::path& content
     outDirs.insert(vendorDir);
 }
 
-void TrashVendorDirs(const std::set<fs::path>& dirs) {
+void RemoveEmptyParents(fs::path dir, const fs::path& vendorRoot) {
+    dir = dir.parent_path();
+    while (!dir.empty() && dir != vendorRoot) {
+        fs::path rel = dir.lexically_relative(vendorRoot);
+        if (rel.empty() || rel == "." || *rel.begin() == "..") break;
+        std::error_code ec;
+        if (!fs::is_directory(dir, ec) || !fs::is_empty(dir, ec)) break;
+        fs::remove(dir, ec);
+        if (ec) break;
+        dir = dir.parent_path();
+    }
+}
+
+void TrashVendorDirs(const std::set<fs::path>& dirs, const fs::path& contentRoot) {
+    fs::path vendorRoot = (contentRoot / "_Source").lexically_normal();
     for (const fs::path& dir : dirs) {
         std::error_code ec;
         if (!fs::exists(dir, ec)) continue;
         std::string trashError;
-        OSTrash::MoveToTrash(dir.string(), trashError);
+        if (OSTrash::MoveToTrash(dir.string(), trashError)) RemoveEmptyParents(dir, vendorRoot);
     }
 }
 
@@ -1275,7 +1289,7 @@ void ContentBrowserPanel::Render() {
             } else {
                 CollectVendorDirForAsset(fs::path(pendingDeletePath), deleteContentRoot, vendorDirsToTrash);
             }
-            TrashVendorDirs(vendorDirsToTrash);
+            TrashVendorDirs(vendorDirsToTrash, deleteContentRoot);
             std::string trashError;
             if (OSTrash::MoveToTrash(pendingDeletePath, trashError)) {
                 importStatus = pendingDeleteIsFolder ? "Moved folder to trash" : "Moved to trash";

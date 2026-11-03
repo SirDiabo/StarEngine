@@ -376,16 +376,16 @@ void InstrumentEditorPanel::Render() {
 
     const float sliderHeight = 118.0f;
     const float columnWidth = 58.0f;
-    struct Column { const char* id; const char* label; float* value; float lo, hi, power, reset; int decimals; bool integer; };
+    struct Column { const char* id; const char* label; float* value; float lo, hi, fieldHi, power, reset; int decimals; bool integer; };
     float volume = set.volume, pan = set.pan, bend = (float)set.bendRange;
     Column columns[7] = {
-        { "volume", "Volume", &volume, 0.0f, 2.0f, 1.0f, 1.0f, 2, false },
-        { "pan", "Pan", &pan, -1.0f, 1.0f, 1.0f, 0.0f, 2, false },
-        { "bend", "Bend", &bend, 0.0f, 24.0f, 1.0f, 2.0f, 0, true },
-        { "attack", "Attack", &set.attack, 0.0f, 10.0f, 3.0f, 0.002f, 3, false },
-        { "decay", "Decay", &set.decay, 0.0f, 10.0f, 3.0f, 0.1f, 3, false },
-        { "sustain", "Sustain", &set.sustain, 0.0f, 1.0f, 1.0f, 1.0f, 3, false },
-        { "release", "Release", &set.release, 0.0f, 10.0f, 3.0f, 0.1f, 3, false },
+        { "volume", "Volume", &volume, 0.0f, 2.0f, 2.0f, 1.0f, 1.0f, 2, false },
+        { "pan", "Pan", &pan, -1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 2, false },
+        { "bend", "Bend", &bend, 0.0f, 24.0f, 24.0f, 1.0f, 2.0f, 0, true },
+        { "attack", "Attack", &set.attack, 0.0f, 10.0f, 100.0f, 3.0f, 0.002f, 3, false },
+        { "decay", "Decay", &set.decay, 0.0f, 20.0f, 100.0f, 3.0f, 0.1f, 3, false },
+        { "sustain", "Sustain", &set.sustain, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 3, false },
+        { "release", "Release", &set.release, 0.0f, 20.0f, 100.0f, 3.0f, 0.1f, 3, false },
     };
     for (int i = 0; i < 7; i++) {
         Column& c = columns[i];
@@ -394,7 +394,7 @@ void InstrumentEditorPanel::Render() {
         Rectangle sl = { cx, y + 16.0f, columnWidth - 8.0f, sliderHeight };
         if (VSlider(std::string("s.") + c.id, sl, *c.value, c.lo, c.hi, c.power, c.reset)) edited = true;
         Rectangle field = { cx, y + 16.0f + sliderHeight + 6.0f, columnWidth - 8.0f, 22.0f };
-        if (NumberField(std::string("f.") + c.id, field, *c.value, c.decimals, c.lo, c.hi, c.integer)) edited = true;
+        if (NumberField(std::string("f.") + c.id, field, *c.value, c.decimals, c.lo, c.fieldHi, c.integer)) edited = true;
     }
     set.volume = volume;
     set.pan = pan;
