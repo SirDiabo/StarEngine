@@ -9,6 +9,33 @@
 
 static const float FLOAT_HEADER_H = 22.0f;
 static const float DRAG_THRESHOLD = 6.0f;
+static const float FLOAT_EDGE_GRAB = 5.0f;
+static const float FLOAT_CORNER_GRAB = 12.0f;
+static const float FLOAT_MIN_W = 160.0f;
+static const float FLOAT_MIN_H = 100.0f;
+
+static int FloatResizeEdgesAt(Rectangle b, Vector2 m) {
+    if (!CheckCollisionPointRec(m, b)) return 0;
+    bool left   = m.x < b.x + FLOAT_EDGE_GRAB;
+    bool right  = m.x > b.x + b.width - FLOAT_EDGE_GRAB;
+    bool top    = m.y < b.y + FLOAT_EDGE_GRAB;
+    bool bottom = m.y > b.y + b.height - FLOAT_EDGE_GRAB;
+    bool cornerX = m.x < b.x + FLOAT_CORNER_GRAB || m.x > b.x + b.width - FLOAT_CORNER_GRAB;
+    bool cornerY = m.y < b.y + FLOAT_CORNER_GRAB || m.y > b.y + b.height - FLOAT_CORNER_GRAB;
+    int edges = 0;
+    if (left || (cornerX && (top || bottom) && m.x < b.x + b.width * 0.5f)) edges |= 1;
+    if (right || (cornerX && (top || bottom) && m.x >= b.x + b.width * 0.5f)) edges |= 2;
+    if (top || (cornerY && (left || right) && m.y < b.y + b.height * 0.5f)) edges |= 4;
+    if (bottom || (cornerY && (left || right) && m.y >= b.y + b.height * 0.5f)) edges |= 8;
+    return edges;
+}
+
+static int FloatResizeCursor(int edges) {
+    if (edges == 1 || edges == 2) return MOUSE_CURSOR_RESIZE_EW;
+    if (edges == 4 || edges == 8) return MOUSE_CURSOR_RESIZE_NS;
+    if (edges == 5 || edges == 10) return MOUSE_CURSOR_RESIZE_NWSE;
+    return MOUSE_CURSOR_RESIZE_NESW;
+}
 
 static bool DockAreaCloseButton(Rectangle r, bool& outHovered) {
     Vector2 mp = GetMousePosition();
@@ -194,6 +221,13 @@ void DockArea::RenderOverlays() {
     Vector2 mouse = GetMousePosition();
 
     // Floating panel windows.
+    const FloatingPanel* topFloating = nullptr;
+    for (int i = (int)floating.size() - 1; i >= 0; i--) {
+        const FloatingPanel& cand = floating[i];
+        if (cand.panel && cand.panel->IsVisible() && CheckCollisionPointRec(mouse, cand.bounds)) { topFloating = &cand; break; }
+    }
+    FloatingPanel* movingFloating = nullptr;
+    int cursorEdges = 0;
     for (FloatingPanel& fp : floating) {
         Panel* p = fp.panel;
         if (!p || !p->IsVisible()) continue;
@@ -220,13 +254,32 @@ void DockArea::RenderOverlays() {
             p->SetVisible(false);
 
         if (!dragging && !pendingDrag) {
-            if (fp.draggingHeader) {
+            if (fp.resizeEdges) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                    float dx = mouse.x - fp.resizeStartMouse.x;
+                    float dy = mouse.y - fp.resizeStartMouse.y;
+                    Rectangle sb = fp.resizeStartBounds;
+                    Rectangle nb = sb;
+                    if (fp.resizeEdges & 1) { nb.x = std::min(sb.x + dx, sb.x + sb.width - FLOAT_MIN_W); nb.width = sb.x + sb.width - nb.x; }
+                    if (fp.resizeEdges & 2) nb.width = std::max(FLOAT_MIN_W, sb.width + dx);
+                    if (fp.resizeEdges & 4) { nb.y = std::min(sb.y + dy, sb.y + sb.height - FLOAT_MIN_H); nb.height = sb.y + sb.height - nb.y; }
+                    if (fp.resizeEdges & 8) nb.height = std::max(FLOAT_MIN_H, sb.height + dy);
+                    fp.bounds = nb;
+                    cursorEdges = fp.resizeEdges;
+                } else {
+                    fp.resizeEdges = 0;
+                }
+            } else if (fp.draggingHeader) {
                 if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
                     fp.bounds.x = mouse.x - fp.dragOffset.x;
                     fp.bounds.y = mouse.y - fp.dragOffset.y;
+                    movingFloating = &fp;
                 } else {
                     fp.draggingHeader = false;
-                    if (CheckCollisionPointRec(mouse, lastArea)) {
+                    DockNode* dropNode = nullptr;
+                    DropZone dropZone = DropZone::None;
+                    bool dropOnTabBar = false;
+                    if (FloatingDropTarget(mouse, &fp, dropNode, dropZone, dropOnTabBar)) {
                         dragging           = true;
                         dragPanelName      = p->GetName();
                         dragSourceNode     = nullptr;
@@ -234,10 +287,19 @@ void DockArea::RenderOverlays() {
                         dragPos            = mouse;
                     }
                 }
-            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !WidgetInput::IsMouseBlocked() &&
-                       CheckCollisionPointRec(mouse, header) && !closeHov) {
-                fp.draggingHeader = true;
-                fp.dragOffset = { mouse.x - full.x, mouse.y - full.y };
+            } else if (&fp == topFloating && !WidgetInput::IsMouseBlocked() && !closeHov) {
+                int edges = FloatResizeEdgesAt(full, mouse);
+                if (edges) cursorEdges = edges;
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (edges) {
+                        fp.resizeEdges = edges;
+                        fp.resizeStartBounds = fp.bounds;
+                        fp.resizeStartMouse = mouse;
+                    } else if (CheckCollisionPointRec(mouse, header)) {
+                        fp.draggingHeader = true;
+                        fp.dragOffset = { mouse.x - full.x, mouse.y - full.y };
+                    }
+                }
             }
         }
 
@@ -245,6 +307,29 @@ void DockArea::RenderOverlays() {
         RenderPanel(p);
     }
     WidgetInput::SetInputScope(nullptr);
+
+    if (movingFloating) {
+        DockNode* dropNode = nullptr;
+        DropZone dropZone = DropZone::None;
+        bool dropOnTabBar = false;
+        if (FloatingDropTarget(mouse, movingFloating, dropNode, dropZone, dropOnTabBar)) {
+            if (dropOnTabBar) {
+                Rectangle tabBar = { dropNode->bounds.x, dropNode->bounds.y, dropNode->bounds.width, DOCK_TAB_HEIGHT };
+                DrawRectangleRec(tabBar, UITheme::Get().dropZone);
+                DrawRectangleLinesEx(tabBar, 2, UITheme::Get().dropBorder);
+            } else {
+                DrawDropHighlight(dropNode, dropZone);
+            }
+        }
+    }
+
+    if (cursorEdges) {
+        SetMouseCursor(FloatResizeCursor(cursorEdges));
+        floatCursorSet = true;
+    } else if (floatCursorSet) {
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        floatCursorSet = false;
+    }
 
     // Pending drag: wait for mouse to move past threshold before committing to drag.
     if (pendingDrag) {
@@ -557,6 +642,31 @@ DockNode* DockArea::FindNodeContaining(const std::string& panelName, DockNode* n
     }
     DockNode* r = FindNodeContaining(panelName, node->first.get());
     return r ? r : FindNodeContaining(panelName, node->second.get());
+}
+
+bool DockArea::FloatingDropTarget(Vector2 mouse, const FloatingPanel* moving, DockNode*& node, DropZone& zone, bool& onTabBar) const {
+    node = nullptr;
+    zone = DropZone::None;
+    onTabBar = false;
+    if (!root || !maximizedPanelName.empty()) return false;
+    if (!CheckCollisionPointRec(mouse, lastArea)) return false;
+    for (const FloatingPanel& other : floating) {
+        if (&other == moving || !other.panel || !other.panel->IsVisible()) continue;
+        if (CheckCollisionPointRec(mouse, other.bounds)) return false;
+    }
+    DockNode* target = FindLeafAt(mouse);
+    if (!target) return false;
+    Rectangle tabBar = { target->bounds.x, target->bounds.y, target->bounds.width, DOCK_TAB_HEIGHT };
+    if (CheckCollisionPointRec(mouse, tabBar)) {
+        node = target;
+        onTabBar = true;
+        return true;
+    }
+    DropZone z = GetDropZone(target->bounds, mouse);
+    if (z == DropZone::None || z == DropZone::Center) return false;
+    node = target;
+    zone = z;
+    return true;
 }
 
 DropZone DockArea::GetDropZone(Rectangle area, Vector2 pos) const {

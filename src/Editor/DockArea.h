@@ -18,6 +18,9 @@ struct FloatingPanel {
     Rectangle bounds = { 200, 200, 400, 300 };
     bool draggingHeader = false;
     Vector2 dragOffset = { 0, 0 };
+    int resizeEdges = 0;
+    Rectangle resizeStartBounds = { 0, 0, 0, 0 };
+    Vector2 resizeStartMouse = { 0, 0 };
 };
 
 class DockArea {
@@ -69,6 +72,7 @@ private:
     DockNode* FindLeafAt(Vector2 pos, DockNode* node = nullptr) const;
     DockNode* FindNodeContaining(const std::string& panelName, DockNode* node = nullptr) const;
     DropZone GetDropZone(Rectangle area, Vector2 pos) const;
+    bool FloatingDropTarget(Vector2 mouse, const FloatingPanel* moving, DockNode*& node, DropZone& zone, bool& onTabBar) const;
     void DrawDropHighlight(DockNode* target, DropZone zone) const;
     void PruneEmptyNodes(std::unique_ptr<DockNode>& node);
 
@@ -97,4 +101,5 @@ private:
     double lastRenderTime = -1000.0;
 
     Rectangle lastArea = { 0, 0, 0, 0 };
+    bool floatCursorSet = false;
 };
