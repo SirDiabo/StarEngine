@@ -11,6 +11,7 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 struct ContentEntry {
     std::string displayName;
@@ -132,7 +133,8 @@ private:
 
     float tileSize = 80.0f;
 
-    std::unordered_map<std::string, Texture2D> icons;
+    mutable std::unordered_map<std::string, Texture2D> icons;
+    mutable std::unordered_set<std::string> moduleIconsTried;
     bool iconsLoaded = false;
 
     bool materialEditorOpen = false;

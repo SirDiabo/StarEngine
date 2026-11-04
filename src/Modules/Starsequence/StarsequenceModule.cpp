@@ -35,6 +35,7 @@ bool StarsequenceModule::Initialize() {
     assetType.extension = ".starseq";
     assetType.category = "Audio";
     assetType.moduleName = "Starsequence";
+    assetType.iconFile = "icon_sequence.png";
     assetType.createAsset = [](const std::string& fullPath, const std::string& assetName) {
         std::string error;
         return Starsequence::SaveSequenceFile(fullPath, Starsequence::MakeDefaultSequence(assetName), error);

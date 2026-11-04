@@ -129,6 +129,20 @@ const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entr
 
     auto it = icons.find(key);
     if (it != icons.end() && it->second.id != 0) return &it->second;
+
+    if (key == "asset") {
+        const AssetTypeInfo* type = AssetTypeRegistry::Get().FindByExtension(entry.extension);
+        if (type && !type->iconFile.empty()) {
+            std::string moduleKey = "module:" + type->moduleName + "/" + type->iconFile;
+            auto found = icons.find(moduleKey);
+            if (found == icons.end() && moduleIconsTried.insert(moduleKey).second) {
+                Texture2D tex = EmbeddedAssets::Get().LoadModuleTextureAsset(type->moduleName, type->iconFile);
+                if (tex.id != 0) found = icons.emplace(moduleKey, tex).first;
+            }
+            if (found != icons.end() && found->second.id != 0) return &found->second;
+        }
+    }
+
     auto fallback = icons.find("asset");
     if (fallback != icons.end() && fallback->second.id != 0) return &fallback->second;
     return nullptr;

@@ -47,16 +47,31 @@ bool EmbeddedAssets::ReadBytes(const std::string& fileName, std::vector<uint8_t>
     return !outBytes.empty();
 }
 
-Image EmbeddedAssets::LoadImageAsset(const std::string& fileName) {
-    std::vector<uint8_t> bytes;
-    if (!ReadBytes(fileName, bytes)) return Image{};
+bool EmbeddedAssets::ReadModuleBytes(const std::string& moduleName, const std::string& fileName, std::vector<uint8_t>& outBytes) const {
+    if (moduleName.empty() || fileName.empty()) return false;
 
-    fs::path ext = fs::path(fileName).extension();
-    return ::LoadImageFromMemory(ext.string().c_str(), bytes.data(), (int)bytes.size());
+    if (pakLoaded) {
+        std::string virtualPath = "Assets/Modules/" + moduleName + "/" + fileName;
+        if (pak.HasEntry(virtualPath)) {
+            outBytes = pak.ReadEntry(virtualPath);
+            if (!outBytes.empty()) return true;
+        }
+    }
+
+#ifdef STARENGINE_SOURCE_ROOT
+    fs::path p = fs::path(STARENGINE_SOURCE_ROOT) / "Modules" / moduleName / "Assets" / fileName;
+    std::ifstream in(p, std::ios::binary);
+    if (in.is_open()) {
+        outBytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        return !outBytes.empty();
+    }
+#endif
+    return false;
 }
 
-Texture2D EmbeddedAssets::LoadTextureAsset(const std::string& fileName) {
-    Image img = LoadImageAsset(fileName);
+Texture2D EmbeddedAssets::TextureFromBytes(const std::string& fileName, const std::vector<uint8_t>& bytes) {
+    fs::path ext = fs::path(fileName).extension();
+    Image img = ::LoadImageFromMemory(ext.string().c_str(), bytes.data(), (int)bytes.size());
     if (!img.data) return Texture2D{};
 
     Texture2D tex = ::LoadTextureFromImage(img);
@@ -66,4 +81,24 @@ Texture2D EmbeddedAssets::LoadTextureAsset(const std::string& fileName) {
         ::SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR);
     }
     return tex;
+}
+
+Texture2D EmbeddedAssets::LoadModuleTextureAsset(const std::string& moduleName, const std::string& fileName) {
+    std::vector<uint8_t> bytes;
+    if (!ReadModuleBytes(moduleName, fileName, bytes)) return Texture2D{};
+    return TextureFromBytes(fileName, bytes);
+}
+
+Image EmbeddedAssets::LoadImageAsset(const std::string& fileName) {
+    std::vector<uint8_t> bytes;
+    if (!ReadBytes(fileName, bytes)) return Image{};
+
+    fs::path ext = fs::path(fileName).extension();
+    return ::LoadImageFromMemory(ext.string().c_str(), bytes.data(), (int)bytes.size());
+}
+
+Texture2D EmbeddedAssets::LoadTextureAsset(const std::string& fileName) {
+    std::vector<uint8_t> bytes;
+    if (!ReadBytes(fileName, bytes)) return Texture2D{};
+    return TextureFromBytes(fileName, bytes);
 }

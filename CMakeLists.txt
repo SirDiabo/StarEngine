@@ -111,7 +111,7 @@ else()
     target_include_directories(AssetPacker PRIVATE src)
 
     add_custom_command(TARGET StarEngine POST_BUILD
-        COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE:StarEngine>"
+        COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE:StarEngine>" ${STARENGINE_MODULE_ASSET_DIRS}
         COMMENT "Embedding Assets/ into StarEngine executable"
         VERBATIM
     )

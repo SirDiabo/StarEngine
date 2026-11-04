@@ -13,6 +13,7 @@ struct AssetTypeInfo {
     std::string extension;
     std::string category;
     std::string moduleName;
+    std::string iconFile;
     std::function<bool(const std::string& fullPath, const std::string& assetName)> createAsset;
     std::function<bool(const std::string& fullPath, const std::string& newAssetName)> renameAsset;
     std::function<std::vector<AssetCreateVariant>()> listCreateVariants;

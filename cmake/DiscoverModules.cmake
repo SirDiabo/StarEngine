@@ -34,6 +34,7 @@ endif()
 set(STARENGINE_MODULE_PLAIN_SOURCES "")
 set(STARENGINE_MODULE_PLAIN_SOURCES_EDITOR_ONLY "")
 set(_starengine_seen_module_names "")
+set(STARENGINE_MODULE_ASSET_DIRS "")
 
 foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
     string(REPLACE "\\" "/" _normalized_root "${MODULE_ROOT}")
@@ -50,6 +51,10 @@ foreach(MODULE_ROOT ${STARENGINE_MODULE_ROOTS})
             continue()
         endif()
         list(APPEND _starengine_seen_module_names "${_module_name}")
+
+        if(IS_DIRECTORY "${_normalized_dir}/Assets")
+            list(APPEND STARENGINE_MODULE_ASSET_DIRS "${_module_name}=${_normalized_dir}/Assets")
+        endif()
 
         set(_starengine_module_editor_only FALSE)
         file(GLOB _starengine_module_manifests "${_normalized_dir}/*.starmodule")
