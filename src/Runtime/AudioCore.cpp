@@ -1,7 +1,9 @@
 #include "AudioCore.h"
 #include "Audio/AudioMixer.h"
 #include "Core/AudioBusRegistry.h"
+#include "Core/AudioEffectRegistry.h"
 #include "raylib.h"
+#include <algorithm>
 #include <vector>
 
 AudioCore::AudioCore() {
@@ -9,6 +11,8 @@ AudioCore::AudioCore() {
         busVolume[i] = 1.0f;
         busMuted[i] = false;
     }
+    AudioEffectRegistry::Get().AddListener([]() { AudioCore::Get().ApplyProjectEffects(); });
+    ApplyProjectEffects();
 }
 
 AudioCore& AudioCore::Get() {
@@ -28,12 +32,15 @@ void AudioCore::CloseDevice() {
     instances.clear();
     AudioMixer::Get().StopAllVoices();
     AudioMixer::Get().Shutdown();
+    for (int i = 0; i < kMaxMixerBuses; i++) busChains[i].reset();
+    retiredChains.clear();
     sampleCache.clear();
     CloseAudioDevice();
     deviceInitialized = false;
 }
 
 void AudioCore::Tick(float deltaTime) {
+    PruneRetired();
     std::vector<int> finished;
     for (auto& kv : instances) {
         kv.second->Tick(deltaTime);
@@ -133,6 +140,7 @@ void AudioCore::ResetBuses() {
         busMuted[i] = false;
         ApplyBus(i);
     }
+    ApplyProjectEffects();
 }
 
 int AudioCore::ResolveBus(const std::string& defaultBusName, const std::string& overrideName) const {
@@ -144,4 +152,102 @@ int AudioCore::ResolveBus(const std::string& defaultBusName, const std::string& 
     }
     int index = registry.IndexOf(defaultBusName);
     return index < 0 ? 0 : index;
+}
+
+void AudioCore::PruneRetired() {
+    if (retiredChains.empty()) return;
+    auto now = std::chrono::steady_clock::now();
+    retiredChains.erase(std::remove_if(retiredChains.begin(), retiredChains.end(),
+        [&](const RetiredChain& r) { return now - r.since > std::chrono::seconds(3); }), retiredChains.end());
+}
+
+bool AudioCore::SetBusEffectsByIndex(int index, const std::vector<std::string>& effectNames) {
+    if (index < 0 || index >= kMaxMixerBuses) return false;
+
+    std::shared_ptr<AudioEffectChain> chain;
+    if (!effectNames.empty()) {
+        chain = std::make_shared<AudioEffectChain>();
+        const AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+        for (const std::string& name : effectNames) {
+            const AudioEffectDef* def = registry.Find(name);
+            if (!def) {
+                TraceLog(LOG_WARNING, "Audio: unknown effect '%s'", name.c_str());
+                continue;
+            }
+            std::shared_ptr<AudioEffect> effect = CreateAudioEffect(def->type, kMixerSampleRate);
+            if (!effect) {
+                TraceLog(LOG_WARNING, "Audio: effect '%s' has unknown type '%s'", name.c_str(), def->type.c_str());
+                continue;
+            }
+            const AudioEffectTypeInfo* info = effect->Info();
+            for (size_t i = 0; i < info->params.size(); i++) {
+                effect->SetParam((int)i, AudioEffectRegistry::ParamValue(*def, info->params[i].id));
+            }
+            chain->effects.push_back(std::move(effect));
+            chain->names.push_back(name);
+        }
+        if (chain->effects.empty()) chain.reset();
+    }
+
+    if (busChains[index]) retiredChains.push_back({ busChains[index], std::chrono::steady_clock::now() });
+    busChains[index] = chain;
+    AudioMixer::Get().SetBusChain(index, chain);
+    PruneRetired();
+    return true;
+}
+
+std::vector<std::string> AudioCore::GetBusEffects(const std::string& busName) const {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0 || !busChains[index]) return {};
+    return busChains[index]->names;
+}
+
+bool AudioCore::SetBusEffects(const std::string& busName, const std::vector<std::string>& effectNames) {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0) return false;
+    return SetBusEffectsByIndex(index, effectNames);
+}
+
+bool AudioCore::AddBusEffect(const std::string& busName, const std::string& effectName) {
+    std::vector<std::string> names = GetBusEffects(busName);
+    names.push_back(effectName);
+    return SetBusEffects(busName, names);
+}
+
+bool AudioCore::RemoveBusEffect(const std::string& busName, const std::string& effectName) {
+    std::vector<std::string> names = GetBusEffects(busName);
+    auto found = std::find(names.begin(), names.end(), effectName);
+    if (found == names.end()) return false;
+    names.erase(found);
+    return SetBusEffects(busName, names);
+}
+
+bool AudioCore::ClearBusEffects(const std::string& busName) {
+    return SetBusEffects(busName, {});
+}
+
+bool AudioCore::SetBusEffectParameter(const std::string& busName, const std::string& effectName, const std::string& paramId, float value) {
+    int index = AudioBusRegistry::Get().IndexOf(busName);
+    if (index < 0 || !busChains[index]) return false;
+    bool applied = false;
+    const AudioEffectChain& chain = *busChains[index];
+    for (size_t i = 0; i < chain.effects.size(); i++) {
+        if (chain.names[i] != effectName) continue;
+        int param = AudioEffectTypes::ParamIndex(*chain.effects[i]->Info(), paramId);
+        if (param < 0) continue;
+        chain.effects[i]->SetParam(param, value);
+        applied = true;
+    }
+    return applied;
+}
+
+void AudioCore::ApplyProjectEffects() {
+    const AudioEffectRegistry& effects = AudioEffectRegistry::Get();
+    const AudioBusRegistry& buses = AudioBusRegistry::Get();
+    for (int i = 0; i < kMaxMixerBuses; i++) {
+        std::string name = buses.NameAt(i);
+        std::vector<std::string> names = name.empty() ? std::vector<std::string>() : effects.BusEffects(name);
+        if (names.empty() && !busChains[i]) continue;
+        SetBusEffectsByIndex(i, names);
+    }
 }

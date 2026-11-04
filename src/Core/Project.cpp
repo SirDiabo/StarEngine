@@ -3,6 +3,7 @@
 #include "LayoutSerializer.h"
 #include "NamedListRegistry.h"
 #include "AudioBusRegistry.h"
+#include "AudioEffectRegistry.h"
 #include "SaveFileRegistry.h"
 #include "SaveMigration.h"
 #include "CollisionLayers.h"
@@ -113,6 +114,7 @@ bool Project::Load(const std::string& path) {
     ModuleManager::Get().ApplyDisabledModuleNames(settings.disabledModules);
     NamedListRegistry::Get().Load(rootPath);
     AudioBusRegistry::Get().EnsureDefaults();
+    AudioEffectRegistry::Get().Load(rootPath);
     SaveFileRegistry::Get().Load(rootPath);
     SaveMigration::Load(rootPath);
     CollisionLayers::Load(rootPath);

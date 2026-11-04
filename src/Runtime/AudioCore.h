@@ -1,10 +1,13 @@
 #pragma once
+#include "Audio/AudioEffects.h"
 #include "Audio/AudioMixer.h"
 #include "Audio/AudioSource.h"
 #include "Audio/WavFile.h"
+#include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class AudioCore {
 public:
@@ -32,8 +35,26 @@ public:
     void ResetBuses();
     int ResolveBus(const std::string& defaultBusName, const std::string& overrideName) const;
 
+    bool SetBusEffects(const std::string& busName, const std::vector<std::string>& effectNames);
+    bool AddBusEffect(const std::string& busName, const std::string& effectName);
+    bool RemoveBusEffect(const std::string& busName, const std::string& effectName);
+    bool ClearBusEffects(const std::string& busName);
+    bool SetBusEffectParameter(const std::string& busName, const std::string& effectName, const std::string& paramId, float value);
+    std::vector<std::string> GetBusEffects(const std::string& busName) const;
+    void ApplyProjectEffects();
+
 private:
     void ApplyBus(int index);
+    bool SetBusEffectsByIndex(int index, const std::vector<std::string>& effectNames);
+    void PruneRetired();
+
+    struct RetiredChain {
+        std::shared_ptr<const AudioEffectChain> chain;
+        std::chrono::steady_clock::time_point since;
+    };
+
+    std::shared_ptr<const AudioEffectChain> busChains[kMaxMixerBuses];
+    std::vector<RetiredChain> retiredChains;
 
     float busVolume[kMaxMixerBuses];
     bool busMuted[kMaxMixerBuses];

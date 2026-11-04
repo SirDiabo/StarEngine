@@ -9,6 +9,9 @@
 constexpr int kMixerSampleRate = 44100;
 constexpr int kMaxMixerBuses = 32;
 constexpr int kMaxMixerVoices = 256;
+constexpr int kBusScratchFrames = 4096;
+
+struct AudioEffectChain;
 
 struct VoiceControl {
     std::atomic<float> volume{1.0f};
@@ -93,6 +96,7 @@ public:
 
     void SetBusGain(int bus, float gain);
     float GetBusGain(int bus) const;
+    void SetBusChain(int bus, const std::shared_ptr<const AudioEffectChain>& chain);
 
     void StopAllVoices();
     int ActiveVoiceCount() const { return activeVoices.load(); }
@@ -118,6 +122,12 @@ private:
         uint64_t epoch = 0;
     };
 
+    struct ChainCommand {
+        int bus = 0;
+        std::shared_ptr<const AudioEffectChain> chain;
+        std::vector<float> scratch;
+    };
+
     struct ActiveRenderer {
         std::shared_ptr<AudioRenderer> renderer;
         float lastGain = 1.0f;
@@ -127,7 +137,8 @@ private:
     static void StreamCallback(void* buffer, unsigned int frames);
 
     void DrainQueues();
-    bool MixVoice(Voice& voice, float* out, int frames);
+    bool MixVoice(Voice& voice, int frames);
+    void PrepareBlock(float* out, int frames);
 
     std::atomic<bool> running{false};
     std::atomic<uint64_t> stopEpoch{0};
@@ -141,6 +152,17 @@ private:
     std::vector<std::shared_ptr<Voice>> voices;
     std::vector<ActiveRenderer> renderers;
     std::vector<float> rendererScratch;
+
+    SpscQueue<ChainCommand, 64> chainQueue;
+    std::shared_ptr<const AudioEffectChain> busChains[kMaxMixerBuses];
+    std::vector<float> busScratch[kMaxMixerBuses];
+    float busLastGain[kMaxMixerBuses];
+    bool busGainPrimed[kMaxMixerBuses];
+    float masterLastGain = 1.0f;
+    bool chainActive[kMaxMixerBuses];
+    bool masterChainActive = false;
+    float blockBusFactor[kMaxMixerBuses];
+    float* blockBusDest[kMaxMixerBuses];
 
     struct StreamHandle;
     StreamHandle* stream = nullptr;

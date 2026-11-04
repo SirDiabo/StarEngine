@@ -1,4 +1,5 @@
 #include "AudioMixer.h"
+#include "AudioEffects.h"
 #include "raylib.h"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +17,14 @@ struct AudioMixer::StreamHandle {
 };
 
 AudioMixer::AudioMixer() {
-    for (int i = 0; i < kMaxMixerBuses; i++) busGains[i].store(1.0f);
+    for (int i = 0; i < kMaxMixerBuses; i++) {
+        busGains[i].store(1.0f);
+        busLastGain[i] = 1.0f;
+        busGainPrimed[i] = false;
+        chainActive[i] = false;
+        blockBusFactor[i] = 1.0f;
+        blockBusDest[i] = nullptr;
+    }
     voices.reserve(kMaxMixerVoices);
     renderers.reserve(32);
 }
@@ -59,6 +67,7 @@ void AudioMixer::Shutdown() {
     streamCreated = false;
     voices.clear();
     renderers.clear();
+    for (int i = 0; i < kMaxMixerBuses; i++) busChains[i].reset();
     activeVoices.store(0);
 }
 
@@ -137,6 +146,15 @@ float AudioMixer::GetBusGain(int bus) const {
     return busGains[bus].load();
 }
 
+void AudioMixer::SetBusChain(int bus, const std::shared_ptr<const AudioEffectChain>& chain) {
+    if (bus < 0 || bus >= kMaxMixerBuses) return;
+    ChainCommand command;
+    command.bus = bus;
+    command.chain = chain;
+    if (chain && !chain->effects.empty() && bus > 0) command.scratch.assign((size_t)kBusScratchFrames * 2, 0.0f);
+    chainQueue.Push(std::move(command));
+}
+
 void AudioMixer::StopAllVoices() {
     stopEpoch.fetch_add(1);
 }
@@ -149,6 +167,13 @@ void AudioMixer::DrainQueues() {
             continue;
         }
         voices.push_back(std::move(incoming));
+    }
+
+    ChainCommand chainCommand;
+    while (chainQueue.Pop(chainCommand)) {
+        busChains[chainCommand.bus] = std::move(chainCommand.chain);
+        if (!chainCommand.scratch.empty()) busScratch[chainCommand.bus] = std::move(chainCommand.scratch);
+        busGainPrimed[chainCommand.bus] = false;
     }
 
     RendererCommand command;
@@ -166,8 +191,32 @@ void AudioMixer::DrainQueues() {
     }
 }
 
-bool AudioMixer::MixVoice(Voice& voice, float* out, int frames) {
+void AudioMixer::PrepareBlock(float* out, int frames) {
+    masterChainActive = busChains[0] && !busChains[0]->effects.empty();
+    const float masterGain = busGains[0].load(std::memory_order_relaxed);
+    const float masterFold = masterChainActive ? 1.0f : masterGain;
+
+    blockBusFactor[0] = masterFold;
+    blockBusDest[0] = out;
+    chainActive[0] = false;
+
+    for (int b = 1; b < kMaxMixerBuses; b++) {
+        chainActive[b] = busChains[b] && !busChains[b]->effects.empty();
+        if (chainActive[b]) {
+            if (busScratch[b].size() < (size_t)frames * 2) busScratch[b].resize((size_t)frames * 2);
+            std::fill(busScratch[b].begin(), busScratch[b].begin() + (size_t)frames * 2, 0.0f);
+            blockBusFactor[b] = 1.0f;
+            blockBusDest[b] = busScratch[b].data();
+        } else {
+            blockBusFactor[b] = busGains[b].load(std::memory_order_relaxed) * masterFold;
+            blockBusDest[b] = out;
+        }
+    }
+}
+
+bool AudioMixer::MixVoice(Voice& voice, int frames) {
     VoiceControl& c = *voice.control;
+    float* out = blockBusDest[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
     const bool hasStream = voice.feed != nullptr;
     const SampleData* data = voice.data.get();
 
@@ -185,9 +234,7 @@ bool AudioMixer::MixVoice(Voice& voice, float* out, int frames) {
 
     const bool stopping = c.stopRequested.load(std::memory_order_relaxed);
     const bool paused = c.paused.load(std::memory_order_relaxed);
-    const float busGain = busGains[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)].load(std::memory_order_relaxed);
-    const float masterBus = busGains[0].load(std::memory_order_relaxed);
-    const float bus = c.bus.load(std::memory_order_relaxed) == 0 ? busGain : busGain * masterBus;
+    const float bus = blockBusFactor[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
 
     const float pan = std::clamp(c.pan.load(std::memory_order_relaxed), -1.0f, 1.0f);
     const float panLeft = std::min(1.0f, 1.0f - pan);
@@ -297,6 +344,8 @@ void AudioMixer::Render(float* out, int frames) {
     std::fill(out, out + (size_t)frames * 2, 0.0f);
     DrainQueues();
 
+    PrepareBlock(out, frames);
+
     uint64_t currentStopEpoch = stopEpoch.load();
     if (currentStopEpoch != handledStopEpoch) {
         handledStopEpoch = currentStopEpoch;
@@ -310,7 +359,7 @@ void AudioMixer::Render(float* out, int frames) {
 
     for (size_t i = 0; i < voices.size();) {
         Voice& voice = *voices[i];
-        if (voice.control->finished.load(std::memory_order_relaxed) || !MixVoice(voice, out, frames)) {
+        if (voice.control->finished.load(std::memory_order_relaxed) || !MixVoice(voice, frames)) {
             voice.control->finished.store(true, std::memory_order_release);
             voices[i] = std::move(voices.back());
             voices.pop_back();
@@ -332,19 +381,51 @@ void AudioMixer::Render(float* out, int frames) {
             entry.renderer->Render(rendererScratch.data(), frames, kMixerSampleRate);
 
             int bus = std::clamp(entry.renderer->bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1);
-            float busGain = busGains[bus].load(std::memory_order_relaxed) * (bus == 0 ? 1.0f : busGains[0].load(std::memory_order_relaxed));
-            float target = entry.renderer->gain.load(std::memory_order_relaxed) * busGain;
+            float* dest = blockBusDest[bus];
+            float target = entry.renderer->gain.load(std::memory_order_relaxed) * blockBusFactor[bus];
             float step = (target - entry.lastGain) / (float)frames;
             float g = entry.lastGain;
             for (int f = 0; f < frames; f++) {
                 g += step;
-                out[f * 2] += rendererScratch[(size_t)f * 2] * g;
-                out[f * 2 + 1] += rendererScratch[(size_t)f * 2 + 1] * g;
+                dest[f * 2] += rendererScratch[(size_t)f * 2] * g;
+                dest[f * 2 + 1] += rendererScratch[(size_t)f * 2 + 1] * g;
             }
             entry.lastGain = target;
             i++;
         }
     }
+
+    const float masterGain = busGains[0].load(std::memory_order_relaxed);
+    const float masterFold = masterChainActive ? 1.0f : masterGain;
+
+    for (int b = 1; b < kMaxMixerBuses; b++) {
+        if (!chainActive[b]) { busGainPrimed[b] = false; continue; }
+        float* buffer = busScratch[b].data();
+        for (const auto& effect : busChains[b]->effects) effect->Process(buffer, frames);
+
+        float target = busGains[b].load(std::memory_order_relaxed) * masterFold;
+        if (!busGainPrimed[b]) { busLastGain[b] = target; busGainPrimed[b] = true; }
+        float step = (target - busLastGain[b]) / (float)frames;
+        float g = busLastGain[b];
+        for (int f = 0; f < frames; f++) {
+            g += step;
+            out[f * 2] += buffer[f * 2] * g;
+            out[f * 2 + 1] += buffer[f * 2 + 1] * g;
+        }
+        busLastGain[b] = target;
+    }
+
+    if (masterChainActive) {
+        for (const auto& effect : busChains[0]->effects) effect->Process(out, frames);
+        float step = (masterGain - masterLastGain) / (float)frames;
+        float g = masterLastGain;
+        for (int f = 0; f < frames; f++) {
+            g += step;
+            out[f * 2] *= g;
+            out[f * 2 + 1] *= g;
+        }
+    }
+    masterLastGain = masterGain;
 
     for (int i = 0; i < frames * 2; i++) out[i] = std::clamp(out[i], -1.0f, 1.0f);
 }

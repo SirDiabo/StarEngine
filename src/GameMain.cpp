@@ -6,6 +6,7 @@
 #include "Core/StarPak.h"
 #include "Core/ExecutablePath.h"
 #include "Core/InputMappingRegistry.h"
+#include "Core/AudioConfig.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -71,6 +72,12 @@ static std::string FetchTextSync(const std::string& url) {
 }
 #endif
 
+static void LoadAudioConfigFromPak(StarPak::Reader& reader) {
+    if (!reader.HasEntry(StarPak::kAudioConfigPath)) return;
+    std::vector<uint8_t> bytes = reader.ReadEntry(StarPak::kAudioConfigPath);
+    AudioConfig::LoadPakText(std::string(bytes.begin(), bytes.end()));
+}
+
 int main(int argc, char* argv[]) {
     std::string resolvedExe = GetExecutablePath();
     fs::path exePath = !resolvedExe.empty() ? fs::path(resolvedExe) : (argc > 0 ? fs::path(argv[0]) : fs::path());
@@ -104,6 +111,7 @@ int main(int argc, char* argv[]) {
             std::vector<uint8_t> mappingBytes = pak.ReadEntry(StarPak::kInputMappingsPath);
             InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
         }
+        LoadAudioConfigFromPak(pak);
         if (pak.HasEntry(StarPak::kIconPath)) embeddedIcon = pak.ReadEntry(StarPak::kIconPath);
         CookedFile::SetActivePak(std::move(pak), config.cipher, config.cipherKey);
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
@@ -153,6 +161,7 @@ int main(int argc, char* argv[]) {
                         std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                         InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                     }
+                    LoadAudioConfigFromPak(sibling);
                     if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
                     CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                     TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
@@ -164,6 +173,7 @@ int main(int argc, char* argv[]) {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
             CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
+            AudioConfig::LoadLoose(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
         }
 #else
@@ -185,6 +195,7 @@ int main(int argc, char* argv[]) {
                     std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
                     InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
                 }
+                LoadAudioConfigFromPak(sibling);
                 if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
                 CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
                 TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
@@ -192,12 +203,14 @@ int main(int argc, char* argv[]) {
                 ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
                 CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
                 InputMappingRegistry::Get().Load(bootstrapDir.string());
+                AudioConfig::LoadLoose(bootstrapDir.string());
                 TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             }
         } else {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
             CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
+            AudioConfig::LoadLoose(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
         }
 #endif

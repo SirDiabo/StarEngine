@@ -6,6 +6,7 @@
 #include "CMakeBuild.h"
 #include "IconBuilder.h"
 #include "BuildDiagnostics.h"
+#include "AudioConfig.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
 #include "ShadingTechniqueRegistry.h"
@@ -369,6 +370,9 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             inputMappingsBytes.assign(std::istreambuf_iterator<char>(mappingsIn), std::istreambuf_iterator<char>());
         }
 
+        const std::string audioConfigText = AudioConfig::BuildPakText();
+        const std::vector<uint8_t> audioConfigBytes(audioConfigText.begin(), audioConfigText.end());
+
         PackagedGameConfig bootConfig;
         bootConfig.name = settings.name;
         bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
@@ -391,6 +395,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             if (!inputMappingsBytes.empty()) {
                 extraFiles.push_back({StarPak::kInputMappingsPath, inputMappingsBytes});
             }
+            extraFiles.push_back({StarPak::kAudioConfigPath, audioConfigBytes});
 
             CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
                                                                 options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression, options.integrity);
@@ -420,6 +425,12 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
                 fs::path outputMappingsPath = fs::path(options.outputDir) / "Config" / "InputMappings.cfg";
                 std::ofstream mappingsOut(outputMappingsPath, std::ios::binary);
                 mappingsOut.write(reinterpret_cast<const char*>(inputMappingsBytes.data()), (std::streamsize)inputMappingsBytes.size());
+            }
+            {
+                std::error_code audioEc;
+                fs::create_directories(fs::path(options.outputDir) / "Config", audioEc);
+                std::ofstream audioOut(fs::path(options.outputDir) / "Config" / "AudioConfig.cfg", std::ios::binary);
+                audioOut.write(reinterpret_cast<const char*>(audioConfigBytes.data()), (std::streamsize)audioConfigBytes.size());
             }
 
             fs::path bootstrapPath = fs::path(options.outputDir) / (foundJs.stem().string() + ".starproject");
@@ -473,6 +484,9 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         inputMappingsBytes.assign(std::istreambuf_iterator<char>(mappingsIn), std::istreambuf_iterator<char>());
     }
 
+    const std::string audioConfigText = AudioConfig::BuildPakText();
+    const std::vector<uint8_t> audioConfigBytes(audioConfigText.begin(), audioConfigText.end());
+
     PackagedGameConfig bootConfig;
     bootConfig.name = settings.name;
     bootConfig.renderScale = RenderSettings::Get().GetRenderScale();
@@ -495,6 +509,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         if (!inputMappingsBytes.empty()) {
             extraFiles.push_back({StarPak::kInputMappingsPath, inputMappingsBytes});
         }
+        extraFiles.push_back({StarPak::kAudioConfigPath, audioConfigBytes});
         if (haveIcon) extraFiles.push_back({StarPak::kIconPath, gameIcon.png});
 
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
@@ -526,6 +541,12 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             fs::path outputMappingsPath = fs::path(options.outputDir) / "Config" / "InputMappings.cfg";
             std::ofstream mappingsOut(outputMappingsPath, std::ios::binary);
             mappingsOut.write(reinterpret_cast<const char*>(inputMappingsBytes.data()), (std::streamsize)inputMappingsBytes.size());
+        }
+        {
+            std::error_code audioEc;
+            fs::create_directories(fs::path(options.outputDir) / "Config", audioEc);
+            std::ofstream audioOut(fs::path(options.outputDir) / "Config" / "AudioConfig.cfg", std::ios::binary);
+            audioOut.write(reinterpret_cast<const char*>(audioConfigBytes.data()), (std::streamsize)audioConfigBytes.size());
         }
 
         fs::path bootstrapPath = fs::path(options.outputDir) / (settings.name + ".starproject");
