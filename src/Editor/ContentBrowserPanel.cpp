@@ -127,9 +127,6 @@ const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entr
     else if (entry.extension == ".starsound")   key = "sound";
     else if (entry.extension == ".starwidget")  key = "widget";
 
-    auto it = icons.find(key);
-    if (it != icons.end() && it->second.id != 0) return &it->second;
-
     if (key == "asset") {
         const AssetTypeInfo* type = AssetTypeRegistry::Get().FindByExtension(entry.extension);
         if (type && !type->iconFile.empty()) {
@@ -142,6 +139,9 @@ const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entr
             if (found != icons.end() && found->second.id != 0) return &found->second;
         }
     }
+
+    auto it = icons.find(key);
+    if (it != icons.end() && it->second.id != 0) return &it->second;
 
     auto fallback = icons.find("asset");
     if (fallback != icons.end() && fallback->second.id != 0) return &fallback->second;
