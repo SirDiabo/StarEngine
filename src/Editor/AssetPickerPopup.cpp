@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include "Core/Project.h"
+#include "Core/ObjectKindRegistry.h"
 #include "Core/Widgets/WidgetOverlay.h"
 #include "Core/Widgets/SearchListElement.h"
 #include "UITheme.h"
@@ -35,6 +36,11 @@ void AssetPickerPopup::OpenWithExtras(Vector2 anchorPos, const std::string& ext,
         while (std::getline(filterStream, part, ';')) {
             if (part == "@audio") {
                 for (const std::string& audioExt : AudioSourceRegistry::Get().GetExtensions()) accepted.push_back(audioExt);
+            } else if (part == "@kinds") {
+                for (const std::string& kind : ObjectKindRegistry::Get().GetAllKinds()) {
+                    displayNames.push_back(kind);
+                    contentPaths.push_back(kind);
+                }
             } else if (!part.empty()) {
                 accepted.push_back(part);
             }

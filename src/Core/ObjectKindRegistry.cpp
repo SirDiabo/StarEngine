@@ -1,4 +1,5 @@
 #include "ObjectKindRegistry.h"
+#include <algorithm>
 
 ObjectKindRegistry& ObjectKindRegistry::Get() {
     static ObjectKindRegistry instance;
@@ -62,6 +63,14 @@ void ObjectKindRegistry::RegisterBuiltInKinds() {
 
 void ObjectKindRegistry::RegisterKind(const std::string& kind, const std::string& parentKind) {
     parents[kind] = parentKind;
+}
+
+std::vector<std::string> ObjectKindRegistry::GetAllKinds() const {
+    std::vector<std::string> kinds;
+    kinds.reserve(parents.size());
+    for (const auto& entry : parents) kinds.push_back(entry.first);
+    std::sort(kinds.begin(), kinds.end());
+    return kinds;
 }
 
 void ObjectKindRegistry::RegisterInterface(const std::string& kind, const std::string& interfaceKind) {

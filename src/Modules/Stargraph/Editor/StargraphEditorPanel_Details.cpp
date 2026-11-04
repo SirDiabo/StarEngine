@@ -223,7 +223,7 @@ void StargraphEditorPanel::BuildVariableRows(std::vector<PropertyRow>& rows, int
 
     if (var.type == PinType::Object) {
         std::string kindLabel = var.objectKind.empty() ? std::string("Any") : std::filesystem::path(var.objectKind).stem().string();
-        PropertyRow kindRow = AssetRow(prefix + "kind", "Kind", ".staractor", kindLabel);
+        PropertyRow kindRow = AssetRow(prefix + "kind", "Kind", ".staractor;@kinds", kindLabel);
         if (!var.objectKind.empty()) {
             kindRow.trailingLabel = "x";
             kindRow.trailingColor = theme.dangerBg;
