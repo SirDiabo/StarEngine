@@ -346,6 +346,47 @@ Value M_audio_play(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "p
 Value M_audio_stop(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "stop")->Stop(); return Value::Void(); }
 Value M_audio_pause(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "pause")->Pause(); return Value::Void(); }
 Value M_audio_resume(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "resume")->Resume(); return Value::Void(); }
+Value M_audio_set_tempo(Runtime&, Value& s, std::vector<Value>& a) { RequireAudio(s, "set_tempo")->tempo = (float)a[0].AsNumber(); return Value::Void(); }
+Value M_audio_set_pan(Runtime&, Value& s, std::vector<Value>& a) { RequireAudio(s, "set_pan")->pan = (float)a[0].AsNumber(); return Value::Void(); }
+Value M_audio_seek(Runtime&, Value& s, std::vector<Value>& a) {
+    if (AudioSource* source = RequireAudio(s, "seek")->GetSource()) source->Seek(a[0].AsNumber());
+    return Value::Void();
+}
+Value M_audio_is_playing(Runtime&, Value& s, std::vector<Value>&) { return Value::Bool(RequireAudio(s, "is_playing")->IsPlaying()); }
+Value M_audio_position(Runtime&, Value& s, std::vector<Value>&) {
+    AudioSource* source = RequireAudio(s, "position")->GetSource();
+    return Value::Float(source ? source->GetPosition() : 0.0);
+}
+Value M_audio_duration(Runtime&, Value& s, std::vector<Value>&) {
+    AudioSource* source = RequireAudio(s, "duration")->GetSource();
+    return Value::Float(source ? source->GetDuration() : 0.0);
+}
+Value M_audio_set_parameter(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_parameter")->SetParameter(a[0].s, AudioParamValue::FromNumber((float)a[1].AsNumber()));
+    return Value::Void();
+}
+Value M_audio_set_parameter_text(Runtime&, Value& s, std::vector<Value>& a) {
+    AudioParamValue value;
+    value.text = a[1].s;
+    RequireAudio(s, "set_parameter_text")->SetParameter(a[0].s, value);
+    return Value::Void();
+}
+Value M_audio_set_layer_mute(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_layer_mute")->SetParameter("Layers/" + a[0].s + "/Mute", AudioParamValue::FromNumber(a[1].b ? 1.0f : 0.0f));
+    return Value::Void();
+}
+Value M_audio_set_layer_solo(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_layer_solo")->SetParameter("Layers/" + a[0].s + "/Solo", AudioParamValue::FromNumber(a[1].b ? 1.0f : 0.0f));
+    return Value::Void();
+}
+Value M_audio_set_layer_volume(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_layer_volume")->SetParameter("Layers/" + a[0].s + "/Volume", AudioParamValue::FromNumber((float)a[1].AsNumber()));
+    return Value::Void();
+}
+Value M_audio_set_layer_pan(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_layer_pan")->SetParameter("Layers/" + a[0].s + "/Pan", AudioParamValue::FromNumber((float)a[1].AsNumber()));
+    return Value::Void();
+}
 Value M_mesh_play_animation(Runtime&, Value& s, std::vector<Value>& a) {
     RequireMesh(s, "play_animation")->PlayAnimation(a[0].s, a.size() > 1 ? a[1].b : false);
     return Value::Void();
@@ -595,6 +636,18 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Component, "stop", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_stop, "AudioComponent" },
         { Kind::Component, "pause", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_pause, "AudioComponent" },
         { Kind::Component, "resume", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_resume, "AudioComponent" },
+        { Kind::Component, "set_tempo", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_set_tempo, "AudioComponent" },
+        { Kind::Component, "set_pan", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_set_pan, "AudioComponent" },
+        { Kind::Component, "seek", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_seek, "AudioComponent" },
+        { Kind::Component, "is_playing", {}, 0, T(Kind::Bool), RetRule::Fixed, false, M_audio_is_playing, "AudioComponent" },
+        { Kind::Component, "position", {}, 0, T(Kind::Float), RetRule::Fixed, false, M_audio_position, "AudioComponent" },
+        { Kind::Component, "duration", {}, 0, T(Kind::Float), RetRule::Fixed, false, M_audio_duration, "AudioComponent" },
+        { Kind::Component, "set_parameter", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter, "AudioComponent" },
+        { Kind::Component, "set_parameter_text", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter_text, "AudioComponent" },
+        { Kind::Component, "set_layer_mute", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_mute, "AudioComponent" },
+        { Kind::Component, "set_layer_solo", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_solo, "AudioComponent" },
+        { Kind::Component, "set_layer_volume", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_volume, "AudioComponent" },
+        { Kind::Component, "set_layer_pan", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_pan, "AudioComponent" },
         { Kind::Component, "play_animation", { T(Kind::String), T(Kind::Bool) }, 1, T(Kind::Void), RetRule::Fixed, false, M_mesh_play_animation, "MeshComponent" },
         { Kind::Component, "stop_animation", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_mesh_stop_animation, "MeshComponent" },
         { Kind::Component, "set_anim_rate", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_mesh_set_anim_rate, "MeshComponent" },

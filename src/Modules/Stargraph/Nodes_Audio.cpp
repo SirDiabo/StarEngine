@@ -7,13 +7,6 @@
 
 namespace {
 
-int ReadHandle(const Node& node, const char* pinName = "Sound") {
-    for (const Pin& p : node.inputs) {
-        if (p.name == pinName && !p.defaultValue.empty()) return std::atoi(p.defaultValue.c_str());
-    }
-    return 0;
-}
-
 float ReadFloat(const Node& node, const char* pinName, float fallback) {
     for (const Pin& p : node.inputs) {
         if (p.name == pinName && !p.defaultValue.empty()) return p.defaultValue.AsFloat();
@@ -30,11 +23,6 @@ std::string ReadText(const Node& node, const char* pinName) {
 
 void WarnUnknownBus(const std::string& bus) {
     TraceLog(LOG_WARNING, "Audio: unknown bus '%s'", bus.c_str());
-}
-
-void AddSoundPins(Node* node, bool withExec) {
-    if (withExec) node->inputs.push_back({"In", PinType::Exec, true, false});
-    node->inputs.push_back({"Sound", PinType::Object, true, false, 0, "", false, "Sound"});
 }
 
 }
@@ -71,131 +59,6 @@ void RegisterAudioNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(playSound);
-
-    NodeTemplate stopSound;
-    stopSound.type = "Stop_Sound";
-    stopSound.category = "Audio";
-    stopSound.moduleName = "Stargraph";
-    stopSound.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    stopSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->Stop();
-    };
-    NodeRegistry::Get().RegisterNode(stopSound);
-
-    NodeTemplate pauseSound;
-    pauseSound.type = "Pause_Sound";
-    pauseSound.category = "Audio";
-    pauseSound.moduleName = "Stargraph";
-    pauseSound.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    pauseSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->Pause();
-    };
-    NodeRegistry::Get().RegisterNode(pauseSound);
-
-    NodeTemplate resumeSound;
-    resumeSound.type = "Resume_Sound";
-    resumeSound.category = "Audio";
-    resumeSound.moduleName = "Stargraph";
-    resumeSound.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    resumeSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->Resume();
-    };
-    NodeRegistry::Get().RegisterNode(resumeSound);
-
-    NodeTemplate isSoundPlaying;
-    isSoundPlaying.type = "Is_Sound_Playing";
-    isSoundPlaying.category = "Audio";
-    isSoundPlaying.moduleName = "Stargraph";
-    isSoundPlaying.createPins = [](Node* node) {
-        AddSoundPins(node, false);
-        node->outputs.push_back({"Playing", PinType::Boolean, false, true});
-    };
-    isSoundPlaying.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node));
-        bool playing = s && s->IsPlaying();
-        for (Pin& p : node.outputs) if (p.name == "Playing") p.defaultValue = playing ? "true" : "false";
-    };
-    NodeRegistry::Get().RegisterNode(isSoundPlaying);
-
-    NodeTemplate setSoundVolume;
-    setSoundVolume.type = "Set_Sound_Volume";
-    setSoundVolume.category = "Audio";
-    setSoundVolume.moduleName = "Stargraph";
-    setSoundVolume.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->inputs.push_back({"Volume", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setSoundVolume.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->SetVolume(ReadFloat(node, "Volume", 1.0f));
-    };
-    NodeRegistry::Get().RegisterNode(setSoundVolume);
-
-    NodeTemplate setSoundPitch;
-    setSoundPitch.type = "Set_Sound_Pitch";
-    setSoundPitch.category = "Audio";
-    setSoundPitch.moduleName = "Stargraph";
-    setSoundPitch.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setSoundPitch.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->SetPitch(ReadFloat(node, "Pitch", 1.0f));
-    };
-    NodeRegistry::Get().RegisterNode(setSoundPitch);
-
-    NodeTemplate setSoundTempo;
-    setSoundTempo.type = "Set_Sound_Tempo";
-    setSoundTempo.category = "Audio";
-    setSoundTempo.moduleName = "Stargraph";
-    setSoundTempo.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->inputs.push_back({"Tempo", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setSoundTempo.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node));
-        if (s && s->SupportsTempo()) s->SetTempo(ReadFloat(node, "Tempo", 1.0f));
-    };
-    NodeRegistry::Get().RegisterNode(setSoundTempo);
-
-    NodeTemplate setSoundPan;
-    setSoundPan.type = "Set_Sound_Pan";
-    setSoundPan.category = "Audio";
-    setSoundPan.moduleName = "Stargraph";
-    setSoundPan.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->inputs.push_back({"Pan", PinType::Float, true, false, 0, "0.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setSoundPan.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->SetPan(ReadFloat(node, "Pan", 0.0f));
-    };
-    NodeRegistry::Get().RegisterNode(setSoundPan);
-
-    NodeTemplate seekSound;
-    seekSound.type = "Seek_Sound";
-    seekSound.category = "Audio";
-    seekSound.moduleName = "Stargraph";
-    seekSound.createPins = [](Node* node) {
-        AddSoundPins(node, true);
-        node->inputs.push_back({"Position", PinType::Float, true, false, 0, "0.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    seekSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        if (AudioSource* s = AudioCore::Get().FindInstance(ReadHandle(node))) s->Seek(ReadFloat(node, "Position", 0.0f));
-    };
-    NodeRegistry::Get().RegisterNode(seekSound);
 
     NodeTemplate setMasterVolume;
     setMasterVolume.type = "Set_Master_Volume";

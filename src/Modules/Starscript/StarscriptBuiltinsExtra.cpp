@@ -259,6 +259,33 @@ Value Fn_set_sound_volume(Runtime&, std::vector<Value>& a) { if (AudioSource* s 
 Value Fn_set_sound_pitch(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetPitch((float)a[1].AsNumber()); return Value::Void(); }
 Value Fn_set_sound_tempo(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); if (s && s->SupportsTempo()) s->SetTempo((float)a[1].AsNumber()); return Value::Void(); }
 Value Fn_set_sound_pan(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetPan((float)a[1].AsNumber()); return Value::Void(); }
+Value Fn_set_sound_looping(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->SetLooping(a[1].b); return Value::Void(); }
+Value Fn_set_sound_parameter(Runtime&, std::vector<Value>& a) {
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter(a[1].s, AudioParamValue::FromNumber((float)a[2].AsNumber()));
+    return Value::Void();
+}
+Value Fn_set_sound_parameter_text(Runtime&, std::vector<Value>& a) {
+    AudioParamValue value;
+    value.text = a[2].s;
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter(a[1].s, value);
+    return Value::Void();
+}
+Value Fn_set_sound_layer_mute(Runtime&, std::vector<Value>& a) {
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter("Layers/" + a[1].s + "/Mute", AudioParamValue::FromNumber(a[2].b ? 1.0f : 0.0f));
+    return Value::Void();
+}
+Value Fn_set_sound_layer_solo(Runtime&, std::vector<Value>& a) {
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter("Layers/" + a[1].s + "/Solo", AudioParamValue::FromNumber(a[2].b ? 1.0f : 0.0f));
+    return Value::Void();
+}
+Value Fn_set_sound_layer_volume(Runtime&, std::vector<Value>& a) {
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter("Layers/" + a[1].s + "/Volume", AudioParamValue::FromNumber((float)a[2].AsNumber()));
+    return Value::Void();
+}
+Value Fn_set_sound_layer_pan(Runtime&, std::vector<Value>& a) {
+    if (AudioSource* s = FindSound(a[0])) s->SetParameter("Layers/" + a[1].s + "/Pan", AudioParamValue::FromNumber((float)a[2].AsNumber()));
+    return Value::Void();
+}
 Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
@@ -352,6 +379,13 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "set_sound_pitch", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_pitch },
         { "set_sound_tempo", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_tempo },
         { "set_sound_pan", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_pan },
+        { "set_sound_looping", { T(Kind::Int), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_looping },
+        { "set_sound_parameter", { T(Kind::Int), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_parameter },
+        { "set_sound_parameter_text", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_parameter_text },
+        { "set_sound_layer_mute", { T(Kind::Int), T(Kind::String), T(Kind::Bool) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_layer_mute },
+        { "set_sound_layer_solo", { T(Kind::Int), T(Kind::String), T(Kind::Bool) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_layer_solo },
+        { "set_sound_layer_volume", { T(Kind::Int), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_layer_volume },
+        { "set_sound_layer_pan", { T(Kind::Int), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_set_sound_layer_pan },
         { "seek_sound", { T(Kind::Int), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_seek_sound },
         { "sound_position", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_position },
         { "sound_duration", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_duration },

@@ -2066,6 +2066,13 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
                 break;
             }
         }
+        if (node->componentClass.empty()) {
+            for (const BasicActorDef& def : GetBasicActorDefs()) {
+                if (def.kindName != sourceKind || def.componentType != externalCompName) continue;
+                node->componentClass = def.componentType;
+                break;
+            }
+        }
         node->title = "Get: " + externalCompName;
     }
     Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, nodeMenuPos));
@@ -2307,6 +2314,18 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                 if (searchLower.empty() || compLower.find(searchLower) != std::string::npos)
                     entries.push_back({"Components", compId});
             }
+        }
+    }
+
+    if (!sourceKind.empty() && sourceKind.find('.') == std::string::npos) {
+        for (const BasicActorDef& def : GetBasicActorDefs()) {
+            if (def.kindName != sourceKind || def.componentType.empty()) continue;
+
+            std::string compId = "Get_External_Component:" + def.componentType;
+            std::string compLower = NodeMenuDisplayLabel(compId);
+            for (char& c : compLower) c = (char)tolower(c);
+            if (searchLower.empty() || compLower.find(searchLower) != std::string::npos)
+                entries.push_back({"Components", compId});
         }
     }
 

@@ -55,10 +55,17 @@ void ObjectKindRegistry::RegisterBuiltInKinds() {
     RegisterKind("GlobalLightActor", "Actor");
     RegisterKind("CameraActor", "Actor");
     RegisterKind("AudioActor", "Actor");
+    RegisterKind("AudioTarget", "");
+    RegisterInterface("Sound", "AudioTarget");
+    RegisterInterface("AudioComponent", "AudioTarget");
 }
 
 void ObjectKindRegistry::RegisterKind(const std::string& kind, const std::string& parentKind) {
     parents[kind] = parentKind;
+}
+
+void ObjectKindRegistry::RegisterInterface(const std::string& kind, const std::string& interfaceKind) {
+    interfaces.emplace(kind, interfaceKind);
 }
 
 std::string ObjectKindRegistry::GetParentKind(const std::string& kind) const {
@@ -71,6 +78,10 @@ bool ObjectKindRegistry::IsCompatible(const std::string& candidateKind, const st
 
     std::string current = candidateKind;
     for (int guard = 0; guard < 32; guard++) {
+        auto range = interfaces.equal_range(current);
+        for (auto it = range.first; it != range.second; ++it) {
+            if (it->second == requiredKind) return true;
+        }
         auto it = parents.find(current);
         if (it == parents.end() || it->second.empty()) return false;
         current = it->second;

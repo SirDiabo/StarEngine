@@ -5,15 +5,110 @@
 #include "Runtime/AudioCore.h"
 #include "raylib.h"
 #include <cstdlib>
+#include <functional>
 #include "ObjectPinRef.h"
 #include "Nodes_Components.h"
+
+namespace {
+
+struct AudioTarget {
+    AudioComponent* component = nullptr;
+    AudioSource* source = nullptr;
+    int handle = 0;
+
+    bool Valid() const { return component != nullptr || source != nullptr; }
+};
+
+AudioTarget ResolveTarget(Node& node, ExecutionContext& ctx) {
+    AudioTarget target;
+    for (const Pin& p : node.inputs) {
+        if (p.name != "Target" || p.defaultValue.empty()) continue;
+        std::string value = p.defaultValue;
+        if (value.find(':') != std::string::npos) {
+            target.component = ObjectPinRef::ResolveAs<AudioComponent>(node, value, "AudioTarget", ctx);
+        } else {
+            target.handle = std::atoi(value.c_str());
+            target.source = AudioCore::Get().FindInstance(target.handle);
+        }
+    }
+    return target;
+}
+
+float ReadFloat(const Node& node, const char* pinName, float fallback) {
+    for (const Pin& p : node.inputs) {
+        if (p.name == pinName && !p.defaultValue.empty()) return p.defaultValue.AsFloat();
+    }
+    return fallback;
+}
+
+bool ReadBool(const Node& node, const char* pinName, bool fallback) {
+    for (const Pin& p : node.inputs) {
+        if (p.name == pinName && !p.defaultValue.empty()) return p.defaultValue.AsBool();
+    }
+    return fallback;
+}
+
+std::string ReadText(const Node& node, const char* pinName) {
+    for (const Pin& p : node.inputs) {
+        if (p.name == pinName) return p.defaultValue;
+    }
+    return std::string();
+}
+
+void SetParameter(AudioTarget& target, const std::string& path, const AudioParamValue& value) {
+    if (target.component) target.component->SetParameter(path, value);
+    else if (target.source) target.source->SetParameter(path, value);
+}
+
+void AddTargetPin(Node* node) {
+    node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioTarget"});
+}
+
+void RegisterTargetNode(const char* type,
+                        std::function<void(Node*)> extraPins,
+                        std::function<void(Node&, AudioTarget&)> run) {
+    NodeTemplate t;
+    t.type = type;
+    t.category = "Audio";
+    t.moduleName = "Stargraph";
+    t.createPins = [extraPins](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        AddTargetPin(node);
+        if (extraPins) extraPins(node);
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    t.execute = [run](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        AudioTarget target = ResolveTarget(node, ctx);
+        if (!target.Valid()) return;
+        run(node, target);
+    };
+    NodeRegistry::Get().RegisterNode(t);
+}
+
+void RegisterLayerNode(const char* type, const char* leaf, const char* valuePin, PinType valueType, const char* valueDefault) {
+    std::string leafName = leaf;
+    std::string pinName = valuePin;
+    bool isBool = valueType == PinType::Boolean;
+    RegisterTargetNode(type,
+        [pinName, valueType, valueDefault](Node* node) {
+            node->inputs.push_back({"Layer", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({pinName, valueType, true, false, 0, valueDefault});
+        },
+        [leafName, pinName, isBool](Node& node, AudioTarget& target) {
+            std::string layer = ReadText(node, "Layer");
+            if (layer.empty()) return;
+            float number = isBool ? (ReadBool(node, pinName.c_str(), false) ? 1.0f : 0.0f) : ReadFloat(node, pinName.c_str(), 0.0f);
+            SetParameter(target, "Layers/" + layer + "/" + leafName, AudioParamValue::FromNumber(number));
+        });
+}
+
+}
 
 void RegisterAudioComponentNodes() {
     NodeTemplate setSoundPath;
     setSoundPath.type = "Set_Sound_Path";
     setSoundPath.category = "Audio";
     setSoundPath.moduleName = "Stargraph";
-    setSoundPath.hideFromContextMenu = true;
     setSoundPath.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
@@ -21,245 +116,122 @@ void RegisterAudioComponentNodes() {
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setSoundPath.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        std::string path;
+        AudioComponent* target = nullptr;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
+                target = ObjectPinRef::ResolveAs<AudioComponent>(node, p.defaultValue, "AudioComponent", ctx);
             }
-            if (p.name == "Sound Path") path = p.defaultValue;
         }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->soundPath = path;
-        }
+        if (target) target->soundPath = ReadText(node, "Sound Path");
     };
     NodeRegistry::Get().RegisterNode(setSoundPath);
 
-    NodeTemplate setVolume;
-    setVolume.type = "Set_Volume";
-    setVolume.category = "Audio";
-    setVolume.moduleName = "Stargraph";
-    setVolume.hideFromContextMenu = true;
-    setVolume.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->inputs.push_back({"Volume", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setVolume.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float volume = 1.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-            if (p.name == "Volume" && !p.defaultValue.empty()) volume = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->volume = volume;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setVolume);
+    RegisterTargetNode("Set_Volume",
+        [](Node* node) { node->inputs.push_back({"Volume", PinType::Float, true, false, 0, "1.0"}); },
+        [](Node& node, AudioTarget& target) {
+            float volume = ReadFloat(node, "Volume", 1.0f);
+            if (target.component) target.component->volume = volume;
+            else target.source->SetVolume(volume);
+        });
 
-    NodeTemplate setLooping;
-    setLooping.type = "Set_Looping";
-    setLooping.category = "Audio";
-    setLooping.moduleName = "Stargraph";
-    setLooping.hideFromContextMenu = true;
-    setLooping.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setLooping.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        bool looping = false;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-            if (p.name == "Looping") looping = (p.defaultValue == "true" || p.defaultValue == "1");
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->looping = looping;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setLooping);
+    RegisterTargetNode("Set_Looping",
+        [](Node* node) { node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"}); },
+        [](Node& node, AudioTarget& target) {
+            bool looping = ReadBool(node, "Looping", false);
+            if (target.component) target.component->looping = looping;
+            else target.source->SetLooping(looping);
+        });
 
-    NodeTemplate setPitch;
-    setPitch.type = "Set_Pitch";
-    setPitch.category = "Audio";
-    setPitch.moduleName = "Stargraph";
-    setPitch.hideFromContextMenu = true;
-    setPitch.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setPitch.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float pitch = 1.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-            if (p.name == "Pitch" && !p.defaultValue.empty()) pitch = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->pitch = pitch;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setPitch);
+    RegisterTargetNode("Set_Pitch",
+        [](Node* node) { node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"}); },
+        [](Node& node, AudioTarget& target) {
+            float pitch = ReadFloat(node, "Pitch", 1.0f);
+            if (target.component) target.component->pitch = pitch;
+            else target.source->SetPitch(pitch);
+        });
 
-    NodeTemplate setTempo;
-    setTempo.type = "Set_Tempo";
-    setTempo.category = "Audio";
-    setTempo.moduleName = "Stargraph";
-    setTempo.hideFromContextMenu = true;
-    setTempo.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->inputs.push_back({"Tempo", PinType::Float, true, false, 0, "1.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setTempo.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float tempo = 1.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-            if (p.name == "Tempo" && !p.defaultValue.empty()) tempo = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->tempo = tempo;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setTempo);
+    RegisterTargetNode("Set_Tempo",
+        [](Node* node) { node->inputs.push_back({"Tempo", PinType::Float, true, false, 0, "1.0"}); },
+        [](Node& node, AudioTarget& target) {
+            float tempo = ReadFloat(node, "Tempo", 1.0f);
+            if (target.component) target.component->tempo = tempo;
+            else if (target.source->SupportsTempo()) target.source->SetTempo(tempo);
+        });
 
-    NodeTemplate setPan;
-    setPan.type = "Set_Pan";
-    setPan.category = "Audio";
-    setPan.moduleName = "Stargraph";
-    setPan.hideFromContextMenu = true;
-    setPan.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->inputs.push_back({"Pan", PinType::Float, true, false, 0, "0.0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setPan.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        float pan = 0.0f;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-            if (p.name == "Pan" && !p.defaultValue.empty()) pan = p.defaultValue.AsFloat();
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->pan = pan;
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setPan);
+    RegisterTargetNode("Set_Pan",
+        [](Node* node) { node->inputs.push_back({"Pan", PinType::Float, true, false, 0, "0.0"}); },
+        [](Node& node, AudioTarget& target) {
+            float pan = ReadFloat(node, "Pan", 0.0f);
+            if (target.component) target.component->pan = pan;
+            else target.source->SetPan(pan);
+        });
 
-    NodeTemplate playAudio;
-    playAudio.type = "Play_Audio";
-    playAudio.category = "Audio";
-    playAudio.moduleName = "Stargraph";
-    playAudio.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    playAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->Play();
-        }
-    };
-    NodeRegistry::Get().RegisterNode(playAudio);
+    RegisterTargetNode("Play_Audio", nullptr,
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->Play();
+            else target.source->Play();
+        });
 
-    NodeTemplate stopAudio;
-    stopAudio.type = "Stop_Audio";
-    stopAudio.category = "Audio";
-    stopAudio.moduleName = "Stargraph";
-    stopAudio.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    stopAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->Stop();
-        }
-    };
-    NodeRegistry::Get().RegisterNode(stopAudio);
+    RegisterTargetNode("Stop_Audio", nullptr,
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->Stop();
+            else AudioCore::Get().StopInstance(target.handle);
+        });
 
-    NodeTemplate pauseAudio;
-    pauseAudio.type = "Pause_Audio";
-    pauseAudio.category = "Audio";
-    pauseAudio.moduleName = "Stargraph";
-    pauseAudio.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    pauseAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->Pause();
-        }
-    };
-    NodeRegistry::Get().RegisterNode(pauseAudio);
+    RegisterTargetNode("Pause_Audio", nullptr,
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->Pause();
+            else target.source->Pause();
+        });
 
-    NodeTemplate resumeAudio;
-    resumeAudio.type = "Resume_Audio";
-    resumeAudio.category = "Audio";
-    resumeAudio.moduleName = "Stargraph";
-    resumeAudio.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "AudioComponent"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    RegisterTargetNode("Resume_Audio", nullptr,
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->Resume();
+            else target.source->Resume();
+        });
+
+    RegisterTargetNode("Seek_Audio",
+        [](Node* node) { node->inputs.push_back({"Position", PinType::Float, true, false, 0, "0.0"}); },
+        [](Node& node, AudioTarget& target) {
+            float position = ReadFloat(node, "Position", 0.0f);
+            AudioSource* source = target.component ? target.component->GetSource() : target.source;
+            if (source) source->Seek(position);
+        });
+
+    RegisterTargetNode("Set_Audio_Parameter",
+        [](Node* node) {
+            node->inputs.push_back({"Path", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Number", PinType::Float, true, false, 0, "0.0"});
+            node->inputs.push_back({"Text", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            std::string path = ReadText(node, "Path");
+            if (path.empty()) return;
+            AudioParamValue value;
+            value.number = ReadFloat(node, "Number", 0.0f);
+            value.text = ReadText(node, "Text");
+            SetParameter(target, path, value);
+        });
+
+    RegisterLayerNode("Set_Layer_Mute", "Mute", "Muted", PinType::Boolean, "false");
+    RegisterLayerNode("Set_Layer_Solo", "Solo", "Soloed", PinType::Boolean, "false");
+    RegisterLayerNode("Set_Layer_Volume", "Volume", "Volume", PinType::Float, "1.0");
+    RegisterLayerNode("Set_Layer_Pan", "Pan", "Pan", PinType::Float, "0.0");
+
+    NodeTemplate isAudioPlaying;
+    isAudioPlaying.type = "Is_Audio_Playing";
+    isAudioPlaying.category = "Audio";
+    isAudioPlaying.moduleName = "Stargraph";
+    isAudioPlaying.createPins = [](Node* node) {
+        AddTargetPin(node);
+        node->outputs.push_back({"Playing", PinType::Boolean, false, true});
     };
-    resumeAudio.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        Component* target = nullptr;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Target" && !p.defaultValue.empty()) {
-                target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "AudioComponent", ctx);
-            }
-        }
-        if (!target) return;
-        if (AudioComponent* ac = dynamic_cast<AudioComponent*>(target)) {
-            ac->Resume();
-        }
+    isAudioPlaying.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        AudioTarget target = ResolveTarget(node, ctx);
+        bool playing = false;
+        if (target.component) playing = target.component->IsPlaying();
+        else if (target.source) playing = target.source->IsPlaying();
+        for (Pin& p : node.outputs) if (p.name == "Playing") p.defaultValue = playing ? "true" : "false";
     };
-    NodeRegistry::Get().RegisterNode(resumeAudio);
+    NodeRegistry::Get().RegisterNode(isAudioPlaying);
 }
