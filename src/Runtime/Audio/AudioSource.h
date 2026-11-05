@@ -53,6 +53,7 @@ public:
 
     virtual void GetParameters(std::vector<AudioParamInfo>& out) const { (void)out; }
     virtual bool SetParameter(const std::string& path, const AudioParamValue& value) { (void)path; (void)value; return false; }
+    virtual bool GetParameter(const std::string& path, AudioParamValue& out) const { (void)path; (void)out; return false; }
 
     virtual void Tick(float deltaTime) { (void)deltaTime; }
 };

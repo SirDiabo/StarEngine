@@ -88,6 +88,8 @@ public:
     bool DeleteSelectedEvent();
     void MoveSelectedEvent(int64_t tick);
     void RenameSelectedMarker(const std::string& name);
+    void SetSelectedMarkerType(Starsequence::MarkerType type);
+    void SetSelectedMarkerTarget(const std::string& target);
     void EventsEdited() { MarkStructureChanged(); }
     int64_t NoteLength() const;
     void SetNoteLength(int64_t length);

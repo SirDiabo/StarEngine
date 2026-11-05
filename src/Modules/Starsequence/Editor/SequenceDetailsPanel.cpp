@@ -129,7 +129,22 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
         const int64_t tick = EventTick(seq, ref);
         if (ref.kind == EventKind::Marker && (size_t)ref.index < seq.markers.size()) {
             rows.push_back(HeaderRow("h.event", "Marker"));
-            rows.push_back(StringRow("ev.name", "Name", seq.markers[(size_t)ref.index].name, [s](const std::string& v) { s->RenameSelectedMarker(v); }));
+            const Marker& marker = seq.markers[(size_t)ref.index];
+            rows.push_back(StringRow("ev.name", "Name", marker.name, [s](const std::string& v) { s->RenameSelectedMarker(v); }));
+            const std::vector<std::string> typeLabels = { "Cue", "Start Point", "End", "Jump To" };
+            const char* current = marker.type == MarkerType::Start ? "Start Point" : marker.type == MarkerType::End ? "End" : marker.type == MarkerType::JumpTo ? "Jump To" : "Cue";
+            rows.push_back(EnumRow("ev.mtype", "Type", current, typeLabels, [s](const std::string& v) {
+                s->SetSelectedMarkerType(v == "Start Point" ? MarkerType::Start : v == "End" ? MarkerType::End : v == "Jump To" ? MarkerType::JumpTo : MarkerType::Cue);
+            }));
+            if (marker.type == MarkerType::JumpTo) {
+                std::vector<std::string> targets = { "(none)" };
+                for (size_t i = 0; i < seq.markers.size(); i++) {
+                    if ((int)i != ref.index) targets.push_back(seq.markers[i].name);
+                }
+                rows.push_back(EnumRow("ev.mtarget", "Jump Target", marker.target.empty() ? "(none)" : marker.target, targets, [s](const std::string& v) {
+                    s->SetSelectedMarkerTarget(v == "(none)" ? std::string() : v);
+                }));
+            }
         } else if (ref.kind == EventKind::Tempo && (size_t)ref.index < seq.tempo.size()) {
             rows.push_back(HeaderRow("h.event", "Tempo Change"));
             rows.push_back(FloatRow("ev.bpm", "BPM", (float)seq.tempo[(size_t)ref.index].bpm, false, [s, ref](float v) {

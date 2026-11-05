@@ -708,6 +708,16 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
                         isDirty = true;
                     }
                 }));
+        } else if (node->type == "Skip_To_Marker" && pin.name == "Quantize") {
+            int pinId = pin.id;
+            const std::vector<std::string> options = { "Keep Current", "Immediate", "Beat", "Bar" };
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("Keep Current") : value, options,
+                [this, pinId](const std::string& v) {
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) {
+                        p->defaultValue = v == "Keep Current" ? std::string() : v;
+                        isDirty = true;
+                    }
+                }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

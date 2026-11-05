@@ -40,6 +40,7 @@ public:
 
     void GetParameters(std::vector<AudioParamInfo>& out) const override;
     bool SetParameter(const std::string& path, const AudioParamValue& value) override;
+    bool GetParameter(const std::string& path, AudioParamValue& out) const override;
 
     bool IsValid() const { return valid; }
     const Sequence& GetSequence() const { return sequence; }

@@ -93,6 +93,10 @@ void AudioComponent::SetParameter(const std::string& path, const AudioParamValue
     source->SetParameter(path, value);
 }
 
+bool AudioComponent::GetParameter(const std::string& path, AudioParamValue& out) const {
+    return source && source->GetParameter(path, out);
+}
+
 namespace {
 
 ComponentFieldDesc BusField() {

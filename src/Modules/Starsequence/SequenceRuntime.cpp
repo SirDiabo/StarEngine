@@ -46,6 +46,35 @@ std::shared_ptr<RtSequence> CompileSequence(const Sequence& s, const SampleLoade
     rt->markers = s.markers;
     s.BuildBoundaries(rt->beats, rt->bars);
 
+    {
+        rt->markerOrder.resize(s.markers.size());
+        for (size_t i = 0; i < s.markers.size(); i++) rt->markerOrder[i] = (int)i;
+        std::stable_sort(rt->markerOrder.begin(), rt->markerOrder.end(),
+            [&](int a, int b) { return s.markers[(size_t)a].tick < s.markers[(size_t)b].tick; });
+
+        std::vector<Marker> ordered = s.markers;
+        std::stable_sort(ordered.begin(), ordered.end(), [](const Marker& a, const Marker& b) { return a.tick < b.tick; });
+        bool haveStart = false;
+        for (const Marker& m : ordered) {
+            if (m.type == MarkerType::Start && !haveStart) {
+                haveStart = true;
+                rt->startTick = s.length > 0 ? std::min<int64_t>(m.tick, s.length) : m.tick;
+            } else if (m.type == MarkerType::End) {
+                rt->markerEvents.push_back({ m.tick, MarkerType::End, 0, -1 });
+            } else if (m.type == MarkerType::JumpTo) {
+                int index = s.FindMarker(m.target);
+                if (m.target.empty()) continue;
+                if (index < 0) {
+                    report.warnings.push_back("Jump marker '" + m.name + "' points to missing marker '" + m.target + "'");
+                } else if (s.markers[(size_t)index].tick == m.tick) {
+                    report.warnings.push_back("Jump marker '" + m.name + "' points to a marker at its own position");
+                } else {
+                    rt->markerEvents.push_back({ m.tick, MarkerType::JumpTo, s.markers[(size_t)index].tick, index });
+                }
+            }
+        }
+    }
+
     std::map<std::string, LoadedSample> cache;
     std::map<std::string, bool> failed;
 
@@ -194,8 +223,8 @@ void SequenceRenderer::Initialize(int rate) {
     }
     pitchSmoothed = control->pitch.load();
     fadeGain = 1.0f;
-    tick = 0.0;
-    JumpTo(0, 0.0);
+    tick = (double)sequence->startTick;
+    JumpTo(sequence->startTick, 0.0);
 }
 
 void SequenceRenderer::ResetBpmIndex() {
@@ -295,6 +324,8 @@ void SequenceRenderer::JumpTo(int64_t target, double overshoot) {
         cursors[l] = (size_t)(it - events.begin());
     }
     ReplayControllers(target);
+    markerCursor = (size_t)(std::lower_bound(sequence->markerEvents.begin(), sequence->markerEvents.end(), target,
+        [](const RtMarkerEvent& e, int64_t t) { return e.tick < t; }) - sequence->markerEvents.begin());
     for (SkippedNote& s : skipped) s.used = false;
     ResetBpmIndex();
     ended = false;
@@ -439,6 +470,7 @@ double SequenceRenderer::NextEventTick() const {
         bool looping = control->looping.load(std::memory_order_relaxed);
         int64_t endTick = (looping && sequence->loopEnd > sequence->loopStart) ? sequence->loopEnd : sequence->length;
         best = std::min(best, (double)endTick);
+        if (markerCursor < sequence->markerEvents.size()) best = std::min(best, (double)sequence->markerEvents[markerCursor].tick);
         for (size_t l = 0; l < sequence->layers.size(); l++) {
             const std::vector<RtEvent>& events = sequence->layers[l].events;
             if (cursors[l] < events.size()) best = std::min(best, (double)events[cursors[l]].tick);
@@ -461,6 +493,7 @@ void SequenceRenderer::ProcessDue() {
         if (jumpPending && tick + 1e-9 >= (double)jumpAt) {
             double over = std::max(0.0, tick - (double)jumpAt);
             jumpPending = false;
+            landMarker = jumpMarkerIndex;
             JumpTo(jumpTarget, over);
             changed = true;
         }
@@ -468,13 +501,19 @@ void SequenceRenderer::ProcessDue() {
         bool looping = control->looping.load(std::memory_order_relaxed);
         int64_t endTick = (looping && sequence->loopEnd > sequence->loopStart) ? sequence->loopEnd : sequence->length;
         if (!ended && tick + 1e-9 >= (double)endTick) {
-            if (looping) {
-                int64_t target = sequence->loopEnd > sequence->loopStart ? sequence->loopStart : 0;
-                JumpTo(target, std::max(0.0, tick - (double)endTick));
-                changed = true;
+            FinishOrLoop(std::max(0.0, tick - (double)endTick));
+            changed = true;
+        }
+
+        if (!ended && markerCursor < sequence->markerEvents.size() && (double)sequence->markerEvents[markerCursor].tick <= tick + 1e-9) {
+            const RtMarkerEvent& m = sequence->markerEvents[markerCursor++];
+            double over = std::max(0.0, tick - (double)m.tick);
+            changed = true;
+            if (m.type == MarkerType::JumpTo) {
+                landMarker = m.targetIndex;
+                JumpTo(m.target, over);
             } else {
-                ended = true;
-                ReleaseAllForJump();
+                FinishOrLoop(over);
             }
         }
 
@@ -490,18 +529,50 @@ void SequenceRenderer::ProcessDue() {
         }
         if (!changed) break;
     }
+    UpdateCurrentMarker();
+}
+
+void SequenceRenderer::UpdateCurrentMarker() {
+    const std::vector<int>& order = sequence->markerOrder;
+    const double now = tick + 1e-9;
+    size_t lo = 0, hi = order.size();
+    while (lo < hi) {
+        size_t mid = (lo + hi) / 2;
+        if ((double)sequence->markers[(size_t)order[mid]].tick <= now) lo = mid + 1; else hi = mid;
+    }
+    int index = lo == 0 ? -1 : order[lo - 1];
+    if (index >= 0 && landMarker >= 0 && (size_t)landMarker < sequence->markers.size() &&
+        sequence->markers[(size_t)landMarker].tick == sequence->markers[(size_t)index].tick) {
+        index = landMarker;
+    } else {
+        landMarker = -1;
+    }
+    control->currentMarker.store(index, std::memory_order_relaxed);
+}
+
+void SequenceRenderer::FinishOrLoop(double overshoot) {
+    landMarker = -1;
+    if (control->looping.load(std::memory_order_relaxed)) {
+        int64_t target = sequence->loopEnd > sequence->loopStart ? sequence->loopStart : sequence->startTick;
+        JumpTo(target, overshoot);
+    } else {
+        ended = true;
+        ReleaseAllForJump();
+    }
 }
 
 void SequenceRenderer::HandleRequests() {
     int64_t seek = control->seekTick.exchange(-1);
     if (seek >= 0) {
         jumpPending = false;
+        landMarker = -1;
         JumpTo(std::clamp<int64_t>(seek, 0, sequence->length), 0.0);
     }
     int marker = control->jumpMarker.exchange(-1);
     if (marker >= 0 && (size_t)marker < sequence->markers.size()) {
         int quantize = control->quantize.load();
         jumpTarget = sequence->markers[(size_t)marker].tick;
+        jumpMarkerIndex = marker;
         int64_t now = (int64_t)std::ceil(tick - 1e-9);
         jumpAt = quantize <= 0 ? now : NextBoundary(now, quantize);
         jumpPending = true;

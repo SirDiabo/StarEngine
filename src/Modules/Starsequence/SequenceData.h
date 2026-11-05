@@ -88,9 +88,13 @@ struct MeterPoint {
     int denominator = 4;
 };
 
+enum class MarkerType { Cue, Start, End, JumpTo };
+
 struct Marker {
     int64_t tick = 0;
     std::string name;
+    MarkerType type = MarkerType::Cue;
+    std::string target;
 };
 
 struct Sequence {

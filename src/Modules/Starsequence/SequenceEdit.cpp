@@ -337,13 +337,76 @@ bool IsAnchorEvent(const Sequence& sequence, EventRef ref) {
     return ref.index == 0 && EventTick(sequence, ref) == 0;
 }
 
+std::string SanitizeMarkerName(const std::string& name) {
+    std::string clean = name;
+    std::replace(clean.begin(), clean.end(), '\n', ' ');
+    std::replace(clean.begin(), clean.end(), '\r', ' ');
+    std::replace(clean.begin(), clean.end(), ')', ']');
+    size_t first = clean.find_first_not_of(" @");
+    size_t last = clean.find_last_not_of(' ');
+    if (first == std::string::npos) return std::string();
+    return clean.substr(first, last - first + 1);
+}
+
 std::string UniqueMarkerName(const Sequence& sequence, const std::string& base) {
     std::vector<std::string> names;
     for (const Marker& m : sequence.markers) names.push_back(m.name);
-    std::string clean = base;
-    std::replace(clean.begin(), clean.end(), '\n', ' ');
-    std::replace(clean.begin(), clean.end(), '\r', ' ');
+    std::string clean = SanitizeMarkerName(base);
+    if (clean.empty()) clean = "Marker";
     return UniqueName(names, clean, -1);
+}
+
+bool EnsureStartMarker(Sequence& sequence) {
+    for (const Marker& m : sequence.markers) {
+        if (m.type == MarkerType::Start) return false;
+    }
+    Marker marker;
+    marker.tick = 0;
+    marker.name = UniqueMarkerName(sequence, "Start");
+    marker.type = MarkerType::Start;
+    sequence.markers.insert(sequence.markers.begin(), marker);
+    return true;
+}
+
+bool RenameMarker(Sequence& sequence, int index, const std::string& name) {
+    if (index < 0 || (size_t)index >= sequence.markers.size()) return false;
+    std::string clean = SanitizeMarkerName(name);
+    if (clean.empty()) return false;
+    for (size_t i = 0; i < sequence.markers.size(); i++) {
+        if ((int)i != index && sequence.markers[i].name == clean) return false;
+    }
+    const std::string oldName = sequence.markers[(size_t)index].name;
+    sequence.markers[(size_t)index].name = clean;
+    for (Marker& m : sequence.markers) {
+        if (m.type == MarkerType::JumpTo && m.target == oldName) m.target = clean;
+    }
+    return true;
+}
+
+void SetMarkerType(Sequence& sequence, int index, MarkerType type) {
+    if (index < 0 || (size_t)index >= sequence.markers.size()) return;
+    if (type == MarkerType::Start) {
+        for (Marker& m : sequence.markers) {
+            if (m.type == MarkerType::Start) m.type = MarkerType::Cue;
+        }
+    }
+    Marker& marker = sequence.markers[(size_t)index];
+    marker.type = type;
+    if (type != MarkerType::JumpTo) marker.target.clear();
+}
+
+void SetMarkerTarget(Sequence& sequence, int index, const std::string& target) {
+    if (index < 0 || (size_t)index >= sequence.markers.size()) return;
+    Marker& marker = sequence.markers[(size_t)index];
+    if (marker.type != MarkerType::JumpTo) return;
+    if (target.empty() || sequence.FindMarker(target) < 0 || sequence.markers[(size_t)sequence.FindMarker(target)].name == marker.name) marker.target.clear();
+    else marker.target = target;
+}
+
+void ClearMarkerTargets(Sequence& sequence, const std::string& markerName) {
+    for (Marker& m : sequence.markers) {
+        if (m.type == MarkerType::JumpTo && m.target == markerName) m.target.clear();
+    }
 }
 
 EventRef AddMarker(Sequence& sequence, int64_t tick, const std::string& name) {

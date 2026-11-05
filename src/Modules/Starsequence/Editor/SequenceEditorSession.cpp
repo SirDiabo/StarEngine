@@ -68,6 +68,7 @@ bool SequenceEditorSession::Open(const std::string& path) {
     }
     sequence = parsed.sequence;
     sequence.Normalize();
+    EnsureStartMarker(sequence);
     AssignNoteUids(sequence, nextUid);
     solo.assign(sequence.layers.size(), false);
     selectedLayer = 0;
@@ -344,8 +345,13 @@ EventRef SequenceEditorSession::AddEventAt(EventKind kind, int64_t tick) {
 
 bool SequenceEditorSession::DeleteSelectedEvent() {
     if (!selectedEvent.Valid()) return false;
+    std::string removedMarker;
+    if (selectedEvent.kind == EventKind::Marker && (size_t)selectedEvent.index < sequence.markers.size()) {
+        removedMarker = sequence.markers[(size_t)selectedEvent.index].name;
+    }
     bool removed = RemoveEvent(sequence, selectedEvent);
     if (removed) {
+        if (!removedMarker.empty()) ClearMarkerTargets(sequence, removedMarker);
         selectedEvent = {};
         if (detailsContext == DetailsContext::Event) detailsContext = DetailsContext::Sequence;
         MarkStructureChanged();
@@ -363,14 +369,21 @@ void SequenceEditorSession::MoveSelectedEvent(int64_t tick) {
 
 void SequenceEditorSession::RenameSelectedMarker(const std::string& name) {
     if (!selectedEvent.Valid() || selectedEvent.kind != EventKind::Marker) return;
-    if ((size_t)selectedEvent.index >= sequence.markers.size() || name.empty()) return;
-    std::string clean = name;
-    std::replace(clean.begin(), clean.end(), '\n', ' ');
-    std::replace(clean.begin(), clean.end(), '\r', ' ');
-    for (size_t i = 0; i < sequence.markers.size(); i++) {
-        if ((int)i != selectedEvent.index && sequence.markers[i].name == clean) return;
-    }
-    sequence.markers[(size_t)selectedEvent.index].name = clean;
+    if (RenameMarker(sequence, selectedEvent.index, name)) MarkStructureChanged();
+}
+
+void SequenceEditorSession::SetSelectedMarkerType(Starsequence::MarkerType type) {
+    if (!selectedEvent.Valid() || selectedEvent.kind != EventKind::Marker) return;
+    if ((size_t)selectedEvent.index >= sequence.markers.size()) return;
+    if (sequence.markers[(size_t)selectedEvent.index].type == type) return;
+    SetMarkerType(sequence, selectedEvent.index, type);
+    MarkStructureChanged();
+}
+
+void SequenceEditorSession::SetSelectedMarkerTarget(const std::string& target) {
+    if (!selectedEvent.Valid() || selectedEvent.kind != EventKind::Marker) return;
+    if ((size_t)selectedEvent.index >= sequence.markers.size()) return;
+    SetMarkerTarget(sequence, selectedEvent.index, target);
     MarkStructureChanged();
 }
 

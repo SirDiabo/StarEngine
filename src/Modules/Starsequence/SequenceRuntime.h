@@ -72,6 +72,13 @@ struct RtLayer {
     std::vector<RtEvent> events;
 };
 
+struct RtMarkerEvent {
+    int64_t tick = 0;
+    MarkerType type = MarkerType::End;
+    int64_t target = 0;
+    int targetIndex = -1;
+};
+
 struct RtSequence {
     int resolution = 480;
     int64_t length = 0;
@@ -80,6 +87,9 @@ struct RtSequence {
     int polyphony = 64;
     std::vector<TempoPoint> tempo;
     std::vector<Marker> markers;
+    std::vector<RtMarkerEvent> markerEvents;
+    std::vector<int> markerOrder;
+    int64_t startTick = 0;
     std::vector<int64_t> beats;
     std::vector<int64_t> bars;
     std::vector<RtInstrument> instruments;
@@ -106,6 +116,7 @@ struct SequenceControl {
     std::atomic<bool> finished{false};
     std::atomic<int> quantize{2};
     std::atomic<int> jumpMarker{-1};
+    std::atomic<int> currentMarker{-1};
     std::atomic<int64_t> seekTick{-1};
     std::atomic<double> positionTick{0.0};
     std::atomic<int> activeVoices{0};
@@ -173,6 +184,8 @@ private:
     void Initialize(int sampleRate);
     void HandleRequests();
     void ProcessDue();
+    void FinishOrLoop(double overshoot);
+    void UpdateCurrentMarker();
     double NextEventTick() const;
     double TicksPerFrame() const;
     void RenderChunk(float* out, int frames);
@@ -206,6 +219,9 @@ private:
 
     std::vector<Voice> voices;
     std::vector<size_t> cursors;
+    size_t markerCursor = 0;
+    int landMarker = -1;
+    int jumpMarkerIndex = -1;
     std::vector<ChannelState> channels;
     std::vector<SkippedNote> skipped;
     std::vector<float> layerGain;

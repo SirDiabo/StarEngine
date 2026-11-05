@@ -213,10 +213,46 @@ void RegisterAudioComponentNodes() {
             SetParameter(target, path, value);
         });
 
+    RegisterTargetNode("Skip_To_Marker",
+        [](Node* node) {
+            node->inputs.push_back({"Marker", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Quantize", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            std::string marker = ReadText(node, "Marker");
+            if (marker.empty()) return;
+            std::string quantize = ReadText(node, "Quantize");
+            if (!quantize.empty()) {
+                AudioParamValue q;
+                q.text = quantize;
+                SetParameter(target, "Playback/Quantize", q);
+            }
+            AudioParamValue value;
+            value.text = marker;
+            SetParameter(target, "Playback/Section", value);
+        });
+
     RegisterLayerNode("Set_Layer_Mute", "Mute", "Muted", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Solo", "Solo", "Soloed", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Volume", "Volume", "Volume", PinType::Float, "1.0");
     RegisterLayerNode("Set_Layer_Pan", "Pan", "Pan", PinType::Float, "0.0");
+
+    NodeTemplate currentMarker;
+    currentMarker.type = "Get_Current_Marker";
+    currentMarker.category = "Audio";
+    currentMarker.moduleName = "Stargraph";
+    currentMarker.createPins = [](Node* node) {
+        AddTargetPin(node);
+        node->outputs.push_back({"Marker", PinType::String, false, true});
+    };
+    currentMarker.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        AudioTarget target = ResolveTarget(node, ctx);
+        AudioParamValue value;
+        if (target.component) target.component->GetParameter("Playback/CurrentMarker", value);
+        else if (target.source) target.source->GetParameter("Playback/CurrentMarker", value);
+        for (Pin& p : node.outputs) if (p.name == "Marker") p.defaultValue = value.text;
+    };
+    NodeRegistry::Get().RegisterNode(currentMarker);
 
     NodeTemplate isAudioPlaying;
     isAudioPlaying.type = "Is_Audio_Playing";

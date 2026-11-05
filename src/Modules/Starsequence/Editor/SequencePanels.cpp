@@ -14,6 +14,16 @@ using namespace Starsequence;
 
 namespace {
 
+Color MarkerColor(const UIPalette& theme, MarkerType type) {
+    switch (type) {
+        case MarkerType::Start: return theme.accent;
+        case MarkerType::End: return theme.danger;
+        case MarkerType::JumpTo: return Color{ 240, 170, 60, 255 };
+        case MarkerType::Cue: break;
+    }
+    return theme.success;
+}
+
 constexpr float kRulerHeight = 24.0f;
 constexpr float kKeyboardWidth = 62.0f;
 constexpr float kLaneHeight = 76.0f;
@@ -849,7 +859,7 @@ void PianoRollPanel::Render() {
     for (const Marker& m : seq.markers) {
         float x = view.XOfTick((double)m.tick, grid.x);
         if (x < grid.x || x > grid.x + grid.width) continue;
-        DrawLineEx({ x, grid.y }, { x, grid.y + grid.height }, 1.0f, Fade(theme.success, 0.6f));
+        DrawLineEx({ x, grid.y }, { x, grid.y + grid.height }, 1.0f, Fade(MarkerColor(theme, m.type), 0.6f));
     }
 
     if (drag == DragMode::Box) {
@@ -889,8 +899,20 @@ void PianoRollPanel::Render() {
     for (const Marker& m : seq.markers) {
         float x = view.XOfTick((double)m.tick, grid.x);
         if (x < ruler.x - 200.0f || x > ruler.x + ruler.width) continue;
-        DrawRectangleRec({ x, ruler.y, 2.0f, ruler.height - 5.0f }, theme.success);
-        Text(m.name, x + 5.0f, ruler.y + 11.0f, theme.success);
+        const Color color = MarkerColor(theme, m.type);
+        DrawRectangleRec({ x, ruler.y, 2.0f, ruler.height - 5.0f }, color);
+        float textX = x + 5.0f;
+        if (m.type == MarkerType::Start) {
+            DrawTriangle({ x + 2.0f, ruler.y }, { x + 2.0f, ruler.y + 10.0f }, { x + 11.0f, ruler.y + 5.0f }, color);
+            textX = x + 14.0f;
+        } else if (m.type == MarkerType::End) {
+            DrawRectangleRec({ x + 3.0f, ruler.y + 1.0f, 8.0f, 8.0f }, color);
+            textX = x + 14.0f;
+        } else if (m.type == MarkerType::JumpTo) {
+            DrawTriangle({ x + 3.0f, ruler.y + 1.0f }, { x + 7.0f, ruler.y + 10.0f }, { x + 11.0f, ruler.y + 1.0f }, color);
+            textX = x + 14.0f;
+        }
+        Text(m.type == MarkerType::JumpTo && !m.target.empty() ? m.name + " > " + m.target : m.name, textX, ruler.y + 11.0f, color);
     }
     DrawLineEx({ ruler.x, ruler.y + ruler.height }, { ruler.x + ruler.width, ruler.y + ruler.height }, 1.0f, theme.panelBorder);
 

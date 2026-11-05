@@ -256,6 +256,16 @@ void SequenceAudioSource::GetParameters(std::vector<AudioParamInfo>& out) const 
     if (valid) DescribeSequenceParameters(sequence, out);
 }
 
+bool SequenceAudioSource::GetParameter(const std::string& path, AudioParamValue& out) const {
+    if (path == "Playback/CurrentMarker") {
+        out = AudioParamValue();
+        int index = control ? control->currentMarker.load(std::memory_order_relaxed) : -1;
+        if (index >= 0 && (size_t)index < sequence.markers.size()) out.text = sequence.markers[(size_t)index].name;
+        return true;
+    }
+    return false;
+}
+
 bool SequenceAudioSource::SetParameter(const std::string& path, const AudioParamValue& value) {
     if (!valid || !control) return false;
 

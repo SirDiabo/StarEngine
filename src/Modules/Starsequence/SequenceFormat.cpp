@@ -377,8 +377,24 @@ struct Parser {
                     return;
                 }
                 std::string name = Trim(text.substr(space));
+                Marker marker;
+                marker.tick = tick;
+                if (name.rfind("@start", 0) == 0 && (name.size() == 6 || name[6] == ' ')) {
+                    marker.type = MarkerType::Start;
+                    name = Trim(name.substr(6));
+                } else if (name.rfind("@end", 0) == 0 && (name.size() == 4 || name[4] == ' ')) {
+                    marker.type = MarkerType::End;
+                    name = Trim(name.substr(4));
+                } else if (name.rfind("@jump(", 0) == 0) {
+                    size_t close = name.find(')');
+                    if (close == std::string::npos) { Error("Malformed jump marker (expected: @jump(<target>) <name>)"); return; }
+                    marker.type = MarkerType::JumpTo;
+                    marker.target = Trim(name.substr(6, close - 6));
+                    name = Trim(name.substr(close + 1));
+                }
                 if (name.empty()) { Error("Marker has no name"); return; }
-                result.sequence.markers.push_back({ tick, name });
+                marker.name = name;
+                result.sequence.markers.push_back(marker);
                 break;
             }
             case Section::Layer:
@@ -486,7 +502,13 @@ std::string WriteSequence(const Sequence& s) {
     for (const MeterPoint& m : s.meter) out += std::to_string(m.tick) + " " + std::to_string(m.numerator) + "/" + std::to_string(m.denominator) + "\n";
     if (!s.markers.empty()) {
         out += "\n[Markers]\n";
-        for (const Marker& m : s.markers) out += std::to_string(m.tick) + " " + m.name + "\n";
+        for (const Marker& m : s.markers) {
+            out += std::to_string(m.tick) + " ";
+            if (m.type == MarkerType::Start) out += "@start ";
+            else if (m.type == MarkerType::End) out += "@end ";
+            else if (m.type == MarkerType::JumpTo) out += "@jump(" + m.target + ") ";
+            out += m.name + "\n";
+        }
     }
 
     const SampleSet defaults;

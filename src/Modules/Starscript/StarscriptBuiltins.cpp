@@ -371,6 +371,23 @@ Value M_audio_set_parameter_text(Runtime&, Value& s, std::vector<Value>& a) {
     RequireAudio(s, "set_parameter_text")->SetParameter(a[0].s, value);
     return Value::Void();
 }
+Value M_audio_skip_to_marker(Runtime&, Value& s, std::vector<Value>& a) {
+    AudioComponent* audio = RequireAudio(s, "skip_to_marker");
+    if (a.size() > 1 && !a[1].s.empty()) {
+        AudioParamValue quantize;
+        quantize.text = a[1].s;
+        audio->SetParameter("Playback/Quantize", quantize);
+    }
+    AudioParamValue marker;
+    marker.text = a[0].s;
+    audio->SetParameter("Playback/Section", marker);
+    return Value::Void();
+}
+Value M_audio_get_current_marker(Runtime&, Value& s, std::vector<Value>&) {
+    AudioParamValue value;
+    RequireAudio(s, "get_current_marker")->GetParameter("Playback/CurrentMarker", value);
+    return Value::String(value.text);
+}
 Value M_audio_set_layer_mute(Runtime&, Value& s, std::vector<Value>& a) {
     RequireAudio(s, "set_layer_mute")->SetParameter("Layers/" + a[0].s + "/Mute", AudioParamValue::FromNumber(a[1].b ? 1.0f : 0.0f));
     return Value::Void();
@@ -644,6 +661,8 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Component, "duration", {}, 0, T(Kind::Float), RetRule::Fixed, false, M_audio_duration, "AudioComponent" },
         { Kind::Component, "set_parameter", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter, "AudioComponent" },
         { Kind::Component, "set_parameter_text", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter_text, "AudioComponent" },
+        { Kind::Component, "skip_to_marker", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_skip_to_marker, "AudioComponent" },
+        { Kind::Component, "get_current_marker", {}, 0, T(Kind::String), RetRule::Fixed, false, M_audio_get_current_marker, "AudioComponent" },
         { Kind::Component, "set_layer_mute", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_mute, "AudioComponent" },
         { Kind::Component, "set_layer_solo", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_solo, "AudioComponent" },
         { Kind::Component, "set_layer_volume", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_volume, "AudioComponent" },
