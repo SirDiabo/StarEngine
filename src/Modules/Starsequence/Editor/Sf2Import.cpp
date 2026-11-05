@@ -1,5 +1,6 @@
 #include "Sf2Import.h"
 #include <algorithm>
+#include <cmath>
 
 namespace Starsequence {
 namespace Sf2 {
@@ -45,6 +46,9 @@ bool BuildSampleSet(const File& file, int presetIndex, SampleWriter& writer, std
     const std::string presetName = file.presets[(size_t)presetIndex].name;
     out.name = presetName.empty() ? "Preset " + std::to_string(presetIndex) : presetName;
 
+    const Envelope env = MostCommonEnvelope(resolved);
+    auto sameMs = [](float a, float b) { return std::lround(a * 1000.0f) == std::lround(b * 1000.0f); };
+
     int failedSamples = 0;
     for (const ResolvedZone& z : resolved) {
         std::string path;
@@ -73,6 +77,12 @@ bool BuildSampleSet(const File& file, int presetIndex, SampleWriter& writer, std
         zone.gainDb = z.gainDb;
         zone.pan = z.pan;
         zone.pitched = z.pitched;
+        zone.attack = z.envelope.attack;
+        zone.decay = z.envelope.decay;
+        zone.sustain = z.envelope.sustain;
+        zone.release = z.envelope.release;
+        zone.ownEnvelope = !(sameMs(z.envelope.attack, env.attack) && sameMs(z.envelope.decay, env.decay) &&
+                             sameMs(z.envelope.sustain, env.sustain) && sameMs(z.envelope.release, env.release));
         if (z.loops) {
             zone.loop = LoopMode::Region;
             zone.loopStart = z.loopStart;
@@ -89,7 +99,6 @@ bool BuildSampleSet(const File& file, int presetIndex, SampleWriter& writer, std
         return false;
     }
 
-    Envelope env = MostCommonEnvelope(resolved);
     out.attack = env.attack;
     out.decay = env.decay;
     out.sustain = env.sustain;

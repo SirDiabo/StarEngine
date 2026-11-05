@@ -26,6 +26,11 @@ struct SampleZone {
     float tuneCents = 0.0f;
     float gainDb = 0.0f;
     float pan = 0.0f;
+    bool ownEnvelope = false;
+    float attack = 0.002f;
+    float decay = 0.1f;
+    float sustain = 1.0f;
+    float release = 0.1f;
 };
 
 struct SampleSet {

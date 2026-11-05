@@ -71,6 +71,10 @@ std::shared_ptr<RtSequence> CompileSequence(const Sequence& s, const SampleLoade
                 rtZone.pitched = zone.pitched;
                 rtZone.tuneCents = zone.tuneCents;
                 rtZone.pan = zone.pan;
+                rtZone.attack = zone.ownEnvelope ? zone.attack : set.attack;
+                rtZone.decay = zone.ownEnvelope ? zone.decay : set.decay;
+                rtZone.sustain = zone.ownEnvelope ? zone.sustain : set.sustain;
+                rtZone.release = zone.ownEnvelope ? zone.release : set.release;
 
                 if (zone.assetPath.empty()) {
                     rtSet.zones.push_back(rtZone);
@@ -256,12 +260,13 @@ void SequenceRenderer::ReplayControllers(int64_t target) {
 
 void SequenceRenderer::ReleaseVoice(Voice& voice, bool forced) {
     if (!voice.active || voice.releasing) return;
-    if (!forced && !voice.zone->pitched) return;
+    const bool loopingZone = voice.zone->looping && voice.zone->loopEnd > voice.zone->loopStart;
+    if (!forced && !voice.zone->pitched && !loopingZone) return;
     voice.releasing = true;
     voice.held = false;
     voice.hasNoteEnd = false;
     voice.stage = 3;
-    float seconds = std::max(voice.set->release, 0.005f);
+    float seconds = std::max(voice.zone->release, 0.005f);
     if (forced && !voice.zone->pitched) seconds = 0.03f;
     voice.releaseStep = voice.envelope / std::max(1.0f, seconds * (float)sampleRate);
 }
@@ -369,20 +374,20 @@ void SequenceRenderer::SpawnVoices(int layer, int instrument, int key, int veloc
         v->velocityGain = (float)velocity / 127.0f;
         v->order = ++voiceCounter;
 
-        float attack = std::max(set.attack, 0.001f);
-        float decay = std::max(set.decay, 0.001f);
+        float attack = std::max(zone.attack, 0.001f);
+        float decay = std::max(zone.decay, 0.001f);
         v->attackStep = 1.0f / (attack * (float)sampleRate);
-        v->decayStep = (1.0f - set.sustain) / (decay * (float)sampleRate);
+        v->decayStep = (1.0f - zone.sustain) / (decay * (float)sampleRate);
         double e = elapsedSeconds;
         if (e < (double)attack) {
             v->stage = 0;
             v->envelope = (float)(e / (double)attack);
-        } else if (e < (double)(attack + decay) && set.sustain < 1.0f) {
+        } else if (e < (double)(attack + decay) && zone.sustain < 1.0f) {
             v->stage = 1;
-            v->envelope = 1.0f - (float)((e - (double)attack) / (double)decay) * (1.0f - set.sustain);
+            v->envelope = 1.0f - (float)((e - (double)attack) / (double)decay) * (1.0f - zone.sustain);
         } else {
             v->stage = 2;
-            v->envelope = set.sustain;
+            v->envelope = zone.sustain;
         }
     }
 }
@@ -512,7 +517,7 @@ void SequenceRenderer::MixVoice(Voice& v, float* out, int frames, float layerSta
     const uint64_t frameCount = data.frameCount;
     const bool looping = zone.looping && zone.loopEnd > zone.loopStart;
     const float inv = frames > 0 ? 1.0f / (float)frames : 0.0f;
-    const float sustainLevel = v.set->sustain;
+    const float sustainLevel = zone.sustain;
 
     for (int i = 0; i < frames; i++) {
         float t = (float)i * inv;

@@ -74,7 +74,8 @@ bool IsSampleProperty(const std::string& token) {
     size_t eq = token.find('=');
     if (eq == std::string::npos) return false;
     std::string key = token.substr(0, eq);
-    return key == "keys" || key == "vel" || key == "root" || key == "loop" || key == "pitched" || key == "tune" || key == "gain" || key == "pan";
+    return key == "keys" || key == "vel" || key == "root" || key == "loop" || key == "pitched" || key == "tune" || key == "gain" || key == "pan" ||
+           key == "attack" || key == "decay" || key == "sustain" || key == "release";
 }
 
 constexpr int64_t kMaxTick = (int64_t)1 << 40;
@@ -104,6 +105,10 @@ struct Parser {
         if (first == 0) { Error("Sample line has no asset path"); return; }
 
         SampleZone zone;
+        zone.attack = CurrentSet().attack;
+        zone.decay = CurrentSet().decay;
+        zone.sustain = CurrentSet().sustain;
+        zone.release = CurrentSet().release;
         for (size_t i = 0; i < first; i++) zone.assetPath += (i ? " " : "") + tokens[i];
 
         for (size_t i = first; i < tokens.size(); i++) {
@@ -143,6 +148,17 @@ struct Parser {
                 if (ParseDouble(val, number)) zone.gainDb = (float)number; else Error("Invalid gain '" + val + "'");
             } else if (key == "pan") {
                 if (ParseDouble(val, number)) zone.pan = std::clamp((float)number, -1.0f, 1.0f); else Error("Invalid pan '" + val + "'");
+            } else if (key == "attack" || key == "decay" || key == "release") {
+                if (ParseDouble(val, number)) {
+                    float v = std::max(0.0f, (float)number);
+                    if (key == "attack") zone.attack = v; else if (key == "decay") zone.decay = v; else zone.release = v;
+                    zone.ownEnvelope = true;
+                } else {
+                    Error("Invalid " + key + " '" + val + "'");
+                }
+            } else if (key == "sustain") {
+                if (ParseDouble(val, number)) { zone.sustain = std::clamp((float)number, 0.0f, 1.0f); zone.ownEnvelope = true; }
+                else Error("Invalid sustain '" + val + "'");
             }
         }
 
@@ -502,6 +518,10 @@ std::string WriteSequence(const Sequence& s) {
                 if (std::fabs(z.tuneCents) > 1e-6f) out += " tune=" + FormatNumber(z.tuneCents);
                 if (std::fabs(z.gainDb) > 1e-6f) out += " gain=" + FormatNumber(z.gainDb);
                 if (std::fabs(z.pan) > 1e-6f) out += " pan=" + FormatNumber(z.pan);
+                if (z.ownEnvelope) {
+                    out += " attack=" + FormatNumber(z.attack) + " decay=" + FormatNumber(z.decay);
+                    out += " sustain=" + FormatNumber(z.sustain) + " release=" + FormatNumber(z.release);
+                }
                 out += "\n";
             }
         }

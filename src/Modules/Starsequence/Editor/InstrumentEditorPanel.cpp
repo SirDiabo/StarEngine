@@ -602,7 +602,7 @@ void InstrumentEditorPanel::Render() {
     for (size_t zi = 0; zi < set.zones.size(); zi++) {
         SampleZone& z = set.zones[zi];
         const int idx = (int)zi;
-        const float cardHeight = 168.0f;
+        const float cardHeight = 196.0f;
         Rectangle card = { x, y, w, cardHeight };
         bool isSelected = idx == selectedZone;
         DrawRectangleRec(card, ColorBrightness(theme.panelBg, 0.06f));
@@ -690,8 +690,31 @@ void InstrumentEditorPanel::Render() {
             Text("end", cx + 430.0f, ry + 4.0f, theme.textSecondary, kSmallFontSize);
             if (NumberField(zid + "le", { cx + 456.0f, ry, 84.0f, 20.0f }, le, 0, 0.0f, 4294967000.0f, true)) { z.loopEnd = (uint32_t)le; edited = true; }
         }
+        float er = ry + 28.0f;
+        Rectangle envBox = { cx, er + 2.0f, 16.0f, 16.0f };
+        bool envHover = Hot(envBox);
+        DrawRectangleRec(envBox, theme.fieldBg);
+        DrawRectangleLinesEx(envBox, 1, envHover ? theme.accent : theme.fieldBorder);
+        if (z.ownEnvelope) DrawRectangleRec({ envBox.x + 4.0f, envBox.y + 4.0f, 8.0f, 8.0f }, theme.accent);
+        Text("Own envelope", cx + 22.0f, er + 4.0f, theme.textPrimary);
+        if (envHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            z.ownEnvelope = !z.ownEnvelope;
+            if (z.ownEnvelope) { z.attack = set.attack; z.decay = set.decay; z.sustain = set.sustain; z.release = set.release; }
+            edited = true;
+        }
+        if (z.ownEnvelope) {
+            float ex = cx + 130.0f;
+            struct EnvField { const char* label; const char* key; float* value; float hi; };
+            EnvField fields[4] = { { "Attack", "ea", &z.attack, 10.0f }, { "Decay", "ed", &z.decay, 20.0f }, { "Sustain", "es", &z.sustain, 1.0f }, { "Release", "er", &z.release, 20.0f } };
+            for (EnvField& f : fields) {
+                Text(f.label, ex, er + 4.0f, theme.textSecondary, kSmallFontSize);
+                float v = *f.value;
+                if (NumberField(zid + f.key, { ex + 52.0f, er, 66.0f, 20.0f }, v, 3, 0.0f, f.hi, false)) { *f.value = v; edited = true; }
+                ex += 132.0f;
+            }
+        }
         if (CheckCollisionRecs(card, bounds) || loopDragId == zid + "wave") {
-            if (DrawZoneWave({ cx, ry + 28.0f, card.width - 28.0f, 52.0f }, z, idx, zid + "wave", cur, setIdx)) edited = true;
+            if (DrawZoneWave({ cx, er + 28.0f, card.width - 28.0f, 52.0f }, z, idx, zid + "wave", cur, setIdx)) edited = true;
         }
         y += cardHeight + 8.0f;
     }
