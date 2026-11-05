@@ -324,8 +324,8 @@ void SequenceRenderer::JumpTo(int64_t target, double overshoot) {
         cursors[l] = (size_t)(it - events.begin());
     }
     ReplayControllers(target);
-    markerCursor = (size_t)(std::lower_bound(sequence->markerEvents.begin(), sequence->markerEvents.end(), target,
-        [](const RtMarkerEvent& e, int64_t t) { return e.tick < t; }) - sequence->markerEvents.begin());
+    markerCursor = (size_t)(std::upper_bound(sequence->markerEvents.begin(), sequence->markerEvents.end(), target,
+        [](int64_t t, const RtMarkerEvent& e) { return t < e.tick; }) - sequence->markerEvents.begin());
     for (SkippedNote& s : skipped) s.used = false;
     ResetBpmIndex();
     ended = false;

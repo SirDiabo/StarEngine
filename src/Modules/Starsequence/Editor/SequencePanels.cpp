@@ -508,7 +508,12 @@ std::string PianoRollPanel::EventLabel(EventKind kind, int index) const {
     const Sequence& seq = session->GetSequence();
     const size_t i = (size_t)index;
     char buffer[48];
-    if (kind == EventKind::Marker) return i < seq.markers.size() ? seq.markers[i].name : std::string();
+    if (kind == EventKind::Marker) {
+        if (i >= seq.markers.size()) return std::string();
+        const Marker& marker = seq.markers[i];
+        if (marker.type == MarkerType::JumpTo && !marker.target.empty()) return marker.name + " > " + marker.target;
+        return marker.name;
+    }
     if (kind == EventKind::Tempo) {
         if (i >= seq.tempo.size()) return std::string();
         snprintf(buffer, sizeof(buffer), "%g", seq.tempo[i].bpm);
@@ -606,8 +611,9 @@ void PianoRollPanel::DrawStrip(const Layout& layout) {
             float width = 8.0f + TextWidth(label);
             if (x + width < strip.x || x > strip.x + strip.width) continue;
             bool isSelected = selected.Valid() && selected.kind == kind && selected.index == (int)n;
-            DrawRectangleRec({ x, rowY + 1.0f, 3.0f, kStripRowHeight - 2.0f }, colors[row]);
-            Text(label, x + 6.0f, rowY + (kStripRowHeight - kFontSize) / 2.0f, isSelected ? WHITE : colors[row]);
+            const Color color = kind == EventKind::Marker ? MarkerColor(theme, seq.markers[n].type) : colors[row];
+            DrawRectangleRec({ x, rowY + 1.0f, 3.0f, kStripRowHeight - 2.0f }, color);
+            Text(label, x + 6.0f, rowY + (kStripRowHeight - kFontSize) / 2.0f, isSelected ? WHITE : color);
             if (isSelected) DrawRectangleLinesEx({ x - 1.0f, rowY, width + 2.0f, kStripRowHeight }, 1.0f, WHITE);
         }
     }
@@ -901,18 +907,13 @@ void PianoRollPanel::Render() {
         if (x < ruler.x - 200.0f || x > ruler.x + ruler.width) continue;
         const Color color = MarkerColor(theme, m.type);
         DrawRectangleRec({ x, ruler.y, 2.0f, ruler.height - 5.0f }, color);
-        float textX = x + 5.0f;
         if (m.type == MarkerType::Start) {
             DrawTriangle({ x + 2.0f, ruler.y }, { x + 2.0f, ruler.y + 10.0f }, { x + 11.0f, ruler.y + 5.0f }, color);
-            textX = x + 14.0f;
         } else if (m.type == MarkerType::End) {
             DrawRectangleRec({ x + 3.0f, ruler.y + 1.0f, 8.0f, 8.0f }, color);
-            textX = x + 14.0f;
         } else if (m.type == MarkerType::JumpTo) {
             DrawTriangle({ x + 3.0f, ruler.y + 1.0f }, { x + 7.0f, ruler.y + 10.0f }, { x + 11.0f, ruler.y + 1.0f }, color);
-            textX = x + 14.0f;
         }
-        Text(m.type == MarkerType::JumpTo && !m.target.empty() ? m.name + " > " + m.target : m.name, textX, ruler.y + 11.0f, color);
     }
     DrawLineEx({ ruler.x, ruler.y + ruler.height }, { ruler.x + ruler.width, ruler.y + ruler.height }, 1.0f, theme.panelBorder);
 
