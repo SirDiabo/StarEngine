@@ -9,6 +9,8 @@
 #include "Core/Widgets/Widget.h"
 #include "Core/CollisionLayers.h"
 #include "Core/AudioBusRegistry.h"
+#include "Core/AudioEffectRegistry.h"
+#include "Core/AudioEffectTypes.h"
 #include "Core/IconBuilder.h"
 #include "Core/EmbeddedAssets.h"
 #include "NativeFileDialog.h"
@@ -17,6 +19,8 @@
 #include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 #include <filesystem>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace fs = std::filesystem;
@@ -29,6 +33,58 @@ static bool InlineButton(Rectangle r, const char* label) {
     int tw = MeasureText(label, 11);
     DrawText(label, (int)(r.x + (r.width - tw) / 2.0f), (int)(r.y + (r.height - 11) / 2.0f), 11, theme.textPrimary);
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+static bool EffectSlider(Rectangle track, float& value, const AudioEffectParamDef& def, const std::string& id, std::string& active, bool blocked, bool& released) {
+    const UIPalette& theme = UITheme::Get();
+    const bool logScale = def.minValue > 0.0f && def.maxValue / def.minValue >= 40.0f;
+    auto toT = [&](float v) {
+        float t = logScale ? std::log(std::max(v, def.minValue) / def.minValue) / std::log(def.maxValue / def.minValue)
+                           : (v - def.minValue) / (def.maxValue - def.minValue);
+        return std::clamp(t, 0.0f, 1.0f);
+    };
+    auto fromT = [&](float t) {
+        t = std::clamp(t, 0.0f, 1.0f);
+        float v = logScale ? def.minValue * std::pow(def.maxValue / def.minValue, t) : def.minValue + t * (def.maxValue - def.minValue);
+        return AudioEffectTypes::ClampParam(def, v);
+    };
+    const Vector2 mp = GetMousePosition();
+    const Rectangle hit = { track.x - 4.0f, track.y - 5.0f, track.width + 8.0f, track.height + 10.0f };
+    const bool hovered = !blocked && !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, hit);
+    bool changed = false;
+    released = false;
+    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && active.empty()) active = id;
+    if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        value = def.defaultValue;
+        changed = true;
+        released = true;
+    }
+    if (active == id) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            float v = fromT((mp.x - track.x) / track.width);
+            if (v != value) { value = v; changed = true; }
+        } else {
+            active.clear();
+            released = true;
+        }
+    }
+    DrawRectangleRec(track, theme.fieldBg);
+    DrawRectangleLinesEx(track, 1, theme.fieldBorder);
+    const float t = toT(value);
+    DrawRectangleRec({ track.x + 1.0f, track.y + 1.0f, (track.width - 2.0f) * t, track.height - 2.0f }, Fade(theme.accent, 0.55f));
+    DrawRectangleRec({ track.x + (track.width - 4.0f) * t, track.y - 2.0f, 4.0f, track.height + 4.0f }, hovered || active == id ? theme.textPrimary : theme.accent);
+    return changed;
+}
+
+static std::string FormatEffectValue(const AudioEffectParamDef& def, float value) {
+    char buffer[48];
+    if (!def.choices.empty()) {
+        size_t index = (size_t)std::clamp((int)std::lround(value), 0, (int)def.choices.size() - 1);
+        return def.choices[index];
+    }
+    if (def.integer) snprintf(buffer, sizeof(buffer), "%d%s%s", (int)std::lround(value), def.unit.empty() ? "" : " ", def.unit.c_str());
+    else snprintf(buffer, sizeof(buffer), "%.3g%s%s", (double)value, def.unit.empty() ? "" : " ", def.unit.c_str());
+    return buffer;
 }
 
 static bool InlineBoolBox(Rectangle r, bool& value) {
@@ -67,6 +123,8 @@ void ProjectSettingsTab::RefreshFromProject() {
     mapPicker.Close();
     rendererPopup.Close();
     shadingTypePopup.Close();
+    effectPopup.Close();
+    effectPopupMode = EffectPopupMode::None;
     moduleSettingsPopupOpen = false;
     moduleSettingsSectionHeight = 0.0f;
 }
@@ -78,6 +136,12 @@ static std::string MapDisplayName(const std::string& path) {
 
 void ProjectSettingsTab::Render(float x, float y, float width, float height) {
     Rectangle content = switcher.Render({x, y, width, height});
+    if (switcher.Selected() != lastCategory) {
+        effectPopup.Close();
+        effectPopupMode = EffectPopupMode::None;
+        activeEffectSlider.clear();
+        lastCategory = switcher.Selected();
+    }
 
     switch (switcher.Selected()) {
         case 0: RenderGeneralCategory(content);   break;
@@ -419,6 +483,14 @@ void ProjectSettingsTab::RenderSaveFilesCategory(Rectangle area) {
 
 void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
     const UIPalette& theme = UITheme::Get();
+    const Rectangle view = area;
+    const bool mouseInView = CheckCollisionPointRec(GetMousePosition(), view);
+    if (mouseInView && !effectPopup.IsOpen() && !WidgetInput::IsMouseBlocked()) audioScroll -= GetMouseWheelMove() * 48.0f;
+    audioScroll = std::clamp(audioScroll, 0.0f, std::max(0.0f, audioContentHeight - view.height + 16.0f));
+    area.y -= audioScroll;
+    BeginScissorMode((int)view.x, (int)view.y, (int)view.width, (int)view.height);
+    WidgetInput::SetMouseBlockedOverride(!mouseInView);
+
     float fx = area.x + 16;
     float fy = area.y + 16;
     float fw = area.width - 32 > 640.0f ? 640.0f : area.width - 32;
@@ -435,6 +507,7 @@ void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
     DrawText(AudioBusRegistry::MasterName(), (int)masterCol.x + 6, (int)masterCol.y + 4, 12, theme.textSecondary);
     DrawText("always present", (int)(masterCol.x + masterCol.width - 92), (int)masterCol.y + 5, 10, theme.textSecondary);
     fy += 22;
+    fy = RenderBusEffectChips(fx, fy, fw, AudioBusRegistry::MasterName());
 
     std::string removeName;
     for (const std::string& busName : AudioBusRegistry::Get().CustomNames()) {
@@ -443,8 +516,9 @@ void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
         DrawRectangleRec(nameCol, theme.fieldBg);
         DrawRectangleLinesEx(nameCol, 1, theme.fieldBorder);
         DrawText(busName.c_str(), (int)nameCol.x + 6, (int)nameCol.y + 4, 12, theme.textPrimary);
-        if (InlineButton(delBtn, "x")) removeName = busName;
+        if (InlineButton(delBtn, "x") && !effectPopup.IsOpen()) removeName = busName;
         fy += 22;
+        fy = RenderBusEffectChips(fx, fy, fw, busName);
     }
     if (!removeName.empty()) AudioBusRegistry::Get().Remove(removeName);
 
@@ -465,17 +539,260 @@ void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
         root->AddChild(newBusField);
     }
     newBusField->size = { newNameRow.width, newNameRow.height };
-    newBusField->offset = { newNameRow.x, newNameRow.y };
+    newBusField->offset = CheckCollisionRecs(newNameRow, view) ? Vector2{ newNameRow.x, newNameRow.y } : Vector2{ -2000.0f, -2000.0f };
     float dt = GetFrameTime();
-    newBusChrome->Tick(dt, {0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    const Rectangle chromeBounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+    newBusChrome->Tick(dt, chromeBounds, 1.0f);
     WidgetInput::ProcessInput(newBusChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
-    newBusChrome->Draw({0, 0, area.width + area.x, area.height + area.y}, 1.0f);
+    newBusChrome->Draw(chromeBounds, 1.0f);
     if (InlineButton(addBtn, "+ Add") && !newBusName.empty()) {
         if (AudioBusRegistry::Get().Add(newBusName)) {
             newBusName.clear();
             newBusField->text.clear();
         }
     }
+    fy += 36.0f;
+
+    fy = RenderAudioEffectsSection(fx, fy, area.width - 32.0f > 760.0f ? 760.0f : area.width - 32.0f, view);
+
+    int picked = -1;
+    if (effectPopup.Render(picked)) {
+        AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+        const std::vector<AudioEffectTypeInfo>& types = AudioEffectTypes::All();
+        if (effectPopupMode == EffectPopupMode::BusAdd && picked >= 0 && (size_t)picked < effectPopupValues.size()) {
+            std::vector<std::string> list = registry.BusEffects(effectPopupBus);
+            list.push_back(effectPopupValues[(size_t)picked]);
+            registry.SetBusEffects(effectPopupBus, list);
+        } else if (effectPopupMode == EffectPopupMode::NewType && picked >= 0 && picked < (int)types.size()) {
+            newEffectType = picked;
+        } else if (effectPopupMode == EffectPopupMode::ParamChoice && picked >= 0 && !selectedEffect.empty()) {
+            registry.SetParam(selectedEffect, effectPopupParam, (float)picked);
+        }
+        effectPopupMode = EffectPopupMode::None;
+    }
+
+    audioContentHeight = fy - area.y;
+    EndScissorMode();
+    WidgetInput::SetMouseBlockedOverride(false);
+}
+
+float ProjectSettingsTab::RenderBusEffectChips(float fx, float fy, float fw, const std::string& busName) {
+    const UIPalette& theme = UITheme::Get();
+    AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+    const bool popupOpen = effectPopup.IsOpen();
+    std::vector<std::string> list = registry.BusEffects(busName);
+    const float h = 18.0f;
+    const float startX = fx + 64.0f;
+    float x = startX;
+    float y = fy;
+    DrawText("Effects", (int)fx + 8, (int)y + 4, 10, theme.textSecondary);
+
+    int removeIndex = -1, moveFrom = -1, moveTo = -1;
+    for (size_t i = 0; i < list.size(); i++) {
+        const int tw = MeasureText(list[i].c_str(), 11);
+        const float chipW = 14.0f + (float)tw + 12.0f + 14.0f + 14.0f;
+        if (x + chipW > fx + fw && x > startX) { x = startX; y += h + 3.0f; }
+        const bool known = registry.Find(list[i]) != nullptr;
+        Rectangle left = { x, y, 14.0f, h };
+        Rectangle body = { x + 14.0f, y, (float)tw + 12.0f, h };
+        Rectangle right = { x + 14.0f + body.width, y, 14.0f, h };
+        Rectangle del = { right.x + 14.0f, y, 14.0f, h };
+        DrawRectangleRec(body, theme.fieldBg);
+        DrawRectangleLinesEx(body, 1, theme.fieldBorder);
+        DrawText(list[i].c_str(), (int)body.x + 6, (int)y + 3, 11, known ? theme.textPrimary : theme.danger);
+        if (InlineButton(left, "<") && !popupOpen && i > 0) { moveFrom = (int)i; moveTo = (int)i - 1; }
+        if (InlineButton(right, ">") && !popupOpen && i + 1 < list.size()) { moveFrom = (int)i; moveTo = (int)i + 1; }
+        if (InlineButton(del, "x") && !popupOpen) removeIndex = (int)i;
+        x += chipW + 4.0f;
+    }
+
+    if (x + 22.0f > fx + fw && x > startX) { x = startX; y += h + 3.0f; }
+    Rectangle addButton = { x, y, 22.0f, h };
+    if (InlineButton(addButton, "+") && !popupOpen) {
+        const std::vector<std::string> names = registry.Names();
+        effectPopupValues = names;
+        std::vector<ChoiceOption> choices;
+        for (const std::string& name : names) choices.push_back({ name, true, "" });
+        if (choices.empty()) choices.push_back({ "No effects defined yet", false, "Create one on the Audio Effects page" });
+        effectPopup.Open({ addButton.x, addButton.y + addButton.height }, 220.0f, choices);
+        effectPopupMode = EffectPopupMode::BusAdd;
+        effectPopupBus = busName;
+    }
+
+    if (removeIndex >= 0) {
+        list.erase(list.begin() + removeIndex);
+        registry.SetBusEffects(busName, list);
+    } else if (moveFrom >= 0) {
+        std::swap(list[(size_t)moveFrom], list[(size_t)moveTo]);
+        registry.SetBusEffects(busName, list);
+    }
+    return y + h + 6.0f;
+}
+
+float ProjectSettingsTab::RenderAudioEffectsSection(float fx, float fy, float fw, Rectangle view) {
+    const UIPalette& theme = UITheme::Get();
+    AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+    const bool popupOpen = effectPopup.IsOpen();
+    const Vector2 mp = GetMousePosition();
+
+    const float listW = 210.0f;
+    const float px = fx + listW + 24.0f;
+
+    DrawText("Audio Effects", (int)fx, (int)fy, 14, theme.sectionHeader);
+    fy += 24.0f;
+    DrawText("Define effects here, then add them to buses above or to audio components in their details panel. Edits are heard immediately.", (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 22.0f;
+    const float top = fy;
+    float paramsBottom = top;
+
+    std::vector<std::string> names = registry.Names();
+    if (!selectedEffect.empty() && !registry.Find(selectedEffect)) selectedEffect.clear();
+    if (selectedEffect.empty() && !names.empty()) selectedEffect = names[0];
+
+    const std::vector<AudioEffectTypeInfo>& types = AudioEffectTypes::All();
+    newEffectType = std::clamp(newEffectType, 0, (int)types.size() - 1);
+
+    const float listHeight = names.empty() ? 20.0f : (float)names.size() * 24.0f;
+    Rectangle newNameRect = { fx, top + listHeight + 6.0f + 14.0f, listW, 20.0f };
+    Rectangle typeButton = { fx, newNameRect.y + 24.0f, listW - 60.0f, 20.0f };
+    Rectangle addButton = { fx + listW - 56.0f, typeButton.y, 56.0f, 20.0f };
+    Rectangle renameRect = { px, top + 14.0f, 240.0f, 20.0f };
+
+    if (!effectsChrome) {
+        effectsChrome = new Widget();
+        auto* root = new WidgetElement();
+        effectsChrome->SetRoot(root);
+        newEffectField = new TextElement();
+        newEffectField->editable = true;
+        newEffectField->fontSize = 12.0f;
+        newEffectField->placeholder = "Name (optional)";
+        newEffectField->backgroundColor = theme.fieldBg;
+        newEffectField->borderColor = theme.fieldBorder;
+        newEffectField->editingBorderColor = theme.accent;
+        newEffectField->onTextChanged = [this](const std::string& text) { newEffectName = text; };
+        root->AddChild(newEffectField);
+        renameEffectField = new TextElement();
+        renameEffectField->editable = true;
+        renameEffectField->fontSize = 12.0f;
+        renameEffectField->backgroundColor = theme.fieldBg;
+        renameEffectField->borderColor = theme.fieldBorder;
+        renameEffectField->editingBorderColor = theme.accent;
+        renameEffectField->onTextCommitted = [this](const std::string& text) {
+            AudioEffectRegistry& reg = AudioEffectRegistry::Get();
+            if (!selectedEffect.empty() && text != selectedEffect && reg.Rename(selectedEffect, text)) selectedEffect = text;
+            else renameBound.clear();
+        };
+        root->AddChild(renameEffectField);
+    }
+    if (renameBound != selectedEffect) {
+        renameEffectField->text = selectedEffect;
+        renameBound = selectedEffect;
+    }
+    newEffectField->size = { newNameRect.width, newNameRect.height };
+    newEffectField->offset = CheckCollisionRecs(newNameRect, view) ? Vector2{ newNameRect.x, newNameRect.y } : Vector2{ -2000.0f, -2000.0f };
+    const bool haveSelection = !selectedEffect.empty();
+    renameEffectField->size = { renameRect.width, renameRect.height };
+    renameEffectField->offset = haveSelection && CheckCollisionRecs(renameRect, view) ? Vector2{ renameRect.x, renameRect.y } : Vector2{ -2000.0f, -2000.0f };
+    {
+        float dt = GetFrameTime();
+        const Rectangle bounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+        effectsChrome->Tick(dt, bounds, 1.0f);
+        WidgetInput::ProcessInput(effectsChrome, WidgetInput::kEditorDevice, dt, mp, 1.0f);
+        effectsChrome->Draw(bounds, 1.0f);
+    }
+
+    std::string removeName;
+    float ly = top;
+    if (names.empty()) {
+        DrawText("No effects yet", (int)fx + 4, (int)ly + 4, 11, theme.textSecondary);
+    }
+    for (const std::string& name : names) {
+        const AudioEffectDef* def = registry.Find(name);
+        Rectangle row = { fx, ly, listW - 24.0f, 22.0f };
+        Rectangle del = { fx + listW - 20.0f, ly, 20.0f, 22.0f };
+        const bool selected = name == selectedEffect;
+        const bool hovered = !popupOpen && !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, row);
+        DrawRectangleRec(row, selected ? Fade(theme.accent, 0.35f) : (hovered ? theme.surfaceHover : theme.fieldBg));
+        DrawRectangleLinesEx(row, 1, selected ? theme.accent : theme.fieldBorder);
+        DrawText(name.c_str(), (int)row.x + 6, (int)row.y + 5, 12, theme.textPrimary);
+        const char* typeText = def ? def->type.c_str() : "?";
+        DrawText(typeText, (int)(row.x + row.width - (float)MeasureText(typeText, 10) - 6.0f), (int)row.y + 6, 10, theme.textSecondary);
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedEffect = name;
+        if (InlineButton(del, "x") && !popupOpen) removeName = name;
+        ly += 24.0f;
+    }
+
+    DrawText("New effect", (int)fx, (int)(newNameRect.y - 14.0f), 11, theme.textSecondary);
+    Rectangle typeBox = typeButton;
+    DrawRectangleRec(typeBox, theme.fieldBg);
+    DrawRectangleLinesEx(typeBox, 1, theme.fieldBorder);
+    DrawText(types[(size_t)newEffectType].displayName.c_str(), (int)typeBox.x + 6, (int)typeBox.y + 4, 12, theme.textPrimary);
+    if (!popupOpen && !WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, typeBox)) {
+        std::vector<ChoiceOption> choices;
+        for (const AudioEffectTypeInfo& info : types) choices.push_back({ info.displayName, true, "" });
+        effectPopup.Open({ typeBox.x, typeBox.y + typeBox.height }, listW, choices);
+        effectPopupMode = EffectPopupMode::NewType;
+    }
+    if (InlineButton(addButton, "+ Add") && !popupOpen) {
+        const std::string& typeName = types[(size_t)newEffectType].type;
+        std::string name = newEffectName;
+        if (name.empty()) {
+            const std::string base = types[(size_t)newEffectType].displayName;
+            name = base;
+            for (int n = 2; registry.Find(name); n++) name = base + " " + std::to_string(n);
+        }
+        if (registry.Add(name, typeName)) {
+            selectedEffect = name;
+            newEffectName.clear();
+            newEffectField->text.clear();
+        }
+    }
+
+    if (!removeName.empty()) registry.Remove(removeName);
+
+    if (haveSelection) {
+        const AudioEffectDef* def = registry.Find(selectedEffect);
+        const AudioEffectTypeInfo* info = def ? AudioEffectTypes::Find(def->type) : nullptr;
+        DrawText("Name", (int)px, (int)top, 11, theme.textSecondary);
+        float py = top + 14.0f + 28.0f;
+        if (!def || !info) {
+            DrawText("This effect has an unknown type and is ignored at runtime.", (int)px, (int)py, 11, theme.danger);
+        } else {
+            DrawText((info->displayName + " parameters").c_str(), (int)px, (int)py, 12, theme.sectionHeader);
+            py += 22.0f;
+            for (const AudioEffectParamDef& param : info->params) {
+                float value = AudioEffectRegistry::ParamValue(*def, param.id);
+                DrawText(param.label.c_str(), (int)px, (int)py + 4, 11, theme.textPrimary);
+                if (!param.choices.empty()) {
+                    Rectangle box = { px + 120.0f, py, 160.0f, 20.0f };
+                    DrawRectangleRec(box, theme.fieldBg);
+                    DrawRectangleLinesEx(box, 1, theme.fieldBorder);
+                    DrawText(FormatEffectValue(param, value).c_str(), (int)box.x + 6, (int)box.y + 4, 12, theme.textPrimary);
+                    if (!popupOpen && !WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, box)) {
+                        std::vector<ChoiceOption> choices;
+                        for (const std::string& choice : param.choices) choices.push_back({ choice, true, "" });
+                        effectPopup.Open({ box.x, box.y + box.height }, box.width, choices);
+                        effectPopupMode = EffectPopupMode::ParamChoice;
+                        effectPopupParam = param.id;
+                    }
+                } else {
+                    Rectangle track = { px + 120.0f, py + 4.0f, 220.0f, 12.0f };
+                    bool released = false;
+                    if (EffectSlider(track, value, param, selectedEffect + "." + param.id, activeEffectSlider, popupOpen, released)) {
+                        registry.SetParam(selectedEffect, param.id, value, false);
+                    }
+                    if (released) registry.Save();
+                    DrawText(FormatEffectValue(param, value).c_str(), (int)(track.x + track.width + 12.0f), (int)py + 4, 11, theme.textSecondary);
+                }
+                py += 24.0f;
+            }
+            DrawText("Drag to change, right-click a slider to reset it.", (int)px, (int)py + 6, 10, theme.textSecondary);
+            paramsBottom = py + 24.0f;
+        }
+    }
+
+    (void)fw;
+    return std::max(paramsBottom, addButton.y + addButton.height) + 20.0f;
 }
 
 void ProjectSettingsTab::RebuildLayerFields() {

@@ -3,11 +3,16 @@
 #include "Core/SafeParse.h"
 #include "Runtime/AudioCore.h"
 #include "Core/AudioBusRegistry.h"
+#include "Core/AudioEffectRegistry.h"
 #include "Runtime/AudioCore.h"
+#include <algorithm>
 #include <cstdlib>
+#include <iterator>
 
 AudioComponent::AudioComponent() = default;
-AudioComponent::~AudioComponent() = default;
+AudioComponent::~AudioComponent() {
+    AudioCore::Get().RetireEffectChain(effectChain);
+}
 
 void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
@@ -31,6 +36,7 @@ AudioSource* AudioComponent::EnsureSource() {
         source = AudioSourceRegistry::Get().Create(soundPath);
         sourcePath = soundPath;
         appliedBusKey.clear();
+        appliedEffectsKey.clear();
     }
     return source.get();
 }
@@ -49,6 +55,42 @@ void AudioComponent::SyncSource() {
         int index = AudioCore::Get().ResolveBus(source->DefaultBusName(), bus);
         source->SetBus(index < 0 ? 0 : index);
     }
+
+    std::string effectsKey = sourcePath + "|" + ComponentField::JoinList(effects);
+    if (effectsKey != appliedEffectsKey) {
+        appliedEffectsKey = effectsKey;
+        std::shared_ptr<const AudioEffectChain> next = AudioCore::Get().BuildEffectChain(effects, effectChain);
+        AudioCore::Get().RetireEffectChain(effectChain);
+        effectChain = next;
+        source->SetEffectChain(effectChain);
+    }
+}
+
+void AudioComponent::PushEffect(const std::string& name) {
+    effects.push_back(name);
+    if (source) SyncSource();
+}
+
+bool AudioComponent::PopEffect(const std::string& name) {
+    if (effects.empty()) return false;
+    if (name.empty()) {
+        effects.pop_back();
+    } else {
+        auto found = std::find(effects.rbegin(), effects.rend(), name);
+        if (found == effects.rend()) return false;
+        effects.erase(std::next(found).base());
+    }
+    if (source) SyncSource();
+    return true;
+}
+
+void AudioComponent::ClearEffects() {
+    effects.clear();
+    if (source) SyncSource();
+}
+
+bool AudioComponent::SetEffectParameter(const std::string& effectName, const std::string& paramId, float value) {
+    return effectChain && AudioCore::SetChainEffectParameter(*effectChain, effectName, paramId, value);
 }
 
 void AudioComponent::Update(float deltaTime) {
@@ -142,6 +184,9 @@ ComponentRegistrar registrar_AudioComponent({
             [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).autoPlay); }),
         ComponentField::Bln("Looping", "Looping", false,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).looping); }),
+        ComponentField::Lst("Effects", "Effects", []() { return AudioEffectRegistry::Get().Names(); },
+            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).effects = ComponentField::SplitList(d.Get("Effects", "")); },
+            [](const Component& c) { return ComponentField::JoinList(static_cast<const AudioComponent&>(c).effects); }),
     }
 });
 }

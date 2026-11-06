@@ -1,3 +1,4 @@
+#include "Core/AudioEffectRegistry.h"
 #include "Nodes_Audio.h"
 #include "NodeRegistry.h"
 #include "Runtime/AudioCore.h"
@@ -89,6 +90,44 @@ void RegisterAudioNodes() {
         if (!AudioCore::Get().SetBusVolume(bus, ReadFloat(node, "Volume", 1.0f))) WarnUnknownBus(bus);
     };
     NodeRegistry::Get().RegisterNode(setBusVolume);
+
+    auto registerBusEffectNode = [](const char* type, bool needsEffect, bool needsParam, std::function<void(Node&, const std::string&)> run) {
+        NodeTemplate t;
+        t.type = type;
+        t.category = "Audio";
+        t.moduleName = "Stargraph";
+        t.createPins = [needsEffect, needsParam](Node* node) {
+            node->inputs.push_back({"In", PinType::Exec, true, false});
+            node->inputs.push_back({"Bus", PinType::String, true, false, 0, "Master"});
+            if (needsEffect) node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+            if (needsParam) {
+                node->inputs.push_back({"Parameter", PinType::String, true, false, 0, ""});
+                node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0"});
+            }
+            node->outputs.push_back({"Out", PinType::Exec, false, true});
+        };
+        t.execute = [run](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            std::string bus = ReadText(node, "Bus");
+            if (AudioBusRegistry::Get().IndexOf(bus) < 0) { WarnUnknownBus(bus); return; }
+            run(node, bus);
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    };
+    registerBusEffectNode("Push_Bus_Effect", true, false, [](Node& node, const std::string& bus) {
+        std::string effect = ReadText(node, "Effect");
+        if (AudioEffectRegistry::Get().Find(effect)) AudioCore::Get().AddBusEffect(bus, effect);
+    });
+    registerBusEffectNode("Pop_Bus_Effect", true, false, [](Node& node, const std::string& bus) {
+        std::string effect = ReadText(node, "Effect");
+        if (effect.empty()) AudioCore::Get().PopBusEffect(bus);
+        else AudioCore::Get().RemoveBusEffect(bus, effect);
+    });
+    registerBusEffectNode("Clear_Bus_Effects", false, false, [](Node&, const std::string& bus) {
+        AudioCore::Get().ClearBusEffects(bus);
+    });
+    registerBusEffectNode("Set_Bus_Effect_Parameter", true, true, [](Node& node, const std::string& bus) {
+        AudioCore::Get().SetBusEffectParameter(bus, ReadText(node, "Effect"), ReadText(node, "Parameter"), ReadFloat(node, "Value", 0.0f));
+    });
 
     NodeTemplate getBusVolume;
     getBusVolume.type = "Get_Bus_Volume";

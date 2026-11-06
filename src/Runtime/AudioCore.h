@@ -38,10 +38,16 @@ public:
     bool SetBusEffects(const std::string& busName, const std::vector<std::string>& effectNames);
     bool AddBusEffect(const std::string& busName, const std::string& effectName);
     bool RemoveBusEffect(const std::string& busName, const std::string& effectName);
+    bool PopBusEffect(const std::string& busName);
     bool ClearBusEffects(const std::string& busName);
     bool SetBusEffectParameter(const std::string& busName, const std::string& effectName, const std::string& paramId, float value);
     std::vector<std::string> GetBusEffects(const std::string& busName) const;
     void ApplyProjectEffects();
+
+    std::shared_ptr<const AudioEffectChain> BuildEffectChain(const std::vector<std::string>& effectNames, const std::shared_ptr<const AudioEffectChain>& reuseFrom = nullptr);
+    void RetireEffectChain(const std::shared_ptr<const AudioEffectChain>& chain);
+    static bool SetChainEffectParameter(const AudioEffectChain& chain, const std::string& effectName, const std::string& paramId, float value);
+    void OnEffectParamChanged(const std::string& effectName, const std::string& paramId, float value);
 
 private:
     void ApplyBus(int index);
@@ -54,6 +60,7 @@ private:
     };
 
     std::shared_ptr<const AudioEffectChain> busChains[kMaxMixerBuses];
+    std::vector<std::weak_ptr<const AudioEffectChain>> trackedChains;
     std::vector<RetiredChain> retiredChains;
 
     float busVolume[kMaxMixerBuses];

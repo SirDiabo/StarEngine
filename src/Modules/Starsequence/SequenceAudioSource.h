@@ -40,6 +40,7 @@ public:
 
     void GetParameters(std::vector<AudioParamInfo>& out) const override;
     bool SetParameter(const std::string& path, const AudioParamValue& value) override;
+    void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
     bool GetParameter(const std::string& path, AudioParamValue& out) const override;
 
     bool IsValid() const { return valid; }
@@ -60,6 +61,7 @@ private:
     std::shared_ptr<const RtSequence> compiled;
     std::shared_ptr<SequenceControl> control;
     std::shared_ptr<SequenceRenderer> renderer;
+    std::shared_ptr<const AudioEffectChain> effectChain;
     float volume = 1.0f;
     int bus = 0;
 };

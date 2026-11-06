@@ -4,6 +4,7 @@
 #include "ChoicePopup.h"
 #include "SettingsSwitcher.h"
 #include "Core/SaveMigration.h"
+#include <map>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,8 @@ private:
     void RenderRenderingCategory(Rectangle area);
     void RenderSaveFilesCategory(Rectangle area);
     void RenderAudioCategory(Rectangle area);
+    float RenderAudioEffectsSection(float fx, float fy, float fw, Rectangle view);
+    float RenderBusEffectChips(float fx, float fy, float fw, const std::string& busName);
     void RenderCollisionLayersCategory(Rectangle area);
     void RebuildLayerFields();
     void RenderMigrationSection(Rectangle area, float fx, float& fy, float fw);
@@ -59,6 +62,24 @@ private:
     Widget* newBusChrome = nullptr;
     TextElement* newBusField = nullptr;
     std::string newBusName;
+
+    enum class EffectPopupMode { None, NewType, ParamChoice, BusAdd };
+    ChoicePopup effectPopup;
+    EffectPopupMode effectPopupMode = EffectPopupMode::None;
+    std::string effectPopupBus;
+    std::string effectPopupParam;
+    std::vector<std::string> effectPopupValues;
+    std::string selectedEffect;
+    std::string activeEffectSlider;
+    std::string newEffectName;
+    int newEffectType = 0;
+    int lastCategory = -1;
+    float audioScroll = 0.0f;
+    float audioContentHeight = 0.0f;
+    Widget* effectsChrome = nullptr;
+    TextElement* newEffectField = nullptr;
+    TextElement* renameEffectField = nullptr;
+    std::string renameBound;
 
     std::vector<SaveMigration::MigrationStep> migrationSteps;
     int migrationVersion = 1;

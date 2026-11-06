@@ -94,6 +94,7 @@ void SoundAudioSource::Play() {
     start.pan = pan;
     start.looping = looping;
     start.bus = bus;
+    start.chain = effectChain;
 
     if (streaming) {
         auto feed = std::make_shared<StreamFeed>(resolvedPath, info);
@@ -131,6 +132,11 @@ void SoundAudioSource::SetVolume(float value) {
 void SoundAudioSource::SetPitch(float value) {
     pitch = std::max(0.0f, value);
     if (voice) voice->pitch.store(pitch * assetPitch);
+}
+
+void SoundAudioSource::SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
+    effectChain = chain;
+    if (voice && !voice->finished.load()) AudioMixer::Get().SetVoiceChain(voice, chain);
 }
 
 void SoundAudioSource::SetLooping(bool value) {

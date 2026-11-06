@@ -181,7 +181,7 @@ void SequenceAudioSource::Play() {
     renderer = std::make_shared<SequenceRenderer>(compiled, control);
     renderer->gain.store(volume * sequence.volume);
     renderer->bus.store(bus);
-    AudioMixer::Get().AddRenderer(renderer);
+    AudioMixer::Get().AddRenderer(renderer, effectChain);
 }
 
 void SequenceAudioSource::Stop() {
@@ -254,6 +254,11 @@ double SequenceAudioSource::GetDuration() const {
 
 void SequenceAudioSource::GetParameters(std::vector<AudioParamInfo>& out) const {
     if (valid) DescribeSequenceParameters(sequence, out);
+}
+
+void SequenceAudioSource::SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
+    effectChain = chain;
+    if (renderer) AudioMixer::Get().SetRendererChain(renderer, chain);
 }
 
 bool SequenceAudioSource::GetParameter(const std::string& path, AudioParamValue& out) const {

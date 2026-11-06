@@ -145,6 +145,12 @@ protected:
         preDelaySamples = P(ReverbParam::PreDelay) * 0.001f * (float)rate;
     }
 
+    float TailSeconds() const override {
+        const float fb = std::clamp(P(ReverbParam::RoomSize) * 0.28f + 0.7f, 0.7f, 0.985f);
+        const float loop = 1400.0f / (float)rate;
+        return std::min(12.0f, 3.0f * loop / -std::log10(fb) + P(ReverbParam::PreDelay) * 0.001f + 0.2f);
+    }
+
     void ResetState() override {
         for (int ch = 0; ch < 2; ch++) {
             for (auto& c : comb[ch]) { std::fill(c.buf.begin(), c.buf.end(), 0.0f); c.idx = 0; c.store = 0.0f; }
@@ -211,6 +217,8 @@ protected:
         feedback = P(ChorusParam::Feedback);
     }
 
+    float TailSeconds() const override { return 0.1f + P(ChorusParam::Delay) * 0.002f + P(ChorusParam::Feedback) * 1.5f; }
+
     void ResetState() override {
         line[0].Clear();
         line[1].Clear();
@@ -250,6 +258,12 @@ protected:
         feedback = P(DelayParam::Feedback);
         toneCoef = std::exp(-2.0f * kPi * P(DelayParam::Tone) / (float)rate);
         pingPong = P(DelayParam::PingPong) >= 0.5f;
+    }
+
+    float TailSeconds() const override {
+        const float fb = std::clamp(P(DelayParam::Feedback), 0.0f, 0.95f);
+        const float repeats = fb < 0.02f ? 1.0f : std::min(60.0f, std::log(0.001f) / std::log(fb));
+        return std::min(12.0f, P(DelayParam::Time) * 0.001f * (1.0f + repeats) + 0.1f);
     }
 
     void ResetState() override {
@@ -355,6 +369,8 @@ protected:
         attackCoef = std::exp(-1.0f / (std::max(0.01f, P(CompressorParam::Attack)) * 0.001f * (float)rate));
         releaseCoef = std::exp(-1.0f / (std::max(0.01f, P(CompressorParam::Release)) * 0.001f * (float)rate));
     }
+
+    float TailSeconds() const override { return 0.05f + P(CompressorParam::Release) * 0.003f; }
 
     void ResetState() override { envelope = 0.0f; }
 

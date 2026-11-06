@@ -28,7 +28,7 @@ public:
     bool Add(const std::string& name, const std::string& type);
     bool Remove(const std::string& name);
     bool Rename(const std::string& oldName, const std::string& newName);
-    bool SetParam(const std::string& name, const std::string& paramId, float value);
+    bool SetParam(const std::string& name, const std::string& paramId, float value, bool persist = true);
     float GetParam(const std::string& name, const std::string& paramId) const;
     static float ParamValue(const AudioEffectDef& def, const std::string& paramId);
 
@@ -37,6 +37,7 @@ public:
 
     uint64_t Revision() const { return revision; }
     void AddListener(std::function<void()> listener);
+    void AddParamListener(std::function<void(const std::string&, const std::string&, float)> listener);
 
 private:
     AudioEffectDef* FindMutable(const std::string& name);
@@ -46,5 +47,6 @@ private:
     std::vector<AudioEffectDef> effects;
     std::vector<std::pair<std::string, std::vector<std::string>>> busLists;
     std::vector<std::function<void()>> listeners;
+    std::vector<std::function<void(const std::string&, const std::string&, float)>> paramListeners;
     uint64_t revision = 0;
 };

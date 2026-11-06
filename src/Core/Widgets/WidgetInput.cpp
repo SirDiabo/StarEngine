@@ -342,7 +342,14 @@ bool IsMouseOccluded(Vector2 position, const void* owner) {
     return false;
 }
 
+static bool mouseBlockedOverride = false;
+
+void SetMouseBlockedOverride(bool blocked) {
+    mouseBlockedOverride = blocked;
+}
+
 bool IsMouseBlocked() {
+    if (mouseBlockedOverride) return true;
     const void* modal = TopModal(kEditorDevice);
     if (modal && modal != inputScope) return true;
     return IsMouseOccluded(GetMousePosition(), inputScope);

@@ -50,6 +50,10 @@ void AudioEffectRegistry::AddListener(std::function<void()> listener) {
     if (listener) listeners.push_back(std::move(listener));
 }
 
+void AudioEffectRegistry::AddParamListener(std::function<void(const std::string&, const std::string&, float)> listener) {
+    if (listener) paramListeners.push_back(std::move(listener));
+}
+
 void AudioEffectRegistry::Changed(bool persist) {
     revision++;
     if (persist) Save();
@@ -242,15 +246,18 @@ float AudioEffectRegistry::ParamValue(const AudioEffectDef& def, const std::stri
     return index < 0 ? 0.0f : info->params[(size_t)index].defaultValue;
 }
 
-bool AudioEffectRegistry::SetParam(const std::string& name, const std::string& paramId, float value) {
+bool AudioEffectRegistry::SetParam(const std::string& name, const std::string& paramId, float value, bool persist) {
     AudioEffectDef* def = FindMutable(name);
     if (!def) return false;
     const AudioEffectTypeInfo* info = AudioEffectTypes::Find(def->type);
     if (!info) return false;
     int index = AudioEffectTypes::ParamIndex(*info, paramId);
     if (index < 0) return false;
-    def->params[paramId] = AudioEffectTypes::ClampParam(info->params[(size_t)index], value);
-    Changed(true);
+    const float clamped = AudioEffectTypes::ClampParam(info->params[(size_t)index], value);
+    def->params[paramId] = clamped;
+    revision++;
+    if (persist) Save();
+    for (const auto& listener : paramListeners) listener(name, paramId, clamped);
     return true;
 }
 

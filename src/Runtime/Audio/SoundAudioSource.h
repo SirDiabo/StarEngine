@@ -29,6 +29,7 @@ public:
     void SetLooping(bool value) override;
     void SetBus(int value) override;
     void SetPan(float value) override;
+    void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
     std::string DefaultBusName() const override;
     void ReloadAssetSettings() override;
 
@@ -59,4 +60,5 @@ private:
     int bus = 0;
 
     std::shared_ptr<VoiceControl> voice;
+    std::shared_ptr<const AudioEffectChain> effectChain;
 };

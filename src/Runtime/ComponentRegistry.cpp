@@ -211,6 +211,39 @@ ComponentFieldDesc Enm(const std::string& key, const std::string& label, const s
     return d;
 }
 
+ComponentFieldDesc Lst(const std::string& key, const std::string& label, std::function<std::vector<std::string>()> provider,
+                        std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read) {
+    ComponentFieldDesc d;
+    d.key = key;
+    d.label = label;
+    d.kind = ComponentFieldKind::NameList;
+    d.enumProvider = std::move(provider);
+    d.apply = std::move(apply);
+    d.read = std::move(read);
+    return d;
+}
+
+std::vector<std::string> SplitList(const std::string& text) {
+    std::vector<std::string> items;
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find(';', start);
+        if (end == std::string::npos) end = text.size();
+        if (end > start) items.push_back(text.substr(start, end - start));
+        start = end + 1;
+    }
+    return items;
+}
+
+std::string JoinList(const std::vector<std::string>& items) {
+    std::string out;
+    for (size_t i = 0; i < items.size(); i++) {
+        if (i > 0) out += ";";
+        out += items[i];
+    }
+    return out;
+}
+
 ComponentFieldDesc Dev(const std::string& key, const std::string& label,
                         std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read) {
     ComponentFieldDesc d;

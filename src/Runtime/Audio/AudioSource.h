@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+struct AudioEffectChain;
+
 enum class AudioParamType { Bool, Float, Int, Enum, Asset, Trigger };
 
 struct AudioParamInfo {
@@ -41,6 +43,7 @@ public:
     virtual void SetLooping(bool looping) = 0;
     virtual void SetBus(int bus) = 0;
     virtual void SetPan(float pan) { (void)pan; }
+    virtual void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) { (void)chain; }
     virtual std::string DefaultBusName() const { return std::string(); }
     virtual void ReloadAssetSettings() {}
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "ChoicePopup.h"
 #include <functional>
 #include <string>
 #include <vector>
@@ -61,6 +62,7 @@ struct PropertyRow {
     Color colorValue{ 255, 255, 255, 255 };
     bool colorHasAlpha = true;
     std::vector<std::string> enumOptions;
+    bool dropdown = false;
     std::string assetExtension;
     Color iconColor{ 0, 0, 0, 0 };
 
@@ -116,6 +118,11 @@ public:
 private:
     void RebuildRows();
     void RefreshValues();
+    void PollDropdown();
+
+    ChoicePopup enumDropdown;
+    std::vector<std::string> enumDropdownOptions;
+    std::string enumDropdownRowId;
 
     VerticalBoxElement* root = nullptr;
     std::vector<PropertyRow> rows;

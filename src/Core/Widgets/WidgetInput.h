@@ -18,6 +18,7 @@ const void* GetInputScope();
 void AddOccluder(Rectangle rect, const void* owner);
 bool IsMouseOccluded(Vector2 position, const void* owner);
 bool IsMouseBlocked();
+void SetMouseBlockedOverride(bool blocked);
 
 void ClaimFocus(Widget* widget, const std::string& device);
 void ClaimOwnerFocus(const void* owner, const std::string& device);

@@ -8,7 +8,7 @@ class Component;
 
 using ComponentReader = std::function<std::string(const Component&)>;
 
-enum class ComponentFieldKind { String, AssetPath, Float, Bool, Enum, Device, LayerMask };
+enum class ComponentFieldKind { String, AssetPath, Float, Bool, Enum, Device, LayerMask, NameList };
 
 struct ComponentFieldDesc {
     std::string key;
@@ -92,6 +92,10 @@ namespace ComponentField {
                             std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read = {});
     ComponentFieldDesc Enm(const std::string& key, const std::string& label, const std::vector<std::string>& options,
                             const std::string& defaultValue, std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read = {});
+    ComponentFieldDesc Lst(const std::string& key, const std::string& label, std::function<std::vector<std::string>()> provider,
+                            std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read = {});
+    std::vector<std::string> SplitList(const std::string& text);
+    std::string JoinList(const std::vector<std::string>& items);
     ComponentFieldDesc Dev(const std::string& key, const std::string& label,
                             std::function<void(Component&, const ComponentDecl&)> apply, ComponentReader read = {});
 }

@@ -222,7 +222,21 @@ WidgetElement* PropertyPanel::GetRootElement() const {
     return root;
 }
 
+void PropertyPanel::PollDropdown() {
+    if (!enumDropdown.IsOpen()) return;
+    int picked = -1;
+    if (!enumDropdown.Render(picked)) return;
+    if (picked < 0 || (size_t)picked >= enumDropdownOptions.size()) return;
+    for (const PropertyRow& row : rows) {
+        if (row.id == enumDropdownRowId && row.setString) {
+            row.setString(enumDropdownOptions[(size_t)picked]);
+            return;
+        }
+    }
+}
+
 void PropertyPanel::SetProperties(std::vector<PropertyRow> newRows) {
+    PollDropdown();
     bool sameShape = RowsShapeEqual(rows, newRows);
     rows = std::move(newRows);
     if (sameShape) {
@@ -596,18 +610,25 @@ void PropertyPanel::RebuildRows() {
                 btn->hoveredColor = buttonHover;
                 btn->selectedColor = buttonHover;
                 btn->pressedColor = buttonHover;
-                std::function<void(const std::string&)> setString = row.setString;
-                std::vector<std::string> options = row.enumOptions;
-                btn->onActivated = [this, i, setString, options]() {
-                    if (options.empty() || !setString) return;
-                    if (i >= rows.size()) return;
-                    const std::string& current = rows[i].stringValue;
-                    size_t idx = 0;
-                    for (size_t o = 0; o < options.size(); o++) {
-                        if (options[o] == current) { idx = o; break; }
+                btn->onActivated = [this, i]() {
+                    if (i >= rows.size() || i >= rowWidgets.size()) return;
+                    const PropertyRow& current = rows[i];
+                    if (current.enumOptions.empty() || !current.setString) return;
+                    if (current.dropdown) {
+                        std::vector<ChoiceOption> choices;
+                        for (const std::string& option : current.enumOptions) choices.push_back({ option, true, "" });
+                        const Rectangle r = rowWidgets[i].assetOrEnumButton ? rowWidgets[i].assetOrEnumButton->lastResolvedRect : Rectangle{ GetMousePosition().x, GetMousePosition().y, 160.0f, 0.0f };
+                        enumDropdownOptions = current.enumOptions;
+                        enumDropdownRowId = current.id;
+                        enumDropdown.Open({ r.x, r.y + r.height }, std::max(r.width, 140.0f), choices);
+                        return;
                     }
-                    idx = (idx + 1) % options.size();
-                    setString(options[idx]);
+                    long idx = -1;
+                    for (size_t o = 0; o < current.enumOptions.size(); o++) {
+                        if (current.enumOptions[o] == current.stringValue) { idx = (long)o; break; }
+                    }
+                    idx = (idx + 1) % (long)current.enumOptions.size();
+                    current.setString(current.enumOptions[(size_t)idx]);
                 };
                 auto* value = new TextElement();
                 value->fontSize = 11.0f;

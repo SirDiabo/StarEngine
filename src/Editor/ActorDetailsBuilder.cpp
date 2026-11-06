@@ -198,6 +198,51 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
                 }
                 continue;
             }
+            case ComponentFieldKind::NameList: {
+                const std::vector<std::string> items = ComponentField::SplitList(value);
+                const std::vector<std::string> available = ComponentField::EnumOptionsOf(f);
+                PropertyRow header;
+                header.id = "field:" + fieldKey + ".h";
+                header.kind = PropertyRowKind::Header;
+                header.label = f.label;
+                rows.push_back(header);
+                for (size_t i = 0; i < items.size(); i++) {
+                    PropertyRow item;
+                    item.id = "field:" + fieldKey + "." + std::to_string(i);
+                    item.label = std::to_string(i + 1);
+                    item.kind = PropertyRowKind::Enum;
+                    item.dropdown = true;
+                    item.stringValue = items[i];
+                    item.enumOptions = available;
+                    if (std::find(available.begin(), available.end(), items[i]) == available.end()) item.enumOptions.push_back(items[i]);
+                    if (i > 0) item.enumOptions.push_back("-- Move Up");
+                    item.enumOptions.push_back("-- Remove");
+                    item.setString = [writeField, onEdited, fieldKey, items, i](const std::string& v) {
+                        std::vector<std::string> next = items;
+                        if (v == "-- Remove") next.erase(next.begin() + (long)i);
+                        else if (v == "-- Move Up") std::swap(next[i], next[i - 1]);
+                        else next[i] = v;
+                        writeField(fieldKey, ComponentField::JoinList(next));
+                        if (onEdited) onEdited();
+                    };
+                    rows.push_back(item);
+                }
+                PropertyRow addRow;
+                addRow.id = "field:" + fieldKey + ".add";
+                addRow.label = "Add";
+                addRow.kind = PropertyRowKind::Enum;
+                addRow.dropdown = true;
+                addRow.stringValue = available.empty() ? "No effects defined" : "Add effect...";
+                addRow.enumOptions = available;
+                addRow.setString = [writeField, onEdited, fieldKey, items](const std::string& v) {
+                    std::vector<std::string> next = items;
+                    next.push_back(v);
+                    writeField(fieldKey, ComponentField::JoinList(next));
+                    if (onEdited) onEdited();
+                };
+                rows.push_back(addRow);
+                continue;
+            }
             case ComponentFieldKind::Device:
                 continue;
         }

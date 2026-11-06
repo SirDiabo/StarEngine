@@ -1,3 +1,4 @@
+#include "Core/AudioEffectRegistry.h"
 #include "StarscriptBuiltins.h"
 #include "StarscriptRuntime.h"
 #include "StarscriptInput.h"
@@ -383,6 +384,28 @@ Value M_audio_skip_to_marker(Runtime&, Value& s, std::vector<Value>& a) {
     audio->SetParameter("Playback/Section", marker);
     return Value::Void();
 }
+AudioEffectRegistry& RequireEffect(const std::string& name) {
+    AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+    if (!registry.Find(name)) throw ScriptError{ "Unknown audio effect '" + name + "'" };
+    return registry;
+}
+Value M_audio_push_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    AudioComponent* audio = RequireAudio(s, "push_effect");
+    RequireEffect(a[0].s);
+    audio->PushEffect(a[0].s);
+    return Value::Void();
+}
+Value M_audio_pop_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    AudioComponent* audio = RequireAudio(s, "pop_effect");
+    return Value::Bool(audio->PopEffect(a.empty() ? std::string() : a[0].s));
+}
+Value M_audio_clear_effects(Runtime&, Value& s, std::vector<Value>&) {
+    RequireAudio(s, "clear_effects")->ClearEffects();
+    return Value::Void();
+}
+Value M_audio_set_effect_parameter(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(RequireAudio(s, "set_effect_parameter")->SetEffectParameter(a[0].s, a[1].s, (float)a[2].AsNumber()));
+}
 Value M_audio_get_current_marker(Runtime&, Value& s, std::vector<Value>&) {
     AudioParamValue value;
     RequireAudio(s, "get_current_marker")->GetParameter("Playback/CurrentMarker", value);
@@ -662,6 +685,10 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Component, "set_parameter", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter, "AudioComponent" },
         { Kind::Component, "set_parameter_text", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_parameter_text, "AudioComponent" },
         { Kind::Component, "skip_to_marker", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_skip_to_marker, "AudioComponent" },
+        { Kind::Component, "push_effect", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_push_effect, "AudioComponent" },
+        { Kind::Component, "pop_effect", { T(Kind::String) }, 0, T(Kind::Bool), RetRule::Fixed, false, M_audio_pop_effect, "AudioComponent" },
+        { Kind::Component, "clear_effects", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_clear_effects, "AudioComponent" },
+        { Kind::Component, "set_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_effect_parameter, "AudioComponent" },
         { Kind::Component, "get_current_marker", {}, 0, T(Kind::String), RetRule::Fixed, false, M_audio_get_current_marker, "AudioComponent" },
         { Kind::Component, "set_layer_mute", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_mute, "AudioComponent" },
         { Kind::Component, "set_layer_solo", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_solo, "AudioComponent" },

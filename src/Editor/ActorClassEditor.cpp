@@ -438,6 +438,36 @@ void ActorClassEditor::BuildComponentRows(std::vector<PropertyRow>& rows, int id
                     }
                     break;
                 }
+                case ComponentFieldKind::NameList: {
+                    const std::vector<std::string> items = ComponentField::SplitList(value);
+                    const std::vector<std::string> available = ComponentField::EnumOptionsOf(f);
+                    rows.push_back(HeaderRow(rowId + ".h", f.label));
+                    for (size_t i = 0; i < items.size(); i++) {
+                        std::vector<std::string> options = available;
+                        if (std::find(available.begin(), available.end(), items[i]) == available.end()) options.push_back(items[i]);
+                        if (i > 0) options.push_back("-- Move Up");
+                        options.push_back("-- Remove");
+                        PropertyRow itemRow = EnumRow(rowId + "." + std::to_string(i), std::to_string(i + 1), items[i], options,
+                            [this, idx, key, items, i](const std::string& v) {
+                                std::vector<std::string> next = items;
+                                if (v == "-- Remove") next.erase(next.begin() + (long)i);
+                                else if (v == "-- Move Up") std::swap(next[i], next[i - 1]);
+                                else next[i] = v;
+                                SetComponentField(idx, key, ComponentField::JoinList(next));
+                            });
+                        itemRow.dropdown = true;
+                        rows.push_back(itemRow);
+                    }
+                    PropertyRow addRow = EnumRow(rowId + ".add", "Add", available.empty() ? "No effects defined" : "Add effect...", available,
+                        [this, idx, key, items](const std::string& v) {
+                            std::vector<std::string> next = items;
+                            next.push_back(v);
+                            SetComponentField(idx, key, ComponentField::JoinList(next));
+                        });
+                    addRow.dropdown = true;
+                    rows.push_back(addRow);
+                    break;
+                }
                 case ComponentFieldKind::AssetPath:
                     rows.push_back(AssetRow(rowId, f.label, f.assetExtension, StemOrNone(value)));
                     break;

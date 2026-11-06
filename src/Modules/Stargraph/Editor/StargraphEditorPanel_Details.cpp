@@ -1,3 +1,4 @@
+#include "Core/AudioEffectRegistry.h"
 #include "StargraphEditorPanel.h"
 #include "Editor/PropertyRowBuilders.h"
 #include "Runtime/ComponentRegistry.h"
@@ -718,6 +719,14 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
                         isDirty = true;
                     }
                 }));
+        } else if (pin.name == "Effect" && (node->type == "Push_Effect" || node->type == "Pop_Effect" || node->type == "Set_Effect_Parameter" ||
+                                            node->type == "Push_Bus_Effect" || node->type == "Pop_Bus_Effect" || node->type == "Set_Bus_Effect_Parameter")) {
+            int pinId = pin.id;
+            std::vector<std::string> options = AudioEffectRegistry::Get().Names();
+            if (!value.empty() && std::find(options.begin(), options.end(), value) == options.end()) options.push_back(value);
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value, options, [this, pinId](const std::string& v) {
+                if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v; isDirty = true; }
+            }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

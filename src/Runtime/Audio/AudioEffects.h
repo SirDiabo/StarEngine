@@ -17,6 +17,7 @@ public:
     float GetParam(int index) const;
     void Process(float* interleavedStereo, int frames);
     void Reset();
+    virtual float TailSeconds() const { return 0.15f; }
 
 protected:
     virtual void ProcessWet(float* interleavedStereo, int frames) = 0;
@@ -40,6 +41,12 @@ private:
 struct AudioEffectChain {
     std::vector<std::shared_ptr<AudioEffect>> effects;
     std::vector<std::string> names;
+
+    float TailSeconds() const {
+        float total = 0.0f;
+        for (const auto& effect : effects) total += effect->TailSeconds();
+        return total > 12.0f ? 12.0f : total;
+    }
 };
 
 std::shared_ptr<AudioEffect> CreateAudioEffect(const std::string& type, int sampleRate);

@@ -95,6 +95,7 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayMemory(const std::shared_ptr<const
     c.bus.store(start.bus);
     c.sourceRate = data->sampleRate;
     c.totalFrames = data->frameCount;
+    voice->chain = start.chain;
 
     if (!voiceQueue.Push(voice)) return nullptr;
     return voice->control;
@@ -118,6 +119,7 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayStream(const std::shared_ptr<Strea
     c.bus.store(start.bus);
     c.sourceRate = feed->Info().sampleRate;
     c.totalFrames = feed->Info().frameCount;
+    voice->chain = start.chain;
 
     feed->SetLooping(start.looping);
     StreamService::Get().Add(feed);
@@ -126,9 +128,19 @@ std::shared_ptr<VoiceControl> AudioMixer::PlayStream(const std::shared_ptr<Strea
     return voice->control;
 }
 
-void AudioMixer::AddRenderer(const std::shared_ptr<AudioRenderer>& renderer) {
+void AudioMixer::AddRenderer(const std::shared_ptr<AudioRenderer>& renderer, const std::shared_ptr<const AudioEffectChain>& chain) {
     if (!renderer) return;
-    rendererQueue.Push({ true, renderer, stopEpoch.load() });
+    rendererQueue.Push({ true, renderer, stopEpoch.load(), chain });
+}
+
+void AudioMixer::SetVoiceChain(const std::shared_ptr<VoiceControl>& control, const std::shared_ptr<const AudioEffectChain>& chain) {
+    if (!control) return;
+    voiceChainQueue.Push({ control, chain });
+}
+
+void AudioMixer::SetRendererChain(const std::shared_ptr<AudioRenderer>& renderer, const std::shared_ptr<const AudioEffectChain>& chain) {
+    if (!renderer) return;
+    rendererChainQueue.Push({ renderer, chain });
 }
 
 void AudioMixer::RemoveRenderer(const std::shared_ptr<AudioRenderer>& renderer) {
@@ -169,6 +181,13 @@ void AudioMixer::DrainQueues() {
         voices.push_back(std::move(incoming));
     }
 
+    VoiceChainCommand voiceChainCommand;
+    while (voiceChainQueue.Pop(voiceChainCommand)) {
+        for (auto& voice : voices) {
+            if (voice->control == voiceChainCommand.control) { voice->chain = voiceChainCommand.chain; break; }
+        }
+    }
+
     ChainCommand chainCommand;
     while (chainQueue.Pop(chainCommand)) {
         busChains[chainCommand.bus] = std::move(chainCommand.chain);
@@ -183,6 +202,7 @@ void AudioMixer::DrainQueues() {
             entry.renderer = command.renderer;
             entry.lastGain = command.renderer->gain.load();
             entry.epoch = command.epoch;
+            entry.chain = command.chain;
             renderers.push_back(std::move(entry));
         } else {
             renderers.erase(std::remove_if(renderers.begin(), renderers.end(),
@@ -214,9 +234,9 @@ void AudioMixer::PrepareBlock(float* out, int frames) {
     }
 }
 
-bool AudioMixer::MixVoice(Voice& voice, int frames) {
+bool AudioMixer::MixVoice(Voice& voice, int frames, float* overrideDest) {
     VoiceControl& c = *voice.control;
-    float* out = blockBusDest[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
+    float* out = overrideDest ? overrideDest : blockBusDest[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
     const bool hasStream = voice.feed != nullptr;
     const SampleData* data = voice.data.get();
 
@@ -234,7 +254,7 @@ bool AudioMixer::MixVoice(Voice& voice, int frames) {
 
     const bool stopping = c.stopRequested.load(std::memory_order_relaxed);
     const bool paused = c.paused.load(std::memory_order_relaxed);
-    const float bus = blockBusFactor[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
+    const float bus = overrideDest ? 1.0f : blockBusFactor[std::clamp(c.bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1)];
 
     const float pan = std::clamp(c.pan.load(std::memory_order_relaxed), -1.0f, 1.0f);
     const float panLeft = std::min(1.0f, 1.0f - pan);
@@ -340,6 +360,48 @@ bool AudioMixer::MixVoice(Voice& voice, int frames) {
     return true;
 }
 
+bool AudioMixer::MixChainedVoice(Voice& voice, int frames) {
+    if (voiceScratch.size() < (size_t)frames * 2) voiceScratch.resize((size_t)frames * 2);
+    float* scratch = voiceScratch.data();
+    std::fill(scratch, scratch + (size_t)frames * 2, 0.0f);
+
+    if (!voice.draining) {
+        if (voice.control->finished.load(std::memory_order_relaxed)) voice.draining = true;
+        else if (!MixVoice(voice, frames, scratch)) voice.draining = true;
+    }
+    if (voice.draining && voice.killTail) return false;
+
+    const bool hasChain = voice.chain && !voice.chain->effects.empty();
+    if (!hasChain && voice.draining) return false;
+
+    float peak = 0.0f;
+    if (hasChain) {
+        for (const auto& effect : voice.chain->effects) effect->Process(scratch, frames);
+        for (int i = 0; i < frames * 2; i++) peak = std::max(peak, std::fabs(scratch[i]));
+    }
+
+    const int busIndex = std::clamp(voice.control->bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1);
+    float* dest = blockBusDest[busIndex];
+    const float target = blockBusFactor[busIndex];
+    if (!voice.busPrimed) { voice.lastBusFactor = target; voice.busPrimed = true; }
+    const float step = (target - voice.lastBusFactor) / (float)frames;
+    float g = voice.lastBusFactor;
+    for (int f = 0; f < frames; f++) {
+        g += step;
+        dest[f * 2] += scratch[f * 2] * g;
+        dest[f * 2 + 1] += scratch[f * 2 + 1] * g;
+    }
+    voice.lastBusFactor = target;
+
+    if (voice.draining) {
+        if (voice.tailFrames < 0) voice.tailFrames = (int)(voice.chain->TailSeconds() * (float)kMixerSampleRate);
+        voice.silentBlocks = peak < 1e-4f ? voice.silentBlocks + 1 : 0;
+        voice.drainFrames += frames;
+        if ((voice.silentBlocks >= 4 && voice.drainFrames >= voice.tailFrames) || voice.drainFrames > kMixerSampleRate * 12) return false;
+    }
+    return true;
+}
+
 void AudioMixer::Render(float* out, int frames) {
     std::fill(out, out + (size_t)frames * 2, 0.0f);
     DrainQueues();
@@ -350,16 +412,25 @@ void AudioMixer::Render(float* out, int frames) {
     if (currentStopEpoch != handledStopEpoch) {
         handledStopEpoch = currentStopEpoch;
         for (auto& voice : voices) {
-            if (voice->epoch < currentStopEpoch) voice->control->stopRequested.store(true);
+            if (voice->epoch < currentStopEpoch) {
+                voice->control->stopRequested.store(true);
+                voice->killTail = true;
+            }
         }
         for (auto& r : renderers) {
-            if (r.epoch < currentStopEpoch) r.renderer->gain.store(0.0f);
+            if (r.epoch < currentStopEpoch) {
+                r.renderer->gain.store(0.0f);
+                r.killTail = true;
+            }
         }
     }
 
     for (size_t i = 0; i < voices.size();) {
         Voice& voice = *voices[i];
-        if (voice.control->finished.load(std::memory_order_relaxed) || !MixVoice(voice, frames)) {
+        const bool chained = voice.draining || (voice.chain && !voice.chain->effects.empty());
+        const bool done = chained ? !MixChainedVoice(voice, frames)
+                                  : (voice.control->finished.load(std::memory_order_relaxed) || !MixVoice(voice, frames));
+        if (done) {
             voice.control->finished.store(true, std::memory_order_release);
             voices[i] = std::move(voices.back());
             voices.pop_back();
@@ -369,16 +440,38 @@ void AudioMixer::Render(float* out, int frames) {
     }
     activeVoices.store((int)voices.size(), std::memory_order_relaxed);
 
+    RendererChainCommand rendererChainCommand;
+    while (rendererChainQueue.Pop(rendererChainCommand)) {
+        for (auto& entry : renderers) {
+            if (entry.renderer == rendererChainCommand.renderer) { entry.chain = rendererChainCommand.chain; break; }
+        }
+    }
+
     if (!renderers.empty()) {
         if (rendererScratch.size() < (size_t)frames * 2) rendererScratch.resize((size_t)frames * 2);
         for (size_t i = 0; i < renderers.size();) {
             ActiveRenderer& entry = renderers[i];
-            if (entry.renderer->IsFinished()) {
+            const bool hasChain = entry.chain && !entry.chain->effects.empty();
+            if (!entry.draining && entry.renderer->IsFinished()) {
+                if (hasChain && !entry.killTail) {
+                    entry.draining = true;
+                } else {
+                    renderers.erase(renderers.begin() + (long)i);
+                    continue;
+                }
+            }
+            if (entry.draining && (entry.killTail || !hasChain)) {
                 renderers.erase(renderers.begin() + (long)i);
                 continue;
             }
             std::fill(rendererScratch.begin(), rendererScratch.begin() + (size_t)frames * 2, 0.0f);
-            entry.renderer->Render(rendererScratch.data(), frames, kMixerSampleRate);
+            if (!entry.draining) entry.renderer->Render(rendererScratch.data(), frames, kMixerSampleRate);
+
+            float peak = 0.0f;
+            if (hasChain) {
+                for (const auto& effect : entry.chain->effects) effect->Process(rendererScratch.data(), frames);
+                for (int f = 0; f < frames * 2; f++) peak = std::max(peak, std::fabs(rendererScratch[(size_t)f]));
+            }
 
             int bus = std::clamp(entry.renderer->bus.load(std::memory_order_relaxed), 0, kMaxMixerBuses - 1);
             float* dest = blockBusDest[bus];
@@ -391,6 +484,15 @@ void AudioMixer::Render(float* out, int frames) {
                 dest[f * 2 + 1] += rendererScratch[(size_t)f * 2 + 1] * g;
             }
             entry.lastGain = target;
+            if (entry.draining) {
+                if (entry.tailFrames < 0) entry.tailFrames = (int)(entry.chain->TailSeconds() * (float)kMixerSampleRate);
+                entry.silentBlocks = peak < 1e-4f ? entry.silentBlocks + 1 : 0;
+                entry.drainFrames += frames;
+                if ((entry.silentBlocks >= 4 && entry.drainFrames >= entry.tailFrames) || entry.drainFrames > kMixerSampleRate * 12) {
+                    renderers.erase(renderers.begin() + (long)i);
+                    continue;
+                }
+            }
             i++;
         }
     }

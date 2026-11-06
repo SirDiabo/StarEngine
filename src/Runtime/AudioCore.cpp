@@ -12,6 +12,9 @@ AudioCore::AudioCore() {
         busMuted[i] = false;
     }
     AudioEffectRegistry::Get().AddListener([]() { AudioCore::Get().ApplyProjectEffects(); });
+    AudioEffectRegistry::Get().AddParamListener([](const std::string& effect, const std::string& param, float value) {
+        AudioCore::Get().OnEffectParamChanged(effect, param, value);
+    });
     ApplyProjectEffects();
 }
 
@@ -164,36 +167,75 @@ void AudioCore::PruneRetired() {
 bool AudioCore::SetBusEffectsByIndex(int index, const std::vector<std::string>& effectNames) {
     if (index < 0 || index >= kMaxMixerBuses) return false;
 
-    std::shared_ptr<AudioEffectChain> chain;
-    if (!effectNames.empty()) {
-        chain = std::make_shared<AudioEffectChain>();
-        const AudioEffectRegistry& registry = AudioEffectRegistry::Get();
-        for (const std::string& name : effectNames) {
-            const AudioEffectDef* def = registry.Find(name);
-            if (!def) {
-                TraceLog(LOG_WARNING, "Audio: unknown effect '%s'", name.c_str());
-                continue;
-            }
-            std::shared_ptr<AudioEffect> effect = CreateAudioEffect(def->type, kMixerSampleRate);
-            if (!effect) {
-                TraceLog(LOG_WARNING, "Audio: effect '%s' has unknown type '%s'", name.c_str(), def->type.c_str());
-                continue;
-            }
-            const AudioEffectTypeInfo* info = effect->Info();
-            for (size_t i = 0; i < info->params.size(); i++) {
-                effect->SetParam((int)i, AudioEffectRegistry::ParamValue(*def, info->params[i].id));
-            }
-            chain->effects.push_back(std::move(effect));
-            chain->names.push_back(name);
-        }
-        if (chain->effects.empty()) chain.reset();
-    }
-
+    std::shared_ptr<const AudioEffectChain> chain = BuildEffectChain(effectNames, busChains[index]);
     if (busChains[index]) retiredChains.push_back({ busChains[index], std::chrono::steady_clock::now() });
     busChains[index] = chain;
     AudioMixer::Get().SetBusChain(index, chain);
     PruneRetired();
     return true;
+}
+
+std::shared_ptr<const AudioEffectChain> AudioCore::BuildEffectChain(const std::vector<std::string>& effectNames, const std::shared_ptr<const AudioEffectChain>& reuseFrom) {
+    if (effectNames.empty()) return nullptr;
+
+    auto chain = std::make_shared<AudioEffectChain>();
+    const AudioEffectRegistry& registry = AudioEffectRegistry::Get();
+    std::vector<bool> taken(reuseFrom ? reuseFrom->effects.size() : 0, false);
+
+    for (const std::string& name : effectNames) {
+        const AudioEffectDef* def = registry.Find(name);
+        if (!def) {
+            TraceLog(LOG_WARNING, "Audio: unknown effect '%s'", name.c_str());
+            continue;
+        }
+
+        std::shared_ptr<AudioEffect> effect;
+        if (reuseFrom) {
+            for (size_t i = 0; i < reuseFrom->effects.size(); i++) {
+                if (!taken[i] && reuseFrom->names[i] == name && reuseFrom->effects[i]->Type() == def->type) {
+                    effect = reuseFrom->effects[i];
+                    taken[i] = true;
+                    break;
+                }
+            }
+        }
+        if (!effect) effect = CreateAudioEffect(def->type, kMixerSampleRate);
+        if (!effect) {
+            TraceLog(LOG_WARNING, "Audio: effect '%s' has unknown type '%s'", name.c_str(), def->type.c_str());
+            continue;
+        }
+
+        const AudioEffectTypeInfo* info = effect->Info();
+        for (size_t i = 0; i < info->params.size(); i++) {
+            effect->SetParam((int)i, AudioEffectRegistry::ParamValue(*def, info->params[i].id));
+        }
+        chain->effects.push_back(std::move(effect));
+        chain->names.push_back(name);
+    }
+    if (chain->effects.empty()) return nullptr;
+
+    trackedChains.erase(std::remove_if(trackedChains.begin(), trackedChains.end(),
+        [](const std::weak_ptr<const AudioEffectChain>& w) { return w.expired(); }), trackedChains.end());
+    trackedChains.push_back(chain);
+    return chain;
+}
+
+void AudioCore::RetireEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
+    if (!chain) return;
+    retiredChains.push_back({ chain, std::chrono::steady_clock::now() });
+    PruneRetired();
+}
+
+bool AudioCore::SetChainEffectParameter(const AudioEffectChain& chain, const std::string& effectName, const std::string& paramId, float value) {
+    bool applied = false;
+    for (size_t i = 0; i < chain.effects.size(); i++) {
+        if (chain.names[i] != effectName) continue;
+        int param = AudioEffectTypes::ParamIndex(*chain.effects[i]->Info(), paramId);
+        if (param < 0) continue;
+        chain.effects[i]->SetParam(param, value);
+        applied = true;
+    }
+    return applied;
 }
 
 std::vector<std::string> AudioCore::GetBusEffects(const std::string& busName) const {
@@ -222,6 +264,13 @@ bool AudioCore::RemoveBusEffect(const std::string& busName, const std::string& e
     return SetBusEffects(busName, names);
 }
 
+bool AudioCore::PopBusEffect(const std::string& busName) {
+    std::vector<std::string> names = GetBusEffects(busName);
+    if (names.empty()) return false;
+    names.pop_back();
+    return SetBusEffects(busName, names);
+}
+
 bool AudioCore::ClearBusEffects(const std::string& busName) {
     return SetBusEffects(busName, {});
 }
@@ -229,16 +278,13 @@ bool AudioCore::ClearBusEffects(const std::string& busName) {
 bool AudioCore::SetBusEffectParameter(const std::string& busName, const std::string& effectName, const std::string& paramId, float value) {
     int index = AudioBusRegistry::Get().IndexOf(busName);
     if (index < 0 || !busChains[index]) return false;
-    bool applied = false;
-    const AudioEffectChain& chain = *busChains[index];
-    for (size_t i = 0; i < chain.effects.size(); i++) {
-        if (chain.names[i] != effectName) continue;
-        int param = AudioEffectTypes::ParamIndex(*chain.effects[i]->Info(), paramId);
-        if (param < 0) continue;
-        chain.effects[i]->SetParam(param, value);
-        applied = true;
+    return SetChainEffectParameter(*busChains[index], effectName, paramId, value);
+}
+
+void AudioCore::OnEffectParamChanged(const std::string& effectName, const std::string& paramId, float value) {
+    for (const auto& weak : trackedChains) {
+        if (std::shared_ptr<const AudioEffectChain> chain = weak.lock()) SetChainEffectParameter(*chain, effectName, paramId, value);
     }
-    return applied;
 }
 
 void AudioCore::ApplyProjectEffects() {

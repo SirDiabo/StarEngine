@@ -37,6 +37,7 @@ struct VoiceStart {
     int bus = 0;
     uint64_t loopStart = 0;
     uint64_t loopEnd = 0;
+    std::shared_ptr<const AudioEffectChain> chain;
 };
 
 class AudioRenderer {
@@ -91,7 +92,9 @@ public:
     std::shared_ptr<VoiceControl> PlayMemory(const std::shared_ptr<const SampleData>& data, const VoiceStart& start);
     std::shared_ptr<VoiceControl> PlayStream(const std::shared_ptr<StreamFeed>& feed, const VoiceStart& start);
 
-    void AddRenderer(const std::shared_ptr<AudioRenderer>& renderer);
+    void AddRenderer(const std::shared_ptr<AudioRenderer>& renderer, const std::shared_ptr<const AudioEffectChain>& chain = nullptr);
+    void SetVoiceChain(const std::shared_ptr<VoiceControl>& control, const std::shared_ptr<const AudioEffectChain>& chain);
+    void SetRendererChain(const std::shared_ptr<AudioRenderer>& renderer, const std::shared_ptr<const AudioEffectChain>& chain);
     void RemoveRenderer(const std::shared_ptr<AudioRenderer>& renderer);
 
     void SetBusGain(int bus, float gain);
@@ -114,12 +117,31 @@ private:
         uint64_t loopEnd = 0;
         int sourceRate = kMixerSampleRate;
         uint64_t epoch = 0;
+        std::shared_ptr<const AudioEffectChain> chain;
+        bool draining = false;
+        bool killTail = false;
+        bool busPrimed = false;
+        float lastBusFactor = 1.0f;
+        int silentBlocks = 0;
+        int drainFrames = 0;
+        int tailFrames = -1;
     };
 
     struct RendererCommand {
         bool add = true;
         std::shared_ptr<AudioRenderer> renderer;
         uint64_t epoch = 0;
+        std::shared_ptr<const AudioEffectChain> chain;
+    };
+
+    struct VoiceChainCommand {
+        std::shared_ptr<VoiceControl> control;
+        std::shared_ptr<const AudioEffectChain> chain;
+    };
+
+    struct RendererChainCommand {
+        std::shared_ptr<AudioRenderer> renderer;
+        std::shared_ptr<const AudioEffectChain> chain;
     };
 
     struct ChainCommand {
@@ -132,12 +154,19 @@ private:
         std::shared_ptr<AudioRenderer> renderer;
         float lastGain = 1.0f;
         uint64_t epoch = 0;
+        std::shared_ptr<const AudioEffectChain> chain;
+        bool draining = false;
+        bool killTail = false;
+        int silentBlocks = 0;
+        int drainFrames = 0;
+        int tailFrames = -1;
     };
 
     static void StreamCallback(void* buffer, unsigned int frames);
 
     void DrainQueues();
-    bool MixVoice(Voice& voice, int frames);
+    bool MixVoice(Voice& voice, int frames, float* overrideDest = nullptr);
+    bool MixChainedVoice(Voice& voice, int frames);
     void PrepareBlock(float* out, int frames);
 
     std::atomic<bool> running{false};
@@ -152,6 +181,9 @@ private:
     std::vector<std::shared_ptr<Voice>> voices;
     std::vector<ActiveRenderer> renderers;
     std::vector<float> rendererScratch;
+    std::vector<float> voiceScratch;
+    SpscQueue<VoiceChainCommand, 256> voiceChainQueue;
+    SpscQueue<RendererChainCommand, 64> rendererChainQueue;
 
     SpscQueue<ChainCommand, 64> chainQueue;
     std::shared_ptr<const AudioEffectChain> busChains[kMaxMixerBuses];

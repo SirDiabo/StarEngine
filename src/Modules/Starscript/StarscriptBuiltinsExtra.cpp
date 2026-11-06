@@ -3,6 +3,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/SaveGame.h"
+#include "Core/AudioEffectRegistry.h"
 #include "Runtime/AudioCore.h"
 #include "Core/AudioBusRegistry.h"
 #include "Runtime/Components/Component.h"
@@ -290,6 +291,29 @@ Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = Find
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
 Value Fn_set_master_volume(Runtime&, std::vector<Value>& a) { AudioCore::Get().SetBusVolume(AudioBusRegistry::MasterName(), (float)a[0].AsNumber()); return Value::Void(); }
+static void RequireBusEffect(const std::string& bus, const std::string& effect) {
+    if (AudioBusRegistry::Get().IndexOf(bus) < 0) throw ScriptError{ "Unknown audio bus '" + bus + "'" };
+    if (!effect.empty() && !AudioEffectRegistry::Get().Find(effect)) throw ScriptError{ "Unknown audio effect '" + effect + "'" };
+}
+Value Fn_push_bus_effect(Runtime&, std::vector<Value>& a) {
+    RequireBusEffect(a[0].s, a[1].s);
+    AudioCore::Get().AddBusEffect(a[0].s, a[1].s);
+    return Value::Void();
+}
+Value Fn_pop_bus_effect(Runtime&, std::vector<Value>& a) {
+    RequireBusEffect(a[0].s, a.size() > 1 ? a[1].s : std::string());
+    if (a.size() > 1 && !a[1].s.empty()) return Value::Bool(AudioCore::Get().RemoveBusEffect(a[0].s, a[1].s));
+    return Value::Bool(AudioCore::Get().PopBusEffect(a[0].s));
+}
+Value Fn_clear_bus_effects(Runtime&, std::vector<Value>& a) {
+    RequireBusEffect(a[0].s, std::string());
+    AudioCore::Get().ClearBusEffects(a[0].s);
+    return Value::Void();
+}
+Value Fn_set_bus_effect_parameter(Runtime&, std::vector<Value>& a) {
+    RequireBusEffect(a[0].s, a[1].s);
+    return Value::Bool(AudioCore::Get().SetBusEffectParameter(a[0].s, a[1].s, a[2].s, (float)a[3].AsNumber()));
+}
 Value Fn_set_bus_volume(Runtime&, std::vector<Value>& a) {
     if (!AudioCore::Get().SetBusVolume(a[0].s, (float)a[1].AsNumber())) throw ScriptError{ "Unknown audio bus '" + a[0].s + "'" };
     return Value::Void();
@@ -390,6 +414,10 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "sound_position", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_position },
         { "sound_duration", { T(Kind::Int) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_sound_duration },
         { "set_bus_volume", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_bus_volume },
+        { "push_bus_effect", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_push_bus_effect },
+        { "pop_bus_effect", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_pop_bus_effect },
+        { "clear_bus_effects", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_clear_bus_effects },
+        { "set_bus_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 4, T(Kind::Bool), RetRule::Fixed, false, Fn_set_bus_effect_parameter },
         { "get_bus_volume", { T(Kind::String) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_get_bus_volume },
         { "set_bus_muted", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_set_bus_muted },
         { "is_bus_muted", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_is_bus_muted },

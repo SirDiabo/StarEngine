@@ -1,3 +1,4 @@
+#include "Core/AudioEffectRegistry.h"
 #include "Runtime/Components/AudioComponent.h"
 #include "NodeRegistry.h"
 #include "Stargraph.h"
@@ -230,6 +231,36 @@ void RegisterAudioComponentNodes() {
             AudioParamValue value;
             value.text = marker;
             SetParameter(target, "Playback/Section", value);
+        });
+
+    RegisterTargetNode("Push_Effect",
+        [](Node* node) { node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""}); },
+        [](Node& node, AudioTarget& target) {
+            std::string effect = ReadText(node, "Effect");
+            if (!target.component || effect.empty() || !AudioEffectRegistry::Get().Find(effect)) return;
+            target.component->PushEffect(effect);
+        });
+
+    RegisterTargetNode("Pop_Effect",
+        [](Node* node) { node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""}); },
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->PopEffect(ReadText(node, "Effect"));
+        });
+
+    RegisterTargetNode("Clear_Effects",
+        [](Node*) {},
+        [](Node&, AudioTarget& target) {
+            if (target.component) target.component->ClearEffects();
+        });
+
+    RegisterTargetNode("Set_Effect_Parameter",
+        [](Node* node) {
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Parameter", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0"});
+        },
+        [](Node& node, AudioTarget& target) {
+            if (target.component) target.component->SetEffectParameter(ReadText(node, "Effect"), ReadText(node, "Parameter"), ReadFloat(node, "Value", 0.0f));
         });
 
     RegisterLayerNode("Set_Layer_Mute", "Mute", "Muted", PinType::Boolean, "false");
