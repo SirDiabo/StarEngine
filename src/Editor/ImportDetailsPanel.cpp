@@ -1,4 +1,5 @@
 #include "ImportDetailsPanel.h"
+#include "EffectListRows.h"
 #include <algorithm>
 #include "ContentUndo.h"
 #include "Runtime/AssetCache.h"
@@ -36,6 +37,7 @@ void ImportDetailsPanel::LoadFromAsset() {
 
     soundLoadMode = asset.soundLoadMode.empty() ? "Auto" : asset.soundLoadMode;
     soundBus = asset.soundBus;
+    soundEffects = asset.soundEffects;
     soundVolume = asset.soundVolume;
     soundPitch = asset.soundPitch;
     soundInfoText.clear();
@@ -65,6 +67,7 @@ void ImportDetailsPanel::SaveToAsset() {
     if (asset.assetType == "Sound") {
         asset.soundLoadMode = soundLoadMode;
         asset.soundBus = soundBus;
+        asset.soundEffects = soundEffects;
         asset.soundVolume = soundVolume;
         asset.soundPitch = soundPitch;
     }
@@ -273,6 +276,11 @@ std::vector<PropertyRow> ImportDetailsPanel::BuildRows(bool modal) {
         hint.label = "";
         hint.stringValue = "Auto streams sounds longer than 10 seconds.";
         rows.push_back(hint);
+
+        AddEffectListRows(rows, "soundfx", soundEffects, [this, modal](const std::vector<std::string>& value) {
+            soundEffects = value;
+            if (!modal) SaveToAsset();
+        });
     } else if (!isMesh) {
         PropertyRow r;
         r.id = "none";

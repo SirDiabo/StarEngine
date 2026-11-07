@@ -21,6 +21,7 @@ struct StarAsset {
 
     std::string soundLoadMode = "Auto";
     std::string soundBus;
+    std::vector<std::string> soundEffects;
     float soundVolume = 1.0f;
     float soundPitch = 1.0f;
 

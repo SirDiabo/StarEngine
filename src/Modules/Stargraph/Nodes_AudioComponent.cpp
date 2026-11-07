@@ -237,20 +237,23 @@ void RegisterAudioComponentNodes() {
         [](Node* node) { node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""}); },
         [](Node& node, AudioTarget& target) {
             std::string effect = ReadText(node, "Effect");
-            if (!target.component || effect.empty() || !AudioEffectRegistry::Get().Find(effect)) return;
-            target.component->PushEffect(effect);
+            if (effect.empty() || !AudioEffectRegistry::Get().Find(effect)) return;
+            if (target.component) target.component->PushEffect(effect);
+            else if (target.handle > 0) AudioCore::Get().PushInstanceEffect(target.handle, effect);
         });
 
     RegisterTargetNode("Pop_Effect",
         [](Node* node) { node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""}); },
         [](Node& node, AudioTarget& target) {
             if (target.component) target.component->PopEffect(ReadText(node, "Effect"));
+            else if (target.handle > 0) AudioCore::Get().PopInstanceEffect(target.handle, ReadText(node, "Effect"));
         });
 
     RegisterTargetNode("Clear_Effects",
         [](Node*) {},
         [](Node&, AudioTarget& target) {
             if (target.component) target.component->ClearEffects();
+            else if (target.handle > 0) AudioCore::Get().ClearInstanceEffects(target.handle);
         });
 
     RegisterTargetNode("Set_Effect_Parameter",
@@ -261,6 +264,7 @@ void RegisterAudioComponentNodes() {
         },
         [](Node& node, AudioTarget& target) {
             if (target.component) target.component->SetEffectParameter(ReadText(node, "Effect"), ReadText(node, "Parameter"), ReadFloat(node, "Value", 0.0f));
+            else if (target.handle > 0) AudioCore::Get().SetInstanceEffectParameter(target.handle, ReadText(node, "Effect"), ReadText(node, "Parameter"), ReadFloat(node, "Value", 0.0f));
         });
 
     RegisterTargetNode("Push_Layer_Effect",

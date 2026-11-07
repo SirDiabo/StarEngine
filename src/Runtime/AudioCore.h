@@ -47,6 +47,10 @@ public:
     std::shared_ptr<const AudioEffectChain> BuildEffectChain(const std::vector<std::string>& effectNames, const std::shared_ptr<const AudioEffectChain>& reuseFrom = nullptr);
     void RetireEffectChain(const std::shared_ptr<const AudioEffectChain>& chain);
     static bool SetChainEffectParameter(const AudioEffectChain& chain, const std::string& effectName, const std::string& paramId, float value);
+    bool PushInstanceEffect(int handle, const std::string& effectName);
+    bool PopInstanceEffect(int handle, const std::string& effectName);
+    bool ClearInstanceEffects(int handle);
+    bool SetInstanceEffectParameter(int handle, const std::string& effectName, const std::string& paramId, float value);
     void OnEffectParamChanged(const std::string& effectName, const std::string& paramId, float value);
 
 private:
@@ -70,4 +74,11 @@ private:
     int nextHandle = 1;
     std::unordered_map<std::string, std::shared_ptr<const SampleData>> sampleCache;
     std::unordered_map<int, std::unique_ptr<AudioSource>> instances;
+
+    struct InstanceEffects {
+        std::vector<std::string> names;
+        std::shared_ptr<const AudioEffectChain> chain;
+    };
+    std::unordered_map<int, InstanceEffects> instanceEffects;
+    bool ApplyInstanceEffects(int handle, InstanceEffects& entry);
 };

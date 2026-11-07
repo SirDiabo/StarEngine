@@ -4,6 +4,7 @@
 #include "WavFile.h"
 #include <memory>
 #include <string>
+#include <vector>
 
 enum class SoundLoadMode { Auto, Memory, Stream };
 
@@ -61,4 +62,8 @@ private:
 
     std::shared_ptr<VoiceControl> voice;
     std::shared_ptr<const AudioEffectChain> effectChain;
+    std::shared_ptr<const AudioEffectChain> soundChain;
+    std::vector<std::string> soundEffectNames;
+    bool soundEffectsDirty = true;
+    std::shared_ptr<const AudioEffectChain> ActiveChain();
 };

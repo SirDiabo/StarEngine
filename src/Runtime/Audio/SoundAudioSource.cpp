@@ -29,6 +29,11 @@ void SoundAudioSource::ReloadAssetSettings() {
     StarAsset header;
     if (assetPath.empty() || !StarAsset::LoadFromFile(assetPath, header) || header.assetType != "Sound") return;
     defaultBus = header.soundBus;
+    if (header.soundEffects != soundEffectNames) {
+        soundEffectNames = header.soundEffects;
+        soundEffectsDirty = true;
+        if (voice && !voice->finished.load()) AudioMixer::Get().SetVoiceChain(voice, ActiveChain());
+    }
     assetVolume = std::clamp(header.soundVolume, 0.0f, 4.0f);
     assetPitch = std::clamp(header.soundPitch, 0.05f, 4.0f);
     if (voice) {
@@ -94,7 +99,7 @@ void SoundAudioSource::Play() {
     start.pan = pan;
     start.looping = looping;
     start.bus = bus;
-    start.chain = effectChain;
+    start.chain = ActiveChain();
 
     if (streaming) {
         auto feed = std::make_shared<StreamFeed>(resolvedPath, info);
@@ -134,9 +139,26 @@ void SoundAudioSource::SetPitch(float value) {
     if (voice) voice->pitch.store(pitch * assetPitch);
 }
 
+std::shared_ptr<const AudioEffectChain> SoundAudioSource::ActiveChain() {
+    if (soundEffectsDirty) {
+        soundEffectsDirty = false;
+        std::shared_ptr<const AudioEffectChain> next = AudioCore::Get().BuildEffectChain(soundEffectNames, soundChain);
+        AudioCore::Get().RetireEffectChain(soundChain);
+        soundChain = next;
+    }
+    if (!soundChain) return effectChain;
+    if (!effectChain) return soundChain;
+    auto merged = std::make_shared<AudioEffectChain>();
+    merged->effects = soundChain->effects;
+    merged->names = soundChain->names;
+    merged->effects.insert(merged->effects.end(), effectChain->effects.begin(), effectChain->effects.end());
+    merged->names.insert(merged->names.end(), effectChain->names.begin(), effectChain->names.end());
+    return merged;
+}
+
 void SoundAudioSource::SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
     effectChain = chain;
-    if (voice && !voice->finished.load()) AudioMixer::Get().SetVoiceChain(voice, chain);
+    if (voice && !voice->finished.load()) AudioMixer::Get().SetVoiceChain(voice, ActiveChain());
 }
 
 void SoundAudioSource::SetLooping(bool value) {

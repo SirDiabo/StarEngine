@@ -22,6 +22,11 @@ bool StarAsset::SaveToFile(const std::string& path) const {
     if (assetType == "Sound") {
         out << "LoadMode=" << soundLoadMode << "\n";
         if (!soundBus.empty()) out << "Bus=" << soundBus << "\n";
+        if (!soundEffects.empty()) {
+            out << "Effects=";
+            for (size_t i = 0; i < soundEffects.size(); i++) out << (i > 0 ? ";" : "") << soundEffects[i];
+            out << "\n";
+        }
         out << "SoundVolume=" << soundVolume << "\n";
         out << "SoundPitch=" << soundPitch << "\n";
     }
@@ -88,6 +93,16 @@ bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
         else if (key == "VendoredSource") outAsset.vendoredSourcePath = value;
         else if (key == "LoadMode") outAsset.soundLoadMode = value;
         else if (key == "Bus") outAsset.soundBus = value;
+        else if (key == "Effects") {
+            outAsset.soundEffects.clear();
+            size_t start = 0;
+            while (start <= value.size()) {
+                size_t end = value.find(';', start);
+                if (end == std::string::npos) end = value.size();
+                if (end > start) outAsset.soundEffects.push_back(value.substr(start, end - start));
+                start = end + 1;
+            }
+        }
         else if (key == "SoundVolume") outAsset.soundVolume = SafeParse::ToFloat(value);
         else if (key == "SoundPitch") outAsset.soundPitch = SafeParse::ToFloat(value);
         else if (key == "PosX") outAsset.importPosX = SafeParse::ToFloat(value);

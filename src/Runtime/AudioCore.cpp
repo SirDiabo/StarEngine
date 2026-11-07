@@ -4,6 +4,7 @@
 #include "Core/AudioEffectRegistry.h"
 #include "raylib.h"
 #include <algorithm>
+#include <iterator>
 #include <vector>
 
 AudioCore::AudioCore() {
@@ -49,7 +50,14 @@ void AudioCore::Tick(float deltaTime) {
         kv.second->Tick(deltaTime);
         if (!kv.second->IsPlaying() && !kv.second->IsPaused()) finished.push_back(kv.first);
     }
-    for (int handle : finished) instances.erase(handle);
+    for (int handle : finished) {
+        instances.erase(handle);
+        auto fx = instanceEffects.find(handle);
+        if (fx != instanceEffects.end()) {
+            RetireEffectChain(fx->second.chain);
+            instanceEffects.erase(fx);
+        }
+    }
 }
 
 std::shared_ptr<const SampleData> AudioCore::GetSampleData(const std::string& resolvedWavPath) {
@@ -279,6 +287,49 @@ bool AudioCore::SetBusEffectParameter(const std::string& busName, const std::str
     int index = AudioBusRegistry::Get().IndexOf(busName);
     if (index < 0 || !busChains[index]) return false;
     return SetChainEffectParameter(*busChains[index], effectName, paramId, value);
+}
+
+bool AudioCore::ApplyInstanceEffects(int handle, InstanceEffects& entry) {
+    AudioSource* source = FindInstance(handle);
+    if (!source) return false;
+    std::shared_ptr<const AudioEffectChain> next = BuildEffectChain(entry.names, entry.chain);
+    RetireEffectChain(entry.chain);
+    entry.chain = next;
+    source->SetEffectChain(entry.chain);
+    return true;
+}
+
+bool AudioCore::PushInstanceEffect(int handle, const std::string& effectName) {
+    if (!FindInstance(handle) || !AudioEffectRegistry::Get().Find(effectName)) return false;
+    InstanceEffects& entry = instanceEffects[handle];
+    entry.names.push_back(effectName);
+    return ApplyInstanceEffects(handle, entry);
+}
+
+bool AudioCore::PopInstanceEffect(int handle, const std::string& effectName) {
+    auto it = instanceEffects.find(handle);
+    if (it == instanceEffects.end() || it->second.names.empty()) return false;
+    std::vector<std::string>& names = it->second.names;
+    if (effectName.empty()) {
+        names.pop_back();
+    } else {
+        auto found = std::find(names.rbegin(), names.rend(), effectName);
+        if (found == names.rend()) return false;
+        names.erase(std::next(found).base());
+    }
+    return ApplyInstanceEffects(handle, it->second);
+}
+
+bool AudioCore::ClearInstanceEffects(int handle) {
+    auto it = instanceEffects.find(handle);
+    if (it == instanceEffects.end()) return FindInstance(handle) != nullptr;
+    it->second.names.clear();
+    return ApplyInstanceEffects(handle, it->second);
+}
+
+bool AudioCore::SetInstanceEffectParameter(int handle, const std::string& effectName, const std::string& paramId, float value) {
+    auto it = instanceEffects.find(handle);
+    return it != instanceEffects.end() && it->second.chain && SetChainEffectParameter(*it->second.chain, effectName, paramId, value);
 }
 
 void AudioCore::OnEffectParamChanged(const std::string& effectName, const std::string& paramId, float value) {

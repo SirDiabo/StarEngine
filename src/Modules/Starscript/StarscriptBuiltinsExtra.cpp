@@ -287,6 +287,41 @@ Value Fn_set_sound_layer_pan(Runtime&, std::vector<Value>& a) {
     if (AudioSource* s = FindSound(a[0])) s->SetParameter("Layers/" + a[1].s + "/Pan", AudioParamValue::FromNumber((float)a[2].AsNumber()));
     return Value::Void();
 }
+static void RequireEffectDefined(const std::string& effect) {
+    if (!AudioEffectRegistry::Get().Find(effect)) throw ScriptError{ "Unknown audio effect '" + effect + "'" };
+}
+static bool SoundEffectOp(const Value& handle, const char* method, const std::string& path, const std::string& text, float number) {
+    AudioSource* source = FindSound(handle);
+    if (!source) throw ScriptError{ std::string(method) + ": the sound is not playing" };
+    AudioParamValue value;
+    value.text = text;
+    value.number = number;
+    return source->SetParameter(path, value);
+}
+Value Fn_push_sound_effect(Runtime&, std::vector<Value>& a) {
+    RequireEffectDefined(a[1].s);
+    if (!AudioCore::Get().PushInstanceEffect((int)a[0].i, a[1].s)) throw ScriptError{ "push_sound_effect: the sound is not playing" };
+    return Value::Void();
+}
+Value Fn_pop_sound_effect(Runtime&, std::vector<Value>& a) { return Value::Bool(AudioCore::Get().PopInstanceEffect((int)a[0].i, a.size() > 1 ? a[1].s : std::string())); }
+Value Fn_clear_sound_effects(Runtime&, std::vector<Value>& a) { AudioCore::Get().ClearInstanceEffects((int)a[0].i); return Value::Void(); }
+Value Fn_set_sound_effect_parameter(Runtime&, std::vector<Value>& a) { return Value::Bool(AudioCore::Get().SetInstanceEffectParameter((int)a[0].i, a[1].s, a[2].s, (float)a[3].AsNumber())); }
+Value Fn_push_sound_layer_effect(Runtime&, std::vector<Value>& a) {
+    RequireEffectDefined(a[2].s);
+    if (!SoundEffectOp(a[0], "push_sound_layer_effect", "Effects/Layer/" + a[1].s, "push:" + a[2].s, 0.0f)) throw ScriptError{ "push_sound_layer_effect: no layer named '" + a[1].s + "' on this sound" };
+    return Value::Void();
+}
+Value Fn_pop_sound_layer_effect(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "pop_sound_layer_effect", "Effects/Layer/" + a[1].s, "pop:" + (a.size() > 2 ? a[2].s : std::string()), 0.0f)); }
+Value Fn_clear_sound_layer_effects(Runtime&, std::vector<Value>& a) { SoundEffectOp(a[0], "clear_sound_layer_effects", "Effects/Layer/" + a[1].s, "clear:", 0.0f); return Value::Void(); }
+Value Fn_set_sound_layer_effect_parameter(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "set_sound_layer_effect_parameter", "Effects/Layer/" + a[1].s, "param:" + a[2].s + ":" + a[3].s, (float)a[4].AsNumber())); }
+Value Fn_push_sound_instrument_effect(Runtime&, std::vector<Value>& a) {
+    RequireEffectDefined(a[2].s);
+    if (!SoundEffectOp(a[0], "push_sound_instrument_effect", "Effects/Instrument/" + a[1].s, "push:" + a[2].s, 0.0f)) throw ScriptError{ "push_sound_instrument_effect: no instrument named '" + a[1].s + "' on this sound" };
+    return Value::Void();
+}
+Value Fn_pop_sound_instrument_effect(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "pop_sound_instrument_effect", "Effects/Instrument/" + a[1].s, "pop:" + (a.size() > 2 ? a[2].s : std::string()), 0.0f)); }
+Value Fn_clear_sound_instrument_effects(Runtime&, std::vector<Value>& a) { SoundEffectOp(a[0], "clear_sound_instrument_effects", "Effects/Instrument/" + a[1].s, "clear:", 0.0f); return Value::Void(); }
+Value Fn_set_sound_instrument_effect_parameter(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "set_sound_instrument_effect_parameter", "Effects/Instrument/" + a[1].s, "param:" + a[2].s + ":" + a[3].s, (float)a[4].AsNumber())); }
 Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
@@ -395,6 +430,18 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "save_slot_count", {}, 0, T(Kind::Int), RetRule::Fixed, false, Fn_save_slot_count },
         { "save_slot_name", { T(Kind::Int) }, 1, T(Kind::String), RetRule::Fixed, false, Fn_save_slot_name },
         { "play_sound", { T(Kind::String), T(Kind::Float), T(Kind::Float), T(Kind::Bool), T(Kind::String) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound },
+        { "push_sound_effect", { T(Kind::Int), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_push_sound_effect },
+        { "pop_sound_effect", { T(Kind::Int), T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_pop_sound_effect },
+        { "clear_sound_effects", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_clear_sound_effects },
+        { "set_sound_effect_parameter", { T(Kind::Int), T(Kind::String), T(Kind::String), T(Kind::Float) }, 4, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_effect_parameter },
+        { "push_sound_layer_effect", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_push_sound_layer_effect },
+        { "pop_sound_layer_effect", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_pop_sound_layer_effect },
+        { "clear_sound_layer_effects", { T(Kind::Int), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_clear_sound_layer_effects },
+        { "set_sound_layer_effect_parameter", { T(Kind::Int), T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 5, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_layer_effect_parameter },
+        { "push_sound_instrument_effect", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 3, T(Kind::Void), RetRule::Fixed, false, Fn_push_sound_instrument_effect },
+        { "pop_sound_instrument_effect", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_pop_sound_instrument_effect },
+        { "clear_sound_instrument_effects", { T(Kind::Int), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_clear_sound_instrument_effects },
+        { "set_sound_instrument_effect_parameter", { T(Kind::Int), T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 5, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_instrument_effect_parameter },
         { "stop_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_stop_sound },
         { "pause_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_pause_sound },
         { "resume_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_resume_sound },
