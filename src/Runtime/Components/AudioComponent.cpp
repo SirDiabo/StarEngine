@@ -130,9 +130,9 @@ void AudioComponent::Resume() {
     if (source) source->Resume();
 }
 
-void AudioComponent::SetParameter(const std::string& path, const AudioParamValue& value) {
-    if (!EnsureSource()) return;
-    source->SetParameter(path, value);
+bool AudioComponent::SetParameter(const std::string& path, const AudioParamValue& value) {
+    if (!EnsureSource()) return false;
+    return source->SetParameter(path, value);
 }
 
 bool AudioComponent::GetParameter(const std::string& path, AudioParamValue& out) const {

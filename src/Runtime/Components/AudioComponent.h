@@ -32,7 +32,7 @@ public:
     bool IsPlaying() const;
     AudioSource* GetSource() { return source.get(); }
     AudioSource* EnsureSource();
-    void SetParameter(const std::string& path, const AudioParamValue& value);
+    bool SetParameter(const std::string& path, const AudioParamValue& value);
     bool GetParameter(const std::string& path, AudioParamValue& out) const;
 
     void PushEffect(const std::string& name);

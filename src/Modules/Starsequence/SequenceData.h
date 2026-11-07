@@ -48,6 +48,7 @@ struct SampleSet {
 struct Instrument {
     std::string name;
     std::vector<SampleSet> sets;
+    std::vector<std::string> effects;
 };
 
 struct Note {
@@ -73,6 +74,7 @@ struct Layer {
     float volume = 1.0f;
     float pan = 0.0f;
     bool muted = false;
+    std::vector<std::string> effects;
     std::vector<Note> notes;
     std::vector<ControllerEvent> controllers;
 };
@@ -107,6 +109,7 @@ struct Sequence {
     int polyphony = 64;
     float layerFade = 0.2f;
     float volume = 1.0f;
+    std::vector<std::string> effects;
 
     std::vector<TempoPoint> tempo;
     std::vector<MeterPoint> meter;

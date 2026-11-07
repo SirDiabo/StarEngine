@@ -720,7 +720,9 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
                     }
                 }));
         } else if (pin.name == "Effect" && (node->type == "Push_Effect" || node->type == "Pop_Effect" || node->type == "Set_Effect_Parameter" ||
-                                            node->type == "Push_Bus_Effect" || node->type == "Pop_Bus_Effect" || node->type == "Set_Bus_Effect_Parameter")) {
+                                            node->type == "Push_Bus_Effect" || node->type == "Pop_Bus_Effect" || node->type == "Set_Bus_Effect_Parameter" ||
+                                            node->type == "Push_Layer_Effect" || node->type == "Pop_Layer_Effect" || node->type == "Set_Layer_Effect_Parameter" ||
+                                            node->type == "Push_Instrument_Effect" || node->type == "Pop_Instrument_Effect" || node->type == "Set_Instrument_Effect_Parameter")) {
             int pinId = pin.id;
             std::vector<std::string> options = AudioEffectRegistry::Get().Names();
             if (!value.empty() && std::find(options.begin(), options.end(), value) == options.end()) options.push_back(value);

@@ -663,6 +663,42 @@ void SequenceRenderer::MixVoice(Voice& v, float* out, int frames, float layerSta
     }
 }
 
+void SequenceEffects::Prepare(int layers, int instruments) {
+    instrumentCount = instruments;
+    any = false;
+    tailSeconds = 0.0f;
+    const size_t scratch = (size_t)kBusScratchFrames * 2;
+    instrumentChains.resize((size_t)layers * (size_t)instruments);
+    layerChains.resize((size_t)layers);
+    instrumentScratch.assign(instrumentChains.size(), std::vector<float>());
+    layerScratch.assign(layerChains.size(), std::vector<float>());
+    sequenceScratch.clear();
+    auto note = [&](const std::shared_ptr<const AudioEffectChain>& chain) {
+        if (!chain || chain->effects.empty()) return false;
+        any = true;
+        tailSeconds = std::max(tailSeconds, chain->TailSeconds());
+        return true;
+    };
+    for (size_t i = 0; i < instrumentChains.size(); i++) {
+        if (note(instrumentChains[i])) instrumentScratch[i].assign(scratch, 0.0f);
+        else instrumentChains[i].reset();
+    }
+    for (size_t l = 0; l < layerChains.size(); l++) {
+        if (note(layerChains[l])) layerScratch[l].assign(scratch, 0.0f);
+        else layerChains[l].reset();
+    }
+    if (note(sequenceChain)) sequenceScratch.assign(scratch, 0.0f);
+    else sequenceChain.reset();
+}
+
+SequenceRenderer::~SequenceRenderer() {
+    delete effectsMail.exchange(nullptr);
+}
+
+void SequenceRenderer::SetEffects(const std::shared_ptr<const SequenceEffects>& effects) {
+    delete effectsMail.exchange(new EffectsMail{ effects });
+}
+
 void SequenceRenderer::RenderChunk(float* out, int frames) {
     UpdateLayerTargets();
     for (size_t l = 0; l < layerTarget.size(); l++) {
@@ -696,6 +732,25 @@ void SequenceRenderer::RenderChunk(float* out, int frames) {
 
     float globalPan = control->pan.load(std::memory_order_relaxed);
 
+    const SequenceEffects* effects = fx && fx->any ? fx.get() : nullptr;
+    float* sequenceBuffer = nullptr;
+    if (effects) {
+        const size_t needed = (size_t)frames * 2;
+        auto prepare = [&](std::vector<float>& buffer) -> float* {
+            if (buffer.empty()) return nullptr;
+            if (buffer.size() < needed) buffer.resize(needed, 0.0f);
+            std::fill(buffer.begin(), buffer.begin() + (long)needed, 0.0f);
+            return buffer.data();
+        };
+        for (auto& buffer : effects->instrumentScratch) prepare(buffer);
+        for (auto& buffer : effects->layerScratch) prepare(buffer);
+        sequenceBuffer = prepare(effects->sequenceScratch);
+    }
+    auto layerDestination = [&](size_t layer) -> float* {
+        if (effects && layer < effects->layerScratch.size() && !effects->layerScratch[layer].empty()) return effects->layerScratch[layer].data();
+        return sequenceBuffer ? sequenceBuffer : out;
+    };
+
     for (Voice& v : voices) {
         if (!v.active) continue;
         const ChannelState& ch = channels[(size_t)v.state];
@@ -709,12 +764,45 @@ void SequenceRenderer::RenderChunk(float* out, int frames) {
         float panRight = std::min(1.0f, 1.0f + pan);
         double bendRatio = std::exp2((double)ch.bend / 8192.0 * (double)v.set->bendRange / 12.0);
 
-        MixVoice(v, out, frames, layerStartGain[(size_t)v.layer], layerEndGain[(size_t)v.layer], pitchStart, pitchEnd,
+        float* dest = out;
+        if (effects) {
+            const size_t group = (size_t)v.layer * (size_t)effects->instrumentCount + (size_t)v.instrument;
+            if (group < effects->instrumentScratch.size() && !effects->instrumentScratch[group].empty()) dest = effects->instrumentScratch[group].data();
+            else dest = layerDestination((size_t)v.layer);
+        }
+
+        MixVoice(v, dest, frames, layerStartGain[(size_t)v.layer], layerEndGain[(size_t)v.layer], pitchStart, pitchEnd,
                  fadeStart, fadeEnd, bendRatio, staticGain, panLeft, panRight);
+    }
+
+    if (!effects) return;
+
+    auto add = [&](const float* from, float* to) {
+        for (int i = 0; i < frames * 2; i++) to[i] += from[i];
+    };
+    for (size_t group = 0; group < effects->instrumentScratch.size(); group++) {
+        std::vector<float>& buffer = effects->instrumentScratch[group];
+        if (buffer.empty()) continue;
+        for (const auto& effect : effects->instrumentChains[group]->effects) effect->Process(buffer.data(), frames);
+        add(buffer.data(), layerDestination(group / (size_t)std::max(1, effects->instrumentCount)));
+    }
+    for (size_t layer = 0; layer < effects->layerScratch.size(); layer++) {
+        std::vector<float>& buffer = effects->layerScratch[layer];
+        if (buffer.empty()) continue;
+        for (const auto& effect : effects->layerChains[layer]->effects) effect->Process(buffer.data(), frames);
+        add(buffer.data(), sequenceBuffer ? sequenceBuffer : out);
+    }
+    if (sequenceBuffer) {
+        for (const auto& effect : effects->sequenceChain->effects) effect->Process(sequenceBuffer, frames);
+        add(sequenceBuffer, out);
     }
 }
 
 void SequenceRenderer::Render(float* out, int frames, int rate) {
+    if (EffectsMail* mail = effectsMail.exchange(nullptr)) {
+        fx = std::move(mail->effects);
+        delete mail;
+    }
     if (!initialized) Initialize(rate);
     if (control->finished.load(std::memory_order_relaxed)) return;
 
@@ -751,7 +839,11 @@ void SequenceRenderer::Render(float* out, int frames, int rate) {
         for (Voice& v : voices) v.active = false;
         control->finished.store(true, std::memory_order_release);
     } else if (ended && ActiveCount() == 0) {
-        control->finished.store(true, std::memory_order_release);
+        tailCounter += frames;
+        const int tailFrames = fx && fx->any ? (int)(fx->tailSeconds * (float)sampleRate) : 0;
+        if (tailCounter >= tailFrames) control->finished.store(true, std::memory_order_release);
+    } else {
+        tailCounter = 0;
     }
     control->positionTick.store(tick, std::memory_order_relaxed);
     control->activeVoices.store(ActiveCount(), std::memory_order_relaxed);

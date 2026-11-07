@@ -1,5 +1,6 @@
 #pragma once
 #include "SequenceData.h"
+#include "Runtime/Audio/AudioEffects.h"
 #include "Runtime/Audio/AudioMixer.h"
 #include "Runtime/Audio/WavFile.h"
 #include <atomic>
@@ -131,9 +132,26 @@ struct SequenceControl {
     std::unique_ptr<std::atomic<int>[]> instrumentSet;
 };
 
+struct SequenceEffects {
+    std::vector<std::shared_ptr<const AudioEffectChain>> instrumentChains;
+    std::vector<std::shared_ptr<const AudioEffectChain>> layerChains;
+    std::shared_ptr<const AudioEffectChain> sequenceChain;
+    int instrumentCount = 0;
+    bool any = false;
+    float tailSeconds = 0.0f;
+    mutable std::vector<std::vector<float>> instrumentScratch;
+    mutable std::vector<std::vector<float>> layerScratch;
+    mutable std::vector<float> sequenceScratch;
+
+    void Prepare(int layers, int instruments);
+};
+
 class SequenceRenderer : public AudioRenderer {
 public:
     SequenceRenderer(std::shared_ptr<const RtSequence> sequence, std::shared_ptr<SequenceControl> control);
+    ~SequenceRenderer() override;
+
+    void SetEffects(const std::shared_ptr<const SequenceEffects>& effects);
 
     void Render(float* interleavedStereo, int frames, int sampleRate) override;
     bool IsFinished() const override { return control->finished.load(std::memory_order_acquire); }
@@ -185,6 +203,10 @@ private:
     void HandleRequests();
     void ProcessDue();
     void FinishOrLoop(double overshoot);
+    struct EffectsMail { std::shared_ptr<const SequenceEffects> effects; };
+    std::atomic<EffectsMail*> effectsMail{ nullptr };
+    std::shared_ptr<const SequenceEffects> fx;
+    int tailCounter = 0;
     void UpdateCurrentMarker();
     double NextEventTick() const;
     double TicksPerFrame() const;

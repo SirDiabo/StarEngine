@@ -1,6 +1,7 @@
 #include "SequenceAudioSource.h"
 #include "SequenceFormat.h"
 #include "Core/AudioBusRegistry.h"
+#include "Core/AudioEffectRegistry.h"
 #include "Core/CookedFile.h"
 #include "Core/StarAsset.h"
 #include "Runtime/AudioCore.h"
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iterator>
 
 namespace Starsequence {
 
@@ -169,6 +171,113 @@ void SequenceAudioSource::CopyControl(const SequenceControl& from, SequenceContr
     }
 }
 
+void SequenceAudioSource::RebuildEffects() {
+    if (!effectNamesReady) {
+        effectNamesReady = true;
+        sequenceEffects = sequence.effects;
+        for (const Instrument& inst : sequence.instruments) instrumentEffects.push_back(inst.effects);
+        for (const Layer& layer : sequence.layers) layerEffects.push_back(layer.effects);
+    }
+
+    const int layerCount = (int)sequence.layers.size();
+    const int instrumentCount = (int)sequence.instruments.size();
+    AudioCore& core = AudioCore::Get();
+    auto next = std::make_shared<SequenceEffects>();
+    next->instrumentChains.resize((size_t)layerCount * (size_t)std::max(1, instrumentCount));
+    next->layerChains.resize((size_t)layerCount);
+
+    for (int l = 0; l < layerCount; l++) {
+        std::vector<bool> used((size_t)std::max(1, instrumentCount), false);
+        for (const Note& n : sequence.layers[(size_t)l].notes) {
+            if (n.instrument >= 0 && n.instrument < instrumentCount) used[(size_t)n.instrument] = true;
+        }
+        for (int i = 0; i < instrumentCount; i++) {
+            if (!used[(size_t)i] || instrumentEffects[(size_t)i].empty()) continue;
+            const size_t slot = (size_t)l * (size_t)instrumentCount + (size_t)i;
+            std::shared_ptr<const AudioEffectChain> reuse = effects && slot < effects->instrumentChains.size() ? effects->instrumentChains[slot] : nullptr;
+            next->instrumentChains[slot] = core.BuildEffectChain(instrumentEffects[(size_t)i], reuse);
+        }
+        std::shared_ptr<const AudioEffectChain> reuse = effects && (size_t)l < effects->layerChains.size() ? effects->layerChains[(size_t)l] : nullptr;
+        next->layerChains[(size_t)l] = core.BuildEffectChain(layerEffects[(size_t)l], reuse);
+    }
+    next->sequenceChain = core.BuildEffectChain(sequenceEffects, effects ? effects->sequenceChain : nullptr);
+    next->Prepare(layerCount, instrumentCount);
+
+    if (effects) {
+        for (const auto& chain : effects->instrumentChains) core.RetireEffectChain(chain);
+        for (const auto& chain : effects->layerChains) core.RetireEffectChain(chain);
+        core.RetireEffectChain(effects->sequenceChain);
+    }
+    effects = next;
+    if (renderer) renderer->SetEffects(effects);
+}
+
+bool SequenceAudioSource::HandleEffectOp(const std::string& path, const AudioParamValue& value) {
+    if (!valid || path.rfind("Effects/", 0) != 0) return false;
+    if (!effectNamesReady) RebuildEffects();
+
+    const std::string scope = path.substr(8);
+    std::vector<std::string>* names = nullptr;
+    int layerIndex = -1, instrumentIndex = -1;
+    if (scope == "Sequence") {
+        names = &sequenceEffects;
+    } else if (scope.rfind("Layer/", 0) == 0) {
+        const std::string name = scope.substr(6);
+        for (size_t i = 0; i < sequence.layers.size(); i++) if (sequence.layers[i].name == name) layerIndex = (int)i;
+        if (layerIndex >= 0) names = &layerEffects[(size_t)layerIndex];
+    } else if (scope.rfind("Instrument/", 0) == 0) {
+        const std::string name = scope.substr(11);
+        for (size_t i = 0; i < sequence.instruments.size(); i++) if (sequence.instruments[i].name == name) instrumentIndex = (int)i;
+        if (instrumentIndex >= 0) names = &instrumentEffects[(size_t)instrumentIndex];
+    }
+    if (!names) return false;
+
+    const size_t colon = value.text.find(':');
+    const std::string op = value.text.substr(0, colon);
+    const std::string rest = colon == std::string::npos ? std::string() : value.text.substr(colon + 1);
+
+    if (op == "push") {
+        if (!AudioEffectRegistry::Get().Find(rest)) return false;
+        names->push_back(rest);
+    } else if (op == "pop") {
+        if (names->empty()) return false;
+        if (rest.empty()) {
+            names->pop_back();
+        } else {
+            auto found = std::find(names->rbegin(), names->rend(), rest);
+            if (found == names->rend()) return false;
+            names->erase(std::next(found).base());
+        }
+    } else if (op == "clear") {
+        names->clear();
+    } else if (op == "param") {
+        const size_t split = rest.find(':');
+        if (split == std::string::npos || !effects) return false;
+        const std::string effectName = rest.substr(0, split);
+        const std::string paramId = rest.substr(split + 1);
+        bool applied = false;
+        if (scope == "Sequence") {
+            applied = effects->sequenceChain && AudioCore::SetChainEffectParameter(*effects->sequenceChain, effectName, paramId, value.number);
+        } else if (layerIndex >= 0) {
+            const auto& chain = effects->layerChains[(size_t)layerIndex];
+            applied = chain && AudioCore::SetChainEffectParameter(*chain, effectName, paramId, value.number);
+        } else {
+            const int instrumentCount = (int)sequence.instruments.size();
+            for (size_t l = 0; l < sequence.layers.size(); l++) {
+                const size_t slot = l * (size_t)instrumentCount + (size_t)instrumentIndex;
+                if (slot < effects->instrumentChains.size() && effects->instrumentChains[slot]) {
+                    applied = AudioCore::SetChainEffectParameter(*effects->instrumentChains[slot], effectName, paramId, value.number) || applied;
+                }
+            }
+        }
+        return applied;
+    } else {
+        return false;
+    }
+    RebuildEffects();
+    return true;
+}
+
 void SequenceAudioSource::Play() {
     if (!Prepare()) return;
     if (started && control) {
@@ -181,6 +290,7 @@ void SequenceAudioSource::Play() {
     renderer = std::make_shared<SequenceRenderer>(compiled, control);
     renderer->gain.store(volume * sequence.volume);
     renderer->bus.store(bus);
+    RebuildEffects();
     AudioMixer::Get().AddRenderer(renderer, effectChain);
 }
 
@@ -272,6 +382,7 @@ bool SequenceAudioSource::GetParameter(const std::string& path, AudioParamValue&
 }
 
 bool SequenceAudioSource::SetParameter(const std::string& path, const AudioParamValue& value) {
+    if (path.rfind("Effects/", 0) == 0) return HandleEffectOp(path, value);
     if (!valid || !control) return false;
 
     auto indexFromValue = [&](const std::vector<std::string>& names) -> int {

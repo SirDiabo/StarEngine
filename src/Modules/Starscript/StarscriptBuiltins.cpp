@@ -389,6 +389,16 @@ AudioEffectRegistry& RequireEffect(const std::string& name) {
     if (!registry.Find(name)) throw ScriptError{ "Unknown audio effect '" + name + "'" };
     return registry;
 }
+bool SequenceEffectOp(Value& component, const char* method, const char* scope, const std::string& name, const std::string& text, float number) {
+    AudioComponent* audio = RequireAudio(component, method);
+    AudioParamValue value;
+    value.text = text;
+    value.number = number;
+    if (!audio->SetParameter(std::string("Effects/") + scope + "/" + name, value) && text.rfind("pop:", 0) != 0 && text.rfind("param:", 0) != 0) {
+        throw ScriptError{ std::string(method) + ": no " + (scope[0] == 'L' ? "layer" : "instrument") + " named '" + name + "' on this audio component" };
+    }
+    return true;
+}
 Value M_audio_push_effect(Runtime&, Value& s, std::vector<Value>& a) {
     AudioComponent* audio = RequireAudio(s, "push_effect");
     RequireEffect(a[0].s);
@@ -405,6 +415,36 @@ Value M_audio_clear_effects(Runtime&, Value& s, std::vector<Value>&) {
 }
 Value M_audio_set_effect_parameter(Runtime&, Value& s, std::vector<Value>& a) {
     return Value::Bool(RequireAudio(s, "set_effect_parameter")->SetEffectParameter(a[0].s, a[1].s, (float)a[2].AsNumber()));
+}
+Value M_audio_push_layer_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireEffect(a[1].s);
+    SequenceEffectOp(s, "push_layer_effect", "Layer", a[0].s, "push:" + a[1].s, 0.0f);
+    return Value::Void();
+}
+Value M_audio_pop_layer_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(SequenceEffectOp(s, "pop_layer_effect", "Layer", a[0].s, "pop:" + (a.size() > 1 ? a[1].s : std::string()), 0.0f));
+}
+Value M_audio_clear_layer_effects(Runtime&, Value& s, std::vector<Value>& a) {
+    SequenceEffectOp(s, "clear_layer_effects", "Layer", a[0].s, "clear:", 0.0f);
+    return Value::Void();
+}
+Value M_audio_set_layer_effect_parameter(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(SequenceEffectOp(s, "set_layer_effect_parameter", "Layer", a[0].s, "param:" + a[1].s + ":" + a[2].s, (float)a[3].AsNumber()));
+}
+Value M_audio_push_instrument_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireEffect(a[1].s);
+    SequenceEffectOp(s, "push_instrument_effect", "Instrument", a[0].s, "push:" + a[1].s, 0.0f);
+    return Value::Void();
+}
+Value M_audio_pop_instrument_effect(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(SequenceEffectOp(s, "pop_instrument_effect", "Instrument", a[0].s, "pop:" + (a.size() > 1 ? a[1].s : std::string()), 0.0f));
+}
+Value M_audio_clear_instrument_effects(Runtime&, Value& s, std::vector<Value>& a) {
+    SequenceEffectOp(s, "clear_instrument_effects", "Instrument", a[0].s, "clear:", 0.0f);
+    return Value::Void();
+}
+Value M_audio_set_instrument_effect_parameter(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(SequenceEffectOp(s, "set_instrument_effect_parameter", "Instrument", a[0].s, "param:" + a[1].s + ":" + a[2].s, (float)a[3].AsNumber()));
 }
 Value M_audio_get_current_marker(Runtime&, Value& s, std::vector<Value>&) {
     AudioParamValue value;
@@ -689,6 +729,14 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Component, "pop_effect", { T(Kind::String) }, 0, T(Kind::Bool), RetRule::Fixed, false, M_audio_pop_effect, "AudioComponent" },
         { Kind::Component, "clear_effects", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_clear_effects, "AudioComponent" },
         { Kind::Component, "set_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_effect_parameter, "AudioComponent" },
+        { Kind::Component, "push_layer_effect", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_push_layer_effect, "AudioComponent" },
+        { Kind::Component, "pop_layer_effect", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, M_audio_pop_layer_effect, "AudioComponent" },
+        { Kind::Component, "clear_layer_effects", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_clear_layer_effects, "AudioComponent" },
+        { Kind::Component, "set_layer_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 4, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_layer_effect_parameter, "AudioComponent" },
+        { Kind::Component, "push_instrument_effect", { T(Kind::String), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_push_instrument_effect, "AudioComponent" },
+        { Kind::Component, "pop_instrument_effect", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, M_audio_pop_instrument_effect, "AudioComponent" },
+        { Kind::Component, "clear_instrument_effects", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_clear_instrument_effects, "AudioComponent" },
+        { Kind::Component, "set_instrument_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 4, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_instrument_effect_parameter, "AudioComponent" },
         { Kind::Component, "get_current_marker", {}, 0, T(Kind::String), RetRule::Fixed, false, M_audio_get_current_marker, "AudioComponent" },
         { Kind::Component, "set_layer_mute", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_mute, "AudioComponent" },
         { Kind::Component, "set_layer_solo", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_solo, "AudioComponent" },

@@ -146,9 +146,9 @@ protected:
     }
 
     float TailSeconds() const override {
-        const float fb = std::clamp(P(ReverbParam::RoomSize) * 0.28f + 0.7f, 0.7f, 0.985f);
+        const float fb = std::clamp(GetParam(ReverbParam::RoomSize) * 0.28f + 0.7f, 0.7f, 0.985f);
         const float loop = 1400.0f / (float)rate;
-        return std::min(12.0f, 3.0f * loop / -std::log10(fb) + P(ReverbParam::PreDelay) * 0.001f + 0.2f);
+        return std::min(12.0f, 3.0f * loop / -std::log10(fb) + GetParam(ReverbParam::PreDelay) * 0.001f + 0.2f);
     }
 
     void ResetState() override {
@@ -217,7 +217,7 @@ protected:
         feedback = P(ChorusParam::Feedback);
     }
 
-    float TailSeconds() const override { return 0.1f + P(ChorusParam::Delay) * 0.002f + P(ChorusParam::Feedback) * 1.5f; }
+    float TailSeconds() const override { return 0.1f + GetParam(ChorusParam::Delay) * 0.002f + GetParam(ChorusParam::Feedback) * 1.5f; }
 
     void ResetState() override {
         line[0].Clear();
@@ -261,9 +261,9 @@ protected:
     }
 
     float TailSeconds() const override {
-        const float fb = std::clamp(P(DelayParam::Feedback), 0.0f, 0.95f);
+        const float fb = std::clamp(GetParam(DelayParam::Feedback), 0.0f, 0.95f);
         const float repeats = fb < 0.02f ? 1.0f : std::min(60.0f, std::log(0.001f) / std::log(fb));
-        return std::min(12.0f, P(DelayParam::Time) * 0.001f * (1.0f + repeats) + 0.1f);
+        return std::min(12.0f, GetParam(DelayParam::Time) * 0.001f * (1.0f + repeats) + 0.1f);
     }
 
     void ResetState() override {
@@ -370,7 +370,7 @@ protected:
         releaseCoef = std::exp(-1.0f / (std::max(0.01f, P(CompressorParam::Release)) * 0.001f * (float)rate));
     }
 
-    float TailSeconds() const override { return 0.05f + P(CompressorParam::Release) * 0.003f; }
+    float TailSeconds() const override { return 0.05f + GetParam(CompressorParam::Release) * 0.003f; }
 
     void ResetState() override { envelope = 0.0f; }
 

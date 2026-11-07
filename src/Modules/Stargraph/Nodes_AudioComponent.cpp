@@ -263,6 +263,94 @@ void RegisterAudioComponentNodes() {
             if (target.component) target.component->SetEffectParameter(ReadText(node, "Effect"), ReadText(node, "Parameter"), ReadFloat(node, "Value", 0.0f));
         });
 
+    RegisterTargetNode("Push_Layer_Effect",
+        [](Node* node) {
+            node->inputs.push_back({"Layer", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "push:" + ReadText(node, "Effect");
+            SetParameter(target, "Effects/Layer/" + ReadText(node, "Layer"), value);
+        });
+
+    RegisterTargetNode("Pop_Layer_Effect",
+        [](Node* node) {
+            node->inputs.push_back({"Layer", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "pop:" + ReadText(node, "Effect");
+            SetParameter(target, "Effects/Layer/" + ReadText(node, "Layer"), value);
+        });
+
+    RegisterTargetNode("Clear_Layer_Effects",
+        [](Node* node) { node->inputs.push_back({"Layer", PinType::String, true, false, 0, ""}); },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "clear:";
+            SetParameter(target, "Effects/Layer/" + ReadText(node, "Layer"), value);
+        });
+
+    RegisterTargetNode("Set_Layer_Effect_Parameter",
+        [](Node* node) {
+            node->inputs.push_back({"Layer", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Parameter", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0"});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "param:" + ReadText(node, "Effect") + ":" + ReadText(node, "Parameter");
+            value.number = ReadFloat(node, "Value", 0.0f);
+            SetParameter(target, "Effects/Layer/" + ReadText(node, "Layer"), value);
+        });
+
+    RegisterTargetNode("Push_Instrument_Effect",
+        [](Node* node) {
+            node->inputs.push_back({"Instrument", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "push:" + ReadText(node, "Effect");
+            SetParameter(target, "Effects/Instrument/" + ReadText(node, "Instrument"), value);
+        });
+
+    RegisterTargetNode("Pop_Instrument_Effect",
+        [](Node* node) {
+            node->inputs.push_back({"Instrument", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "pop:" + ReadText(node, "Effect");
+            SetParameter(target, "Effects/Instrument/" + ReadText(node, "Instrument"), value);
+        });
+
+    RegisterTargetNode("Clear_Instrument_Effects",
+        [](Node* node) { node->inputs.push_back({"Instrument", PinType::String, true, false, 0, ""}); },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "clear:";
+            SetParameter(target, "Effects/Instrument/" + ReadText(node, "Instrument"), value);
+        });
+
+    RegisterTargetNode("Set_Instrument_Effect_Parameter",
+        [](Node* node) {
+            node->inputs.push_back({"Instrument", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Effect", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Parameter", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0"});
+        },
+        [](Node& node, AudioTarget& target) {
+            AudioParamValue value;
+            value.text = "param:" + ReadText(node, "Effect") + ":" + ReadText(node, "Parameter");
+            value.number = ReadFloat(node, "Value", 0.0f);
+            SetParameter(target, "Effects/Instrument/" + ReadText(node, "Instrument"), value);
+        });
+
     RegisterLayerNode("Set_Layer_Mute", "Mute", "Muted", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Solo", "Solo", "Soloed", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Volume", "Volume", "Volume", PinType::Float, "1.0");

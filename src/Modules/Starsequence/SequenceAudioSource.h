@@ -50,6 +50,8 @@ public:
 private:
     bool Prepare();
     void InitControl();
+    void RebuildEffects();
+    bool HandleEffectOp(const std::string& path, const AudioParamValue& value);
     void CopyControl(const SequenceControl& from, SequenceControl& to) const;
 
     std::string assetPath;
@@ -62,6 +64,11 @@ private:
     std::shared_ptr<SequenceControl> control;
     std::shared_ptr<SequenceRenderer> renderer;
     std::shared_ptr<const AudioEffectChain> effectChain;
+    std::vector<std::vector<std::string>> instrumentEffects;
+    std::vector<std::vector<std::string>> layerEffects;
+    std::vector<std::string> sequenceEffects;
+    bool effectNamesReady = false;
+    std::shared_ptr<const SequenceEffects> effects;
     float volume = 1.0f;
     int bus = 0;
 };

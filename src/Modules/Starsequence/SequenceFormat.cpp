@@ -82,6 +82,30 @@ constexpr int64_t kMaxTick = (int64_t)1 << 40;
 
 enum class Section { Header, Tempo, Meter, Markers, Instrument, Layer, Unknown };
 
+std::vector<std::string> SplitEffectList(const std::string& text) {
+    std::vector<std::string> items;
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find(';', start);
+        if (end == std::string::npos) end = text.size();
+        std::string item = text.substr(start, end - start);
+        size_t first = item.find_first_not_of(' ');
+        size_t last = item.find_last_not_of(' ');
+        if (first != std::string::npos) items.push_back(item.substr(first, last - first + 1));
+        start = end + 1;
+    }
+    return items;
+}
+
+std::string JoinEffectList(const std::vector<std::string>& items) {
+    std::string out;
+    for (size_t i = 0; i < items.size(); i++) {
+        if (i > 0) out += ";";
+        out += items[i];
+    }
+    return out;
+}
+
 struct Parser {
     ParseResult result;
     Section section = Section::Header;
@@ -177,6 +201,8 @@ struct Parser {
         int64_t integer = 0;
         if (key == "Name") {
             inst.name = value;
+        } else if (key == "Effects") {
+            inst.effects = SplitEffectList(value);
         } else if (key == "Set") {
             SampleSet set;
             set.name = value.empty() ? "Set" : value;
@@ -215,6 +241,7 @@ struct Parser {
         else if (key == "Polyphony") { if (ParseInt(value, integer)) s.polyphony = (int)integer; else Error("Invalid Polyphony"); }
         else if (key == "LayerFade") { if (ParseDouble(value, number)) s.layerFade = (float)number; else Error("Invalid LayerFade"); }
         else if (key == "Volume") { if (ParseDouble(value, number)) s.volume = std::max(0.0f, (float)number); else Error("Invalid Volume"); }
+        else if (key == "Effects") s.effects = SplitEffectList(value);
         else Warn("Unknown header key '" + key + "'");
     }
 
@@ -229,6 +256,7 @@ struct Parser {
             if (key == "Volume") { if (ParseDouble(value, number)) layer.volume = std::max(0.0f, (float)number); else Error("Invalid Volume"); }
             else if (key == "Pan") { if (ParseDouble(value, number)) layer.pan = std::clamp((float)number, -1.0f, 1.0f); else Error("Invalid Pan"); }
             else if (key == "Muted") { if (ParseBool(value, flag)) layer.muted = flag; else Error("Invalid Muted"); }
+            else if (key == "Effects") layer.effects = SplitEffectList(value);
             else Warn("Unknown layer key '" + key + "'");
             return;
         }
@@ -495,6 +523,7 @@ std::string WriteSequence(const Sequence& s) {
     if (s.polyphony != 64) out += "Polyphony=" + std::to_string(s.polyphony) + "\n";
     if (std::fabs(s.layerFade - 0.2f) > 1e-6f) out += "LayerFade=" + FormatNumber(s.layerFade) + "\n";
     if (std::fabs(s.volume - 1.0f) > 1e-6f) out += "Volume=" + FormatNumber(s.volume) + "\n";
+    if (!s.effects.empty()) out += "Effects=" + JoinEffectList(s.effects) + "\n";
 
     out += "\n[Tempo]\n";
     for (const TempoPoint& p : s.tempo) out += std::to_string(p.tick) + " " + FormatNumber(p.bpm) + "\n";
@@ -516,6 +545,7 @@ std::string WriteSequence(const Sequence& s) {
         const Instrument& inst = s.instruments[i];
         out += "\n[Instrument " + std::to_string(i) + "]\n";
         out += "Name=" + inst.name + "\n";
+        if (!inst.effects.empty()) out += "Effects=" + JoinEffectList(inst.effects) + "\n";
         bool singleDefault = inst.sets.size() == 1 && inst.sets[0].name == "Default";
         for (const SampleSet& set : inst.sets) {
             if (!singleDefault) out += "Set=" + set.name + "\n";
@@ -554,6 +584,7 @@ std::string WriteSequence(const Sequence& s) {
         if (std::fabs(layer.volume - 1.0f) > 1e-6f) out += "Volume=" + FormatNumber(layer.volume) + "\n";
         if (std::fabs(layer.pan) > 1e-6f) out += "Pan=" + FormatNumber(layer.pan) + "\n";
         if (layer.muted) out += "Muted=true\n";
+        if (!layer.effects.empty()) out += "Effects=" + JoinEffectList(layer.effects) + "\n";
         for (const ControllerEvent& c : layer.controllers) {
             out += std::string(ControllerCode(c.type)) + " " + std::to_string(c.instrument) + " " + std::to_string(c.tick) + " " + std::to_string(c.value) + "\n";
         }
