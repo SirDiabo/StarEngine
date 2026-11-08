@@ -41,6 +41,8 @@ public:
     void GetParameters(std::vector<AudioParamInfo>& out) const override;
     bool SetParameter(const std::string& path, const AudioParamValue& value) override;
     void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
+    void SetSpatial(float gain, float pan) override;
+    void SetSpatialChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
     bool GetParameter(const std::string& path, AudioParamValue& out) const override;
 
     bool IsValid() const { return valid; }
@@ -64,6 +66,10 @@ private:
     std::shared_ptr<SequenceControl> control;
     std::shared_ptr<SequenceRenderer> renderer;
     std::shared_ptr<const AudioEffectChain> effectChain;
+    std::shared_ptr<const AudioEffectChain> spatialChain;
+    float userPan = 0.0f;
+    float spatialGain = 1.0f;
+    float spatialPan = 0.0f;
     std::vector<std::vector<std::string>> instrumentEffects;
     std::vector<std::vector<std::string>> layerEffects;
     std::vector<std::string> sequenceEffects;

@@ -16,6 +16,7 @@ public:
     float pan = 0.0f;
     std::string bus;
     std::vector<std::string> effects;
+    std::string attenuation;
 
     AudioComponent();
     ~AudioComponent() override;
@@ -39,6 +40,9 @@ public:
     bool PopEffect(const std::string& name);
     void ClearEffects();
     bool SetEffectParameter(const std::string& effectName, const std::string& paramId, float value);
+    bool SetAttenuation(const std::string& name);
+    bool SetAttenuationEnabled(bool enabled);
+    bool SetAttenuationParameter(const std::string& paramId, float value);
 
 private:
     void SyncSource();
@@ -47,6 +51,10 @@ private:
     std::string sourcePath;
     std::string appliedBusKey;
     std::string appliedEffectsKey;
+    std::string appliedAttenuationKey;
+    int emitterId = 0;
+    bool attenuationEnabled = true;
+    void DestroyEmitter(bool resetSource);
     std::shared_ptr<const AudioEffectChain> effectChain;
     bool wantsPlaying = false;
     bool paused = false;

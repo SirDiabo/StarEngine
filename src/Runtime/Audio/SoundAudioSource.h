@@ -31,6 +31,8 @@ public:
     void SetBus(int value) override;
     void SetPan(float value) override;
     void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
+    void SetSpatial(float gain, float pan) override;
+    void SetSpatialChain(const std::shared_ptr<const AudioEffectChain>& chain) override;
     std::string DefaultBusName() const override;
     void ReloadAssetSettings() override;
 
@@ -63,6 +65,9 @@ private:
     std::shared_ptr<VoiceControl> voice;
     std::shared_ptr<const AudioEffectChain> effectChain;
     std::shared_ptr<const AudioEffectChain> soundChain;
+    std::shared_ptr<const AudioEffectChain> spatialChain;
+    float spatialGain = 1.0f;
+    float spatialPan = 0.0f;
     std::vector<std::string> soundEffectNames;
     bool soundEffectsDirty = true;
     std::shared_ptr<const AudioEffectChain> ActiveChain();

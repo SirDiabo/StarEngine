@@ -1,3 +1,4 @@
+#include "Core/AudioAttenuationRegistry.h"
 #include "Core/AudioEffectRegistry.h"
 #include "StargraphEditorPanel.h"
 #include "Editor/PropertyRowBuilders.h"
@@ -728,6 +729,14 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
             if (!value.empty() && std::find(options.begin(), options.end(), value) == options.end()) options.push_back(value);
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value, options, [this, pinId](const std::string& v) {
                 if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v; isDirty = true; }
+            }));
+        } else if (pin.name == "Attenuation" && (node->type == "Play_Sound" || node->type == "Set_Attenuation")) {
+            int pinId = pin.id;
+            std::vector<std::string> options = { "None" };
+            for (const std::string& name : AudioAttenuationRegistry::Get().Names()) options.push_back(name);
+            if (!value.empty() && std::find(options.begin(), options.end(), value) == options.end()) options.push_back(value);
+            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("None") : value, options, [this, pinId](const std::string& v) {
+                if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v == "None" ? std::string() : v; isDirty = true; }
             }));
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;

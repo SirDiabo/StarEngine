@@ -446,6 +446,17 @@ Value M_audio_clear_instrument_effects(Runtime&, Value& s, std::vector<Value>& a
 Value M_audio_set_instrument_effect_parameter(Runtime&, Value& s, std::vector<Value>& a) {
     return Value::Bool(SequenceEffectOp(s, "set_instrument_effect_parameter", "Instrument", a[0].s, "param:" + a[1].s + ":" + a[2].s, (float)a[3].AsNumber()));
 }
+Value M_audio_set_attenuation(Runtime&, Value& s, std::vector<Value>& a) {
+    if (!RequireAudio(s, "set_attenuation")->SetAttenuation(a[0].s)) throw ScriptError{ "set_attenuation: unknown attenuation '" + a[0].s + "'" };
+    return Value::Void();
+}
+Value M_audio_set_attenuation_enabled(Runtime&, Value& s, std::vector<Value>& a) {
+    RequireAudio(s, "set_attenuation_enabled")->SetAttenuationEnabled(a[0].b);
+    return Value::Void();
+}
+Value M_audio_set_attenuation_parameter(Runtime&, Value& s, std::vector<Value>& a) {
+    return Value::Bool(RequireAudio(s, "set_attenuation_parameter")->SetAttenuationParameter(a[0].s, (float)a[1].AsNumber()));
+}
 Value M_audio_get_current_marker(Runtime&, Value& s, std::vector<Value>&) {
     AudioParamValue value;
     RequireAudio(s, "get_current_marker")->GetParameter("Playback/CurrentMarker", value);
@@ -735,6 +746,9 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Component, "pop_instrument_effect", { T(Kind::String), T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, M_audio_pop_instrument_effect, "AudioComponent" },
         { Kind::Component, "clear_instrument_effects", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_clear_instrument_effects, "AudioComponent" },
         { Kind::Component, "set_instrument_effect_parameter", { T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 4, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_instrument_effect_parameter, "AudioComponent" },
+        { Kind::Component, "set_attenuation", { T(Kind::String) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_set_attenuation, "AudioComponent" },
+        { Kind::Component, "set_attenuation_enabled", { T(Kind::Bool) }, 1, T(Kind::Void), RetRule::Fixed, false, M_audio_set_attenuation_enabled, "AudioComponent" },
+        { Kind::Component, "set_attenuation_parameter", { T(Kind::String), T(Kind::Float) }, 2, T(Kind::Bool), RetRule::Fixed, false, M_audio_set_attenuation_parameter, "AudioComponent" },
         { Kind::Component, "get_current_marker", {}, 0, T(Kind::String), RetRule::Fixed, false, M_audio_get_current_marker, "AudioComponent" },
         { Kind::Component, "set_layer_mute", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_mute, "AudioComponent" },
         { Kind::Component, "set_layer_solo", { T(Kind::String), T(Kind::Bool) }, 2, T(Kind::Void), RetRule::Fixed, false, M_audio_set_layer_solo, "AudioComponent" },

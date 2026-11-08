@@ -2,6 +2,8 @@
 #include "Audio/AudioMixer.h"
 #include "Core/AudioBusRegistry.h"
 #include "Core/AudioEffectRegistry.h"
+#include "Core/AudioAttenuationRegistry.h"
+#include "Runtime/CollisionTrace.h"
 #include "raylib.h"
 #include <algorithm>
 #include <iterator>
@@ -17,6 +19,8 @@ AudioCore::AudioCore() {
         AudioCore::Get().OnEffectParamChanged(effect, param, value);
     });
     ApplyProjectEffects();
+    AudioAttenuationRegistry::Get().AddListener([]() { AudioCore::Get().OnAttenuationChanged(); });
+    AudioAttenuationRegistry::Get().AddParamListener([](const std::string&) { AudioCore::Get().OnAttenuationChanged(); });
 }
 
 AudioCore& AudioCore::Get() {
@@ -43,14 +47,154 @@ void AudioCore::CloseDevice() {
     deviceInitialized = false;
 }
 
+static bool DefaultAudioRaycast(const Vector3& from, const Vector3& to, uint32_t mask, bool meshes, Actor* ignore, Actor*& hitActor) {
+    CollisionTrace::QueryParams params;
+    params.ignoreActor = ignore;
+    params.mask = mask;
+    params.meshes = meshes;
+    params.shapes = true;
+    CollisionTrace::HitResult hit;
+    if (!CollisionTrace::Raycast(from, to, params, hit)) return false;
+    hitActor = hit.actor;
+    return true;
+}
+
+void AudioCore::SetListener(const Vector3& position, const Vector3& right, Actor* actor) {
+    listener.position = position;
+    listener.right = right;
+    listener.actor = actor;
+    listener.valid = true;
+}
+
+void AudioCore::ClearListener() {
+    listener = AudioListenerState();
+}
+
+void AudioCore::SetRaycastHook(AudioRaycastFn hook) {
+    raycastHook = std::move(hook);
+}
+
+int AudioCore::CreateEmitter(AudioSource* source, const std::string& attenuationName) {
+    const AudioAttenuationDef* def = AudioAttenuationRegistry::Get().Find(attenuationName);
+    if (!source || !def) return 0;
+    const int id = nextEmitterId++;
+    emitters[id] = std::make_unique<AudioEmitter>(id, source, attenuationName, AudioAttenuationSchema::MakeSettings(*def));
+    return id;
+}
+
+void AudioCore::DestroyEmitter(int id, bool resetSource) {
+    auto it = emitters.find(id);
+    if (it == emitters.end()) return;
+    it->second->Release(resetSource);
+    emitters.erase(it);
+}
+
+AudioEmitter* AudioCore::FindEmitter(int id) {
+    auto it = emitters.find(id);
+    return it == emitters.end() ? nullptr : it->second.get();
+}
+
+void AudioCore::UpdateEmitters(float deltaTime) {
+    if (emitters.empty()) return;
+    const AudioRaycastFn& raycast = raycastHook ? raycastHook : AudioRaycastFn(DefaultAudioRaycast);
+    for (auto& kv : emitters) kv.second->Update(deltaTime, listener, raycast);
+}
+
+void AudioCore::RefreshEmitter(int id) {
+    if (AudioEmitter* emitter = FindEmitter(id)) emitter->Update(0.0f, listener, raycastHook ? raycastHook : AudioRaycastFn(DefaultAudioRaycast));
+}
+
+void AudioCore::OnAttenuationChanged() {
+    const AudioAttenuationRegistry& registry = AudioAttenuationRegistry::Get();
+    for (auto& kv : emitters) {
+        const AudioAttenuationDef* def = registry.Find(kv.second->Attenuation());
+        if (def) kv.second->SetSettings(AudioAttenuationSchema::MakeSettings(*def));
+    }
+}
+
+int AudioCore::PlayAssetSpatial(const std::string& assetPath, float volume, float pitch, bool looping, const std::string& busName,
+                                const std::string& attenuationName, AudioPositionFn provider) {
+    std::unique_ptr<AudioSource> source = AudioSourceRegistry::Get().Create(assetPath);
+    if (!source) return 0;
+
+    source->SetVolume(volume);
+    source->SetPitch(pitch);
+    source->SetLooping(looping);
+    int bus = ResolveBus(source->DefaultBusName(), busName);
+    source->SetBus(bus < 0 ? 0 : bus);
+
+    int emitterId = CreateEmitter(source.get(), attenuationName);
+    if (emitterId) {
+        AudioEmitter* emitter = FindEmitter(emitterId);
+        emitter->SetProvider(std::move(provider));
+        emitter->Update(0.0f, listener, raycastHook ? raycastHook : AudioRaycastFn(DefaultAudioRaycast));
+    }
+
+    source->Play();
+    if (!source->IsPlaying()) {
+        if (emitterId) DestroyEmitter(emitterId, false);
+        return 0;
+    }
+
+    int handle = nextHandle++;
+    instances[handle] = std::move(source);
+    if (emitterId) instanceEmitters[handle] = emitterId;
+    return handle;
+}
+
+bool AudioCore::SetInstanceAttenuationEnabled(int handle, bool enabled) {
+    auto it = instanceEmitters.find(handle);
+    AudioEmitter* emitter = it == instanceEmitters.end() ? nullptr : FindEmitter(it->second);
+    if (!emitter) return false;
+    emitter->SetEnabled(enabled);
+    return true;
+}
+
+bool AudioCore::SetInstanceAttenuationParameter(int handle, const std::string& paramId, float value) {
+    auto it = instanceEmitters.find(handle);
+    AudioEmitter* emitter = it == instanceEmitters.end() ? nullptr : FindEmitter(it->second);
+    return emitter && emitter->Settings().SetValue(paramId, value);
+}
+
+bool AudioCore::SetInstanceAttenuation(int handle, const std::string& attenuationName) {
+    AudioSource* source = FindInstance(handle);
+    const AudioAttenuationDef* def = AudioAttenuationRegistry::Get().Find(attenuationName);
+    if (!source || !def) return false;
+    auto it = instanceEmitters.find(handle);
+    AudioEmitter* emitter = it == instanceEmitters.end() ? nullptr : FindEmitter(it->second);
+    if (!emitter) {
+        const int id = CreateEmitter(source, attenuationName);
+        if (!id) return false;
+        instanceEmitters[handle] = id;
+        return true;
+    }
+    emitter->SetAttenuation(attenuationName, AudioAttenuationSchema::MakeSettings(*def));
+    return true;
+}
+
+bool AudioCore::SetInstancePosition(int handle, const Vector3& position) {
+    auto it = instanceEmitters.find(handle);
+    AudioEmitter* emitter = it == instanceEmitters.end() ? nullptr : FindEmitter(it->second);
+    if (!emitter) return false;
+    emitter->SetProvider(nullptr);
+    emitter->SetPosition(position, nullptr);
+    return true;
+}
+
 void AudioCore::Tick(float deltaTime) {
     PruneRetired();
+    UpdateEmitters(deltaTime);
     std::vector<int> finished;
     for (auto& kv : instances) {
         kv.second->Tick(deltaTime);
         if (!kv.second->IsPlaying() && !kv.second->IsPaused()) finished.push_back(kv.first);
     }
     for (int handle : finished) {
+        auto emitter = instanceEmitters.find(handle);
+        if (emitter != instanceEmitters.end()) {
+            DestroyEmitter(emitter->second, false);
+            instanceEmitters.erase(emitter);
+        }
         instances.erase(handle);
         auto fx = instanceEffects.find(handle);
         if (fx != instanceEffects.end()) {
@@ -106,6 +250,8 @@ void AudioCore::StopInstance(int handle) {
 
 void AudioCore::StopAll() {
     for (auto& kv : instances) kv.second->Stop();
+    for (auto& kv : instanceEmitters) DestroyEmitter(kv.second, false);
+    instanceEmitters.clear();
     instances.clear();
     AudioMixer::Get().StopAllVoices();
 }

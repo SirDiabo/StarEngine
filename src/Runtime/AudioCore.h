@@ -1,5 +1,6 @@
 #pragma once
 #include "Audio/AudioEffects.h"
+#include "Audio/AudioEmitter.h"
 #include "Audio/AudioMixer.h"
 #include "Audio/AudioSource.h"
 #include "Audio/WavFile.h"
@@ -47,6 +48,20 @@ public:
     std::shared_ptr<const AudioEffectChain> BuildEffectChain(const std::vector<std::string>& effectNames, const std::shared_ptr<const AudioEffectChain>& reuseFrom = nullptr);
     void RetireEffectChain(const std::shared_ptr<const AudioEffectChain>& chain);
     static bool SetChainEffectParameter(const AudioEffectChain& chain, const std::string& effectName, const std::string& paramId, float value);
+    void SetListener(const Vector3& position, const Vector3& right, Actor* actor);
+    void ClearListener();
+    void SetRaycastHook(AudioRaycastFn hook);
+    int CreateEmitter(AudioSource* source, const std::string& attenuationName);
+    void DestroyEmitter(int id, bool resetSource = true);
+    AudioEmitter* FindEmitter(int id);
+    int PlayAssetSpatial(const std::string& assetPath, float volume, float pitch, bool looping, const std::string& busName,
+                         const std::string& attenuationName, AudioPositionFn provider);
+    bool SetInstanceAttenuationEnabled(int handle, bool enabled);
+    bool SetInstanceAttenuationParameter(int handle, const std::string& paramId, float value);
+    bool SetInstanceAttenuation(int handle, const std::string& attenuationName);
+    bool SetInstancePosition(int handle, const Vector3& position);
+    void OnAttenuationChanged();
+    void RefreshEmitter(int id);
     bool PushInstanceEffect(int handle, const std::string& effectName);
     bool PopInstanceEffect(int handle, const std::string& effectName);
     bool ClearInstanceEffects(int handle);
@@ -80,5 +95,11 @@ private:
         std::shared_ptr<const AudioEffectChain> chain;
     };
     std::unordered_map<int, InstanceEffects> instanceEffects;
+    std::unordered_map<int, std::unique_ptr<AudioEmitter>> emitters;
+    std::unordered_map<int, int> instanceEmitters;
+    int nextEmitterId = 1;
+    AudioListenerState listener;
+    AudioRaycastFn raycastHook;
+    void UpdateEmitters(float deltaTime);
     bool ApplyInstanceEffects(int handle, InstanceEffects& entry);
 };

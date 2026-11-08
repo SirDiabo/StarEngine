@@ -42,6 +42,18 @@ struct AudioEffectChain {
     std::vector<std::shared_ptr<AudioEffect>> effects;
     std::vector<std::string> names;
 
+    static std::shared_ptr<const AudioEffectChain> Merge(const std::shared_ptr<const AudioEffectChain>& first,
+                                                         const std::shared_ptr<const AudioEffectChain>& second) {
+        if (!first || first->effects.empty()) return second;
+        if (!second || second->effects.empty()) return first;
+        auto merged = std::make_shared<AudioEffectChain>();
+        merged->effects = first->effects;
+        merged->names = first->names;
+        merged->effects.insert(merged->effects.end(), second->effects.begin(), second->effects.end());
+        merged->names.insert(merged->names.end(), second->names.begin(), second->names.end());
+        return merged;
+    }
+
     float TailSeconds() const {
         float total = 0.0f;
         for (const auto& effect : effects) total += effect->TailSeconds();

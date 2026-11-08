@@ -355,6 +355,44 @@ void RegisterAudioComponentNodes() {
             SetParameter(target, "Effects/Instrument/" + ReadText(node, "Instrument"), value);
         });
 
+    RegisterTargetNode("Set_Attenuation",
+        [](Node* node) { node->inputs.push_back({"Attenuation", PinType::String, true, false, 0, ""}); },
+        [](Node& node, AudioTarget& target) {
+            std::string name = ReadText(node, "Attenuation");
+            if (target.component) target.component->SetAttenuation(name);
+            else if (target.handle > 0) AudioCore::Get().SetInstanceAttenuation(target.handle, name);
+        });
+
+    RegisterTargetNode("Set_Attenuation_Enabled",
+        [](Node* node) { node->inputs.push_back({"Enabled", PinType::Boolean, true, false, 0, "true"}); },
+        [](Node& node, AudioTarget& target) {
+            bool enabled = true;
+            for (const Pin& p : node.inputs) if (p.name == "Enabled") enabled = ReadBool(p);
+            if (target.component) target.component->SetAttenuationEnabled(enabled);
+            else if (target.handle > 0) AudioCore::Get().SetInstanceAttenuationEnabled(target.handle, enabled);
+        });
+
+    RegisterTargetNode("Set_Attenuation_Parameter",
+        [](Node* node) {
+            node->inputs.push_back({"Parameter", PinType::String, true, false, 0, ""});
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0"});
+        },
+        [](Node& node, AudioTarget& target) {
+            std::string param = ReadText(node, "Parameter");
+            float value = ReadFloat(node, "Value", 0.0f);
+            if (target.component) target.component->SetAttenuationParameter(param, value);
+            else if (target.handle > 0) AudioCore::Get().SetInstanceAttenuationParameter(target.handle, param, value);
+        });
+
+    RegisterTargetNode("Set_Sound_Position",
+        [](Node* node) { node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"}); },
+        [](Node& node, AudioTarget& target) {
+            if (target.handle <= 0) return;
+            Vector3 position = { 0.0f, 0.0f, 0.0f };
+            for (const Pin& p : node.inputs) if (p.name == "Position") ReadVec3(p, position.x, position.y, position.z);
+            AudioCore::Get().SetInstancePosition(target.handle, position);
+        });
+
     RegisterLayerNode("Set_Layer_Mute", "Mute", "Muted", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Solo", "Solo", "Soloed", PinType::Boolean, "false");
     RegisterLayerNode("Set_Layer_Volume", "Volume", "Volume", PinType::Float, "1.0");

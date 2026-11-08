@@ -288,10 +288,11 @@ void SequenceAudioSource::Play() {
     }
     started = true;
     renderer = std::make_shared<SequenceRenderer>(compiled, control);
-    renderer->gain.store(volume * sequence.volume);
+    renderer->gain.store(volume * sequence.volume * spatialGain);
     renderer->bus.store(bus);
     RebuildEffects();
-    AudioMixer::Get().AddRenderer(renderer, effectChain);
+    control->pan.store(std::clamp(userPan + spatialPan, -1.0f, 1.0f));
+    AudioMixer::Get().AddRenderer(renderer, AudioEffectChain::Merge(effectChain, spatialChain));
 }
 
 void SequenceAudioSource::Stop() {
@@ -316,7 +317,7 @@ bool SequenceAudioSource::IsPaused() const {
 
 void SequenceAudioSource::SetVolume(float value) {
     volume = std::max(0.0f, value);
-    if (renderer) renderer->gain.store(volume * sequence.volume);
+    if (renderer) renderer->gain.store(volume * sequence.volume * spatialGain);
 }
 
 void SequenceAudioSource::SetPitch(float value) {
@@ -333,7 +334,8 @@ void SequenceAudioSource::SetBus(int value) {
 }
 
 void SequenceAudioSource::SetPan(float value) {
-    if (control) control->pan.store(std::clamp(value, -1.0f, 1.0f));
+    userPan = std::clamp(value, -1.0f, 1.0f);
+    if (control) control->pan.store(std::clamp(userPan + spatialPan, -1.0f, 1.0f));
 }
 
 void SequenceAudioSource::SetTempo(float value) {
@@ -368,7 +370,19 @@ void SequenceAudioSource::GetParameters(std::vector<AudioParamInfo>& out) const 
 
 void SequenceAudioSource::SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
     effectChain = chain;
-    if (renderer) AudioMixer::Get().SetRendererChain(renderer, chain);
+    if (renderer) AudioMixer::Get().SetRendererChain(renderer, AudioEffectChain::Merge(effectChain, spatialChain));
+}
+
+void SequenceAudioSource::SetSpatial(float gain, float panValue) {
+    spatialGain = std::max(0.0f, gain);
+    spatialPan = std::clamp(panValue, -1.0f, 1.0f);
+    if (renderer) renderer->gain.store(volume * sequence.volume * spatialGain);
+    if (control) control->pan.store(std::clamp(userPan + spatialPan, -1.0f, 1.0f));
+}
+
+void SequenceAudioSource::SetSpatialChain(const std::shared_ptr<const AudioEffectChain>& chain) {
+    spatialChain = chain;
+    if (renderer) AudioMixer::Get().SetRendererChain(renderer, AudioEffectChain::Merge(effectChain, spatialChain));
 }
 
 bool SequenceAudioSource::GetParameter(const std::string& path, AudioParamValue& out) const {

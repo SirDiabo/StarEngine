@@ -1,6 +1,7 @@
 #include "AudioConfig.h"
 #include "AudioBusRegistry.h"
 #include "AudioEffectRegistry.h"
+#include "AudioAttenuationRegistry.h"
 #include "NamedListRegistry.h"
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@ std::string AudioConfig::BuildPakText() {
     }
     out += "\n";
     out += AudioEffectRegistry::Get().ToText();
+    out += AudioAttenuationRegistry::Get().ToText();
     return out;
 }
 
@@ -37,6 +39,7 @@ void AudioConfig::LoadPakText(const std::string& text) {
     }
     if (haveBuses) NamedListRegistry::Get().SetList(AudioBusRegistry::Category(), buses);
     AudioEffectRegistry::Get().LoadFromText(text);
+    AudioAttenuationRegistry::Get().LoadFromText(text);
 }
 
 void AudioConfig::LoadLoose(const std::string& directory) {

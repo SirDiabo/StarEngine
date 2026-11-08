@@ -4,6 +4,8 @@
 #include "Runtime/AudioCore.h"
 #include "Core/AudioBusRegistry.h"
 #include "Core/AudioEffectRegistry.h"
+#include "Core/AudioAttenuationRegistry.h"
+#include "Runtime/Actor.h"
 #include "Runtime/AudioCore.h"
 #include <algorithm>
 #include <cstdlib>
@@ -11,6 +13,7 @@
 
 AudioComponent::AudioComponent() = default;
 AudioComponent::~AudioComponent() {
+    DestroyEmitter(false);
     AudioCore::Get().RetireEffectChain(effectChain);
 }
 
@@ -26,13 +29,23 @@ void AudioComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddString("Bus", &bus);
 }
 
+void AudioComponent::DestroyEmitter(bool resetSource) {
+    if (!emitterId) return;
+    AudioCore::Get().DestroyEmitter(emitterId, resetSource);
+    emitterId = 0;
+}
+
 AudioSource* AudioComponent::EnsureSource() {
     if (soundPath.empty()) {
+        DestroyEmitter(false);
+        appliedAttenuationKey.clear();
         source.reset();
         sourcePath.clear();
         return nullptr;
     }
     if (!source || sourcePath != soundPath) {
+        DestroyEmitter(false);
+        appliedAttenuationKey.clear();
         source = AudioSourceRegistry::Get().Create(soundPath);
         sourcePath = soundPath;
         appliedBusKey.clear();
@@ -64,6 +77,41 @@ void AudioComponent::SyncSource() {
         effectChain = next;
         source->SetEffectChain(effectChain);
     }
+
+    std::string attenuationKey = sourcePath + "|" + attenuation;
+    if (attenuationKey != appliedAttenuationKey) {
+        appliedAttenuationKey = attenuationKey;
+        DestroyEmitter(true);
+        if (!attenuation.empty()) emitterId = AudioCore::Get().CreateEmitter(source.get(), attenuation);
+        if (AudioEmitter* emitter = AudioCore::Get().FindEmitter(emitterId)) {
+            emitter->SetEnabled(attenuationEnabled);
+            if (owningActor) emitter->SetPosition(owningActor->GetComponentWorldPosition(this), owningActor);
+            AudioCore::Get().RefreshEmitter(emitterId);
+        }
+    }
+    if (AudioEmitter* emitter = AudioCore::Get().FindEmitter(emitterId)) {
+        if (owningActor) emitter->SetPosition(owningActor->GetComponentWorldPosition(this), owningActor);
+    }
+}
+
+bool AudioComponent::SetAttenuation(const std::string& name) {
+    const std::string next = name == "None" ? std::string() : name;
+    if (!next.empty() && !AudioAttenuationRegistry::Get().Find(next)) return false;
+    attenuation = next;
+    if (source) SyncSource();
+    return true;
+}
+
+bool AudioComponent::SetAttenuationEnabled(bool enabled) {
+    attenuationEnabled = enabled;
+    AudioEmitter* emitter = AudioCore::Get().FindEmitter(emitterId);
+    if (emitter) emitter->SetEnabled(enabled);
+    return emitter != nullptr;
+}
+
+bool AudioComponent::SetAttenuationParameter(const std::string& paramId, float value) {
+    AudioEmitter* emitter = AudioCore::Get().FindEmitter(emitterId);
+    return emitter && emitter->Settings().SetValue(paramId, value);
 }
 
 void AudioComponent::PushEffect(const std::string& name) {
@@ -141,6 +189,24 @@ bool AudioComponent::GetParameter(const std::string& path, AudioParamValue& out)
 
 namespace {
 
+ComponentFieldDesc AttenuationField() {
+    ComponentFieldDesc d = ComponentField::Enm("Attenuation", "Attenuation", {}, "None",
+        [](Component& c, const ComponentDecl& decl) {
+            std::string value = decl.Get("Attenuation", "None");
+            static_cast<AudioComponent&>(c).attenuation = value == "None" ? std::string() : value;
+        },
+        [](const Component& c) -> std::string {
+            const std::string& value = static_cast<const AudioComponent&>(c).attenuation;
+            return value.empty() ? std::string("None") : value;
+        });
+    d.enumProvider = []() {
+        std::vector<std::string> options = { "None" };
+        for (const std::string& name : AudioAttenuationRegistry::Get().Names()) options.push_back(name);
+        return options;
+    };
+    return d;
+}
+
 ComponentFieldDesc BusField() {
     ComponentFieldDesc d = ComponentField::Enm("Bus", "Bus", {}, AudioBusRegistry::AssetDefaultLabel(),
         [](Component& c, const ComponentDecl& decl) {
@@ -184,6 +250,7 @@ ComponentRegistrar registrar_AudioComponent({
             [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).autoPlay); }),
         ComponentField::Bln("Looping", "Looping", false,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).looping); }),
+        AttenuationField(),
         ComponentField::Lst("Effects", "Effects", []() { return AudioEffectRegistry::Get().Names(); },
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).effects = ComponentField::SplitList(d.Get("Effects", "")); },
             [](const Component& c) { return ComponentField::JoinList(static_cast<const AudioComponent&>(c).effects); }),

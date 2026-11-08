@@ -4,6 +4,7 @@
 #include "NamedListRegistry.h"
 #include "AudioBusRegistry.h"
 #include "AudioEffectRegistry.h"
+#include "AudioAttenuationRegistry.h"
 #include "SaveFileRegistry.h"
 #include "SaveMigration.h"
 #include "CollisionLayers.h"
@@ -115,6 +116,7 @@ bool Project::Load(const std::string& path) {
     NamedListRegistry::Get().Load(rootPath);
     AudioBusRegistry::Get().EnsureDefaults();
     AudioEffectRegistry::Get().Load(rootPath);
+    AudioAttenuationRegistry::Get().Load(rootPath);
     SaveFileRegistry::Get().Load(rootPath);
     SaveMigration::Load(rootPath);
     CollisionLayers::Load(rootPath);

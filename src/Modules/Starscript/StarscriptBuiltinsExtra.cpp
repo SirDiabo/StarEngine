@@ -3,6 +3,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/World.h"
 #include "Runtime/SaveGame.h"
+#include "Core/AudioAttenuationRegistry.h"
 #include "Core/AudioEffectRegistry.h"
 #include "Runtime/AudioCore.h"
 #include "Core/AudioBusRegistry.h"
@@ -322,6 +323,25 @@ Value Fn_push_sound_instrument_effect(Runtime&, std::vector<Value>& a) {
 Value Fn_pop_sound_instrument_effect(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "pop_sound_instrument_effect", "Effects/Instrument/" + a[1].s, "pop:" + (a.size() > 2 ? a[2].s : std::string()), 0.0f)); }
 Value Fn_clear_sound_instrument_effects(Runtime&, std::vector<Value>& a) { SoundEffectOp(a[0], "clear_sound_instrument_effects", "Effects/Instrument/" + a[1].s, "clear:", 0.0f); return Value::Void(); }
 Value Fn_set_sound_instrument_effect_parameter(Runtime&, std::vector<Value>& a) { return Value::Bool(SoundEffectOp(a[0], "set_sound_instrument_effect_parameter", "Effects/Instrument/" + a[1].s, "param:" + a[2].s + ":" + a[3].s, (float)a[4].AsNumber())); }
+Value Fn_play_sound_at(Runtime&, std::vector<Value>& a) {
+    float volume = a.size() > 3 ? (float)a[3].AsNumber() : 1.0f;
+    float pitch = a.size() > 4 ? (float)a[4].AsNumber() : 1.0f;
+    bool looping = a.size() > 5 ? a[5].b : false;
+    std::string bus = a.size() > 6 ? a[6].s : std::string();
+    if (!AudioAttenuationRegistry::Get().Find(a[2].s)) throw ScriptError{ "play_sound_at: unknown attenuation '" + a[2].s + "'" };
+    const Vector3 position = { a[1].x, a[1].y, a[1].z };
+    AudioPositionFn provider = [position](Vector3& out, Actor*& ignore) { out = position; ignore = nullptr; return true; };
+    return Value::Int(AudioCore::Get().PlayAssetSpatial(a[0].s, volume, pitch, looping, bus, a[2].s, provider));
+}
+Value Fn_set_sound_position(Runtime&, std::vector<Value>& a) {
+    return Value::Bool(AudioCore::Get().SetInstancePosition((int)a[0].i, { a[1].x, a[1].y, a[1].z }));
+}
+Value Fn_set_sound_attenuation(Runtime&, std::vector<Value>& a) {
+    if (!AudioAttenuationRegistry::Get().Find(a[1].s)) throw ScriptError{ "set_sound_attenuation: unknown attenuation '" + a[1].s + "'" };
+    return Value::Bool(AudioCore::Get().SetInstanceAttenuation((int)a[0].i, a[1].s));
+}
+Value Fn_set_sound_attenuation_enabled(Runtime&, std::vector<Value>& a) { return Value::Bool(AudioCore::Get().SetInstanceAttenuationEnabled((int)a[0].i, a[1].b)); }
+Value Fn_set_sound_attenuation_parameter(Runtime&, std::vector<Value>& a) { return Value::Bool(AudioCore::Get().SetInstanceAttenuationParameter((int)a[0].i, a[1].s, (float)a[2].AsNumber())); }
 Value Fn_seek_sound(Runtime&, std::vector<Value>& a) { if (AudioSource* s = FindSound(a[0])) s->Seek(a[1].AsNumber()); return Value::Void(); }
 Value Fn_sound_position(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetPosition() : 0.0); }
 Value Fn_sound_duration(Runtime&, std::vector<Value>& a) { AudioSource* s = FindSound(a[0]); return Value::Float(s ? s->GetDuration() : 0.0); }
@@ -442,6 +462,11 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "pop_sound_instrument_effect", { T(Kind::Int), T(Kind::String), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_pop_sound_instrument_effect },
         { "clear_sound_instrument_effects", { T(Kind::Int), T(Kind::String) }, 2, T(Kind::Void), RetRule::Fixed, false, Fn_clear_sound_instrument_effects },
         { "set_sound_instrument_effect_parameter", { T(Kind::Int), T(Kind::String), T(Kind::String), T(Kind::String), T(Kind::Float) }, 5, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_instrument_effect_parameter },
+        { "play_sound_at", { T(Kind::String), T(Kind::Vec3), T(Kind::String), T(Kind::Float), T(Kind::Float), T(Kind::Bool), T(Kind::String) }, 3, T(Kind::Int), RetRule::Fixed, false, Fn_play_sound_at },
+        { "set_sound_position", { T(Kind::Int), T(Kind::Vec3) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_position },
+        { "set_sound_attenuation", { T(Kind::Int), T(Kind::String) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_attenuation },
+        { "set_sound_attenuation_enabled", { T(Kind::Int), T(Kind::Bool) }, 2, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_attenuation_enabled },
+        { "set_sound_attenuation_parameter", { T(Kind::Int), T(Kind::String), T(Kind::Float) }, 3, T(Kind::Bool), RetRule::Fixed, false, Fn_set_sound_attenuation_parameter },
         { "stop_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_stop_sound },
         { "pause_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_pause_sound },
         { "resume_sound", { T(Kind::Int) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_resume_sound },

@@ -37,7 +37,7 @@ void SoundAudioSource::ReloadAssetSettings() {
     assetVolume = std::clamp(header.soundVolume, 0.0f, 4.0f);
     assetPitch = std::clamp(header.soundPitch, 0.05f, 4.0f);
     if (voice) {
-        voice->volume.store(volume * assetVolume);
+        voice->volume.store(volume * assetVolume * spatialGain);
         voice->pitch.store(pitch * assetPitch);
     }
 }
@@ -94,9 +94,9 @@ void SoundAudioSource::Play() {
     if (voice) voice->stopRequested.store(true);
 
     VoiceStart start;
-    start.volume = volume * assetVolume;
+    start.volume = volume * assetVolume * spatialGain;
     start.pitch = pitch * assetPitch;
-    start.pan = pan;
+    start.pan = std::clamp(pan + spatialPan, -1.0f, 1.0f);
     start.looping = looping;
     start.bus = bus;
     start.chain = ActiveChain();
@@ -131,7 +131,7 @@ bool SoundAudioSource::IsPaused() const {
 
 void SoundAudioSource::SetVolume(float value) {
     volume = std::max(0.0f, value);
-    if (voice) voice->volume.store(volume * assetVolume);
+    if (voice) voice->volume.store(volume * assetVolume * spatialGain);
 }
 
 void SoundAudioSource::SetPitch(float value) {
@@ -146,14 +146,21 @@ std::shared_ptr<const AudioEffectChain> SoundAudioSource::ActiveChain() {
         AudioCore::Get().RetireEffectChain(soundChain);
         soundChain = next;
     }
-    if (!soundChain) return effectChain;
-    if (!effectChain) return soundChain;
-    auto merged = std::make_shared<AudioEffectChain>();
-    merged->effects = soundChain->effects;
-    merged->names = soundChain->names;
-    merged->effects.insert(merged->effects.end(), effectChain->effects.begin(), effectChain->effects.end());
-    merged->names.insert(merged->names.end(), effectChain->names.begin(), effectChain->names.end());
-    return merged;
+    return AudioEffectChain::Merge(AudioEffectChain::Merge(soundChain, effectChain), spatialChain);
+}
+
+void SoundAudioSource::SetSpatial(float gain, float panValue) {
+    spatialGain = std::max(0.0f, gain);
+    spatialPan = std::clamp(panValue, -1.0f, 1.0f);
+    if (voice) {
+        voice->volume.store(volume * assetVolume * spatialGain);
+        voice->pan.store(std::clamp(pan + spatialPan, -1.0f, 1.0f));
+    }
+}
+
+void SoundAudioSource::SetSpatialChain(const std::shared_ptr<const AudioEffectChain>& chain) {
+    spatialChain = chain;
+    if (voice && !voice->finished.load()) AudioMixer::Get().SetVoiceChain(voice, ActiveChain());
 }
 
 void SoundAudioSource::SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) {
@@ -173,7 +180,7 @@ void SoundAudioSource::SetBus(int value) {
 
 void SoundAudioSource::SetPan(float value) {
     pan = std::clamp(value, -1.0f, 1.0f);
-    if (voice) voice->pan.store(pan);
+    if (voice) voice->pan.store(std::clamp(pan + spatialPan, -1.0f, 1.0f));
 }
 
 void SoundAudioSource::Seek(double seconds) {

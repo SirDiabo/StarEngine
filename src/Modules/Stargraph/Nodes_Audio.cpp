@@ -1,3 +1,7 @@
+#include "Core/AudioAttenuationRegistry.h"
+#include "Core/ObjectRefRegistry.h"
+#include "Runtime/Actor.h"
+#include "Runtime/Components/Component.h"
 #include "Core/AudioEffectRegistry.h"
 #include "Nodes_Audio.h"
 #include "NodeRegistry.h"
@@ -28,6 +32,31 @@ void WarnUnknownBus(const std::string& bus) {
 
 }
 
+namespace {
+
+AudioPositionFn MakeFollowProvider(unsigned int id) {
+    return [id](Vector3& position, Actor*& ignore) {
+        Object* object = ObjectRefRegistry::Get().Resolve(id);
+        if (!object) return false;
+        if (Actor* actor = dynamic_cast<Actor*>(object)) {
+            Matrix m = actor->GetWorldMatrix();
+            position = { m.m12, m.m13, m.m14 };
+            ignore = actor;
+            return true;
+        }
+        if (Component* component = dynamic_cast<Component*>(object)) {
+            Actor* owner = component->GetOwningActor();
+            if (!owner) return false;
+            position = owner->GetComponentWorldPosition(component);
+            ignore = owner;
+            return true;
+        }
+        return false;
+    };
+}
+
+}
+
 void RegisterAudioNodes() {
     NodeTemplate playSound;
     playSound.type = "Play_Sound";
@@ -40,6 +69,9 @@ void RegisterAudioNodes() {
         node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "1.0"});
         node->inputs.push_back({"Looping", PinType::Boolean, true, false, 0, "false"});
         node->inputs.push_back({"Bus", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Attenuation", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Position", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"Follow", PinType::Object, true, false, 0, "", false, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         node->outputs.push_back({"Sound", PinType::Object, false, true, 0, "", false, "Sound"});
     };
@@ -54,7 +86,26 @@ void RegisterAudioNodes() {
         }
         float volume = ReadFloat(node, "Volume", 1.0f);
         float pitch = ReadFloat(node, "Pitch", 1.0f);
-        int handle = AudioCore::Get().PlayAsset(path, volume, pitch, looping, bus);
+        std::string attenuation = ReadText(node, "Attenuation");
+        int handle = 0;
+        if (!attenuation.empty() && AudioAttenuationRegistry::Get().Find(attenuation)) {
+            AudioPositionFn provider;
+            std::string follow = ReadText(node, "Follow");
+            std::string followKind;
+            unsigned int followId = 0;
+            if (!follow.empty() && ObjectRefRegistry::TryDecode(follow, followKind, followId)) {
+                provider = MakeFollowProvider(followId);
+            } else {
+                Vector3 fixed = { 0.0f, 0.0f, 0.0f };
+                for (const Pin& p : node.inputs) {
+                    if (p.name == "Position") ReadVec3(p, fixed.x, fixed.y, fixed.z);
+                }
+                provider = [fixed](Vector3& position, Actor*& ignore) { position = fixed; ignore = nullptr; return true; };
+            }
+            handle = AudioCore::Get().PlayAssetSpatial(path, volume, pitch, looping, bus, attenuation, provider);
+        } else {
+            handle = AudioCore::Get().PlayAsset(path, volume, pitch, looping, bus);
+        }
         for (Pin& p : node.outputs) {
             if (p.name == "Sound") p.defaultValue = std::to_string(handle);
         }

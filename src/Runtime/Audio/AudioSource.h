@@ -44,6 +44,8 @@ public:
     virtual void SetBus(int bus) = 0;
     virtual void SetPan(float pan) { (void)pan; }
     virtual void SetEffectChain(const std::shared_ptr<const AudioEffectChain>& chain) { (void)chain; }
+    virtual void SetSpatial(float gain, float pan) { (void)gain; (void)pan; }
+    virtual void SetSpatialChain(const std::shared_ptr<const AudioEffectChain>& chain) { (void)chain; }
     virtual std::string DefaultBusName() const { return std::string(); }
     virtual void ReloadAssetSettings() {}
 
