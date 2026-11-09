@@ -1,3 +1,4 @@
+#include "Editor/EffectListRows.h"
 #include "ActorClassEditor.h"
 #include "Editor/PropertyRowBuilders.h"
 #include "Runtime/ComponentRegistry.h"
@@ -421,6 +422,16 @@ void ActorClassEditor::BuildComponentRows(std::vector<PropertyRow>& rows, int id
                     }));
                     break;
                 case ComponentFieldKind::Enum:
+                    if (f.inlineEditor == "Attenuation") {
+                        PropertyRow attenuationRow = EnumRow(rowId, f.label, value.empty() ? std::string("None") : value, AttenuationDropdownOptions(value),
+                            [this, idx, key](const std::string& v) { SetComponentField(idx, key, ResolveAttenuationChoice(v)); });
+                        attenuationRow.dropdown = true;
+                        rows.push_back(attenuationRow);
+                        if (!value.empty() && value != "None") {
+                            AddAttenuationSettingsRows(rows, rowId, value, [this, idx, key](const std::string& selected) { SetComponentField(idx, key, selected); });
+                        }
+                        break;
+                    }
                     rows.push_back(EnumRow(rowId, f.label, value, ComponentField::EnumOptionsOf(f), [this, idx, key](const std::string& v) {
                         SetComponentField(idx, key, v);
                     }));
@@ -440,6 +451,12 @@ void ActorClassEditor::BuildComponentRows(std::vector<PropertyRow>& rows, int id
                 }
                 case ComponentFieldKind::NameList: {
                     const std::vector<std::string> items = ComponentField::SplitList(value);
+                    if (f.inlineEditor == "Effects") {
+                        AddEffectListRows(rows, rowId, items, [this, idx, key](const std::vector<std::string>& next) {
+                            SetComponentField(idx, key, ComponentField::JoinList(next));
+                        });
+                        break;
+                    }
                     const std::vector<std::string> available = ComponentField::EnumOptionsOf(f);
                     rows.push_back(HeaderRow(rowId + ".h", f.label));
                     for (size_t i = 0; i < items.size(); i++) {

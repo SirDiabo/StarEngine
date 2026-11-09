@@ -1,3 +1,4 @@
+#include "Editor/RegistryEditorRows.h"
 #include "Core/AudioAttenuationRegistry.h"
 #include "Core/AudioEffectRegistry.h"
 #include "StargraphEditorPanel.h"
@@ -732,12 +733,18 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
             }));
         } else if (pin.name == "Attenuation" && (node->type == "Play_Sound" || node->type == "Set_Attenuation")) {
             int pinId = pin.id;
-            std::vector<std::string> options = { "None" };
-            for (const std::string& name : AudioAttenuationRegistry::Get().Names()) options.push_back(name);
-            if (!value.empty() && std::find(options.begin(), options.end(), value) == options.end()) options.push_back(value);
-            rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("None") : value, options, [this, pinId](const std::string& v) {
-                if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = v == "None" ? std::string() : v; isDirty = true; }
-            }));
+            PropertyRow attenuationRow = EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? std::string("None") : value, AttenuationDropdownOptions(value),
+                [this, pinId](const std::string& v) {
+                    std::string chosen = ResolveAttenuationChoice(v);
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = chosen == "None" ? std::string() : chosen; isDirty = true; }
+                });
+            attenuationRow.dropdown = true;
+            rows.push_back(attenuationRow);
+            if (!value.empty()) {
+                AddAttenuationSettingsRows(rows, "n.p" + std::to_string(pin.id) + ".att", value, [this, pinId](const std::string& selected) {
+                    if (Pin* p = ActiveGraph().FindPin(pinId)) { p->defaultValue = selected == "None" ? std::string() : selected; isDirty = true; }
+                });
+            }
         } else if (isInterpNode && pin.name == "Method") {
             int pinId = pin.id;
             rows.push_back(EnumRow("n.p" + std::to_string(pin.id), pin.name, value.empty() ? "Exponential" : value,

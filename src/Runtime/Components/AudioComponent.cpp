@@ -189,6 +189,14 @@ bool AudioComponent::GetParameter(const std::string& path, AudioParamValue& out)
 
 namespace {
 
+ComponentFieldDesc EffectsField() {
+    ComponentFieldDesc d = ComponentField::Lst("Effects", "Effects", []() { return AudioEffectRegistry::Get().Names(); },
+        [](Component& c, const ComponentDecl& decl) { static_cast<AudioComponent&>(c).effects = ComponentField::SplitList(decl.Get("Effects", "")); },
+        [](const Component& c) { return ComponentField::JoinList(static_cast<const AudioComponent&>(c).effects); });
+    d.inlineEditor = "Effects";
+    return d;
+}
+
 ComponentFieldDesc AttenuationField() {
     ComponentFieldDesc d = ComponentField::Enm("Attenuation", "Attenuation", {}, "None",
         [](Component& c, const ComponentDecl& decl) {
@@ -199,6 +207,7 @@ ComponentFieldDesc AttenuationField() {
             const std::string& value = static_cast<const AudioComponent&>(c).attenuation;
             return value.empty() ? std::string("None") : value;
         });
+    d.inlineEditor = "Attenuation";
     d.enumProvider = []() {
         std::vector<std::string> options = { "None" };
         for (const std::string& name : AudioAttenuationRegistry::Get().Names()) options.push_back(name);
@@ -251,9 +260,7 @@ ComponentRegistrar registrar_AudioComponent({
         ComponentField::Bln("Looping", "Looping", false,
             [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).looping = d.Get("Looping", "false") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const AudioComponent&>(c).looping); }),
         AttenuationField(),
-        ComponentField::Lst("Effects", "Effects", []() { return AudioEffectRegistry::Get().Names(); },
-            [](Component& c, const ComponentDecl& d) { static_cast<AudioComponent&>(c).effects = ComponentField::SplitList(d.Get("Effects", "")); },
-            [](const Component& c) { return ComponentField::JoinList(static_cast<const AudioComponent&>(c).effects); }),
+        EffectsField(),
     }
 });
 }

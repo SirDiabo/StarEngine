@@ -1,3 +1,4 @@
+#include "Editor/EffectListRows.h"
 #include "ActorDetailsBuilder.h"
 #include "Core/CollisionLayers.h"
 #include "Runtime/AssetCache.h"
@@ -153,6 +154,24 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
                 };
                 break;
             case ComponentFieldKind::Enum:
+                if (f.inlineEditor == "Attenuation") {
+                    row.kind = PropertyRowKind::Enum;
+                    row.stringValue = value.empty() ? std::string("None") : value;
+                    row.enumOptions = AttenuationDropdownOptions(value);
+                    row.dropdown = true;
+                    row.setString = [writeField, onEdited, fieldKey](const std::string& v) {
+                        writeField(fieldKey, ResolveAttenuationChoice(v));
+                        if (onEdited) onEdited();
+                    };
+                    rows.push_back(row);
+                    if (!value.empty() && value != "None") {
+                        AddAttenuationSettingsRows(rows, "field:" + fieldKey, value, [writeField, onEdited, fieldKey](const std::string& selected) {
+                            writeField(fieldKey, selected);
+                            if (onEdited) onEdited();
+                        });
+                    }
+                    continue;
+                }
                 row.kind = PropertyRowKind::Enum;
                 row.stringValue = value;
                 row.enumOptions = ComponentField::EnumOptionsOf(f);
@@ -200,6 +219,13 @@ static void BuildInlineComponentRows(ActorInstance& inst, std::vector<PropertyRo
             }
             case ComponentFieldKind::NameList: {
                 const std::vector<std::string> items = ComponentField::SplitList(value);
+                if (f.inlineEditor == "Effects") {
+                    AddEffectListRows(rows, "field:" + fieldKey, items, [writeField, onEdited, fieldKey](const std::vector<std::string>& next) {
+                        writeField(fieldKey, ComponentField::JoinList(next));
+                        if (onEdited) onEdited();
+                    });
+                    continue;
+                }
                 const std::vector<std::string> available = ComponentField::EnumOptionsOf(f);
                 PropertyRow header;
                 header.id = "field:" + fieldKey + ".h";

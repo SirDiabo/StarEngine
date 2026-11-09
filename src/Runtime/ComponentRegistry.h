@@ -14,6 +14,7 @@ struct ComponentFieldDesc {
     std::string key;
     std::string label;
     ComponentFieldKind kind = ComponentFieldKind::String;
+    std::string inlineEditor;
     std::string defaultValue;
     std::string assetExtension;
     std::vector<std::string> enumOptions;
