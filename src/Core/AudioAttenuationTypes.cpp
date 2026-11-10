@@ -49,8 +49,8 @@ std::vector<AttenuationParamDef> Build() {
     return {
         Flag("distance_attenuation", "Enable Volume Attenuation", "Volume", true),
         Pick("curve", "Falloff Curve", "Volume", { "Linear", "Inverse", "Logarithmic", "Smooth" }, 0),
-        Num("min_distance", "Inner Radius", "Volume", 0.0f, 1000.0f, 2.0f, "m"),
-        Num("max_distance", "Falloff End", "Volume", 0.1f, 5000.0f, 30.0f, "m"),
+        Num("min_distance", "Inner Radius", "Volume", 0.0f, 10000000.0f, 200.0f),
+        Num("max_distance", "Falloff End", "Volume", 1.0f, 10000000.0f, 5000.0f),
         Flag("spatialization", "Enable Spatialization", "Spatialization", true),
         Num("spatial_blend", "Spatial Blend", "Spatialization", 0.0f, 1.0f, 1.0f),
         Num("pan_strength", "Pan Strength", "Spatialization", 0.0f, 1.0f, 1.0f),

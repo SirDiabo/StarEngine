@@ -53,6 +53,21 @@ inline PropertyRow EnumRow(const std::string& id, const std::string& label, cons
     return row;
 }
 
+inline PropertyRow SliderRow(const std::string& id, const std::string& label, float value, float minValue, float maxValue,
+                      bool integer, bool logScale, std::function<void(float)> setter) {
+    PropertyRow row;
+    row.id = id;
+    row.kind = PropertyRowKind::Slider;
+    row.label = label;
+    row.floatValue = value;
+    row.sliderMin = minValue;
+    row.sliderMax = maxValue;
+    row.integer = integer;
+    row.logScale = logScale && minValue > 0.0f && maxValue / minValue >= 40.0f;
+    row.setFloat = std::move(setter);
+    return row;
+}
+
 inline PropertyRow BoolRow(const std::string& id, const std::string& label, bool value, std::function<void(bool)> setter) {
     PropertyRow row;
     row.id = id;

@@ -860,7 +860,11 @@ void ViewportPanel::RenderToolbar() {
             }
         }
 
-        if (!WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn) || IsKeyPressed(KEY_ESCAPE) && playing || World::Get().ConsumeQuitRequest()) {
+        const bool stopClicked = !WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), stopBtn);
+        const bool escapePressed = IsKeyPressed(KEY_ESCAPE) && playing;
+        const bool quitRequested = World::Get().ConsumeQuitRequest();
+        if (stopClicked || escapePressed || quitRequested) {
+            TraceLog(LOG_INFO, "PIE stopped: %s", stopClicked ? "stop button" : escapePressed ? "escape key" : "quit request");
             GameSession::EndSession();
             yaw = savedYaw;
             pitch = savedPitch;

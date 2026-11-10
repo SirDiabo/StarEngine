@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "Core/Widgets/SliderElement.h"
 #include "ChoicePopup.h"
 #include <functional>
 #include <string>
@@ -16,6 +17,7 @@ enum class PropertyRowKind {
     ReadOnlyText,
     String,
     Float,
+    Slider,
     Bool,
     Vec2,
     Vec3,
@@ -66,6 +68,9 @@ struct PropertyRow {
     std::string assetExtension;
     Color iconColor{ 0, 0, 0, 0 };
 
+    float sliderMin = 0.0f;
+    float sliderMax = 1.0f;
+    bool logScale = false;
     bool integer = false;
     bool commitOnly = false;
     std::string placeholder;
@@ -131,6 +136,7 @@ private:
         std::string id;
         PropertyRowKind kind = PropertyRowKind::String;
         TextElement* textField = nullptr;
+        SliderElement* slider = nullptr;
         CheckBoxElement* checkBox = nullptr;
         TextElement* vecX = nullptr;
         TextElement* vecY = nullptr;

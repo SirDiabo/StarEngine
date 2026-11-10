@@ -566,6 +566,45 @@ void PropertyPanel::RebuildRows() {
                 rw.textField = box;
                 break;
             }
+            case PropertyRowKind::Slider: {
+                auto* slider = new SliderElement();
+                slider->size = { 0.0f, rowHeight };
+                slider->trackColor = fieldBg;
+                slider->borderColor = fieldBorder;
+                slider->fillColor = checkBoxCheckColor;
+                slider->handleColor = checkBoxCheckColor;
+                slider->minValue = 0.0f;
+                slider->maxValue = 1.0f;
+                slider->onValueChanged = [this, i](float t) {
+                    if (i >= rows.size() || !rows[i].setFloat) return;
+                    const PropertyRow& current = rows[i];
+                    t = std::clamp(t, 0.0f, 1.0f);
+                    float value = current.logScale && current.sliderMin > 0.0f
+                        ? current.sliderMin * std::pow(current.sliderMax / current.sliderMin, t)
+                        : current.sliderMin + t * (current.sliderMax - current.sliderMin);
+                    if (current.integer) value = std::round(value);
+                    current.setFloat(value);
+                };
+                rowBox->AddChild(slider);
+                auto* box = new TextElement();
+                box->editable = true;
+                box->numericOnly = true;
+                box->fontSize = 11.0f;
+                box->backgroundColor = fieldBg;
+                box->borderColor = fieldBorder;
+                box->editingBorderColor = fieldEditingBorder;
+                box->size = { 64.0f, rowHeight };
+                box->onTextChanged = [this, i](const std::string& text) {
+                    if (i >= rows.size() || !rows[i].setFloat) return;
+                    float value = (float)atof(text.c_str());
+                    if (rows[i].integer) value = std::round(value);
+                    rows[i].setFloat(value);
+                };
+                rowBox->AddChild(box);
+                rw.slider = slider;
+                rw.textField = box;
+                break;
+            }
             case PropertyRowKind::Bool: {
                 auto* check = new CheckBoxElement();
                 check->size = { rowHeight - 4.0f, rowHeight - 4.0f };
@@ -670,6 +709,15 @@ void PropertyPanel::RefreshValues() {
                 if (rw.textField && !rw.textField->isEditing) rw.textField->text = row.stringValue;
                 break;
             case PropertyRowKind::Float:
+                if (rw.textField && !rw.textField->isEditing) rw.textField->text = row.integer ? FormatInteger(row.floatValue) : FormatFloat(row.floatValue);
+                break;
+            case PropertyRowKind::Slider:
+                if (rw.slider) {
+                    float t = row.logScale && row.sliderMin > 0.0f
+                        ? std::log(std::max(row.floatValue, row.sliderMin) / row.sliderMin) / std::log(row.sliderMax / row.sliderMin)
+                        : (row.floatValue - row.sliderMin) / std::max(0.000001f, row.sliderMax - row.sliderMin);
+                    rw.slider->value = std::clamp(t, 0.0f, 1.0f);
+                }
                 if (rw.textField && !rw.textField->isEditing) rw.textField->text = row.integer ? FormatInteger(row.floatValue) : FormatFloat(row.floatValue);
                 break;
             case PropertyRowKind::Bool:

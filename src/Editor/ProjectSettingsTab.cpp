@@ -9,6 +9,7 @@
 #include "Core/Widgets/Widget.h"
 #include "Core/CollisionLayers.h"
 #include "Core/AudioBusRegistry.h"
+#include "Core/AudioAttenuationRegistry.h"
 #include "Core/AudioEffectRegistry.h"
 #include "Core/AudioEffectTypes.h"
 #include "Core/IconBuilder.h"
@@ -553,7 +554,9 @@ void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
     }
     fy += 36.0f;
 
-    fy = RenderAudioEffectsSection(fx, fy, area.width - 32.0f > 760.0f ? 760.0f : area.width - 32.0f, view);
+    const float sectionWidth = area.width - 32.0f > 760.0f ? 760.0f : area.width - 32.0f;
+    fy = RenderAudioEffectsSection(fx, fy, sectionWidth, view);
+    fy = RenderAttenuationSection(fx, fy + 10.0f, sectionWidth, view);
 
     int picked = -1;
     if (effectPopup.Render(picked)) {
@@ -567,6 +570,10 @@ void ProjectSettingsTab::RenderAudioCategory(Rectangle area) {
             newEffectType = picked;
         } else if (effectPopupMode == EffectPopupMode::ParamChoice && picked >= 0 && !selectedEffect.empty()) {
             registry.SetParam(selectedEffect, effectPopupParam, (float)picked);
+        } else if (effectPopupMode == EffectPopupMode::AttenuationChoice && picked >= 0 && !selectedAttenuation.empty()) {
+            AudioAttenuationRegistry::Get().SetValue(selectedAttenuation, effectPopupParam, (float)picked);
+        } else if (effectPopupMode == EffectPopupMode::AttenuationEffect && picked >= 0 && !selectedAttenuation.empty()) {
+            AudioAttenuationRegistry::Get().SetText(selectedAttenuation, effectPopupParam, picked == 0 || (size_t)picked > effectPopupValues.size() ? std::string() : effectPopupValues[(size_t)picked - 1]);
         }
         effectPopupMode = EffectPopupMode::None;
     }
@@ -627,6 +634,204 @@ float ProjectSettingsTab::RenderBusEffectChips(float fx, float fy, float fw, con
         registry.SetBusEffects(busName, list);
     }
     return y + h + 6.0f;
+}
+
+float ProjectSettingsTab::RenderAttenuationSection(float fx, float fy, float fw, Rectangle view) {
+    const UIPalette& theme = UITheme::Get();
+    AudioAttenuationRegistry& registry = AudioAttenuationRegistry::Get();
+    const bool popupOpen = effectPopup.IsOpen();
+    const Vector2 mp = GetMousePosition();
+    const float listW = 210.0f;
+    const float px = fx + listW + 24.0f;
+    const float control = px + 190.0f;
+
+    DrawText("Attenuations", (int)fx, (int)fy, 14, theme.sectionHeader);
+    fy += 24.0f;
+    DrawText("Control how sounds fade with distance, pan in 3D and get muffled by walls. Assign them on audio components and Play Sound.", (int)fx, (int)fy, 10, theme.textSecondary);
+    fy += 22.0f;
+    const float top = fy;
+    float paramsBottom = top;
+
+    std::vector<std::string> names = registry.Names();
+    if (!selectedAttenuation.empty() && !registry.Find(selectedAttenuation)) selectedAttenuation.clear();
+    if (selectedAttenuation.empty() && !names.empty()) selectedAttenuation = names[0];
+
+    const float listHeight = names.empty() ? 20.0f : (float)names.size() * 24.0f;
+    Rectangle newNameRect = { fx, top + listHeight + 6.0f + 14.0f, listW - 60.0f, 20.0f };
+    Rectangle addButton = { fx + listW - 56.0f, newNameRect.y, 56.0f, 20.0f };
+    Rectangle renameRect = { px, top + 14.0f, 240.0f, 20.0f };
+
+    if (!attenuationChrome) {
+        attenuationChrome = new Widget();
+        auto* root = new WidgetElement();
+        attenuationChrome->SetRoot(root);
+        newAttenuationField = new TextElement();
+        newAttenuationField->editable = true;
+        newAttenuationField->fontSize = 12.0f;
+        newAttenuationField->placeholder = "Name (optional)";
+        newAttenuationField->backgroundColor = theme.fieldBg;
+        newAttenuationField->borderColor = theme.fieldBorder;
+        newAttenuationField->editingBorderColor = theme.accent;
+        newAttenuationField->onTextChanged = [this](const std::string& text) { newAttenuationName = text; };
+        root->AddChild(newAttenuationField);
+        renameAttenuationField = new TextElement();
+        renameAttenuationField->editable = true;
+        renameAttenuationField->fontSize = 12.0f;
+        renameAttenuationField->backgroundColor = theme.fieldBg;
+        renameAttenuationField->borderColor = theme.fieldBorder;
+        renameAttenuationField->editingBorderColor = theme.accent;
+        renameAttenuationField->onTextCommitted = [this](const std::string& text) {
+            AudioAttenuationRegistry& live = AudioAttenuationRegistry::Get();
+            if (!selectedAttenuation.empty() && text != selectedAttenuation && live.Rename(selectedAttenuation, text)) selectedAttenuation = text;
+            else attenuationRenameBound.clear();
+        };
+        root->AddChild(renameAttenuationField);
+    }
+    if (attenuationRenameBound != selectedAttenuation) {
+        renameAttenuationField->text = selectedAttenuation;
+        attenuationRenameBound = selectedAttenuation;
+    }
+    const bool haveSelection = !selectedAttenuation.empty();
+    newAttenuationField->size = { newNameRect.width, newNameRect.height };
+    newAttenuationField->offset = CheckCollisionRecs(newNameRect, view) ? Vector2{ newNameRect.x, newNameRect.y } : Vector2{ -2000.0f, -2000.0f };
+    renameAttenuationField->size = { renameRect.width, renameRect.height };
+    renameAttenuationField->offset = haveSelection && CheckCollisionRecs(renameRect, view) ? Vector2{ renameRect.x, renameRect.y } : Vector2{ -2000.0f, -2000.0f };
+    {
+        float dt = GetFrameTime();
+        const Rectangle bounds = { 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() };
+        attenuationChrome->Tick(dt, bounds, 1.0f);
+        WidgetInput::ProcessInput(attenuationChrome, WidgetInput::kEditorDevice, dt, mp, 1.0f);
+        attenuationChrome->Draw(bounds, 1.0f);
+    }
+
+    std::string removeName;
+    float ly = top;
+    if (names.empty()) DrawText("No attenuations yet", (int)fx + 4, (int)ly + 4, 11, theme.textSecondary);
+    for (const std::string& name : names) {
+        Rectangle row = { fx, ly, listW - 24.0f, 22.0f };
+        Rectangle del = { fx + listW - 20.0f, ly, 20.0f, 22.0f };
+        const bool selected = name == selectedAttenuation;
+        const bool hovered = !popupOpen && !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mp, row);
+        DrawRectangleRec(row, selected ? Fade(theme.accent, 0.35f) : (hovered ? theme.surfaceHover : theme.fieldBg));
+        DrawRectangleLinesEx(row, 1, selected ? theme.accent : theme.fieldBorder);
+        DrawText(name.c_str(), (int)row.x + 6, (int)row.y + 5, 12, theme.textPrimary);
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedAttenuation = name;
+        if (InlineButton(del, "x") && !popupOpen) removeName = name;
+        ly += 24.0f;
+    }
+    DrawText("New attenuation", (int)fx, (int)(newNameRect.y - 14.0f), 11, theme.textSecondary);
+    if (InlineButton(addButton, "+ Add") && !popupOpen) {
+        std::string name = newAttenuationName;
+        if (name.empty()) {
+            name = "Attenuation";
+            for (int n = 2; registry.Find(name); n++) name = "Attenuation " + std::to_string(n);
+        }
+        if (registry.Add(name)) {
+            selectedAttenuation = name;
+            newAttenuationName.clear();
+            newAttenuationField->text.clear();
+        }
+    }
+    if (!removeName.empty()) registry.Remove(removeName);
+
+    const AudioAttenuationDef* def = haveSelection ? registry.Find(selectedAttenuation) : nullptr;
+    if (def) {
+        DrawText("Name", (int)px, (int)top, 11, theme.textSecondary);
+        DrawText("Renaming does not update components that already use it.", (int)(px + 250.0f), (int)(top + 18.0f), 10, theme.textSecondary);
+        float py = top + 14.0f + 32.0f;
+        const AudioAttenuationSettings settings = AudioAttenuationSchema::MakeSettings(*def);
+        std::string section;
+        for (const AttenuationParamDef& param : AudioAttenuationSchema::All()) {
+            if ((param.id == "curve" || param.id == "min_distance" || param.id == "max_distance") && !settings.distanceEnabled) continue;
+            if ((param.id == "spatial_blend" || param.id == "pan_strength") && !settings.spatialization) continue;
+            if (param.section == "Occlusion" && param.id != "occlusion" && !settings.occlusion) continue;
+            if (param.section != section) {
+                section = param.section;
+                py += section == "Volume" ? 0.0f : 6.0f;
+                DrawText(section.c_str(), (int)px, (int)py, 12, theme.sectionHeader);
+                py += 20.0f;
+            }
+            DrawText(param.label.c_str(), (int)px, (int)py + 4, 11, theme.textPrimary);
+            const std::string paramId = param.id;
+            switch (param.kind) {
+                case AttenuationParamKind::Bool: {
+                    bool flag = AudioAttenuationSchema::ValueOf(*def, param) >= 0.5f;
+                    if (InlineBoolBox({ control, py + 2.0f, 16.0f, 16.0f }, flag) && !popupOpen) registry.SetValue(selectedAttenuation, paramId, flag ? 1.0f : 0.0f);
+                    break;
+                }
+                case AttenuationParamKind::Float: {
+                    AudioEffectParamDef slider;
+                    slider.minValue = param.minValue;
+                    slider.maxValue = (param.id == "min_distance" || param.id == "max_distance") ? 20000.0f : param.maxValue;
+                    slider.defaultValue = param.defaultValue;
+                    slider.unit = param.unit;
+                    float value = AudioAttenuationSchema::ValueOf(*def, param);
+                    Rectangle track = { control, py + 4.0f, 220.0f, 12.0f };
+                    bool released = false;
+                    if (EffectSlider(track, value, slider, "att." + selectedAttenuation + "." + paramId, activeEffectSlider, popupOpen, released)) {
+                        registry.SetValue(selectedAttenuation, paramId, value, false);
+                    }
+                    if (released) registry.Save();
+                    DrawText(FormatEffectValue(slider, value).c_str(), (int)(track.x + track.width + 12.0f), (int)py + 4, 11, theme.textSecondary);
+                    break;
+                }
+                case AttenuationParamKind::Choice: {
+                    Rectangle box = { control, py, 160.0f, 20.0f };
+                    DrawRectangleRec(box, theme.fieldBg);
+                    DrawRectangleLinesEx(box, 1, theme.fieldBorder);
+                    const int index = std::clamp((int)AudioAttenuationSchema::ValueOf(*def, param), 0, (int)param.choices.size() - 1);
+                    DrawText(param.choices[(size_t)index].c_str(), (int)box.x + 6, (int)box.y + 4, 12, theme.textPrimary);
+                    if (!popupOpen && !WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, box)) {
+                        std::vector<ChoiceOption> choices;
+                        for (const std::string& choice : param.choices) choices.push_back({ choice, true, "" });
+                        effectPopup.Open({ box.x, box.y + box.height }, box.width, choices);
+                        effectPopupMode = EffectPopupMode::AttenuationChoice;
+                        effectPopupParam = paramId;
+                    }
+                    break;
+                }
+                case AttenuationParamKind::EffectName: {
+                    Rectangle box = { control, py, 160.0f, 20.0f };
+                    const std::string current = AudioAttenuationSchema::TextOf(*def, param);
+                    DrawRectangleRec(box, theme.fieldBg);
+                    DrawRectangleLinesEx(box, 1, theme.fieldBorder);
+                    DrawText(current.empty() ? "None" : current.c_str(), (int)box.x + 6, (int)box.y + 4, 12, theme.textPrimary);
+                    if (!popupOpen && !WidgetInput::IsMouseBlocked() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, box)) {
+                        effectPopupValues = AudioEffectRegistry::Get().Names();
+                        std::vector<ChoiceOption> choices = { { "None", true, "" } };
+                        for (const std::string& effect : effectPopupValues) choices.push_back({ effect, true, "" });
+                        effectPopup.Open({ box.x, box.y + box.height }, box.width, choices);
+                        effectPopupMode = EffectPopupMode::AttenuationEffect;
+                        effectPopupParam = paramId;
+                    }
+                    break;
+                }
+                case AttenuationParamKind::LayerMask: {
+                    uint32_t mask = CollisionLayers::ParseMask(AudioAttenuationSchema::TextOf(*def, param));
+                    float bx = control;
+                    float by = py + 2.0f;
+                    for (int layerIndex : CollisionLayers::UsedIndices()) {
+                        const std::string layerName = CollisionLayers::NameAt(layerIndex);
+                        const float width = 22.0f + (float)MeasureText(layerName.c_str(), 11) + 12.0f;
+                        if (bx + width > px + fw && bx > control) { bx = control; by += 20.0f; py += 20.0f; }
+                        bool on = (mask & CollisionLayers::Bit(layerIndex)) != 0;
+                        if (InlineBoolBox({ bx, by, 16.0f, 16.0f }, on) && !popupOpen) {
+                            mask = on ? (mask | CollisionLayers::Bit(layerIndex)) : (mask & ~CollisionLayers::Bit(layerIndex));
+                            registry.SetText(selectedAttenuation, paramId, CollisionLayers::MaskToString(mask));
+                        }
+                        DrawText(layerName.c_str(), (int)bx + 22, (int)by + 2, 11, theme.textPrimary);
+                        bx += width;
+                    }
+                    break;
+                }
+            }
+            py += 24.0f;
+        }
+        paramsBottom = py;
+    }
+
+    (void)fw;
+    return std::max(paramsBottom, addButton.y + addButton.height) + 20.0f;
 }
 
 float ProjectSettingsTab::RenderAudioEffectsSection(float fx, float fy, float fw, Rectangle view) {

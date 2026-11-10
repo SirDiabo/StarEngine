@@ -28,8 +28,8 @@ struct AudioAttenuationDef {
 struct AudioAttenuationSettings {
     bool distanceEnabled = true;
     int curve = 0;
-    float minDistance = 2.0f;
-    float maxDistance = 30.0f;
+    float minDistance = 200.0f;
+    float maxDistance = 5000.0f;
     bool spatialization = true;
     float spatialBlend = 1.0f;
     float panStrength = 1.0f;

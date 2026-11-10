@@ -71,9 +71,11 @@ inline void AddAttenuationSettingsRows(std::vector<PropertyRow>& rows, const std
                 });
                 break;
             case AttenuationParamKind::Float:
-                row = PropertyRows::FloatRow(rowId, UnitLabel(param.label, param.unit), AudioAttenuationSchema::ValueOf(*def, param), false, [name, paramId](float v) {
-                    AudioAttenuationRegistry::Get().SetValue(name, paramId, v);
-                });
+                row = PropertyRows::SliderRow(rowId, UnitLabel(param.label, param.unit), AudioAttenuationSchema::ValueOf(*def, param), param.minValue,
+                    param.id == "min_distance" || param.id == "max_distance" ? 20000.0f : param.maxValue, false,
+                    param.id == "max_distance" || param.id == "occlusion_interval" || param.id == "occlusion_smoothing", [name, paramId](float v) {
+                        AudioAttenuationRegistry::Get().SetValue(name, paramId, v);
+                    });
                 break;
             case AttenuationParamKind::Choice: {
                 const std::vector<std::string> choices = param.choices;
@@ -148,7 +150,7 @@ inline void AddEffectSettingsRows(std::vector<PropertyRow>& rows, const std::str
                 AudioEffectRegistry::Get().SetParam(effectName, paramId, v ? 1.0f : 0.0f);
             });
         } else {
-            row = PropertyRows::FloatRow(rowId, UnitLabel(param.label, param.unit), value, param.integer, [effectName, paramId](float v) {
+            row = PropertyRows::SliderRow(rowId, UnitLabel(param.label, param.unit), value, param.minValue, param.maxValue, param.integer, true, [effectName, paramId](float v) {
                 AudioEffectRegistry::Get().SetParam(effectName, paramId, v);
             });
         }

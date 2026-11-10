@@ -28,6 +28,7 @@ private:
     void RenderSaveFilesCategory(Rectangle area);
     void RenderAudioCategory(Rectangle area);
     float RenderAudioEffectsSection(float fx, float fy, float fw, Rectangle view);
+    float RenderAttenuationSection(float fx, float fy, float fw, Rectangle view);
     float RenderBusEffectChips(float fx, float fy, float fw, const std::string& busName);
     void RenderCollisionLayersCategory(Rectangle area);
     void RebuildLayerFields();
@@ -63,7 +64,7 @@ private:
     TextElement* newBusField = nullptr;
     std::string newBusName;
 
-    enum class EffectPopupMode { None, NewType, ParamChoice, BusAdd };
+    enum class EffectPopupMode { None, NewType, ParamChoice, BusAdd, AttenuationChoice, AttenuationEffect };
     ChoicePopup effectPopup;
     EffectPopupMode effectPopupMode = EffectPopupMode::None;
     std::string effectPopupBus;
@@ -80,6 +81,12 @@ private:
     TextElement* newEffectField = nullptr;
     TextElement* renameEffectField = nullptr;
     std::string renameBound;
+    std::string selectedAttenuation;
+    std::string newAttenuationName;
+    Widget* attenuationChrome = nullptr;
+    TextElement* newAttenuationField = nullptr;
+    TextElement* renameAttenuationField = nullptr;
+    std::string attenuationRenameBound;
 
     std::vector<SaveMigration::MigrationStep> migrationSteps;
     int migrationVersion = 1;
