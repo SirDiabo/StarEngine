@@ -361,8 +361,8 @@ bool SequenceEditorSession::DeleteSelectedEvent() {
 
 void SequenceEditorSession::MoveSelectedEvent(int64_t tick) {
     if (!selectedEvent.Valid()) return;
-    EventRef moved = MoveEvent(sequence, selectedEvent, tick);
-    bool changed = moved.index != selectedEvent.index || EventTick(sequence, moved) != tick;
+    bool changed = false;
+    EventRef moved = MoveEventTracked(sequence, selectedEvent, tick, changed);
     selectedEvent = moved;
     if (changed) MarkStructureChanged();
 }

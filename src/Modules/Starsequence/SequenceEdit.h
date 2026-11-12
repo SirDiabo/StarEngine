@@ -73,6 +73,7 @@ EventRef AddTempoPoint(Sequence& sequence, int64_t tick, double bpm);
 EventRef AddMeterPoint(Sequence& sequence, int64_t tick, int numerator, int denominator);
 bool RemoveEvent(Sequence& sequence, EventRef ref);
 EventRef MoveEvent(Sequence& sequence, EventRef ref, int64_t newTick);
+EventRef MoveEventTracked(Sequence& sequence, EventRef ref, int64_t newTick, bool& changed);
 
 int64_t BarsToTicks(const Sequence& sequence, double bars);
 double TicksToBars(const Sequence& sequence, int64_t ticks);

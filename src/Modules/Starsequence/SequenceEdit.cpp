@@ -528,6 +528,13 @@ EventRef MoveEvent(Sequence& sequence, EventRef ref, int64_t newTick) {
     return { EventKind::Meter, index };
 }
 
+EventRef MoveEventTracked(Sequence& sequence, EventRef ref, int64_t newTick, bool& changed) {
+    const int64_t oldTick = EventTick(sequence, ref);
+    const EventRef moved = MoveEvent(sequence, ref, newTick);
+    changed = ref.Valid() && (moved.index != ref.index || EventTick(sequence, moved) != oldTick);
+    return moved;
+}
+
 int64_t BarsToTicks(const Sequence& sequence, double bars) {
     return (int64_t)std::llround(std::max(0.0, bars) * (double)sequence.BarTicksAt(0));
 }
