@@ -385,6 +385,13 @@ bool RenameMarker(Sequence& sequence, int index, const std::string& name) {
 
 void SetMarkerType(Sequence& sequence, int index, MarkerType type) {
     if (index < 0 || (size_t)index >= sequence.markers.size()) return;
+    if (sequence.markers[(size_t)index].type == MarkerType::Start && type != MarkerType::Start) {
+        int starts = 0;
+        for (const Marker& m : sequence.markers) {
+            if (m.type == MarkerType::Start) starts++;
+        }
+        if (starts <= 1) return;
+    }
     if (type == MarkerType::Start) {
         for (Marker& m : sequence.markers) {
             if (m.type == MarkerType::Start) m.type = MarkerType::Cue;

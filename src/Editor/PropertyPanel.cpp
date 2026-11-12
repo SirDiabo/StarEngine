@@ -30,6 +30,7 @@ class LabeledRow : public WidgetElement {
 public:
     float labelWidth = 90.0f;
     bool hasTrailing = false;
+    bool valueThenSlider = false;
     float trailingWidth = 20.0f;
 
 protected:
@@ -37,10 +38,18 @@ protected:
         float lw = AdaptiveLabelWidth(labelWidth, ownRect.width, uiScale);
         float tw = trailingWidth * uiScale;
         float gap = 4.0f * uiScale;
-        if (hasTrailing && childIndex == 2) return { ownRect.x + ownRect.width - tw, ownRect.y, tw, ownRect.height };
+        const int trailingIndex = valueThenSlider ? 3 : 2;
+        if (hasTrailing && childIndex == trailingIndex) return { ownRect.x + ownRect.width - tw, ownRect.y, tw, ownRect.height };
         if (childIndex == 0) return { ownRect.x + gap, ownRect.y, std::max(0.0f, lw - gap * 2.0f), ownRect.height };
         float controlX = ownRect.x + lw;
         float controlW = ownRect.width - lw - (hasTrailing ? tw + gap : 0.0f);
+        if (valueThenSlider && children.size() > 1) {
+            const float boxW = children[1]->size.x > 0.0f ? children[1]->size.x * uiScale : 0.0f;
+            Rectangle sliderRect = (childIndex == 1)
+                ? Rectangle{ controlX, ownRect.y, boxW, ownRect.height }
+                : Rectangle{ controlX + boxW + gap, ownRect.y, std::max(0.0f, controlW - boxW - gap), ownRect.height };
+            return CenterControlVertically(child, sliderRect, uiScale);
+        }
         Rectangle rect = (child->size.x > 0.0f)
             ? Rectangle{ controlX, ownRect.y, child->size.x * uiScale, ownRect.height }
             : Rectangle{ controlX, ownRect.y, controlW, ownRect.height };
@@ -567,6 +576,7 @@ void PropertyPanel::RebuildRows() {
                 break;
             }
             case PropertyRowKind::Slider: {
+                rowBox->valueThenSlider = true;
                 auto* slider = new SliderElement();
                 slider->size = { 0.0f, rowHeight };
                 slider->trackColor = fieldBg;
@@ -585,7 +595,6 @@ void PropertyPanel::RebuildRows() {
                     if (current.integer) value = std::round(value);
                     current.setFloat(value);
                 };
-                rowBox->AddChild(slider);
                 auto* box = new TextElement();
                 box->editable = true;
                 box->numericOnly = true;
@@ -601,6 +610,7 @@ void PropertyPanel::RebuildRows() {
                     rows[i].setFloat(value);
                 };
                 rowBox->AddChild(box);
+                rowBox->AddChild(slider);
                 rw.slider = slider;
                 rw.textField = box;
                 break;

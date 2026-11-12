@@ -146,9 +146,15 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
             rows.push_back(StringRow("ev.name", "Name", marker.name, [s](const std::string& v) { s->RenameSelectedMarker(v); }));
             const std::vector<std::string> typeLabels = { "Cue", "Start Point", "End", "Jump To" };
             const char* current = marker.type == MarkerType::Start ? "Start Point" : marker.type == MarkerType::End ? "End" : marker.type == MarkerType::JumpTo ? "Jump To" : "Cue";
-            rows.push_back(EnumRow("ev.mtype", "Type", current, typeLabels, [s](const std::string& v) {
-                s->SetSelectedMarkerType(v == "Start Point" ? MarkerType::Start : v == "End" ? MarkerType::End : v == "Jump To" ? MarkerType::JumpTo : MarkerType::Cue);
-            }));
+            if (marker.type == MarkerType::Start) {
+                rows.push_back(ReadOnlyRow("ev.mtype", "Type", current));
+            } else {
+                PropertyRow typeRow = EnumRow("ev.mtype", "Type", current, typeLabels, [s](const std::string& v) {
+                    s->SetSelectedMarkerType(v == "Start Point" ? MarkerType::Start : v == "End" ? MarkerType::End : v == "Jump To" ? MarkerType::JumpTo : MarkerType::Cue);
+                });
+                typeRow.dropdown = true;
+                rows.push_back(std::move(typeRow));
+            }
             if (marker.type == MarkerType::JumpTo) {
                 std::vector<std::string> targets = { "(none)" };
                 for (size_t i = 0; i < seq.markers.size(); i++) {
