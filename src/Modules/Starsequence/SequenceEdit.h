@@ -61,6 +61,7 @@ struct EventRef {
 int64_t BarStartTick(const Sequence& sequence, int64_t tick);
 int64_t EventTick(const Sequence& sequence, EventRef ref);
 bool IsAnchorEvent(const Sequence& sequence, EventRef ref);
+bool IsOnlyStartMarker(const Sequence& sequence, EventRef ref);
 std::string UniqueMarkerName(const Sequence& sequence, const std::string& base);
 EventRef AddMarker(Sequence& sequence, int64_t tick, const std::string& name);
 std::string SanitizeMarkerName(const std::string& name);

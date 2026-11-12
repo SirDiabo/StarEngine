@@ -1,4 +1,6 @@
 #pragma once
+#include <atomic>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,7 +20,14 @@ struct PackagePlatformInfo {
     std::string unavailableReason;
 };
 
+struct PackagePlatformProbe {
+    std::atomic<bool> ready{false};
+    std::vector<PackagePlatformInfo> platforms;
+};
+
 std::string PackagePlatformName(PackagePlatform platform);
 PackagePlatform PackagePlatformFromName(const std::string& name);
 
 std::vector<PackagePlatformInfo> GetAvailablePackagePlatforms();
+std::vector<PackagePlatformInfo> GetPendingPackagePlatforms();
+std::shared_ptr<PackagePlatformProbe> StartPackagePlatformProbe();

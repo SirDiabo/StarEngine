@@ -9,6 +9,7 @@
 #include "Core/Project.h"
 #include "Core/AsyncTask.h"
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,8 +26,10 @@ public:
 
 private:
     void RunPackage();
+    void ChooseDefaultPlatform();
 
     std::vector<PackagePlatformInfo> platforms;
+    std::shared_ptr<PackagePlatformProbe> platformProbe;
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
     std::string cipher = CookCiphers::None;

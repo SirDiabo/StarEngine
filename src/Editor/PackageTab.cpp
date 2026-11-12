@@ -101,11 +101,7 @@ static void PackageTabScrollableLog(Rectangle r, const std::string& content, flo
     }
 }
 
-void PackageTab::Initialize() {
-    title     = "Package Project";
-    permanent = false;
-
-    platforms = GetAvailablePackagePlatforms();
+void PackageTab::ChooseDefaultPlatform() {
     selectedPlatformIndex = -1;
 
 #ifdef _WIN32
@@ -127,6 +123,26 @@ void PackageTab::Initialize() {
             if (platforms[i].available) { selectedPlatformIndex = i; break; }
         }
     }
+    if (selectedPlatformIndex < 0) {
+        for (int i = 0; i < (int)platforms.size(); i++) {
+            if (platforms[i].platform == nativePlatform) { selectedPlatformIndex = i; break; }
+        }
+    }
+    if (selectedPlatformIndex < 0) selectedPlatformIndex = 0;
+}
+
+void PackageTab::Initialize() {
+    title     = "Package Project";
+    permanent = false;
+
+    platformProbe = StartPackagePlatformProbe();
+    if (platformProbe->ready.load(std::memory_order_acquire)) {
+        platforms = platformProbe->platforms;
+        platformProbe.reset();
+    } else {
+        platforms = GetPendingPackagePlatforms();
+    }
+    ChooseDefaultPlatform();
 
     renderer = Project::Get().GetSettings().renderer;
     outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
@@ -140,6 +156,19 @@ void PackageTab::Render(float x, float y, float width, float height) {
     const UIPalette& theme = UITheme::Get();
     DrawRectangleRec({x, y, width, height}, theme.panelBg);
     DrawRectangleLinesEx({x, y, width, height}, 1, theme.panelBorder);
+
+    if (platformProbe && platformProbe->ready.load(std::memory_order_acquire)) {
+        const PackagePlatform previous = platforms[selectedPlatformIndex].platform;
+        platforms = platformProbe->platforms;
+        platformProbe.reset();
+        ChooseDefaultPlatform();
+        for (int i = 0; i < (int)platforms.size(); i++) {
+            if (platforms[i].platform == previous && platforms[i].available) { selectedPlatformIndex = i; break; }
+        }
+        if (platforms[selectedPlatformIndex].platform != previous) {
+            outputDir = (fs::path(Project::Get().GetRootPath()) / "Packaged" / PackagePlatformName(platforms[selectedPlatformIndex].platform)).string();
+        }
+    }
 
     if (packageRunning) {
         LoadingPanel::Get().SetStatusLine(packageTask.GetLatestLine());

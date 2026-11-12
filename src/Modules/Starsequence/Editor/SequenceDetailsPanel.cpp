@@ -189,7 +189,7 @@ std::vector<PropertyRow> SequenceDetailsPanel::BuildRows() {
         }
         if (!anchor) {
             rows.push_back(FloatRow("ev.tick", "Position (ticks)", (float)tick, true, [s](float v) { s->MoveSelectedEvent((int64_t)std::max(0.0f, v)); }));
-            rows.push_back(ButtonRow("ev.delete", "Delete", [s]() { s->DeleteSelectedEvent(); }));
+            if (!IsOnlyStartMarker(seq, ref)) rows.push_back(ButtonRow("ev.delete", "Delete", [s]() { s->DeleteSelectedEvent(); }));
         } else {
             rows.push_back(ReadOnlyRow("ev.anchor", "Position", "Start of sequence"));
         }

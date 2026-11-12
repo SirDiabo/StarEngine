@@ -383,15 +383,19 @@ bool RenameMarker(Sequence& sequence, int index, const std::string& name) {
     return true;
 }
 
+bool IsOnlyStartMarker(const Sequence& sequence, EventRef ref) {
+    if (ref.kind != EventKind::Marker || !ref.Valid() || (size_t)ref.index >= sequence.markers.size()) return false;
+    if (sequence.markers[(size_t)ref.index].type != MarkerType::Start) return false;
+    int starts = 0;
+    for (const Marker& m : sequence.markers) {
+        if (m.type == MarkerType::Start) starts++;
+    }
+    return starts <= 1;
+}
+
 void SetMarkerType(Sequence& sequence, int index, MarkerType type) {
     if (index < 0 || (size_t)index >= sequence.markers.size()) return;
-    if (sequence.markers[(size_t)index].type == MarkerType::Start && type != MarkerType::Start) {
-        int starts = 0;
-        for (const Marker& m : sequence.markers) {
-            if (m.type == MarkerType::Start) starts++;
-        }
-        if (starts <= 1) return;
-    }
+    if (type != MarkerType::Start && IsOnlyStartMarker(sequence, EventRef{ EventKind::Marker, index })) return;
     if (type == MarkerType::Start) {
         for (Marker& m : sequence.markers) {
             if (m.type == MarkerType::Start) m.type = MarkerType::Cue;
@@ -464,7 +468,7 @@ EventRef AddMeterPoint(Sequence& sequence, int64_t tick, int numerator, int deno
 }
 
 bool RemoveEvent(Sequence& sequence, EventRef ref) {
-    if (!ref.Valid() || IsAnchorEvent(sequence, ref)) return false;
+    if (!ref.Valid() || IsAnchorEvent(sequence, ref) || IsOnlyStartMarker(sequence, ref)) return false;
     const size_t i = (size_t)ref.index;
     switch (ref.kind) {
         case EventKind::Marker:
