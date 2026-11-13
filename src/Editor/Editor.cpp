@@ -1,5 +1,6 @@
 #include "Editor.h"
 #include "Core/ProfilerRender.h"
+#include "Core/EnvVar.h"
 #include "EditorTab.h"
 #include "LevelEditorTab.h"
 #include "AssetPreviewTab.h"
@@ -455,14 +456,8 @@ void Editor::LoadLayout() {
 std::string Editor::GetLayoutPath() const {
     std::string home;
 #ifdef _WIN32
-    char* buf = nullptr;
-    size_t len = 0;
-    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
-        home = buf;
-        free(buf);
-    } else {
-        home = ".";
-    }
+    home = GetEnvironmentValue("USERPROFILE");
+    if (home.empty()) home = ".";
 #else
     const char* h = getenv("HOME");
     home = h ? h : ".";

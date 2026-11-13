@@ -25,6 +25,7 @@ struct ModuleManifest {
 
     bool hasExternalDependencies = false;
 
+    static bool IsValidName(const std::string& name);
     static bool LoadFromFile(const std::string& filePath, ModuleManifest& outManifest);
     static bool SaveToFile(const std::string& filePath, const ModuleManifest& manifest);
 };

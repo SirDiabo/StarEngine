@@ -1,5 +1,6 @@
 #include "SourceVendoring.h"
 #include "ObjMtlParser.h"
+#include "PathSafety.h"
 #include <filesystem>
 #include <fstream>
 
@@ -28,20 +29,22 @@ std::string SourceVendoring::Vendor(const std::string& contentRootStr, const std
     std::error_code ec;
     if (!fs::exists(source, ec)) return "";
 
+    if (!PathSafety::IsPlainFileName(assetName)) return "";
+
     fs::path vendorDir = contentRoot / "_Source" / assetName;
     if (!CopyFileInto(source, vendorDir)) return "";
 
     if (ObjMtlParser::IsObjFile(source)) {
         std::vector<uint8_t> objBytes = ReadBytes(source);
         for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(objBytes)) {
-            fs::path mtlPath = source.parent_path() / mtlName;
-            if (!fs::exists(mtlPath, ec)) continue;
+            fs::path mtlPath = PathSafety::ResolveMtlReference(source.parent_path(), mtlName);
+            if (mtlPath.empty()) continue;
             CopyFileInto(mtlPath, vendorDir);
 
             std::vector<uint8_t> mtlBytes = ReadBytes(mtlPath);
             for (const std::string& texName : ObjMtlParser::ParseMtlTextureReferences(mtlBytes)) {
-                fs::path texPath = mtlPath.parent_path() / texName;
-                if (fs::exists(texPath, ec)) CopyFileInto(texPath, vendorDir);
+                fs::path texPath = PathSafety::ResolveTextureReference(mtlPath.parent_path(), texName);
+                if (!texPath.empty()) CopyFileInto(texPath, vendorDir);
             }
         }
     }

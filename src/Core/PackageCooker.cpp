@@ -1,6 +1,7 @@
 #include "PackageCooker.h"
 #include "StarPak.h"
 #include "ObjMtlParser.h"
+#include "PathSafety.h"
 #include "Module.h"
 #include <filesystem>
 #include <fstream>
@@ -124,6 +125,7 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
         bool insideContent = !ec && relativeToContent.generic_string().rfind("..", 0) != 0;
         if (insideContent) return key + "=" + relativeToContent.generic_string();
 
+        if (!PathSafety::IsMediaSourceExtension(valuePath)) return line;
         return key + "=" + queueImport(value);
     };
 
@@ -168,13 +170,13 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
 
         if (ObjMtlParser::IsObjFile(sourcePath)) {
             for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(bytes)) {
-                fs::path mtlPath = sourcePath.parent_path() / mtlName;
-                if (fs::exists(mtlPath)) queueImport(mtlPath.string());
+                fs::path mtlPath = PathSafety::ResolveMtlReference(sourcePath.parent_path(), mtlName);
+                if (!mtlPath.empty()) queueImport(mtlPath.string());
             }
         } else if (ObjMtlParser::IsMtlFile(sourcePath)) {
             for (const std::string& texName : ObjMtlParser::ParseMtlTextureReferences(bytes)) {
-                fs::path texPath = sourcePath.parent_path() / texName;
-                if (fs::exists(texPath)) queueImport(texPath.string());
+                fs::path texPath = PathSafety::ResolveTextureReference(sourcePath.parent_path(), texName);
+                if (!texPath.empty()) queueImport(texPath.string());
             }
         }
 
@@ -207,18 +209,28 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
     StarPak::Writer writer;
     writer.SetHashEntries(hashEntries);
 
+    std::string rejectedPath;
     CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey, compression,
         [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t rawSize, const std::string& used) {
-            writer.AddEntry(virtualPath, bytes, rawSize, used);
+            if (!writer.AddEntry(virtualPath, bytes, rawSize, used) && rejectedPath.empty()) rejectedPath = virtualPath;
         });
     if (!result.success) return result;
+    if (!rejectedPath.empty()) {
+        result.success = false;
+        result.error = "A file name contains a tab or line break and cannot be packaged: " + rejectedPath;
+        return result;
+    }
     if (hashEntries) result.filesHashed = result.filesCooked;
 
     writer.AddFile(StarPak::kBootConfigPath,
                    std::vector<uint8_t>(bootConfigText.begin(), bootConfigText.end()));
 
     for (const ExtraPakFile& extra : extraFiles) {
-        writer.AddFile(extra.virtualPath, extra.bytes);
+        if (!writer.AddFile(extra.virtualPath, extra.bytes)) {
+            result.success = false;
+            result.error = "Invalid file name in package: " + extra.virtualPath;
+            return result;
+        }
     }
 
     if (!writer.WriteToFile(outputPakFileStr)) {

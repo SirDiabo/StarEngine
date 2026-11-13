@@ -1,4 +1,5 @@
 #include "SavePaths.h"
+#include "EnvVar.h"
 #include "Project.h"
 #include <algorithm>
 #include <cctype>
@@ -24,12 +25,7 @@ namespace {
     std::string GetOSSaveRoot() {
         std::string base;
 #ifdef _WIN32
-        char* buf = nullptr;
-        size_t len = 0;
-        if (_dupenv_s(&buf, &len, "APPDATA") == 0 && buf) {
-            base = buf;
-            free(buf);
-        }
+        base = GetEnvironmentValue("APPDATA");
 #elif defined(__APPLE__)
         const char* home = getenv("HOME");
         if (home) base = (fs::path(home) / "Library" / "Application Support").string();

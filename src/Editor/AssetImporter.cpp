@@ -1,5 +1,6 @@
 #include "AssetImporter.h"
 #include "Core/Project.h"
+#include "Core/PathSafety.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/SourceVendoring.h"
@@ -244,8 +245,8 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
     if (ObjMtlParser::IsObjFile(absoluteSrc)) {
         std::vector<uint8_t> objBytes = ReadFileBytes(absoluteSrc);
         for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(objBytes)) {
-            fs::path mtlPath = absoluteSrc.parent_path() / mtlName;
-            if (!fs::exists(mtlPath, ec)) continue;
+            fs::path mtlPath = PathSafety::ResolveMtlReference(absoluteSrc.parent_path(), mtlName);
+            if (mtlPath.empty()) continue;
 
             std::vector<uint8_t> mtlBytes = ReadFileBytes(mtlPath);
             for (const ObjMtlParser::MtlMaterial& mat : ObjMtlParser::ParseMtlMaterials(mtlBytes)) {
@@ -264,8 +265,8 @@ StarAsset BuildMeshAsset(const fs::path& absoluteSrc, const std::filesystem::pat
                 starMat.baseColor = Color{mat.colorR, mat.colorG, mat.colorB, mat.colorA};
 
                 if (!mat.texturePath.empty()) {
-                    fs::path texPath = mtlPath.parent_path() / mat.texturePath;
-                    if (fs::exists(texPath, ec)) {
+                    fs::path texPath = PathSafety::ResolveTextureReference(mtlPath.parent_path(), mat.texturePath);
+                    if (!texPath.empty()) {
                         fs::path texTarget = UniqueTargetPath(folder, fs::path(mat.texturePath).stem().string(), ".startex");
                         StarAsset texAsset;
                         texAsset.assetType = "Texture";
@@ -389,8 +390,8 @@ MeshImportPreview InspectMeshSource(const std::string& srcPath) {
     if (ObjMtlParser::IsObjFile(absoluteSrc)) {
         std::vector<uint8_t> objBytes = ReadFileBytes(absoluteSrc);
         for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(objBytes)) {
-            fs::path mtlPath = absoluteSrc.parent_path() / mtlName;
-            if (!fs::exists(mtlPath, ec)) continue;
+            fs::path mtlPath = PathSafety::ResolveMtlReference(absoluteSrc.parent_path(), mtlName);
+            if (mtlPath.empty()) continue;
             std::vector<uint8_t> mtlBytes = ReadFileBytes(mtlPath);
             for (const ObjMtlParser::MtlMaterial& mat : ObjMtlParser::ParseMtlMaterials(mtlBytes)) {
                 preview.materialNames.push_back(mat.name);

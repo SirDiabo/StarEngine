@@ -1,8 +1,11 @@
 #include "StarPak.h"
 #include "Sha256.h"
+#include <algorithm>
 #include <cstring>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 
 namespace fs = std::filesystem;
 
@@ -36,6 +39,14 @@ std::vector<std::string> SplitTabs(const std::string& line) {
     return fields;
 }
 
+bool IsValidVirtualPath(const std::string& virtualPath) {
+    if (virtualPath.empty()) return false;
+    for (char c : virtualPath) {
+        if (c == '\t' || c == '\n' || c == '\r' || c == '\0') return false;
+    }
+    return true;
+}
+
 std::string ParentOf(const std::string& virtualPath) {
     size_t slash = virtualPath.find_last_of('/');
     return slash == std::string::npos ? std::string() : virtualPath.substr(0, slash);
@@ -45,11 +56,12 @@ std::string ParentOf(const std::string& virtualPath) {
 
 namespace StarPak {
 
-void Writer::AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes) {
-    AddEntry(virtualPath, bytes, bytes.size(), kNoCompression);
+bool Writer::AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes) {
+    return AddEntry(virtualPath, bytes, bytes.size(), kNoCompression);
 }
 
-void Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression) {
+bool Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression) {
+    if (!IsValidVirtualPath(virtualPath)) return false;
     Entry e;
     e.path = virtualPath;
     e.offset = blob.size();
@@ -59,6 +71,7 @@ void Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>
     if (hashEntries) e.sha256 = Sha256::ToHex(Sha256::Compute(storedBytes));
     entries.push_back(std::move(e));
     blob.insert(blob.end(), storedBytes.begin(), storedBytes.end());
+    return true;
 }
 
 bool Writer::WriteToFile(const std::string& outputPath) const {
@@ -77,7 +90,7 @@ bool Writer::WriteToFile(const std::string& outputPath) const {
     return out.good();
 }
 
-bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
+bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
     entries.clear();
     indexByPath.clear();
     blob.clear();
@@ -108,7 +121,8 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
         return false;
     }
 
-    entries.reserve(count);
+    if (count > (buffer.size() - pos) / 6) return false;
+    entries.reserve(std::min<size_t>(count, 65536));
     for (size_t i = 0; i < count; i++) {
         std::string line;
         if (!readLine(line)) return false;
@@ -116,6 +130,8 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
         std::vector<std::string> fields = SplitTabs(line);
         size_t required = versionOne ? 3 : 5;
         if (fields.size() < required) return false;
+
+        if (fields[0].empty()) return false;
 
         Entry e;
         e.path = fields[0];
@@ -151,21 +167,28 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) {
 
     blob.assign(buffer.begin() + (std::ptrdiff_t)pos, buffer.end());
     return true;
+} catch (const std::exception&) {
+    entries.clear();
+    indexByPath.clear();
+    blob.clear();
+    return false;
 }
 
-bool Reader::LoadFile(const std::string& pakPath) {
+bool Reader::LoadFile(const std::string& pakPath) try {
     std::ifstream in(pakPath, std::ios::binary);
     if (!in.is_open()) return false;
 
     std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     return ParseFromBuffer(std::move(buffer));
+} catch (const std::exception&) {
+    return false;
 }
 
 bool Reader::LoadBuffer(const std::vector<uint8_t>& buffer) {
     return ParseFromBuffer(std::vector<uint8_t>(buffer));
 }
 
-bool Reader::LoadFromExecutable(const std::string& exePath) {
+bool Reader::LoadFromExecutable(const std::string& exePath) try {
     std::ifstream in(exePath, std::ios::binary);
     if (!in.is_open()) return false;
 
@@ -178,15 +201,19 @@ bool Reader::LoadFromExecutable(const std::string& exePath) {
     in.read(reinterpret_cast<char*>(&footer), sizeof(Footer));
     if (!in) return false;
     if (std::memcmp(footer.magic, kFooterMagic, sizeof(kFooterMagic)) != 0) return false;
-    if (footer.pakSize == 0 || footer.pakOffset > (uint64_t)fileSize) return false;
-    if (footer.pakOffset + footer.pakSize != (uint64_t)fileSize - sizeof(Footer)) return false;
+    const uint64_t usableSize = (uint64_t)fileSize - sizeof(Footer);
+    if (footer.pakSize == 0 || footer.pakOffset > usableSize || footer.pakSize > usableSize - footer.pakOffset) return false;
+    if (footer.pakOffset + footer.pakSize != usableSize) return false;
+    if (footer.pakSize > (uint64_t)std::numeric_limits<size_t>::max()) return false;
 
-    std::vector<uint8_t> buffer(footer.pakSize);
+    std::vector<uint8_t> buffer((size_t)footer.pakSize);
     in.seekg((std::streamoff)footer.pakOffset);
     in.read(reinterpret_cast<char*>(buffer.data()), (std::streamsize)footer.pakSize);
     if (!in) return false;
 
     return ParseFromBuffer(std::move(buffer));
+} catch (const std::exception&) {
+    return false;
 }
 
 bool Reader::HasEntry(const std::string& virtualPath) const {

@@ -1,5 +1,6 @@
 #include "UITheme.h"
 #include "Core/LayoutSerializer.h"
+#include "Core/EnvVar.h"
 #include "Core/Widgets/WidgetFont.h"
 #include <filesystem>
 #include <unordered_map>
@@ -719,14 +720,8 @@ static void RecomputeEffectivePalette() {
 static std::string GetThemeConfigPath() {
     std::string home;
 #ifdef _WIN32
-    char* buf = nullptr;
-    size_t len = 0;
-    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
-        home = buf;
-        free(buf);
-    } else {
-        home = ".";
-    }
+    home = GetEnvironmentValue("USERPROFILE");
+    if (home.empty()) home = ".";
 #else
     const char* h = getenv("HOME");
     home = h ? h : ".";

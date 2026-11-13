@@ -278,8 +278,15 @@ bool DeflateCompress(const std::vector<uint8_t>& input, std::vector<uint8_t>& ou
 bool DeflateDecompress(const std::vector<uint8_t>& input, uint64_t rawSize, std::vector<uint8_t>& output) {
     if (input.empty() || rawSize == 0) return false;
     if (rawSize > (uint64_t)input.size() * kMaxDeflateRatio) return false;
+    constexpr uint64_t kMaxDecompressedSize = 0x7FFFFFFFull;
+    if (rawSize > kMaxDecompressedSize) return false;
 
-    output.assign((size_t)rawSize, 0);
+    try {
+        output.assign((size_t)rawSize, 0);
+    } catch (const std::exception&) {
+        output.clear();
+        return false;
+    }
     if (!Inflate(input.data(), input.size(), output.data(), output.size())) {
         output.clear();
         return false;

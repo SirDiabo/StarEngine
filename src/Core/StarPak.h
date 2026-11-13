@@ -23,8 +23,8 @@ struct Entry {
 
 class Writer {
 public:
-    void AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes);
-    void AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression);
+    bool AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes);
+    bool AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression);
     void SetHashEntries(bool enabled) { hashEntries = enabled; }
     bool WriteToFile(const std::string& outputPath) const;
 

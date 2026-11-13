@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
+#include "Core/EnvVar.h"
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -24,14 +25,8 @@ inline float ClampWidth(float w) {
 inline std::string SettingsPath() {
     std::string home;
 #ifdef _WIN32
-    char* buf = nullptr;
-    size_t len = 0;
-    if (_dupenv_s(&buf, &len, "USERPROFILE") == 0 && buf) {
-        home = buf;
-        free(buf);
-    } else {
-        home = ".";
-    }
+    home = GetEnvironmentValue("USERPROFILE");
+    if (home.empty()) home = ".";
 #else
     const char* h = getenv("HOME");
     home = h ? h : ".";

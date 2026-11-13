@@ -24,10 +24,23 @@ static std::string JoinCsv(const std::vector<std::string>& values) {
     return result;
 }
 
+bool ModuleManifest::IsValidName(const std::string& name) {
+    if (name.empty() || name.size() > 64) return false;
+    const char first = name[0];
+    if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z'))) return false;
+    for (char c : name) {
+        const bool letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        const bool digit = c >= '0' && c <= '9';
+        if (!letter && !digit && c != '_') return false;
+    }
+    return true;
+}
+
 bool ModuleManifest::LoadFromFile(const std::string& filePath, ModuleManifest& outManifest) {
     std::unordered_map<std::string, std::string> data;
     if (!LayoutSerializer::Load(filePath, data)) return false;
     if (data.find("name") == data.end()) return false;
+    if (!IsValidName(data["name"])) return false;
 
     outManifest = ModuleManifest();
     outManifest.name        = data["name"];

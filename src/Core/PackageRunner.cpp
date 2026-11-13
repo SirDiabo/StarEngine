@@ -71,11 +71,12 @@ std::string WriteToolchainFileIfNeeded(PackagePlatform platform, const std::stri
 
 #if !defined(_WIN32)
     if (platform == PackagePlatform::Windows) {
+        const std::string mingwSuffix = SafeProcess::FindExecutableInPath("x86_64-w64-mingw32-g++-posix").empty() ? std::string() : std::string("-posix");
         content =
             "set(CMAKE_SYSTEM_NAME Windows)\n"
             "set(CMAKE_SYSTEM_PROCESSOR x86_64)\n"
-            "set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)\n"
-            "set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)\n"
+            "set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc" + mingwSuffix + ")\n"
+            "set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++" + mingwSuffix + ")\n"
             "set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)\n"
             "set(CMAKE_FIND_ROOT_PATH /usr/x86_64-w64-mingw32)\n"
             "set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)\n"

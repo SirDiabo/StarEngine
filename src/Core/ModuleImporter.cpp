@@ -167,7 +167,7 @@ bool ModuleImporter::CopyFromDisk(const std::string& manifestPath,
                                    std::string& outError) {
     ModuleManifest manifest;
     if (!ModuleManifest::LoadFromFile(manifestPath, manifest)) {
-        outError = "Failed to read manifest: " + manifestPath;
+        outError = "Failed to read manifest (missing, or the module name is invalid; names may only contain letters, digits and underscores and must start with a letter): " + manifestPath;
         return false;
     }
 

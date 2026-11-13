@@ -41,7 +41,10 @@ int main(int argc, char* argv[]) {
                 return false;
             }
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            writer.AddFile(virtualPath, bytes);
+            if (!writer.AddFile(virtualPath, bytes)) {
+                std::cerr << "AssetPacker: unsafe file name " << virtualPath << "\n";
+                return false;
+            }
         }
         return true;
     };
