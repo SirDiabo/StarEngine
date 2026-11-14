@@ -534,7 +534,7 @@ static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, c
 }
 
 void ViewportPanel::RenderScene() {
-    rlSetClipPlanes(0.1, 5000000.0);
+    rlSetClipPlanes(5.0, 400000.0);
     DebugDraw::viewportHeight = (float)renderTargetHeight;
     BeginMode3D(camera);
 

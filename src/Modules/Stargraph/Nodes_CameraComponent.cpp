@@ -123,14 +123,14 @@ void RegisterCameraComponentNodes() {
     setCameraClip.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "CameraComponent"});
-        node->inputs.push_back({"Near", PinType::Float, true, false, 0, "0.1"});
-        node->inputs.push_back({"Far", PinType::Float, true, false, 0, "4000.0"});
+        node->inputs.push_back({"Near", PinType::Float, true, false, 0, "5.0"});
+        node->inputs.push_back({"Far", PinType::Float, true, false, 0, "400000.0"});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setCameraClip.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Component* target = nullptr;
-        float nearClip = 0.1f;
-        float farClip = 4000.0f;
+        float nearClip = 5.0f;
+        float farClip = 400000.0f;
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "CameraComponent", ctx);
@@ -200,8 +200,8 @@ void RegisterCameraComponentNodes() {
 
         Camera3D cam = {0};
         cam.up = {0, 1, 0};
-        float nearClip = 0.1f;
-        float farClip = 4000.0f;
+        float nearClip = 5.0f;
+        float farClip = 400000.0f;
         if (targetActor->GetCameraComponent()) {
             CameraComponent* cc = targetActor->GetCameraComponent();
             Vector3 compPos = targetActor->GetComponentWorldPosition(cc);

@@ -183,7 +183,7 @@ void ActorClassEditor::UpdatePreviewCamera(Rectangle client) {
 }
 
 void ActorClassEditor::RenderPreviewScene() {
-    rlSetClipPlanes(0.1, 500000.0);
+    rlSetClipPlanes(5.0, 400000.0);
     DebugDraw::viewportHeight = (float)previewRenderTargetHeight;
     BeginMode3D(previewCamera);
 

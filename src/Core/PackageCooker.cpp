@@ -115,7 +115,7 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
         fs::path valuePath(value);
         bool exists = valuePath.is_absolute() && fs::exists(valuePath);
 
-        if (!exists && key == "Source" && !vendoredFallback.empty()) {
+        if (key == "Source" && !vendoredFallback.empty()) {
             std::error_code vec;
             if (fs::exists(contentRoot / vendoredFallback, vec)) return key + "=" + vendoredFallback;
         }
