@@ -46,15 +46,15 @@ std::string DescribeCookedPak(const CookResult& cookResult, const PackageOptions
                 std::to_string(cookResult.filesCooked) + " files compressed, " + FormatByteSize(cookResult.rawBytes) + " -> " +
                 FormatByteSize(cookResult.storedBytes) + " (" + std::to_string(percent) + "%).\n";
     }
-    if (options.cipher != CookCiphers::None) text += "Encryption: " + options.cipher + ".\n";
+    if (options.cipher != CookCiphers::None) text += "Obfuscation: " + options.cipher + ".\n";
     if (cookResult.filesHashed > 0) text += "Integrity: SHA-256 recorded for " + std::to_string(cookResult.filesHashed) + " entries.\n";
     return text;
 }
 
 std::string ValidateCodecs(const PackageOptions& options) {
     CookCipherInfo cipherInfo;
-    if (!CookCipherRegistry::Get().Find(options.cipher, cipherInfo)) return "Unknown encryption method: " + options.cipher;
-    if (!CookCipherRegistry::Get().IsAvailable(cipherInfo)) return "Encryption method \"" + cipherInfo.displayName + "\" needs the " + cipherInfo.moduleName + " module, which is not enabled.";
+    if (!CookCipherRegistry::Get().Find(options.cipher, cipherInfo)) return "Unknown obfuscation method: " + options.cipher;
+    if (!CookCipherRegistry::Get().IsAvailable(cipherInfo)) return "Obfuscation method \"" + cipherInfo.displayName + "\" needs the " + cipherInfo.moduleName + " module, which is not enabled.";
 
     PackCompressionInfo compressionInfo;
     if (!PackCompressionRegistry::Get().Find(options.compression, compressionInfo)) return "Unknown compression method: " + options.compression;

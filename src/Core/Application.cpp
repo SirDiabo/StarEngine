@@ -5,6 +5,7 @@
 #include "Editor/Editor.h"
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
+#include "Core/ProjectCreation.h"
 #include "Core/Module.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Core/StarMaterial.h"
@@ -50,14 +51,12 @@ static void ForwardTraceLogToPanel(int logLevel, const char* text, va_list args)
 }
 
 static bool CreateProject(const std::string& name) {
-    fs::path projPath = fs::path(Project::GetProjectsDirectory()) / name;
-    fs::create_directories(projPath);
-    fs::create_directories(projPath / "Content");
-    fs::create_directories(projPath / "Config");
-    fs::create_directories(projPath / "Saved");
-
-    fs::path projFile = projPath / (name + ".starproject");
-    std::ofstream(projFile).close();
+    fs::path projFile;
+    std::string error;
+    if (!ProjectCreation::CreateFolders(Project::GetProjectsDirectory(), name, projFile, error)) {
+        TraceLog(LOG_ERROR, "Could not create project \"%s\": %s", name.c_str(), error.c_str());
+        return false;
+    }
 
     Project::Get().Load(projFile.string());
     Project::Get().Save();

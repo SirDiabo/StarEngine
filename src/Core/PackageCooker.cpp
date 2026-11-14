@@ -67,7 +67,7 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
     std::error_code ec;
     auto cipherImpl = CreateCookCipher(cipher);
     if (!cipherImpl) {
-        result.error = "Unknown encryption method: " + cipher;
+        result.error = "Unknown obfuscation method: " + cipher;
         return result;
     }
 

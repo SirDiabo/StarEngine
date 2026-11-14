@@ -79,15 +79,15 @@ CookCipherRegistry::CookCipherRegistry() {
     CookCipherInfo none;
     none.id = CookCiphers::None;
     none.displayName = "None";
-    none.description = "Content is stored as it is.";
+    none.description = "Content is stored as it is and can be read by anyone who has the package.";
     none.usesKey = false;
     none.create = []() { return std::unique_ptr<ICookCipher>(new NullCipher()); };
     ciphers.push_back(none);
 
     CookCipherInfo xorCipher;
     xorCipher.id = CookCiphers::XorSimple;
-    xorCipher.displayName = "XOR (simple, unsafe)";
-    xorCipher.description = "A fresh key is generated for every package. XOR deters casual inspection, it is not secure.";
+    xorCipher.displayName = "XOR (light)";
+    xorCipher.description = "Scrambles content with a fresh key for every package. Deters casual browsing only, the key ships inside the game.";
     xorCipher.create = []() { return std::unique_ptr<ICookCipher>(new XorSimpleCipher()); };
     xorCipher.generateKey = []() { return RandomAlphanumericKey(24); };
     ciphers.push_back(xorCipher);
@@ -95,7 +95,7 @@ CookCipherRegistry::CookCipherRegistry() {
     CookCipherInfo aes;
     aes.id = CookCiphers::Aes256Ctr;
     aes.displayName = "AES-256 (CTR)";
-    aes.description = "AES-256 with a fresh random key per package and a unique nonce per file. The key ships inside the game.";
+    aes.description = "Scrambles content with AES-256 using a fresh random key per package and a unique nonce per file. Raises the effort to extract assets but cannot stop a determined person, because the key ships inside the game and the game has to decrypt content to run.";
     aes.create = []() { return std::unique_ptr<ICookCipher>(new Aes256CtrCipher()); };
     aes.generateKey = []() { return RandomHexKey(32); };
     ciphers.push_back(aes);

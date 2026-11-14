@@ -52,12 +52,24 @@ static fs::path LocateBuiltEditorExecutable(const fs::path& buildDir, const std:
 }
 
 // Renaming a locked exe aside works on Windows too, unlike overwriting it directly
-static void MoveAsideForReplacement(const fs::path& launcherPath) {
+static bool MoveAsideForReplacement(const fs::path& launcherPath) {
     std::error_code ec;
     fs::path oldPath = launcherPath;
     oldPath += ".old";
     fs::remove(oldPath, ec);
+    ec.clear();
     fs::rename(launcherPath, oldPath, ec);
+    return !ec;
+}
+
+static void RestoreAfterFailedReplacement(const fs::path& launcherPath) {
+    std::error_code ec;
+    fs::path oldPath = launcherPath;
+    oldPath += ".old";
+    if (!fs::exists(oldPath, ec)) return;
+    fs::remove(launcherPath, ec);
+    ec.clear();
+    fs::rename(oldPath, launcherPath, ec);
 }
 
 BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config,
@@ -121,11 +133,12 @@ BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string
         return result;
     }
 
-    MoveAsideForReplacement(runningExe);
+    const bool movedAside = MoveAsideForReplacement(runningExe);
 
     std::error_code ec;
     fs::copy_file(builtExe, runningExe, fs::copy_options::overwrite_existing, ec);
     if (ec) {
+        if (movedAside) RestoreAfterFailedReplacement(runningExe);
         result.success = false;
         result.error = "Rebuilt the editor, but could not replace the running executable: " + ec.message();
         return result;

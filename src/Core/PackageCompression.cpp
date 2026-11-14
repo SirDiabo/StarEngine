@@ -323,7 +323,7 @@ PackCompressionRegistry::PackCompressionRegistry() {
     PackCompressionInfo deflate;
     deflate.id = PackCompressions::Deflate;
     deflate.displayName = "Deflate (smaller package)";
-    deflate.description = "Applied before encryption. Files that do not shrink, such as png or ogg, are stored as they are.";
+    deflate.description = "Applied before obfuscation. Files that do not shrink, such as png or ogg, are stored as they are.";
     deflate.compressor = std::make_shared<DeflateCompressor>();
     methods.push_back(deflate);
 }

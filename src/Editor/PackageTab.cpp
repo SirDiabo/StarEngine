@@ -230,7 +230,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     fy += 24;
 
     // Encryption
-    DrawText("Content Encryption", (int)fx, (int)fy, 11, theme.textSecondary);
+    DrawText("Content Obfuscation", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle cipherRow = SelectRow(fx, fy, fw, 22);
     DrawRectangleRec(cipherRow, theme.fieldBg);
