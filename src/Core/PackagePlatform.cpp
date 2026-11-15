@@ -1,5 +1,7 @@
 #include "PackagePlatform.h"
 #include "SafeProcess.h"
+#include <atomic>
+#include <mutex>
 #include <thread>
 
 namespace {
@@ -9,6 +11,8 @@ bool CommandExists(const std::string& name) {
 }
 
 #ifdef _WIN32
+std::atomic<bool> wslToolsConfirmed{false};
+
 bool WslHasCommands(const std::vector<std::string>& names) {
     std::vector<std::string> argv = { "wsl", "which" };
     argv.insert(argv.end(), names.begin(), names.end());
@@ -17,9 +21,9 @@ bool WslHasCommands(const std::vector<std::string>& names) {
 }
 #endif
 
-std::vector<PackagePlatformInfo> BuildPlatformList(bool probe) {
+std::vector<PackagePlatformInfo> BuildPlatformList(bool runSlowChecks) {
     const std::string pendingReason = "Checking available build tools...";
-    auto has = [probe](const char* name) { return probe && CommandExists(name); };
+    auto has = [](const char* name) { return CommandExists(name); };
 
     std::vector<PackagePlatformInfo> list;
 
@@ -30,23 +34,27 @@ std::vector<PackagePlatformInfo> BuildPlatformList(bool probe) {
 #if defined(__linux__)
     linuxInfo.available = has("g++") && has("make") && has("cmake");
     if (!linuxInfo.available) {
-        linuxInfo.unavailableReason = !probe ? pendingReason :
+        linuxInfo.unavailableReason =
             "Requires the Linux build tools (g++, make, cmake). "
             "Install them, e.g. \"sudo apt install build-essential cmake\" on Debian/Ubuntu.";
     }
 #elif defined(_WIN32)
-    if (!probe) {
-        linuxInfo.available = false;
-        linuxInfo.unavailableReason = pendingReason;
-    } else if (!CommandExists("wsl")) {
+    if (!CommandExists("wsl")) {
+        wslToolsConfirmed.store(false);
         linuxInfo.available = false;
         linuxInfo.unavailableReason = "WSL (Windows Subsystem for Linux) is not installed. "
             "Install WSL, then install build-essential, gcc, g++, make, and cmake inside it.";
+    } else if (wslToolsConfirmed.load()) {
+        linuxInfo.available = true;
+    } else if (!runSlowChecks) {
+        linuxInfo.available = false;
+        linuxInfo.unavailableReason = pendingReason;
     } else if (!WslHasCommands({ "x86_64-linux-gnu-g++", "cmake" })) {
         linuxInfo.available = false;
         linuxInfo.unavailableReason = "WSL is installed but the Linux build tools are missing inside it. "
             "Inside WSL run: sudo apt install build-essential cmake";
     } else {
+        wslToolsConfirmed.store(true);
         linuxInfo.available = true;
     }
 #else
@@ -63,7 +71,7 @@ std::vector<PackagePlatformInfo> BuildPlatformList(bool probe) {
     winInfo.available = true;
 #else
     winInfo.available = has("x86_64-w64-mingw32-g++");
-    if (!winInfo.available) winInfo.unavailableReason = !probe ? pendingReason : "Requires the mingw-w64 cross toolchain.";
+    if (!winInfo.available) winInfo.unavailableReason = "Requires the mingw-w64 cross toolchain.";
 #endif
     list.push_back(winInfo);
 
@@ -75,7 +83,7 @@ std::vector<PackagePlatformInfo> BuildPlatformList(bool probe) {
     macInfo.available = true;
 #else
     macInfo.available = has("o64-clang") || has("oa64-clang");
-    if (!macInfo.available) macInfo.unavailableReason = !probe ? pendingReason : "Requires an osxcross toolchain with the macOS SDK.";
+    if (!macInfo.available) macInfo.unavailableReason = "Requires an osxcross toolchain with the macOS SDK.";
 #endif
     list.push_back(macInfo);
 
@@ -84,7 +92,7 @@ std::vector<PackagePlatformInfo> BuildPlatformList(bool probe) {
     webInfo.name = "Web";
     webInfo.displayName = "Web (HTML5 / WASM)";
     webInfo.available = has("emcc");
-    if (!webInfo.available) webInfo.unavailableReason = !probe ? pendingReason : "Requires the Emscripten SDK (emcc not found on PATH).";
+    if (!webInfo.available) webInfo.unavailableReason = "Requires the Emscripten SDK (emcc not found on PATH).";
     list.push_back(webInfo);
 
     PackagePlatformInfo androidInfo;
@@ -128,13 +136,28 @@ std::vector<PackagePlatformInfo> GetPendingPackagePlatforms() {
 }
 
 std::shared_ptr<PackagePlatformProbe> StartPackagePlatformProbe() {
-    auto state = std::make_shared<PackagePlatformProbe>();
 #ifdef _WIN32
+    static std::mutex inFlightMutex;
+    static std::weak_ptr<PackagePlatformProbe> inFlight;
+
+    std::lock_guard<std::mutex> lock(inFlightMutex);
+    if (std::shared_ptr<PackagePlatformProbe> running = inFlight.lock()) {
+        if (!running->ready.load(std::memory_order_acquire)) return running;
+    }
+
+    auto state = std::make_shared<PackagePlatformProbe>();
+    if (wslToolsConfirmed.load()) {
+        state->platforms = BuildPlatformList(true);
+        state->ready.store(true, std::memory_order_release);
+        return state;
+    }
+    inFlight = state;
     std::thread([state]() {
         state->platforms = BuildPlatformList(true);
         state->ready.store(true, std::memory_order_release);
     }).detach();
 #else
+    auto state = std::make_shared<PackagePlatformProbe>();
     state->platforms = BuildPlatformList(true);
     state->ready.store(true, std::memory_order_release);
 #endif
