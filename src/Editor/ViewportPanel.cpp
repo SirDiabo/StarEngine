@@ -11,6 +11,8 @@
 #include "Runtime/Components/CollisionComponent.h"
 #include "Runtime/PrintMessageLog.h"
 #include "Core/RenderPipeline.h"
+#include "Core/SceneSnapshot.h"
+#include "Core/ShadingModel.h"
 #include "Core/GameSession.h"
 #include "Core/SaveSlots.h"
 #include "Core/Widgets/WidgetRenderer.h"
@@ -499,6 +501,88 @@ static Color ClassColor(const std::string& className) {
     return {200, 160, 80, 255};
 }
 
+static void ComputeDeclWorldTransform(const std::vector<ComponentDecl>& comps, const ComponentDecl& target,
+                                       Vector3 basePos, Vector3 baseRot, Vector3 baseScale,
+                                       Vector3& outPos, Vector3& outRot, Vector3& outScale);
+
+static Model* ResolveStaticMeshModel(const std::string& meshAssetPath) {
+    if (meshAssetPath.empty()) return nullptr;
+    const MeshSourceInfo* source = AssetCache::Get().GetMeshSource(meshAssetPath);
+    if (!source || source->assetType != "StaticMesh") return nullptr;
+    return AssetCache::Get().GetOrLoadModel(source->sourcePath);
+}
+
+static Matrix ShadowCasterTransform(Vector3 pos, Vector3 rot, Vector3 scl) {
+    Matrix localTransform = MatrixMultiply(MatrixScale(scl.x, scl.y, scl.z), ComposeRotationDegrees(rot));
+    return MatrixMultiply(localTransform, MatrixTranslate(pos.x, pos.y, pos.z));
+}
+
+static LightComponent::LightType LightTypeFromName(const std::string& name) {
+    if (name == "Rectangle") return LightComponent::Rectangle;
+    if (name == "Spot") return LightComponent::Spot;
+    if (name == "Global") return LightComponent::Global;
+    if (name == "Sun") return LightComponent::Sun;
+    return LightComponent::Point;
+}
+
+static SceneLight SceneLightFromDecl(const ComponentDecl& decl, Vector3 pos, Vector3 rot, const void* owner) {
+    SceneLight light;
+    light.type = LightTypeFromName(decl.Get("LightType", "Point"));
+    light.position = pos;
+    light.rotation = rot;
+    light.color = { SafeParse::ToFloat(decl.Get("LightColorR", "1")), SafeParse::ToFloat(decl.Get("LightColorG", "1")),
+                    SafeParse::ToFloat(decl.Get("LightColorB", "1")) };
+    light.intensity = SafeParse::ToFloat(decl.Get("LightIntensity", "1"));
+    light.radius = SafeParse::ToFloat(decl.Get("LightRadius", "500"));
+    light.innerConeAngle = SafeParse::ToFloat(decl.Get("LightInnerConeAngle", "25"));
+    light.outerConeAngle = SafeParse::ToFloat(decl.Get("LightOuterConeAngle", "35"));
+    light.owner = owner;
+    return light;
+}
+
+void ViewportPanel::BuildSceneSnapshot(SceneSnapshot& out) {
+    out.lights.clear();
+    out.casters.clear();
+
+    auto addCaster = [&](const std::string& meshPath, Vector3 pos, Vector3 rot, Vector3 scl, const void* owner) {
+        Model* model = ResolveStaticMeshModel(meshPath);
+        if (!model) return;
+        SceneShadowCaster caster;
+        caster.model = model;
+        caster.transform = ShadowCasterTransform(pos, rot, scl);
+        caster.owner = owner;
+        out.casters.push_back(caster);
+    };
+
+    for (const ActorInstance& inst : starMap.GetInstances()) {
+        Vector3 pos = {inst.posX, inst.posY, inst.posZ};
+        Vector3 rot = {inst.rotX, inst.rotY, inst.rotZ};
+        Vector3 scl = {inst.scaleX, inst.scaleY, inst.scaleZ};
+        const void* owner = &inst;
+
+        if (!inst.classAssetPath.empty()) {
+            const ActorAssetData* classData = GetOrLoadClass(inst.classAssetPath);
+            if (!classData) continue;
+            for (const ComponentDecl& comp : classData->components) {
+                if (comp.componentType != "MeshComponent" && comp.componentType != "LightComponent") continue;
+                Vector3 compPos, compRot, compScale;
+                ComputeDeclWorldTransform(classData->components, comp, pos, rot, scl, compPos, compRot, compScale);
+                if (comp.componentType == "LightComponent") {
+                    out.lights.push_back(SceneLightFromDecl(comp, compPos, compRot, owner));
+                } else if (comp.Get("MeshCastsShadow", "true") == "true") {
+                    addCaster(comp.Get("Mesh"), compPos, compRot, compScale, owner);
+                }
+            }
+        } else if (inst.hasComponent) {
+            if (inst.component.componentType == "LightComponent") {
+                out.lights.push_back(SceneLightFromDecl(inst.component, pos, rot, owner));
+            }
+        } else if (inst.castsShadow) {
+            addCaster(inst.meshAssetPath, pos, rot, scl, owner);
+        }
+    }
+}
+
 static std::string IconForActorKind(const std::string& kind) {
     for (const BasicActorDef& def : GetBasicActorDefs()) {
         if (def.kindName == kind) return def.iconFile;
@@ -537,6 +621,10 @@ void ViewportPanel::RenderScene() {
     rlSetClipPlanes(5.0, 400000.0);
     DebugDraw::viewportHeight = (float)renderTargetHeight;
     BeginMode3D(camera);
+    {
+        PROFILE_RENDER_SCOPE("Update Light Uniforms");
+        ShadingModel::UpdateLightUniforms();
+    }
 
     float gridStep = (gridStepSize > 0.001f) ? gridStepSize : 100.0f;
     float snappedGridX = floorf(camera.position.x / gridStep) * gridStep;
@@ -964,6 +1052,13 @@ void ViewportPanel::Render() {
             }
         } else {
             PROFILE_RENDER_SCOPE("Editor Scene");
+            SceneSnapshot sceneSnapshot;
+            {
+                PROFILE_SCOPE("Build Scene Snapshot");
+                BuildSceneSnapshot(sceneSnapshot);
+            }
+            SceneSnapshotSource::Scope sceneSnapshotScope(&sceneSnapshot);
+            RenderPipeline::RunShadingPrePass(camera, {(float)renderTargetWidth, (float)renderTargetHeight});
             BeginTextureMode(renderTarget);
             ClearBackground(clearColor);
             RenderScene();

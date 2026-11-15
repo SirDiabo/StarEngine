@@ -10,6 +10,15 @@
 
 namespace RenderPipeline {
 
+void RunShadingPrePass(Camera3D camera, Vector2 targetSize) {
+    const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
+    ShadingModel::ResetShadowSource();
+    if (activeTechnique && activeTechnique->renderPrePass) {
+        PROFILE_RENDER_SCOPE("Shading Pre-Pass");
+        activeTechnique->renderPrePass(camera, targetSize);
+    }
+}
+
 void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(RenderSettings::Get().GetShadingType());
 
@@ -22,11 +31,7 @@ void Render(Camera3D camera, RenderTexture2D target, Color clearColor) {
         WidgetRenderer::PrepareWorldSpaceWidgets();
     }
 
-    ShadingModel::ResetShadowSource();
-    if (activeTechnique && activeTechnique->renderPrePass) {
-        PROFILE_RENDER_SCOPE("Shading Pre-Pass");
-        activeTechnique->renderPrePass(camera, {(float)target.texture.width, (float)target.texture.height});
-    }
+    RunShadingPrePass(camera, {(float)target.texture.width, (float)target.texture.height});
 
     BeginTextureMode(target);
     ClearBackground(clearColor);

@@ -2,6 +2,7 @@
 #include "ShadowMapPrePass.h"
 #include "Core/ProfilerRender.h"
 #include "Core/ShadingModel.h"
+#include "Core/SceneSnapshot.h"
 #include "Core/RenderSettings.h"
 #include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "Runtime/World.h"
@@ -88,7 +89,7 @@ void EnsureCubeFacesLoaded() {
 
 struct ShadowCasterLight {
     LightComponent::LightType type = LightComponent::Sun;
-    Actor* ownerActor = nullptr;
+    const void* owner = nullptr;
     Vector3 position{0.0f, 0.0f, 0.0f};
     Vector3 direction{0.0f, -1.0f, 0.0f};
     float outerConeAngle = 35.0f;
@@ -110,35 +111,51 @@ bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {
     ShadowCasterLight nearest;
     float bestDistSq = 1e30f;
 
-    for (const auto& actorPtr : World::Get().GetActors()) {
-        Actor* actor = actorPtr.get();
-        if (!actor) continue;
-        for (Component* comp : actor->GetComponents()) {
-            LightComponent* lc = dynamic_cast<LightComponent*>(comp);
-            if (!lc || lc->lightType == LightComponent::Global) continue;
+    auto consider = [&](const SceneLight& light) {
+        if (light.type == LightComponent::Global) return;
 
-            if (lc->lightType == LightComponent::Sun) {
-                if (!haveSun) {
-                    sun.ownerActor = actor;
-                    sun.direction = DirectionFromRotation(actor->GetComponentWorldRotation(lc));
-                    haveSun = true;
-                }
-                continue;
+        if (light.type == LightComponent::Sun) {
+            if (!haveSun) {
+                sun.owner = light.owner;
+                sun.direction = DirectionFromRotation(light.rotation);
+                haveSun = true;
             }
+            return;
+        }
 
-            Vector3 pos = actor->GetComponentWorldPosition(lc);
-            float distSq = Vector3DistanceSqr(pos, aroundPos);
-            if (distSq < bestDistSq) {
-                bestDistSq = distSq;
-                nearest.type = lc->lightType;
-                nearest.ownerActor = actor;
-                nearest.position = pos;
-                nearest.outerConeAngle = lc->outerConeAngle;
-                nearest.radius = lc->radius;
-                if (lc->lightType == LightComponent::Spot) {
-                    nearest.direction = DirectionFromRotation(actor->GetComponentWorldRotation(lc));
-                }
-                haveNearest = true;
+        float distSq = Vector3DistanceSqr(light.position, aroundPos);
+        if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            nearest.type = light.type;
+            nearest.owner = light.owner;
+            nearest.position = light.position;
+            nearest.outerConeAngle = light.outerConeAngle;
+            nearest.radius = light.radius;
+            if (light.type == LightComponent::Spot) {
+                nearest.direction = DirectionFromRotation(light.rotation);
+            }
+            haveNearest = true;
+        }
+    };
+
+    if (const SceneSnapshot* snapshot = SceneSnapshotSource::Get()) {
+        for (const SceneLight& light : snapshot->lights) consider(light);
+    } else {
+        for (const auto& actorPtr : World::Get().GetActors()) {
+            Actor* actor = actorPtr.get();
+            if (!actor) continue;
+            for (Component* comp : actor->GetComponents()) {
+                LightComponent* lc = dynamic_cast<LightComponent*>(comp);
+                if (!lc) continue;
+
+                SceneLight light;
+                light.type = lc->lightType;
+                light.position = actor->GetComponentWorldPosition(lc);
+                light.rotation = actor->GetComponentWorldRotation(lc);
+                light.outerConeAngle = lc->outerConeAngle;
+                light.radius = lc->radius;
+                light.owner = actor;
+                consider(light);
             }
         }
     }
@@ -205,11 +222,20 @@ void BuildCubeFaceCamera(Vector3 lightPos, int face, Camera3D& outLightCamera) {
     outLightCamera.projection = CAMERA_PERSPECTIVE;
 }
 
-void DrawShadowCasters(Actor* excludeActor) {
+void DrawShadowCasters(const void* excludeOwner) {
     rlEnableBackfaceCulling();
+    if (const SceneSnapshot* snapshot = SceneSnapshotSource::Get()) {
+        for (const SceneShadowCaster& caster : snapshot->casters) {
+            if (!caster.model || (excludeOwner && caster.owner == excludeOwner)) continue;
+            for (int i = 0; i < caster.model->meshCount; i++) {
+                DrawMesh(caster.model->meshes[i], depthMaterial, caster.transform);
+            }
+        }
+        return;
+    }
     for (const auto& actorPtr : World::Get().GetActors()) {
         Actor* actor = actorPtr.get();
-        if (!actor || actor == excludeActor) continue;
+        if (!actor || actor == excludeOwner) continue;
         for (Component* comp : actor->GetComponents()) {
             MeshComponent* mc = dynamic_cast<MeshComponent*>(comp);
             if (!mc || !mc->castsShadow) continue;
@@ -232,7 +258,7 @@ void DrawShadowCasters(Actor* excludeActor) {
     }
 }
 
-void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* excludeActor, float shadowStrength, int aaMethod) {
+void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, const void* excludeOwner, float shadowStrength, int aaMethod) {
     PROFILE_RENDER_SCOPE("Shadow Depth Pass");
     BeginTextureMode(shadowTarget);
     ClearBackground(BLANK);
@@ -243,7 +269,7 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* exclu
 
     {
         PROFILE_SCOPE("Draw Shadow Casters");
-        DrawShadowCasters(excludeActor);
+        DrawShadowCasters(excludeOwner);
     }
 
     EndMode3D();
@@ -254,7 +280,7 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, Actor* exclu
     ShadingModel::SetShadowSource(shadowTarget.depth.id, lightViewProj, lightDirToSurface, shadowTargetSize, shadowStrength, aaMethod);
 }
 
-void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength, int aaMethod) {
+void RunCubePass(Vector3 lightPos, const void* excludeOwner, float shadowStrength, int aaMethod) {
     PROFILE_RENDER_SCOPE("Shadow Cube Pass");
     EnsureCubeFacesLoaded();
 
@@ -275,7 +301,7 @@ void RunCubePass(Vector3 lightPos, Actor* excludeActor, float shadowStrength, in
 
         {
             PROFILE_SCOPE("Draw Shadow Casters");
-            DrawShadowCasters(excludeActor);
+            DrawShadowCasters(excludeOwner);
         }
 
         EndMode3D();
@@ -320,17 +346,17 @@ void Run(Camera3D camera) {
         Camera3D lightCamera{};
         Vector3 lightDirToSurface;
         BuildSunCamera(camera, caster, halfSize, pullback, lightCamera, lightDirToSurface);
-        RunSinglePass(lightCamera, lightDirToSurface, caster.ownerActor, shadowStrength, aaMethod);
+        RunSinglePass(lightCamera, lightDirToSurface, caster.owner, shadowStrength, aaMethod);
     } else if (caster.type == LightComponent::Spot) {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
         Camera3D lightCamera{};
         BuildSpotCamera(caster, lightCamera);
-        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.ownerActor, shadowStrength, aaMethod);
+        RunSinglePass(lightCamera, Vector3Negate(caster.direction), caster.owner, shadowStrength, aaMethod);
     } else {
         float near = fmaxf(caster.radius * 0.01f, 2.0f);
         rlSetClipPlanes(near, caster.radius);
-        RunCubePass(caster.position, caster.ownerActor, shadowStrength, aaMethod);
+        RunCubePass(caster.position, caster.owner, shadowStrength, aaMethod);
     }
 
     rlSetClipPlanes(savedNear, savedFar);

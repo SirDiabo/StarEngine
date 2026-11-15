@@ -10,6 +10,8 @@
 #include <vector>
 #include <functional>
 
+struct SceneSnapshot;
+
 class Actor;
 class LogPanel;
 class Widget;
@@ -53,6 +55,7 @@ private:
     void EnsurePieRenderTarget(int width, int height);
     void UpdateCamera(Rectangle client);
     void RenderScene();
+    void BuildSceneSnapshot(SceneSnapshot& out);
     void RenderToolbar();
     void EnsureToolbarChrome();
     void ResetFpsStats();

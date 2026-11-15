@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "Core/RotationMath.h"
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 
@@ -743,8 +744,8 @@ void RegisterMathNodes() {
 
             float result = 0;
             switch (op) {
-                case 'c': result = fminf(a, b); break;
-                case 'm': result = fmaxf(a, b); break;
+                case 'n': result = fminf(a, b); break;
+                case 'x': result = fmaxf(a, b); break;
             }
 
             PinType resultType = (typeA == PinType::Integer || typeB == PinType::Integer) ? PinType::Integer : PinType::Float;
@@ -759,8 +760,8 @@ void RegisterMathNodes() {
         NodeRegistry::Get().RegisterNode(t);
     };
 
-    RegisterWildcardFloatBinary("Min", 'm');
-    RegisterWildcardFloatBinary("Max", 'c');
+    RegisterWildcardFloatBinary("Min", 'n');
+    RegisterWildcardFloatBinary("Max", 'x');
 
     auto RegisterWildcardClamp = []() {
         NodeTemplate t;
@@ -1322,4 +1323,129 @@ void RegisterMathNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(alignToGround);
+
+    struct FloatUnaryDef {
+        const char* type;
+        const char* label;
+        float (*fn)(float);
+    };
+    static const FloatUnaryDef unaryDefs[] = {
+        { "Square_Root", "Square Root", [](float v) { return v > 0.0f ? sqrtf(v) : 0.0f; } },
+        { "Sin", "Sin (radians)", [](float v) { return sinf(v); } },
+        { "Cos", "Cos (radians)", [](float v) { return cosf(v); } },
+        { "Tan", "Tan (radians)", [](float v) { return tanf(v); } },
+        { "Asin", "Asin (radians)", [](float v) { return asinf(fminf(1.0f, fmaxf(-1.0f, v))); } },
+        { "Acos", "Acos (radians)", [](float v) { return acosf(fminf(1.0f, fmaxf(-1.0f, v))); } },
+        { "Atan", "Atan (radians)", [](float v) { return atanf(v); } },
+        { "Exp", "Exp (e^x)", [](float v) { return expf(v); } },
+        { "Log", "Log (natural)", [](float v) { return v > 0.0f ? logf(v) : 0.0f; } },
+        { "Log10", "Log10", [](float v) { return v > 0.0f ? log10f(v) : 0.0f; } },
+        { "Sign", "Sign", [](float v) { return v > 0.0f ? 1.0f : (v < 0.0f ? -1.0f : 0.0f); } },
+        { "Degrees_To_Radians", "Degrees To Radians", [](float v) { return v * DEG2RAD; } },
+        { "Radians_To_Degrees", "Radians To Degrees", [](float v) { return v * RAD2DEG; } },
+        { "Wrap_Angle", "Wrap Angle (-180 to 180)", [](float v) { return WrapAngleDegrees(v); } },
+    };
+    for (const FloatUnaryDef& def : unaryDefs) {
+        NodeTemplate t;
+        t.type = def.type;
+        t.menuLabel = def.label;
+        t.category = "Math";
+        t.moduleName = "Stargraph";
+        t.createPins = [](Node* node) {
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+            node->outputs.push_back({"Result", PinType::Float, false, true});
+        };
+        float (*fn)(float) = def.fn;
+        t.execute = [fn](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            float v = 0;
+            for (const Pin& p : node.inputs) if (p.name == "Value") v = GetScalarValue(p);
+            float result = fn(v);
+            if (!std::isfinite(result)) result = 0.0f;
+            char buf[48]; snprintf(buf, sizeof(buf), "%.9g", result);
+            for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    }
+
+    struct FloatBinaryDef {
+        const char* type;
+        const char* label;
+        const char* inputA;
+        const char* inputB;
+        const char* output;
+        float (*fn)(float, float);
+    };
+    static const FloatBinaryDef binaryDefs[] = {
+        { "Atan2", "Atan2 (radians)", "Y", "X", "Result", [](float y, float x) { return atan2f(y, x); } },
+        { "Angle_Delta", "Angle Delta (shortest)", "From", "To", "Delta", [](float from, float to) { return AngleDeltaDegrees(from, to); } },
+    };
+    for (const FloatBinaryDef& def : binaryDefs) {
+        NodeTemplate t;
+        t.type = def.type;
+        t.menuLabel = def.label;
+        t.category = "Math";
+        t.moduleName = "Stargraph";
+        std::string nameA = def.inputA, nameB = def.inputB, nameOut = def.output;
+        t.createPins = [nameA, nameB, nameOut](Node* node) {
+            node->inputs.push_back({nameA, PinType::Float, true, false, 0, "0.0"});
+            node->inputs.push_back({nameB, PinType::Float, true, false, 0, "0.0"});
+            node->outputs.push_back({nameOut, PinType::Float, false, true});
+        };
+        float (*fn)(float, float) = def.fn;
+        t.execute = [fn, nameA, nameB, nameOut](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            float a = 0, b = 0;
+            for (const Pin& p : node.inputs) {
+                if (p.name == nameA) a = GetScalarValue(p);
+                else if (p.name == nameB) b = GetScalarValue(p);
+            }
+            float result = fn(a, b);
+            if (!std::isfinite(result)) result = 0.0f;
+            char buf[48]; snprintf(buf, sizeof(buf), "%.9g", result);
+            for (Pin& p : node.outputs) if (p.name == nameOut) p.defaultValue = buf;
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    }
+
+    struct FloatConstantDef { const char* type; float value; };
+    static const FloatConstantDef constantDefs[] = {
+        { "Pi", 3.14159265358979f },
+        { "Tau", 6.28318530717959f },
+    };
+    for (const FloatConstantDef& def : constantDefs) {
+        NodeTemplate t;
+        t.type = def.type;
+        t.category = "Math";
+        t.moduleName = "Stargraph";
+        t.createPins = [](Node* node) {
+            node->outputs.push_back({"Value", PinType::Float, false, true});
+        };
+        float value = def.value;
+        t.execute = [value](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+            char buf[48]; snprintf(buf, sizeof(buf), "%.9g", value);
+            for (Pin& p : node.outputs) if (p.name == "Value") p.defaultValue = buf;
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    }
+
+    NodeTemplate lookAtRotation;
+    lookAtRotation.type = "Look_At_Rotation";
+    lookAtRotation.menuLabel = "Look At Rotation";
+    lookAtRotation.category = "Math";
+    lookAtRotation.moduleName = "Stargraph";
+    lookAtRotation.createPins = [](Node* node) {
+        node->inputs.push_back({"From", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->inputs.push_back({"To", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Rotation", PinType::Rotator, false, true});
+    };
+    lookAtRotation.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Vector3 from{0, 0, 0}, to{0, 0, 0};
+        for (const Pin& p : node.inputs) {
+            if (p.name == "From") ReadVec3(p, from.x, from.y, from.z);
+            else if (p.name == "To") ReadVec3(p, to.x, to.y, to.z);
+        }
+        Vector3 rot = LookAtRotationDegrees(from, to);
+        char buf[96]; snprintf(buf, sizeof(buf), "%.6g,%.6g,%.6g", rot.x, rot.y, rot.z);
+        for (Pin& p : node.outputs) if (p.name == "Rotation") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(lookAtRotation);
 }

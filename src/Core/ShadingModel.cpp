@@ -5,6 +5,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/Components/LightComponent.h"
+#include "SceneSnapshot.h"
 #include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "rlgl.h"
 #include "raymath.h"
@@ -418,33 +419,50 @@ void ShadingModel::UpdateLightUniforms() {
     LitVariant& variant = ActiveVariant();
 
     int count = 0;
-    for (const auto& actor : World::Get().GetActors()) {
-        for (Component* comp : actor->GetComponents()) {
-            LightComponent* lc = dynamic_cast<LightComponent*>(comp);
-            if (!lc || count >= kMaxLights) continue;
+    auto applyLight = [&](const SceneLight& light) {
+        if (count >= kMaxLights) return;
 
-            Vector3 worldPos = actor->GetComponentWorldPosition(lc);
-            Vector3 worldRot = actor->GetComponentWorldRotation(lc);
-            Vector3 dir = DirectionFromRotation(worldRot);
+        Vector3 dir = DirectionFromRotation(light.rotation);
 
-            int type = (int)lc->lightType;
-            float pos[3] = {worldPos.x, worldPos.y, worldPos.z};
-            float dirArr[3] = {dir.x, dir.y, dir.z};
-            float color[3] = {lc->lightColor.x, lc->lightColor.y, lc->lightColor.z};
-            float innerCos = cosf(lc->innerConeAngle * DEG2RAD);
-            float outerCos = cosf(lc->outerConeAngle * DEG2RAD);
+        int type = (int)light.type;
+        float pos[3] = {light.position.x, light.position.y, light.position.z};
+        float dirArr[3] = {dir.x, dir.y, dir.z};
+        float color[3] = {light.color.x, light.color.y, light.color.z};
+        float innerCos = cosf(light.innerConeAngle * DEG2RAD);
+        float outerCos = cosf(light.outerConeAngle * DEG2RAD);
 
-            const LightLocs& locs = variant.lightLocs[count];
-            SetShaderValue(variant.shader, locs.type, &type, SHADER_UNIFORM_INT);
-            SetShaderValue(variant.shader, locs.position, pos, SHADER_UNIFORM_VEC3);
-            SetShaderValue(variant.shader, locs.direction, dirArr, SHADER_UNIFORM_VEC3);
-            SetShaderValue(variant.shader, locs.color, color, SHADER_UNIFORM_VEC3);
-            SetShaderValue(variant.shader, locs.intensity, &lc->intensity, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(variant.shader, locs.radius, &lc->radius, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(variant.shader, locs.innerCos, &innerCos, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(variant.shader, locs.outerCos, &outerCos, SHADER_UNIFORM_FLOAT);
+        const LightLocs& locs = variant.lightLocs[count];
+        SetShaderValue(variant.shader, locs.type, &type, SHADER_UNIFORM_INT);
+        SetShaderValue(variant.shader, locs.position, pos, SHADER_UNIFORM_VEC3);
+        SetShaderValue(variant.shader, locs.direction, dirArr, SHADER_UNIFORM_VEC3);
+        SetShaderValue(variant.shader, locs.color, color, SHADER_UNIFORM_VEC3);
+        SetShaderValue(variant.shader, locs.intensity, &light.intensity, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(variant.shader, locs.radius, &light.radius, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(variant.shader, locs.innerCos, &innerCos, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(variant.shader, locs.outerCos, &outerCos, SHADER_UNIFORM_FLOAT);
 
-            count++;
+        count++;
+    };
+
+    if (const SceneSnapshot* snapshot = SceneSnapshotSource::Get()) {
+        for (const SceneLight& light : snapshot->lights) applyLight(light);
+    } else {
+        for (const auto& actor : World::Get().GetActors()) {
+            for (Component* comp : actor->GetComponents()) {
+                LightComponent* lc = dynamic_cast<LightComponent*>(comp);
+                if (!lc) continue;
+
+                SceneLight light;
+                light.type = lc->lightType;
+                light.position = actor->GetComponentWorldPosition(lc);
+                light.rotation = actor->GetComponentWorldRotation(lc);
+                light.color = lc->lightColor;
+                light.intensity = lc->intensity;
+                light.radius = lc->radius;
+                light.innerConeAngle = lc->innerConeAngle;
+                light.outerConeAngle = lc->outerConeAngle;
+                applyLight(light);
+            }
         }
     }
 

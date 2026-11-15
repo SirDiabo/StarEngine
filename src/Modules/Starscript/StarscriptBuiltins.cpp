@@ -150,6 +150,33 @@ Value Fn_tan(Runtime&, std::vector<Value>& a) { return Value::Float(std::tan(a[0
 Value Fn_atan2(Runtime&, std::vector<Value>& a) { return Value::Float(std::atan2(a[0].AsNumber(), a[1].AsNumber())); }
 Value Fn_radians(Runtime&, std::vector<Value>& a) { return Value::Float(a[0].AsNumber() * (PI / 180.0)); }
 Value Fn_degrees(Runtime&, std::vector<Value>& a) { return Value::Float(a[0].AsNumber() * (180.0 / PI)); }
+Value Fn_asin(Runtime&, std::vector<Value>& a) {
+    Require(a[0].AsNumber() >= -1.0 && a[0].AsNumber() <= 1.0, "asin: argument must be between -1 and 1");
+    return Value::Float(std::asin(a[0].AsNumber()));
+}
+Value Fn_acos(Runtime&, std::vector<Value>& a) {
+    Require(a[0].AsNumber() >= -1.0 && a[0].AsNumber() <= 1.0, "acos: argument must be between -1 and 1");
+    return Value::Float(std::acos(a[0].AsNumber()));
+}
+Value Fn_atan(Runtime&, std::vector<Value>& a) { return Value::Float(std::atan(a[0].AsNumber())); }
+Value Fn_exp(Runtime&, std::vector<Value>& a) { return Value::Float(std::exp(a[0].AsNumber())); }
+Value Fn_log(Runtime&, std::vector<Value>& a) {
+    Require(a[0].AsNumber() > 0.0, "log: argument must be positive");
+    return Value::Float(std::log(a[0].AsNumber()));
+}
+Value Fn_log10(Runtime&, std::vector<Value>& a) {
+    Require(a[0].AsNumber() > 0.0, "log10: argument must be positive");
+    return Value::Float(std::log10(a[0].AsNumber()));
+}
+Value Fn_sign(Runtime&, std::vector<Value>& a) {
+    double v = a[0].AsNumber();
+    return Value::Int(v > 0.0 ? 1 : (v < 0.0 ? -1 : 0));
+}
+Value Fn_pi(Runtime&, std::vector<Value>&) { return Value::Float(3.14159265358979323846); }
+Value Fn_tau(Runtime&, std::vector<Value>&) { return Value::Float(6.28318530717958647692); }
+Value Fn_wrap_angle(Runtime&, std::vector<Value>& a) { return Value::Float(WrapAngleDegrees((float)a[0].AsNumber())); }
+Value Fn_angle_delta(Runtime&, std::vector<Value>& a) { return Value::Float(AngleDeltaDegrees((float)a[0].AsNumber(), (float)a[1].AsNumber())); }
+Value Fn_look_at_rotation(Runtime&, std::vector<Value>& a) { return V3(LookAtRotationDegrees(ToV3(a[0]), ToV3(a[1]))); }
 Value Fn_lerp(Runtime&, std::vector<Value>& a) { return Value::Float(a[0].AsNumber() + (a[1].AsNumber() - a[0].AsNumber()) * a[2].AsNumber()); }
 
 Value Fn_random(Runtime&, std::vector<Value>&) {
@@ -676,6 +703,18 @@ const std::vector<BuiltinDef>& Builtins() {
         { "radians", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_radians },
         { "degrees", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_degrees },
         { "lerp", { T(Kind::Float), T(Kind::Float), T(Kind::Float) }, 3, T(Kind::Float), RetRule::Fixed, false, Fn_lerp },
+        { "asin", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_asin },
+        { "acos", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_acos },
+        { "atan", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_atan },
+        { "exp", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_exp },
+        { "log", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_log },
+        { "log10", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_log10 },
+        { "sign", { T(Kind::Float) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_sign },
+        { "pi", {}, 0, T(Kind::Float), RetRule::Fixed, false, Fn_pi },
+        { "tau", {}, 0, T(Kind::Float), RetRule::Fixed, false, Fn_tau },
+        { "wrap_angle", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_wrap_angle },
+        { "angle_delta", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_angle_delta },
+        { "look_at_rotation", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Vec3), RetRule::Fixed, false, Fn_look_at_rotation },
         { "random", {}, 0, T(Kind::Float), RetRule::Fixed, false, Fn_random },
         { "random_range", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_random_range },
         { "random_int", { T(Kind::Int), T(Kind::Int) }, 2, T(Kind::Int), RetRule::Fixed, false, Fn_random_int },
