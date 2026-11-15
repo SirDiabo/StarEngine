@@ -623,7 +623,7 @@ Value P_actor_get_up(Runtime&, const Value& s) {
 Value P_actor_get_show_cursor(Runtime&, const Value& s) { return Value::Bool(RequireActor(s, "show_mouse_cursor")->showMouseCursor); }
 void P_actor_set_show_cursor(Runtime&, const Value& s, const Value& v) { RequireActor(s, "show_mouse_cursor")->showMouseCursor = v.b; }
 Value P_actor_get_control_rotation(Runtime&, const Value& s) { return V3(RequireActor(s, "control_rotation")->controlRotation); }
-void P_actor_set_control_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "control_rotation")->controlRotation = ToV3(v); }
+void P_actor_set_control_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "control_rotation")->SetControlRotation(ToV3(v)); }
 Value P_actor_get_movement_speed(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "movement_speed")->MovementSpeed); }
 void P_actor_set_movement_speed(Runtime&, const Value& s, const Value& v) { RequireActor(s, "movement_speed")->MovementSpeed = (float)v.AsNumber(); }
 

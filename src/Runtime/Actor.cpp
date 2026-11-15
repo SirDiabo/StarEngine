@@ -81,7 +81,7 @@ void Actor::SetBehavior(ActorBehavior* newBehavior) {
 }
 
 void Actor::BeginPlay() {
-    controlRotation = rotation;
+    controlRotation = WrapRotationDegrees(rotation);
     hasBegunPlay = true;
     for (size_t i = 0; i < components.size(); i++) components[i]->InitializeOnce();
     OnBeginPlay();
@@ -95,14 +95,16 @@ void Actor::Tick(float deltaTime) {
     }
     if (behavior) behavior->OnTick(this, deltaTime);
 
+    controlRotation = WrapRotationDegrees(controlRotation);
+
     if (useControlYaw)   rotation.y = controlRotation.y;
     if (useControlPitch) rotation.x = controlRotation.x;
     if (useControlRoll)  rotation.z = controlRotation.z;
 
     if (CameraComponent* cam = GetCameraComponent()) {
-        if (cam->useControlYaw)   cam->rotation.y = controlRotation.y - rotation.y;
-        if (cam->useControlPitch) cam->rotation.x = controlRotation.x - rotation.x;
-        if (cam->useControlRoll)  cam->rotation.z = controlRotation.z - rotation.z;
+        if (cam->useControlYaw)   cam->rotation.y = AngleDeltaDegrees(rotation.y, controlRotation.y);
+        if (cam->useControlPitch) cam->rotation.x = AngleDeltaDegrees(rotation.x, controlRotation.x);
+        if (cam->useControlRoll)  cam->rotation.z = AngleDeltaDegrees(rotation.z, controlRotation.z);
     }
 
     float moveLenSq = pendingMovementInput.x * pendingMovementInput.x
@@ -259,8 +261,12 @@ Component* Actor::FindComponentByName(const std::string& name) const {
     return nullptr;
 }
 
+void Actor::SetControlRotation(Vector3 value) {
+    controlRotation = WrapRotationDegrees(value);
+}
+
 void Actor::AddControlYawInput(float value) {
-    controlRotation.y += value;
+    controlRotation.y = WrapAngleDegrees(controlRotation.y + value);
 }
 
 void Actor::AddControlPitchInput(float value) {
@@ -270,7 +276,7 @@ void Actor::AddControlPitchInput(float value) {
 }
 
 void Actor::AddControlRollInput(float value) {
-    controlRotation.z += value;
+    controlRotation.z = WrapAngleDegrees(controlRotation.z + value);
 }
 
 void Actor::AddMovementInput(Vector3 worldDirection, float scaleValue) {

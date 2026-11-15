@@ -185,8 +185,6 @@ private:
     TextElement* pinEditField = nullptr;
     bool pinEditActiveThisFrame = false;
 
-    std::vector<std::string> varValueSnapshot;
-
     int selectedVariableIndex = -1;
     int lastValidVariableIndex = -1;
     int listeningForKeyPinId = 0;

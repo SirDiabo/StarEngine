@@ -45,7 +45,7 @@ void StargraphEditorPanel::Initialize() {
     undoDocument->restore = [this](const std::string& content, const std::string& selection) { RestoreUndoState(content, selection); };
     undoDocument->reveal = [this]() { if (undoReveal) undoReveal(); };
     undoDocument->canTrack = [this]() {
-        if (!isOpen || !varValueSnapshot.empty()) return false;
+        if (!isOpen) return false;
         return undoOwnerActive ? undoOwnerActive() : true;
     };
     UndoManager::Get().RegisterDocument(undoDocument);
@@ -230,7 +230,6 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
     btnLeft += 54;
 
     Vector2 mp = GetMousePosition();
-    bool canStop = !varValueSnapshot.empty();
 
     Rectangle selfBtn = {btnLeft, btnY, 48, 22};
     bool selfHovered = CheckCollisionPointRec(mp, selfBtn);
@@ -252,23 +251,6 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
         Close();
         return;
     }
-    btnRight -= 26;
-
-    Rectangle stopBtn = {btnRight - 48, btnY, 48, 22};
-    if (canStop) {
-        bool stopHovered = CheckCollisionPointRec(mp, stopBtn);
-        DrawRectangleRec(stopBtn, stopHovered ? theme.danger : theme.dangerBg);
-        DrawText("STOP", (int)stopBtn.x + 7, (int)stopBtn.y + 4, 13, WHITE);
-        btnRight -= 52;
-    }
-
-    Rectangle playBtn = {btnRight - 48, btnY, 48, 22};
-    if (!canStop) {
-        bool playHovered = CheckCollisionPointRec(mp, playBtn);
-        DrawRectangleRec(playBtn, playHovered ? theme.success : theme.successBg);
-        DrawText("PLAY", (int)playBtn.x + 7, (int)playBtn.y + 4, 13, WHITE);
-        btnRight -= 52;
-    }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (CheckCollisionPointRec(mp, selfBtn)) {
@@ -279,21 +261,6 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
                 selectedVariableIndex = -1;
                 actorEditor.ClearSelection();
             }
-        }
-        if (canStop && CheckCollisionPointRec(mp, stopBtn)) {
-            for (size_t i = 0; i < graph.GetVariables().size() && i < varValueSnapshot.size(); i++) {
-                graph.GetVariables()[i].value = varValueSnapshot[i];
-            }
-            varValueSnapshot.clear();
-        }
-        if (!canStop && CheckCollisionPointRec(mp, playBtn)) {
-            graph.SyncArrayVariables();
-            varValueSnapshot.clear();
-            for (const Variable& v : graph.GetVariables()) {
-                varValueSnapshot.push_back(v.value);
-            }
-            SaveGraph();
-            GraphExecutor::Run(graph, "Event_BeginPlay");
         }
     }
 }

@@ -69,6 +69,7 @@ public:
 
     float MovementSpeed = 600.0f;
 
+    void SetControlRotation(Vector3 value);
     void AddControlYawInput(float value);
     void AddControlPitchInput(float value);
     void AddControlRollInput(float value);

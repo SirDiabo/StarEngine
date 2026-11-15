@@ -2,6 +2,7 @@
 #include "NodeRegistry.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "Core/RotationMath.h"
 #include <cstdlib>
 #include <ctime>
 
@@ -24,14 +25,8 @@ static float InterpStep(float value, float target, float delta, float speed, con
     return value + diff * t;
 }
 
-static float WrapAngleDeg(float deg) {
-    while (deg > 180.0f) deg -= 360.0f;
-    while (deg <= -180.0f) deg += 360.0f;
-    return deg;
-}
-
 static float InterpAngleStep(float value, float target, float delta, float speed, const std::string& method) {
-    float diff = WrapAngleDeg(target - value);
+    float diff = AngleDeltaDegrees(value, target);
     if (method == "Linear") {
         float step = fabsf(speed) * delta;
         if (fabsf(diff) <= step) return value + diff;

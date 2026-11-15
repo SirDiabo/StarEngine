@@ -144,7 +144,6 @@ void StargraphEditorTab::BuildMenus(MenuBar* menuBar) {
     menuBar->SetMenus({
         { "File",   { "Save", "Save All" } },
         { "Asset",  { "Find in Content Browser" } },
-        { "Debug",  { "Play Graph", "Stop" } },
         { "Window", { "Preview", "Components", "My Stargraph", "Graph", "Details", "Logs", "---", "Reset Layout" }, windowChecked },
         { "Help",   { "Support", "GitHub", "About" } },
     });

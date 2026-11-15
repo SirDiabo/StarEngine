@@ -670,7 +670,9 @@ void RegisterActorNodes() {
         if (!target) return;
         for (const Pin& p : node.inputs) {
             if (p.name == "Rotation") {
-                ReadVec3(p, target->controlRotation.x, target->controlRotation.y, target->controlRotation.z);
+                Vector3 value = target->controlRotation;
+                ReadVec3(p, value.x, value.y, value.z);
+                target->SetControlRotation(value);
                 break;
             }
         }
