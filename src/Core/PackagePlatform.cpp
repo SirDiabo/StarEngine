@@ -21,7 +21,7 @@ bool WslHasCommands(const std::vector<std::string>& names) {
 }
 #endif
 
-std::vector<PackagePlatformInfo> BuildPlatformList(bool runSlowChecks) {
+std::vector<PackagePlatformInfo> BuildPlatformList([[maybe_unused]] bool runSlowChecks) {
     const std::string pendingReason = "Checking available build tools...";
     auto has = [](const char* name) { return CommandExists(name); };
 

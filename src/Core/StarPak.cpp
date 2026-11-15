@@ -5,6 +5,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <limits>
 
 namespace fs = std::filesystem;
@@ -46,6 +47,20 @@ bool IsValidVirtualPath(const std::string& virtualPath) {
     }
     return true;
 }
+
+class RollbackGuard {
+public:
+    explicit RollbackGuard(std::function<void()> action) : action(std::move(action)) {}
+    ~RollbackGuard() {
+        if (action) action();
+    }
+    void Dismiss() { action = nullptr; }
+    RollbackGuard(const RollbackGuard&) = delete;
+    RollbackGuard& operator=(const RollbackGuard&) = delete;
+
+private:
+    std::function<void()> action;
+};
 
 std::string ParentOf(const std::string& virtualPath) {
     size_t slash = virtualPath.find_last_of('/');
@@ -94,6 +109,11 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
     entries.clear();
     indexByPath.clear();
     blob.clear();
+    RollbackGuard rollback([this]() {
+        entries.clear();
+        indexByPath.clear();
+        blob.clear();
+    });
 
     size_t pos = 0;
     auto readLine = [&](std::string& line) -> bool {
@@ -166,6 +186,7 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
     }
 
     blob.assign(buffer.begin() + (std::ptrdiff_t)pos, buffer.end());
+    rollback.Dismiss();
     return true;
 } catch (const std::exception&) {
     entries.clear();
@@ -280,14 +301,23 @@ bool AppendPakToExecutable(const std::string& exePath, const std::string& pakPat
     if (ec) return false;
 
     uint64_t pakOffset = originalSize;
+    bool replacingExisting = false;
     if (originalSize >= sizeof(Footer)) {
         std::ifstream peek(exePath, std::ios::binary);
         peek.seekg((std::streamoff)(originalSize - sizeof(Footer)));
         Footer existing{};
         peek.read(reinterpret_cast<char*>(&existing), sizeof(Footer));
-        if (peek && std::memcmp(existing.magic, kFooterMagic, sizeof(kFooterMagic)) == 0) {
+        const uint64_t usableSize = originalSize - sizeof(Footer);
+        if (peek && std::memcmp(existing.magic, kFooterMagic, sizeof(kFooterMagic)) == 0 &&
+            existing.pakOffset <= usableSize && existing.pakSize == usableSize - existing.pakOffset) {
             pakOffset = existing.pakOffset;
+            replacingExisting = true;
         }
+    }
+
+    if (replacingExisting) {
+        fs::resize_file(exePath, pakOffset, ec);
+        if (ec) return false;
     }
 
     std::ofstream out(exePath, std::ios::binary | std::ios::app);

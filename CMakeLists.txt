@@ -5,6 +5,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 option(STARENGINE_BUILD_GAME "Build the runtime-only packaged game instead of the editor" OFF)
+option(STARENGINE_BUILD_TESTS "Build the test suites in tests/ (run them with ctest)" OFF)
+option(STARENGINE_TEST_SANITIZE "Build the test suites with AddressSanitizer and UBSan (GCC/Clang only)" OFF)
 
 add_subdirectory(external/raylib)
 
@@ -116,4 +118,9 @@ else()
         VERBATIM
     )
     add_dependencies(StarEngine AssetPacker)
+endif()
+
+if(STARENGINE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
