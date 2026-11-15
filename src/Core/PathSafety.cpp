@@ -26,6 +26,13 @@ fs::path ResolveReference(const fs::path& baseDir, const std::string& reference,
 
     std::string normalized = reference;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
+
+    for (size_t i = 0; i < normalized.size(); i++) {
+        if (normalized[i] != ':') continue;
+        const bool driveColon = i == 1 && std::isalpha((unsigned char)normalized[0]) && i + 1 < normalized.size() && normalized[i + 1] == '/';
+        if (!driveColon) return {};
+    }
+
     const fs::path relative(normalized);
 
     std::error_code ec;

@@ -332,8 +332,30 @@ TEST(resolve_references_skip_directories_and_device_names) {
     for (const char* name : { "CON.png", "NUL.png", "AUX.png", "COM1.png", "LPT1.png", "PRN.png" }) {
         CHECK_MSG(PathSafety::ResolveTextureReference(base, name).empty(), name);
     }
-    CHECK(PathSafety::ResolveTextureReference(base, "tex.png:evil.png").empty());
-    CHECK(PathSafety::ResolveTextureReference(base, "tex.png::$DATA").empty());
+    for (const char* name : { "tex.png:evil.png", "tex.png::$DATA", "tex.png:stream:$DATA", "tex.png::$INDEX_ALLOCATION" }) {
+        fs::path result = PathSafety::ResolveTextureReference(base, name);
+        CHECK_MSG(result.empty(), std::string(name) + " resolved to " + result.string());
+    }
+}
+
+TEST(resolve_references_reject_alternate_stream_syntax) {
+    TempDir dir;
+    fs::path base = dir.Path("assets");
+    REQUIRE(test::WriteText(base / "host.txt", "visible"));
+    REQUIRE(test::WriteText(base / "tex.png", "x"));
+
+    bool created = test::WriteText(fs::path(base.string() + "/host.txt:hidden.png"), "hidden payload");
+    if (!created) std::printf("    note: could not create a colon-named file or stream here\n");
+
+    for (const char* name : { "host.txt:hidden.png", "tex.png:hidden.png", "sub/host.txt:hidden.png", "dir:name.png", ":x.png", "x:.png" }) {
+        fs::path result = PathSafety::ResolveTextureReference(base, name);
+        CHECK_MSG(result.empty(), std::string(name) + " resolved to " + result.string());
+    }
+
+    fs::path drivePrefixed = PathSafety::ResolveTextureReference(base, "C:\\Users\\someone\\tex.png");
+    CHECK(!drivePrefixed.empty() && SameFile(drivePrefixed, base / "tex.png"));
+    fs::path driveForward = PathSafety::ResolveTextureReference(base, "D:/images/tex.png");
+    CHECK(!driveForward.empty() && SameFile(driveForward, base / "tex.png"));
 }
 
 TEST(resolve_references_refuse_symlinks_that_leave_the_base) {
@@ -481,7 +503,11 @@ TEST(find_executable_in_path) {
         std::string found = SafeProcess::FindExecutableInPath("mytool");
         CHECK(!found.empty());
         CHECK(found.find("mytool") != std::string::npos);
-        CHECK(SameFile(found, bin / (found.find(".exe") != std::string::npos ? "mytool.exe" : "mytool")));
+#ifdef _WIN32
+        CHECK_MSG(SameFile(found, bin / "mytool.exe"), "found: " + found);
+#else
+        CHECK_MSG(SameFile(found, bin / "mytool"), "found: " + found);
+#endif
 
         CHECK(SafeProcess::FindExecutableInPath("definitely_not_a_real_tool").empty());
         CHECK(SafeProcess::FindExecutableInPath("").empty());

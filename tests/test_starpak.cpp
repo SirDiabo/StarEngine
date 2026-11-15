@@ -581,13 +581,13 @@ TEST(starpak_rejects_invalid_executable_footers) {
         { "pak region is not a pak", Concat({ prefix, Pattern(40, 9), MakeFooter(200, 40) }), false },
     };
     for (const Case& c : cases) {
-        REQUIRE(test::WriteFile(dir.Path("probe.exe"), c.bytes));
+        REQUIRE(test::WriteFile(dir.Path("probe.bin"), c.bytes));
         StarPak::Reader reader;
-        CHECK_MSG(reader.LoadFromExecutable(dir.Str("probe.exe")) == c.shouldLoad, c.name);
+        CHECK_MSG(reader.LoadFromExecutable(dir.Str("probe.bin")) == c.shouldLoad, c.name);
         if (!c.shouldLoad) CHECK_MSG(!reader.HasEntry("a"), c.name);
     }
     StarPak::Reader missing;
-    CHECK(!missing.LoadFromExecutable(dir.Str("not_there.exe")));
+    CHECK(!missing.LoadFromExecutable(dir.Str("not_there.bin")));
 }
 
 TEST(starpak_survives_mutated_paks) {
@@ -653,9 +653,9 @@ TEST(starpak_survives_mutated_executables) {
             else data[pos] ^= (uint8_t)(1u << rng.Below(8));
         }
         if (rng.Below(5) == 0) data.resize(rng.Below((uint32_t)data.size() + 1));
-        REQUIRE(test::WriteFile(dir.Path("mut.exe"), data));
+        REQUIRE(test::WriteFile(dir.Path("mut.bin"), data));
         StarPak::Reader reader;
-        if (reader.LoadFromExecutable(dir.Str("mut.exe"))) CheckReaderBounded(reader, paths);
+        if (reader.LoadFromExecutable(dir.Str("mut.bin"))) CheckReaderBounded(reader, paths);
     }
 }
 
