@@ -326,12 +326,6 @@ static void BuildClassComponentsRows(const ActorInstance& inst, std::vector<Prop
         row.stringValue = "(" + comp.componentType + ")";
         rows.push_back(row);
     }
-
-    PropertyRow hint;
-    hint.kind = PropertyRowKind::ReadOnlyText;
-    hint.label = "";
-    hint.stringValue = "Edit components in the class blueprint.";
-    rows.push_back(hint);
 }
 
 std::vector<PropertyRow> BuildActorPropertyRows(

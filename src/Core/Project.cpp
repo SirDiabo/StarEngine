@@ -1,5 +1,6 @@
 #include "Project.h"
 #include "EnvVar.h"
+#include "StarEngineHome.h"
 #include "Module.h"
 #include "LayoutSerializer.h"
 #include "NamedListRegistry.h"
@@ -20,21 +21,6 @@
 #include <random>
 
 namespace fs = std::filesystem;
-
-static std::string GetStarEngineHomeDir() {
-    std::string home;
-#ifdef _WIN32
-    home = GetEnvironmentValue("USERPROFILE");
-    if (home.empty()) home = ".";
-#else
-    const char* h = getenv("HOME");
-    home = h ? h : ".";
-#endif
-    fs::path dir = fs::path(home) / ".starengine";
-    std::error_code ec;
-    fs::create_directories(dir, ec);
-    return dir.string();
-}
 
 std::string GameRendererName(GameRenderer renderer) {
     return renderer == GameRenderer::Software ? "Software" : "Hardware";
@@ -137,7 +123,7 @@ std::string Project::GetModulesDirectory() const {
 void Project::WriteActiveProjectPointer() const {
     std::unordered_map<std::string, std::string> data;
     data["ProjectRoot"] = rootPath;
-    LayoutSerializer::Save((fs::path(GetStarEngineHomeDir()) / "active_project.cfg").string(), data);
+    LayoutSerializer::Save((fs::path(StarEngineHome::Directory()) / "active_project.cfg").string(), data);
 }
 
 void Project::Save() {

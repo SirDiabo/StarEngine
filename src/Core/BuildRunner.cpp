@@ -5,6 +5,8 @@
 #include "CMakeBuild.h"
 #include "BuildDiagnostics.h"
 #include "SafeProcess.h"
+#include "Project.h"
+#include "ProjectTrust.h"
 #include <cstdio>
 #include <filesystem>
 
@@ -75,6 +77,13 @@ static void RestoreAfterFailedReplacement(const fs::path& launcherPath) {
 BuildResult BuildRunner::RunBuild(const std::string& buildDir, const std::string& config,
                                    const std::function<void(const std::string&)>& onOutput) {
     BuildResult result;
+
+    const std::string projectRoot = Project::Get().GetRootPath();
+    if (!projectRoot.empty() && !ProjectTrust::IsTrusted(projectRoot)) {
+        result.success = false;
+        result.error = ProjectTrust::NotTrustedMessage();
+        return result;
+    }
 
     std::string cmakeMissing = BuildDiagnostics::CheckCMakeAvailable();
     if (!cmakeMissing.empty()) {

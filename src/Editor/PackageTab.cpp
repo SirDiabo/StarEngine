@@ -2,6 +2,7 @@
 #include "MenuBar.h"
 #include "NativeFileDialog.h"
 #include "Core/PackageRunner.h"
+#include "Core/ProjectTrust.h"
 #include "LoadingPanel.h"
 #include "UITheme.h"
 #include "Core/Widgets/WidgetInput.h"
@@ -189,7 +190,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     float fy = y + 16;
     float fw = width - 32 > 640.0f ? 640.0f : width - 32;
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
-                               cipherPopup.IsOpen() || formatPopup.IsOpen() || compressionPopup.IsOpen() || integrityPopup.IsOpen() || unsavedLevelPopup.IsOpen();
+                               cipherPopup.IsOpen() || formatPopup.IsOpen() || compressionPopup.IsOpen() || integrityPopup.IsOpen() || unsavedLevelPopup.IsOpen() || trustPopup.IsOpen();
 
     DrawText("Package Project", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 26;
@@ -338,12 +339,10 @@ void PackageTab::Render(float x, float y, float width, float height) {
     Rectangle packageButton = {fx, fy, fw, 28};
     bool platformReady = selectedPlatform.available;
     if (PackageTabButton(packageButton, "Package", platformReady && !packageRunning) && !anyPopupOpen) {
-        if (hasUnsavedLevelChanges && hasUnsavedLevelChanges()) {
-            unsavedLevelPopup.Open(
-                "The open level has unsaved changes. The packaged build will use the version last saved to disk unless you save first.",
-                "Save and Package");
+        if (ProjectTrust::IsTrusted(Project::Get().GetRootPath())) {
+            BeginPackage();
         } else {
-            RunPackage();
+            trustPopup.Open(Project::Get().GetSettings().name, Project::Get().GetRootPath());
         }
     }
     fy += 36;
@@ -404,9 +403,31 @@ void PackageTab::Render(float x, float y, float width, float height) {
         integrity = integrityChoice == 0;
     }
 
+    bool trustDecision = false;
+    if (trustPopup.Render(trustDecision) && trustDecision) {
+        if (ProjectTrust::Trust(Project::Get().GetRootPath())) {
+            BeginPackage();
+        } else {
+            hasResult = true;
+            lastSuccess = false;
+            resultMessage = "Could not save the trust decision for this project.";
+            resultLog.clear();
+        }
+    }
+
     bool unsavedConfirmed = false;
     if (unsavedLevelPopup.Render(unsavedConfirmed) && unsavedConfirmed) {
         if (saveLevelCallback) saveLevelCallback();
+        RunPackage();
+    }
+}
+
+void PackageTab::BeginPackage() {
+    if (hasUnsavedLevelChanges && hasUnsavedLevelChanges()) {
+        unsavedLevelPopup.Open(
+            "The open level has unsaved changes. The packaged build will use the version last saved to disk unless you save first.",
+            "Save and Package");
+    } else {
         RunPackage();
     }
 }

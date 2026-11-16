@@ -4,6 +4,8 @@
 #include "Core/ModuleImporter.h"
 #include "Core/AsyncTask.h"
 #include "ChoicePopup.h"
+#include "TrustProjectPopup.h"
+#include <functional>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -34,6 +36,7 @@ private:
     void HandleImportedModule(const std::string& destDir);
     void FinishImport(bool success, const std::string& message);
     void StartRebuildAsync();
+    void RunWhenTrusted(std::function<void()> action);
     void ApplyPendingToggles();
 
     LogPanel* logPanel = nullptr;
@@ -47,6 +50,8 @@ private:
     bool catalogLoading = false;
 
     ChoicePopup engineOrProjectPopup;
+    TrustProjectPopup trustPopup;
+    std::function<void()> actionAfterTrust;
     std::string pendingRelocateDir;
 
     std::unordered_map<std::string, bool> pendingToggles;

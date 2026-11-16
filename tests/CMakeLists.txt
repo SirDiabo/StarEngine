@@ -48,3 +48,9 @@ star_add_test(test_paths_process
     SOURCES
         "${STAR_SRC}/Core/PathSafety.cpp"
         "${STAR_SRC}/Core/SafeProcess.cpp")
+
+star_add_test(test_trust_cache
+    SOURCES
+        "${STAR_SRC}/Core/TrustStore.cpp"
+        "${STAR_SRC}/Core/BuildCacheGuard.cpp"
+        "${STAR_SRC}/Core/PathSafety.cpp")

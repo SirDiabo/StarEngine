@@ -4,6 +4,7 @@
 #include "Core/ModuleManifest.h"
 #include "Core/BuildRunner.h"
 #include "Core/Project.h"
+#include "Core/ProjectTrust.h"
 #include "Core/ModuleImporter.h"
 #include "LogPanel.h"
 #include "LoadingPanel.h"
@@ -215,7 +216,7 @@ void ModuleBrowserPanel::Render() {
                 auto* box = new CheckBoxElement();
                 box->checked = liveEnabled;
                 box->onToggled = [this, moduleName, liveEnabled](bool toggled) {
-                    if (importMenu.IsOpen() || engineOrProjectPopup.IsOpen() || rebuildRunning) return;
+                    if (importMenu.IsOpen() || engineOrProjectPopup.IsOpen() || trustPopup.IsOpen() || rebuildRunning) return;
                     bool needsRestart = ModuleManager::Get().NeedsRestartToApply(moduleName, toggled);
                     if (needsRestart) {
                         if (toggled == liveEnabled) pendingToggles.erase(moduleName);
@@ -280,6 +281,19 @@ void ModuleBrowserPanel::Render() {
     WidgetInput::ProcessInput(controlsChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
     controlsChrome->Draw(bounds, 1.0f);
 
+    bool trustDecision = false;
+    if (trustPopup.Render(trustDecision)) {
+        std::function<void()> action = std::move(actionAfterTrust);
+        actionAfterTrust = nullptr;
+        if (trustDecision) {
+            if (ProjectTrust::Trust(Project::Get().GetRootPath())) {
+                if (action) action();
+            } else {
+                statusMessage = "Could not save the trust decision for this project.";
+            }
+        }
+    }
+
     int engineOrProjectChoice = -1;
     if (engineOrProjectPopup.Render(engineOrProjectChoice)) {
         if (engineOrProjectChoice == 0) {
@@ -313,7 +327,7 @@ void ModuleBrowserPanel::RenderImportBar() {
     btn->hoveredColor = theme.buttonHover;
     btn->pressedColor = theme.buttonPressed;
     btn->onActivated = [this, importBtn]() {
-        if (engineOrProjectPopup.IsOpen()) return;
+        if (engineOrProjectPopup.IsOpen() || trustPopup.IsOpen()) return;
         importMenu.Open({ importBtn.x, importBtn.y - 3 * 22.0f - 4 }, importBtn.width,
             { {"Import from Disk..."}, {"Import from Repository..."}, {"Import from Catalog..."} });
     };
@@ -327,10 +341,20 @@ void ModuleBrowserPanel::RenderImportBar() {
 
     int choiceIndex = -1;
     if (importMenu.Render(choiceIndex)) {
-        if (choiceIndex == 0) ImportFromDisk();
-        else if (choiceIndex == 1) BeginRepositoryEntry();
-        else if (choiceIndex == 2) BeginCatalogBrowse();
+        if (choiceIndex == 0) RunWhenTrusted([this]() { ImportFromDisk(); });
+        else if (choiceIndex == 1) RunWhenTrusted([this]() { BeginRepositoryEntry(); });
+        else if (choiceIndex == 2) RunWhenTrusted([this]() { BeginCatalogBrowse(); });
     }
+}
+
+void ModuleBrowserPanel::RunWhenTrusted(std::function<void()> action) {
+    const std::string& root = Project::Get().GetRootPath();
+    if (root.empty() || ProjectTrust::IsTrusted(root)) {
+        if (action) action();
+        return;
+    }
+    actionAfterTrust = std::move(action);
+    trustPopup.Open(Project::Get().GetSettings().name, root);
 }
 
 void ModuleBrowserPanel::RenderRepositoryEntry(Rectangle area) {

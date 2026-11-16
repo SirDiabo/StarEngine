@@ -4,6 +4,8 @@
 #include "SafeProcess.h"
 #include "EngineRoot.h"
 #include "CMakeBuild.h"
+#include "BuildCacheGuard.h"
+#include "ProjectTrust.h"
 #include "IconBuilder.h"
 #include "BuildDiagnostics.h"
 #include "AudioConfig.h"
@@ -155,6 +157,11 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
                                       const std::function<void(const std::string&)>& onOutput) {
     PackageResult result;
 
+    if (!ProjectTrust::IsTrusted(options.projectRoot)) {
+        result.error = ProjectTrust::NotTrustedMessage();
+        return result;
+    }
+
     std::string codecError = ValidateCodecs(options);
     if (!codecError.empty()) {
         result.error = codecError;
@@ -183,7 +190,18 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
 
     std::string platformKey = PackagePlatformName(options.platform);
     std::string rendererKey = GameRendererName(options.renderer);
-    fs::path buildDir = fs::temp_directory_path() / "StarEnginePackageBuild" / (platformKey + "_" + rendererKey);
+    const std::string machineToken = ProjectTrust::Default().MachineToken();
+    BuildCacheGuard::Preparation cache = BuildCacheGuard::Prepare(options.projectRoot, platformKey + "_" + rendererKey, machineToken);
+    if (!cache.ok) {
+        result.error = "Could not prepare the build cache: " + cache.error;
+        return result;
+    }
+    fs::path buildDir = cache.path;
+    if (cache.wiped) {
+        std::string note = "Build cache did not belong to this machine and was cleared.\n";
+        result.log += note;
+        if (onOutput) onOutput(note);
+    }
 
 #ifdef _WIN32
     bool useWsl = (options.platform == PackagePlatform::Linux);
@@ -192,8 +210,11 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
 #endif
 
     if (CMakeBuild::CacheSourceMismatch(buildDir.string(), engineRoot.string())) {
-        std::error_code wipeEc;
-        fs::remove_all(buildDir, wipeEc);
+        std::string resetError;
+        if (!BuildCacheGuard::Reset(buildDir.string(), machineToken, resetError)) {
+            result.error = "Could not clear the outdated build cache: " + resetError;
+            return result;
+        }
     }
 
     IconBuilder::Result gameIcon;

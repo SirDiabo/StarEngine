@@ -2,6 +2,7 @@
 #include "EditorTab.h"
 #include "ChoicePopup.h"
 #include "ConfirmPopup.h"
+#include "TrustProjectPopup.h"
 #include "Core/PackagePlatform.h"
 #include "Core/PackageCipher.h"
 #include "Core/PackageCompression.h"
@@ -25,6 +26,7 @@ public:
     void SetSaveLevelCallback(std::function<void()> saveFn) { saveLevelCallback = saveFn; }
 
 private:
+    void BeginPackage();
     void RunPackage();
     void ChooseDefaultPlatform();
 
@@ -48,6 +50,7 @@ private:
     ChoicePopup compressionPopup;
     ChoicePopup integrityPopup;
     ConfirmPopup unsavedLevelPopup;
+    TrustProjectPopup trustPopup;
 
     std::function<bool()> hasUnsavedLevelChanges;
     std::function<void()> saveLevelCallback;
