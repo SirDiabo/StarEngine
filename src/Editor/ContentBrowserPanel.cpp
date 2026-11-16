@@ -308,6 +308,21 @@ void ContentBrowserPanel::PasteFromClipboard() {
     std::string stem = clipboardIsFolder ? src.filename().string() : src.stem().string();
     std::string ext = clipboardIsFolder ? "" : src.extension().string();
 
+    if (clipboardIsFolder) {
+        std::error_code srcEc, folderEc;
+        fs::path canonSrc = fs::weakly_canonical(src, srcEc);
+        fs::path canonFolder = fs::weakly_canonical(folder, folderEc);
+        if (srcEc || folderEc) {
+            canonSrc = src.lexically_normal();
+            canonFolder = folder.lexically_normal();
+        }
+        fs::path rel = canonFolder.lexically_relative(canonSrc);
+        if (!rel.empty() && *rel.begin() != "..") {
+            importStatus = "Paste failed: cannot paste a folder into itself or its own subfolder";
+            return;
+        }
+    }
+
     fs::path dest = folder / (stem + ext);
     std::error_code ec;
     int suffix = 1;

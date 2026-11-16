@@ -159,7 +159,7 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
         if (pin.name == "Component_Name") continue;
-        if (pin.type != PinType::Exec && pin.type != PinType::Array && editingPinId != pin.id) {
+        if (pin.type != PinType::Exec && pin.type != PinType::Array) {
             bool linked = false;
             for (const Link& lk : ActiveGraph().GetLinks()) {
                 if (lk.inputPinId == pin.id) { linked = true; break; }
@@ -311,6 +311,7 @@ bool StargraphEditorPanel::ConnectPins(int outputPinId, int inputPinId) {
     if (!conversionType || !NodeRegistry::Get().GetTemplate(conversionType)) return false;
 
     Vector2 inputPinWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea, GetPinPos(*inNode, *inPin));
+    const float inNodeX = inNode->posX;
 
     Node* conversion = ActiveGraph().CreateNode(conversionType);
     if (!conversion) return false;
@@ -324,7 +325,7 @@ bool StargraphEditorPanel::ConnectPins(int outputPinId, int inputPinId) {
     }
 
     Vector2 position = GraphCanvas::SnapToGrid({
-        inNode->posX - GetNodeWidth(*conversion) - 48.0f,
+        inNodeX - GetNodeWidth(*conversion) - 48.0f,
         inputPinWorld.y - headerHeight - pinHeight * 0.5f
     });
     conversion->posX = position.x;

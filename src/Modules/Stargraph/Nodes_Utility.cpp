@@ -99,7 +99,6 @@ void RegisterUtilityNodes() {
     };
     NodeRegistry::Get().RegisterNode(printError);
 
-    static float gameTime = 0.0f;
     NodeTemplate getGameTime;
     getGameTime.type = "Get_Game_Time";
     getGameTime.category = "Utility";
@@ -108,9 +107,8 @@ void RegisterUtilityNodes() {
         node->outputs.push_back({"Time", PinType::Float, false, true});
     };
     getGameTime.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        gameTime += ctx.deltaTime;
         char buf[32];
-        snprintf(buf, sizeof(buf), "%g", gameTime);
+        snprintf(buf, sizeof(buf), "%g", GetTime());
         for (Pin& p : node.outputs) if (p.name == "Time") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getGameTime);
@@ -285,7 +283,7 @@ void RegisterUtilityNodes() {
     getMonitorSize.category = "Utility";
     getMonitorSize.moduleName = "Stargraph";
     getMonitorSize.createPins = [](Node* node) {
-        node->inputs.push_back({"Monitor ID", PinType::Integer, false, true, 0, "0"});
+        node->inputs.push_back({"Monitor ID", PinType::Integer, true, false, 0, "0"});
         node->outputs.push_back({"Width", PinType::Integer, false, true});
         node->outputs.push_back({"Height", PinType::Integer, false, true});
     };

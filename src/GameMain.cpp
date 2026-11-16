@@ -68,7 +68,6 @@ static std::string FetchTextSync(const std::string& url) {
     char* raw = emscripten_run_script_string(script.c_str());
     if (!raw) return "";
     std::string text(raw);
-    free(raw);
     return text;
 }
 #endif

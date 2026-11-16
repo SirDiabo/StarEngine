@@ -124,8 +124,8 @@ void RegisterMathNodes() {
             } else if (resultType == PinType::Integer) {
                 int a = 0, b = 0;
                 for (const Pin& p : node.inputs) {
-                    if (p.name == "A") a = (int)GetScalarValue(p);
-                    if (p.name == "B") b = (int)GetScalarValue(p);
+                    if (p.name == "A") a = p.defaultValue.AsInt();
+                    if (p.name == "B") b = p.defaultValue.AsInt();
                 }
                 int result = 0;
                 switch (op) {
