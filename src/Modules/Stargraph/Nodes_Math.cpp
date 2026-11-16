@@ -53,14 +53,15 @@ void RegisterMathNodes() {
         };
         t.execute = [op](Node& node, Stargraph& graph, ExecutionContext& ctx) {
             PinType typeA = PinType::Float, typeB = PinType::Float;
+            bool aIsFloat = false, bIsFloat = false;
             for (const Pin& p : node.inputs) {
                 if (p.name == "A") {
                     PinType t = graph.GetConnectedOutputType(p.id);
-                    if (t != PinType::None) typeA = t;
+                    if (t != PinType::None) { typeA = t; aIsFloat = (t == PinType::Float); }
                 }
                 if (p.name == "B") {
                     PinType t = graph.GetConnectedOutputType(p.id);
-                    if (t != PinType::None) typeB = t;
+                    if (t != PinType::None) { typeB = t; bIsFloat = (t == PinType::Float); }
                 }
             }
 
@@ -103,9 +104,13 @@ void RegisterMathNodes() {
                     r = bVec;
                     switch (op) {
                         case '+': r.x += aScalar; r.y += aScalar; r.z += aScalar; break;
-                        case '-': r.x -= aScalar; r.y -= aScalar; r.z -= aScalar; break;
+                        case '-': r.x = aScalar - r.x; r.y = aScalar - r.y; r.z = aScalar - r.z; break;
                         case '*': r.x *= aScalar; r.y *= aScalar; r.z *= aScalar; break;
-                        case '/': if (aScalar != 0) { r.x /= aScalar; r.y /= aScalar; r.z /= aScalar; } break;
+                        case '/':
+                            r.x = r.x != 0.0f ? aScalar / r.x : 0.0f;
+                            r.y = r.y != 0.0f ? aScalar / r.y : 0.0f;
+                            r.z = r.z != 0.0f ? aScalar / r.z : 0.0f;
+                            break;
                     }
                 } else {
                     switch (op) {
@@ -148,7 +153,7 @@ void RegisterMathNodes() {
                     case '*': result = a * b; break;
                     case '/': result = (b != 0) ? a / b : 0; break;
                 }
-                char buf[32]; snprintf(buf, sizeof(buf), "%g", result);
+                char buf[32]; snprintf(buf, sizeof(buf), "%.9g", result);
                 for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
             }
         };

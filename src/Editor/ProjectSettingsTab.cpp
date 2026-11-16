@@ -106,6 +106,7 @@ static bool InlineBoolBox(Rectangle r, bool& value) {
 
 ProjectSettingsTab::~ProjectSettingsTab() {
     if (iconPreview.id != 0) UnloadTexture(iconPreview);
+    delete renderScaleChrome;
 }
 
 void ProjectSettingsTab::Initialize() {

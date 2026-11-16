@@ -80,6 +80,11 @@ void TrashVendorDirs(const std::set<fs::path>& dirs, const fs::path& contentRoot
     }
 }
 
+bool IsValidItemName(const std::string& name) {
+    if (name == "." || name == "..") return false;
+    return name.find_first_of("/\\") == std::string::npos;
+}
+
 }
 
 void ContentBrowserPanel::LoadIcons() {
@@ -227,6 +232,10 @@ void ContentBrowserPanel::BeginRename(const ContentEntry& entry) {
 void ContentBrowserPanel::ConfirmRename() {
     std::string typedName = nameBuffer;
     if (typedName.empty()) return;
+    if (!IsValidItemName(typedName)) {
+        importStatus = "Rename failed: name cannot contain path separators";
+        return;
+    }
 
     fs::path folder = GetCurrentFolderPath();
     fs::path oldPath = folder / renamingOriginalDiskName;
@@ -235,7 +244,9 @@ void ContentBrowserPanel::ConfirmRename() {
     bool success = true;
     if (newPath != oldPath) {
         std::error_code ec;
-        if (fs::exists(newPath, ec)) {
+        std::error_code equivEc;
+        bool isSameFile = fs::exists(newPath, ec) && fs::equivalent(oldPath, newPath, equivEc) && !equivEc;
+        if (fs::exists(newPath, ec) && !isSameFile) {
             importStatus = "Rename failed: " + newPath.filename().string() + " already exists";
             success = false;
         } else {
@@ -380,6 +391,10 @@ void ContentBrowserPanel::BeginCreateAsset(const AssetTypeInfo& info, const std:
 void ContentBrowserPanel::ConfirmPendingCreate() {
     std::string typedName = nameBuffer;
     if (typedName.empty()) return;
+    if (!IsValidItemName(typedName)) {
+        importStatus = "Create failed: name cannot contain path separators";
+        return;
+    }
 
     fs::path folder = GetCurrentFolderPath();
     fs::path target = isCreatingFolder
