@@ -88,11 +88,17 @@ Value Fn_print_warning(Runtime&, std::vector<Value>& a) { return PrintWith(Print
 Value Fn_print_error(Runtime&, std::vector<Value>& a) { return PrintWith(PrintMessageType::Error, a); }
 Value Fn_str(Runtime&, std::vector<Value>& a) { return Value::String(ToDisplayString(a[0])); }
 
+long long DoubleToInt(double d, const char* what) {
+    if (!(d >= -9223372036854775808.0 && d < 9223372036854775808.0))
+        throw ScriptError{ std::string(what) + ": the number is not finite or is too large for an integer" };
+    return (long long)d;
+}
+
 Value Fn_to_int(Runtime&, std::vector<Value>& a) {
     const Value& v = a[0];
     switch (v.kind) {
         case Kind::Int: return v;
-        case Kind::Float: return Value::Int((long long)v.f);
+        case Kind::Float: return Value::Int(DoubleToInt(v.f, "to_int"));
         case Kind::Bool: return Value::Int(v.b ? 1 : 0);
         case Kind::String: return Value::Int(strtoll(v.s.c_str(), nullptr, 10));
         default: throw ScriptError{ "to_int: cannot convert " + SType{ v.kind }.ToString() };
@@ -122,12 +128,12 @@ bool AllInts(const std::vector<Value>& a) {
 Value Fn_abs(Runtime&, std::vector<Value>& a) { return a[0].kind == Kind::Int ? Value::Int(std::llabs(a[0].i)) : Value::Float(std::fabs(a[0].f)); }
 
 Value Fn_min(Runtime&, std::vector<Value>& a) {
-    double r = std::min(a[0].AsNumber(), a[1].AsNumber());
-    return AllInts(a) ? Value::Int((long long)r) : Value::Float(r);
+    if (AllInts(a)) return Value::Int(std::min(a[0].i, a[1].i));
+    return Value::Float(std::min(a[0].AsNumber(), a[1].AsNumber()));
 }
 
 Value Fn_max(Runtime&, std::vector<Value>& a) {
-    double r = std::max(a[0].AsNumber(), a[1].AsNumber());
+    double r = std::min(std::max(a[0].AsNumber(), a[1].AsNumber()), a[2].AsNumber());
     return AllInts(a) ? Value::Int((long long)r) : Value::Float(r);
 }
 
@@ -136,9 +142,9 @@ Value Fn_clamp(Runtime&, std::vector<Value>& a) {
     return AllInts(a) ? Value::Int((long long)r) : Value::Float(r);
 }
 
-Value Fn_floor(Runtime&, std::vector<Value>& a) { return Value::Int((long long)std::floor(a[0].AsNumber())); }
-Value Fn_ceil(Runtime&, std::vector<Value>& a) { return Value::Int((long long)std::ceil(a[0].AsNumber())); }
-Value Fn_round(Runtime&, std::vector<Value>& a) { return Value::Int((long long)std::llround(a[0].AsNumber())); }
+Value Fn_floor(Runtime&, std::vector<Value>& a) { return Value::Int(DoubleToInt(std::floor(a[0].AsNumber()), "floor")); }
+Value Fn_ceil(Runtime&, std::vector<Value>& a) { return Value::Int(DoubleToInt(std::ceil(a[0].AsNumber()), "ceil")); }
+Value Fn_round(Runtime&, std::vector<Value>& a) { return Value::Int(DoubleToInt(std::round(a[0].AsNumber()), "round")); }
 Value Fn_sqrt(Runtime&, std::vector<Value>& a) {
     Require(a[0].AsNumber() >= 0.0, "sqrt: negative number");
     return Value::Float(std::sqrt(a[0].AsNumber()));

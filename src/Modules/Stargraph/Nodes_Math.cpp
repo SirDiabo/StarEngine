@@ -128,9 +128,25 @@ void RegisterMathNodes() {
                 for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
             } else if (resultType == PinType::Integer) {
                 int a = 0, b = 0;
+                float af = 0, bf = 0;
                 for (const Pin& p : node.inputs) {
                     if (p.name == "A") a = p.defaultValue.AsInt();
+                    if (p.name == "A") af = p.defaultValue.AsFloat();
                     if (p.name == "B") b = p.defaultValue.AsInt();
+                    if (p.name == "B") bf = p.defaultValue.AsFloat();
+                }
+                bool useFloat = aIsFloat || bIsFloat || af != floorf(af) || bf != floorf(bf);
+                if (useFloat) {
+                    float fresult = 0;
+                    switch (op) {
+                        case '+': fresult = af + bf; break;
+                        case '-': fresult = af - bf; break;
+                        case '*': fresult = af * bf; break;
+                        case '/': fresult = (bf != 0) ? af / bf : 0; break;
+                    }
+                    char buf[32]; snprintf(buf, sizeof(buf), "%.9g", fresult);
+                    for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
+                    return;
                 }
                 int result = 0;
                 switch (op) {

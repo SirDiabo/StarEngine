@@ -108,7 +108,7 @@ void RegisterUtilityNodes() {
     };
     getGameTime.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         char buf[32];
-        snprintf(buf, sizeof(buf), "%g", GetTime());
+        snprintf(buf, sizeof(buf), "%.6f", GetTime());
         for (Pin& p : node.outputs) if (p.name == "Time") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(getGameTime);

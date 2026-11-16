@@ -278,7 +278,7 @@ bool ConvertToSequence(const File& file, const ConvertOptions& options, const st
         if (e.type != EventType::NoteOn && e.type != EventType::NoteOff) continue;
         if (e.channel < 0 || e.channel > 15 || e.a < 0 || e.a > 127) continue;
         const int slot = e.channel * 128 + e.a;
-        if (e.type == EventType::NoteOn) {
+        if (e.type == EventType::NoteOn && e.b > 0) {
             ActiveNote a;
             a.tick = e.tick;
             a.velocity = std::clamp(e.b, 1, 127);
