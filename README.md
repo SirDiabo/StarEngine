@@ -1,5 +1,11 @@
 # <img src="Assets/logo.png" width="24"/> StarEngine
 
+[![Last commit](https://img.shields.io/github/last-commit/SirDiabo/StarEngine)](https://github.com/SirDiabo/StarEngine/commits)
+[![Latest release](https://img.shields.io/github/v/release/SirDiabo/StarEngine)](https://github.com/SirDiabo/StarEngine/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/SirDiabo/StarEngine/total)](https://github.com/SirDiabo/StarEngine/releases)
+[![License](https://img.shields.io/github/license/SirDiabo/StarEngine)](LICENSE)
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/sirdiabo)
+
 > **StarEngine is very early in development!** APIs, file formats and editor behavior are subject to change, and projects made with one version may need migrating for the next.
 
 StarEngine is an indie game engine for 3D games with simple graphics.
@@ -74,7 +80,7 @@ event BeginPlay():
 
 event Input("Jump"):
     if grounded:
-        Physics.add_impulse(Vec3(0, 5, 0))
+        self.add_impulse(Vec3(0, 5, 0))
         jumps += 1
 
 event Tick(dt: float):
