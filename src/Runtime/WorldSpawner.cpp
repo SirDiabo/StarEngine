@@ -35,6 +35,7 @@ Actor* WorldSpawner::SpawnActorFromInstance(const ActorInstance& inst) {
     if (!inst.classAssetPath.empty()) {
         actor->SetActorClass(inst.classAssetPath);
         if (const ActorAssetData* classData = ActorClassCache::Get().GetOrLoad(inst.classAssetPath)) {
+            actor->ApplySettings(classData->settings);
             if (ActorBehavior* behavior = ActorAsset::CreateBehavior(*classData)) {
                 actor->SetBehavior(behavior);
             } else if (!classData->programmingInterface.empty()) {

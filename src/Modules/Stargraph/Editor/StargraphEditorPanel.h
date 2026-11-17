@@ -234,6 +234,4 @@ private:
     int layerPickerPinId = 0;
     int saveTargetIndex = -1;
 
-    bool showSelfActorDetails = false;
-
 };

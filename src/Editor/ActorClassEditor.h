@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "Runtime/ActorSettings.h"
 #include "Runtime/ComponentDecl.h"
 #include "Editor/ComponentEditing.h"
 #include "Editor/PropertyPanel.h"
@@ -36,6 +37,7 @@ inline void MoveInList(std::vector<T>& items, int fromIndex, int toIndex, TreeDr
 
 struct ActorClassEditorHost {
     std::function<std::vector<ComponentDecl>&()> components;
+    std::function<ActorSettings&()> settings;
     std::function<void()> markDirty;
     std::function<void()> onComponentSelected;
 };
@@ -52,6 +54,8 @@ public:
     int GetSelectedIndex() const { return selectedComponentIndex; }
     int GetDetailIndex() const { return lastValidComponentIndex; }
     void SelectComponent(int index);
+    void SelectSelf();
+    bool IsSelfSelected() const { return selfSelected; }
     void ClearSelection();
     void ClampSelection();
     void OnDocumentReplaced();
@@ -77,6 +81,8 @@ private:
 
     void BuildOutlinerChrome();
     void BuildComponentRows(std::vector<PropertyRow>& rows, int index);
+    void BuildSelfRows(std::vector<PropertyRow>& rows);
+    ActorSettings& Settings();
     ComponentDecl* DetailComponent(int index);
     void SetComponentField(int index, const std::string& fieldKey, const std::string& value);
 
@@ -90,6 +96,7 @@ private:
     ActorClassEditorHost host;
     LiveComponentCache liveComponents;
 
+    bool selfSelected = false;
     int selectedComponentIndex = -1;
     int lastValidComponentIndex = -1;
 

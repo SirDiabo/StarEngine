@@ -758,8 +758,6 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
 }
 
 std::string StargraphEditorPanel::DetailsSelectionKey() {
-    if (showSelfActorDetails) return "self";
-
     if (actorEditor.HasDetailsSelection()) return actorEditor.DetailsSelectionKey();
     if (lastValidVariableIndex >= 0 && lastValidVariableIndex < (int)graph.GetVariables().size())
         return "v" + std::to_string(lastValidVariableIndex);
@@ -803,10 +801,7 @@ std::vector<PropertyRow> StargraphEditorPanel::BuildDetailsRows() {
         lastDetailsSelectionKey = key;
     }
 
-    if (showSelfActorDetails) {
-        rows.push_back(HeaderRow("self.h", graph.assetName));
-        rows.push_back(ReadOnlyRow("self.d", "Type", "Actor properties"));
-    } else if (actorEditor.HasDetailsSelection()) {
+    if (actorEditor.HasDetailsSelection()) {
         actorEditor.BuildDetailsRows(rows);
     } else if (lastValidVariableIndex >= 0) {
         BuildVariableRows(rows, lastValidVariableIndex, false);

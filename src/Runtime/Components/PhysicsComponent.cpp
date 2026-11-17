@@ -162,8 +162,16 @@ void PhysicsComponent::Update(float deltaTime) {
         velocity.y -= gravity * gravityScale * dt;
     }
     if (grounded && velocity.y < 0.0f) velocity.y = 0.0f;
-    if (linearDrag > 0.0f) velocity = Times(velocity, 1.0f / (1.0f + linearDrag * dt));
-    if (grounded && groundFriction > 0.0f) {
+    const bool driven = actor->IsMovementDriven();
+    if (linearDrag > 0.0f) {
+        const float dragFactor = 1.0f / (1.0f + linearDrag * dt);
+        velocity.y *= dragFactor;
+        if (!driven) {
+            velocity.x *= dragFactor;
+            velocity.z *= dragFactor;
+        }
+    }
+    if (grounded && groundFriction > 0.0f && !driven) {
         float f = 1.0f - groundFriction * dt;
         if (f < 0.0f) f = 0.0f;
         velocity.x *= f;

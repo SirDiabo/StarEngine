@@ -6,6 +6,7 @@
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "Core/SafeParse.h"
 #include "raylib.h"
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
@@ -25,6 +26,21 @@ void WriteHeader(std::ostream& out, const ActorAssetHeader& header) {
     out << "Name=" << header.assetName << "\n";
     out << "ParentClass=" << header.parentClass << "\n";
     out << "ProgrammingInterface=" << header.programmingInterface << "\n";
+    out << "\n";
+}
+
+void WriteSettings(std::ostream& out, const ActorSettings& settings) {
+    const ActorSettings defaults;
+    if (settings == defaults) return;
+    out << "[ActorSettings]\n";
+    if (settings.movementSpeed != defaults.movementSpeed) out << "MovementSpeed=" << settings.movementSpeed << "\n";
+    if (settings.acceleration != defaults.acceleration) out << "Acceleration=" << settings.acceleration << "\n";
+    if (settings.brakingDeceleration != defaults.brakingDeceleration) out << "BrakingDeceleration=" << settings.brakingDeceleration << "\n";
+    if (settings.mass != defaults.mass) out << "Mass=" << settings.mass << "\n";
+    if (settings.showMouseCursor != defaults.showMouseCursor) out << "ShowMouseCursor=" << (settings.showMouseCursor ? "true" : "false") << "\n";
+    if (settings.useControlYaw != defaults.useControlYaw) out << "UseControlYaw=" << (settings.useControlYaw ? "true" : "false") << "\n";
+    if (settings.useControlPitch != defaults.useControlPitch) out << "UseControlPitch=" << (settings.useControlPitch ? "true" : "false") << "\n";
+    if (settings.useControlRoll != defaults.useControlRoll) out << "UseControlRoll=" << (settings.useControlRoll ? "true" : "false") << "\n";
     out << "\n";
 }
 
@@ -103,6 +119,39 @@ ActorAssetHeader ReadHeader(const std::vector<ParsedSection>& sections) {
     return header;
 }
 
+static float ReadSettingFloat(const ParsedSection& section, const char* key, float fallback) {
+    const std::string* v = FindEntry(section, key);
+    if (!v) return fallback;
+    float value = SafeParse::ToFloat(*v, fallback);
+    if (!std::isfinite(value) || value < 0.0f || value > 1.0e9f) return fallback;
+    return value;
+}
+
+static bool ReadSettingBool(const ParsedSection& section, const char* key, bool fallback) {
+    const std::string* v = FindEntry(section, key);
+    if (!v) return fallback;
+    if (*v == "true" || *v == "1") return true;
+    if (*v == "false" || *v == "0") return false;
+    return fallback;
+}
+
+ActorSettings ReadSettings(const std::vector<ParsedSection>& sections) {
+    ActorSettings settings;
+    for (const ParsedSection& section : sections) {
+        if (section.name != "ActorSettings") continue;
+        settings.movementSpeed = ReadSettingFloat(section, "MovementSpeed", settings.movementSpeed);
+        settings.acceleration = ReadSettingFloat(section, "Acceleration", settings.acceleration);
+        settings.brakingDeceleration = ReadSettingFloat(section, "BrakingDeceleration", settings.brakingDeceleration);
+        settings.mass = ReadSettingFloat(section, "Mass", settings.mass);
+        settings.showMouseCursor = ReadSettingBool(section, "ShowMouseCursor", settings.showMouseCursor);
+        settings.useControlYaw = ReadSettingBool(section, "UseControlYaw", settings.useControlYaw);
+        settings.useControlPitch = ReadSettingBool(section, "UseControlPitch", settings.useControlPitch);
+        settings.useControlRoll = ReadSettingBool(section, "UseControlRoll", settings.useControlRoll);
+        break;
+    }
+    return settings;
+}
+
 void ReadComponents(const std::vector<ParsedSection>& sections, std::vector<ComponentDecl>& outComponents) {
     outComponents.clear();
     for (const ParsedSection& section : sections) {
@@ -166,6 +215,7 @@ bool Write(std::ostream& out, const ActorAssetData& data) {
     header.parentClass = data.parentClass;
     header.programmingInterface = data.programmingInterface;
     WriteHeader(out, header);
+    WriteSettings(out, data.settings);
     WriteComponents(out, data.components);
 
     if (!data.programmingInterface.empty() && data.behaviorContent) {
@@ -193,6 +243,7 @@ bool Read(std::istream& in, ActorAssetData& outData, bool loadBehavior) {
     outData.assetName = header.assetName;
     outData.parentClass = header.parentClass;
     outData.programmingInterface = header.programmingInterface;
+    outData.settings = ReadSettings(sections);
     ReadComponents(sections, outData.components);
 
     delete outData.behaviorContent;

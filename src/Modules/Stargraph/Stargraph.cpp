@@ -557,6 +557,7 @@ bool Stargraph::SaveToStream(std::ostream& out) const {
     header.parentClass = parentClass;
     header.programmingInterface = kStargraphInterfaceName;
     ActorAsset::WriteHeader(out, header);
+    ActorAsset::WriteSettings(out, actorSettings);
     ActorAsset::WriteComponents(out, components);
     SaveContent(out, ActorAsset::ContentPrefix);
     return true;
@@ -734,6 +735,7 @@ bool Stargraph::LoadFromFile(const std::string& path) {
 
 bool Stargraph::LoadFromStream(std::istream& in) {
     components.clear();
+    actorSettings = ActorSettings();
     functions.clear();
 
     std::vector<ParsedSection> sections = ParseSections(in);
@@ -746,6 +748,7 @@ bool Stargraph::LoadFromStream(std::istream& in) {
         parentClass = header.parentClass;
     }
 
+    actorSettings = ActorAsset::ReadSettings(sections);
     ActorAsset::ReadComponents(sections, components);
     return LoadContent(sections, header.found && !header.isLegacy ? std::string(ActorAsset::ContentPrefix) : std::string());
 }

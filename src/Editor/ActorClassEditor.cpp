@@ -35,6 +35,15 @@ std::vector<ComponentDecl>& ActorClassEditor::Components() {
     return host.components();
 }
 
+ActorSettings& ActorClassEditor::Settings() {
+    static ActorSettings fallback;
+    if (!host.settings) {
+        fallback = ActorSettings();
+        return fallback;
+    }
+    return host.settings();
+}
+
 void ActorClassEditor::MarkDirty() {
     if (host.markDirty) host.markDirty();
 }
@@ -44,11 +53,20 @@ void ActorClassEditor::NotifyComponentSelected() {
 }
 
 void ActorClassEditor::SelectComponent(int index) {
+    selfSelected = false;
     selectedComponentIndex = index;
     lastValidComponentIndex = index;
 }
 
+void ActorClassEditor::SelectSelf() {
+    selfSelected = true;
+    selectedComponentIndex = -1;
+    lastValidComponentIndex = -1;
+    NotifyComponentSelected();
+}
+
 void ActorClassEditor::ClearSelection() {
+    selfSelected = false;
     selectedComponentIndex = -1;
     lastValidComponentIndex = -1;
 }
@@ -66,17 +84,23 @@ void ActorClassEditor::OnDocumentReplaced() {
 }
 
 std::string ActorClassEditor::DetailsSelectionKey() {
+    if (selfSelected) return "self";
     if (lastValidComponentIndex >= 0 && lastValidComponentIndex < (int)Components().size())
         return "c" + std::to_string(lastValidComponentIndex);
     return std::string();
 }
 
 bool ActorClassEditor::HasDetailsSelection() {
+    if (selfSelected) return true;
     return lastValidComponentIndex >= 0 && lastValidComponentIndex < (int)Components().size();
 }
 
 void ActorClassEditor::BuildDetailsRows(std::vector<PropertyRow>& rows) {
     if (!HasDetailsSelection()) return;
+    if (selfSelected) {
+        BuildSelfRows(rows);
+        return;
+    }
     BuildComponentRows(rows, lastValidComponentIndex);
 }
 
@@ -113,6 +137,7 @@ void ActorClassEditor::BuildOutlinerChrome() {
         std::vector<ComponentDecl>& comps = Components();
         for (size_t i = 0; i < comps.size(); i++) {
             if (comps[i].name == id) {
+                selfSelected = false;
                 selectedComponentIndex = (int)i;
                 lastValidComponentIndex = (int)i;
                 break;
@@ -183,6 +208,19 @@ void ActorClassEditor::RenderOutliner(Rectangle area, Rectangle screenBounds) {
 
     float y = area.y + 6;
     bool popupWasOpenThisFrame = addComponentMenu.IsOpen();
+
+    Rectangle selfRow = { area.x + 4, y - 2, area.width - 8, 20 };
+    bool selfHov = !popupWasOpenThisFrame && !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(GetMousePosition(), selfRow);
+    if (selfSelected) DrawRectangleRec(selfRow, theme.surfaceSelected);
+    else if (selfHov) DrawRectangleRec(selfRow, theme.surfaceHover);
+    DrawText("Self", (int)selfRow.x + 6, (int)(selfRow.y + (selfRow.height - 12) / 2.0f), 12, theme.textPrimary);
+    const char* selfHint = "Actor";
+    DrawText(selfHint, (int)(selfRow.x + selfRow.width - MeasureText(selfHint, 10) - 6), (int)(selfRow.y + (selfRow.height - 10) / 2.0f), 10, theme.textSecondary);
+    if (selfHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) SelectSelf();
+
+    y += 24;
+    DrawLine((int)area.x + 4, (int)y, (int)(area.x + area.width - 4), (int)y, theme.panelBorder);
+    y += 6;
 
     DrawText("Components", (int)area.x + 8, (int)y, 12, theme.textSecondary);
 
@@ -255,6 +293,7 @@ void ActorClassEditor::RenderOutliner(Rectangle area, Rectangle screenBounds) {
             comp.componentType = picked;
             comp.name          = picked;
             Components().push_back(comp);
+            selfSelected = false;
             selectedComponentIndex = (int)Components().size() - 1;
             lastValidComponentIndex = selectedComponentIndex;
             NotifyComponentSelected();
@@ -299,6 +338,38 @@ static std::vector<std::string> GetValidParentOptions(const std::vector<Componen
 ComponentDecl* ActorClassEditor::DetailComponent(int index) {
     std::vector<ComponentDecl>& comps = Components();
     return (index >= 0 && index < (int)comps.size()) ? &comps[index] : nullptr;
+}
+
+void ActorClassEditor::BuildSelfRows(std::vector<PropertyRow>& rows) {
+    ActorSettings& s = Settings();
+
+    auto clampValue = [](float v) { return std::isfinite(v) ? std::min(std::max(v, 0.0f), 1.0e9f) : 0.0f; };
+
+    rows.push_back(HeaderRow("self.type", "Actor"));
+
+    rows.push_back(HeaderRow("self.movement", "Movement"));
+    rows.push_back(FloatRow("self.speed", "Movement Speed", s.movementSpeed, false, [this, clampValue](float v) {
+        Settings().movementSpeed = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.accel", "Acceleration", s.acceleration, false, [this, clampValue](float v) {
+        Settings().acceleration = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.brake", "Braking Deceleration", s.brakingDeceleration, false, [this, clampValue](float v) {
+        Settings().brakingDeceleration = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.mass", "Mass", s.mass, false, [this, clampValue](float v) {
+        Settings().mass = clampValue(v);
+        MarkDirty();
+    }));
+
+    rows.push_back(HeaderRow("self.controller", "Controller"));
+    rows.push_back(BoolRow("self.yaw", "Use Control Yaw", s.useControlYaw, [this](bool v) { Settings().useControlYaw = v; MarkDirty(); }));
+    rows.push_back(BoolRow("self.pitch", "Use Control Pitch", s.useControlPitch, [this](bool v) { Settings().useControlPitch = v; MarkDirty(); }));
+    rows.push_back(BoolRow("self.roll", "Use Control Roll", s.useControlRoll, [this](bool v) { Settings().useControlRoll = v; MarkDirty(); }));
+    rows.push_back(BoolRow("self.cursor", "Show Mouse Cursor", s.showMouseCursor, [this](bool v) { Settings().showMouseCursor = v; MarkDirty(); }));
 }
 
 void ActorClassEditor::BuildComponentRows(std::vector<PropertyRow>& rows, int idx) {

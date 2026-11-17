@@ -9,6 +9,7 @@
 #include <istream>
 #include <fstream>
 #include "Runtime/ReplicationMode.h"
+#include "Runtime/ActorSettings.h"
 #include "Runtime/ComponentDecl.h"
 #include "Core/SectionFileIO.h"
 
@@ -192,6 +193,8 @@ public:
     std::vector<Variable>& GetVariables() { return variables; }
     const std::vector<ComponentDecl>& GetComponents() const { return components; }
     std::vector<ComponentDecl>& GetComponents() { return components; }
+    const ActorSettings& GetActorSettings() const { return actorSettings; }
+    ActorSettings& GetActorSettings() { return actorSettings; }
 
     Node* CreateNode(const std::string& type);
     void AddLink(const Link& link);
@@ -264,6 +267,7 @@ private:
     std::vector<Link> links;
     std::vector<Variable> variables;
     std::vector<ComponentDecl> components;
+    ActorSettings actorSettings;
     std::vector<FunctionDef> functions;
     int nextPinId = 1;
     int nextNodeId = 1;

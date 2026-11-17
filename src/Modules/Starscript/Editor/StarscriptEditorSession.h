@@ -2,6 +2,7 @@
 #include "CodeEditor.h"
 #include "Editor/ActorClassEditor.h"
 #include "../StarscriptAst.h"
+#include "Runtime/ActorSettings.h"
 #include "Runtime/ComponentDecl.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 #include "../StarscriptCompiler.h"
@@ -66,6 +67,7 @@ private:
     std::string assetName;
     std::string parentClass = "Actor";
     std::vector<ComponentDecl> components;
+    ActorSettings actorSettings;
     CodeEditor code;
     ActorClassEditor actorEditor;
 

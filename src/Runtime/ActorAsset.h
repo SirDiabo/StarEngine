@@ -1,4 +1,5 @@
 #pragma once
+#include "ActorSettings.h"
 #include "ComponentDecl.h"
 #include "Core/SectionFileIO.h"
 #include <istream>
@@ -13,6 +14,7 @@ struct ActorAssetData {
     std::string assetName;
     std::string parentClass = "Actor";
     std::string programmingInterface;
+    ActorSettings settings;
     std::vector<ComponentDecl> components;
     IBehaviorContent* behaviorContent = nullptr;
 
@@ -44,6 +46,8 @@ bool Write(std::ostream& out, const ActorAssetData& data);
 std::string PeekInterface(const std::string& path);
 
 void WriteHeader(std::ostream& out, const ActorAssetHeader& header);
+void WriteSettings(std::ostream& out, const ActorSettings& settings);
+ActorSettings ReadSettings(const std::vector<SectionFileIO::ParsedSection>& sections);
 void WriteComponents(std::ostream& out, const std::vector<ComponentDecl>& components);
 ActorAssetHeader ReadHeader(const std::vector<SectionFileIO::ParsedSection>& sections);
 void ReadComponents(const std::vector<SectionFileIO::ParsedSection>& sections, std::vector<ComponentDecl>& outComponents);

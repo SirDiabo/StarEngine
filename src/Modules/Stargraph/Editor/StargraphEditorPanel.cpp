@@ -3,6 +3,7 @@
 #include "Modules/Stargraph/StargraphAssetCache.h"
 #include "Editor/ViewportPanel.h"
 #include "Editor/UITheme.h"
+#include "Core/Widgets/Widget.h"
 #include "Core/Widgets/WidgetInput.h"
 #include "Editor/EditorUndo.h"
 #include <sstream>
@@ -34,6 +35,7 @@ StargraphEditorPanel::~StargraphEditorPanel() {
 void StargraphEditorPanel::Initialize() {
     ActorClassEditorHost host;
     host.components = [this]() -> std::vector<ComponentDecl>& { return graph.GetComponents(); };
+    host.settings = [this]() -> ActorSettings& { return graph.GetActorSettings(); };
     host.markDirty = [this]() { isDirty = true; };
     host.onComponentSelected = [this]() { ClearOtherLeftSelections(3); };
     actorEditor.SetHost(std::move(host));
@@ -227,15 +229,6 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
     if (saveHov && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         SaveGraph();
     }
-    btnLeft += 54;
-
-    Vector2 mp = GetMousePosition();
-
-    Rectangle selfBtn = {btnLeft, btnY, 48, 22};
-    bool selfHovered = CheckCollisionPointRec(mp, selfBtn);
-    Color selfColor = (showSelfActorDetails || selfHovered) ? theme.accent : theme.buttonBg;
-    DrawRectangleRec(selfBtn, selfColor);
-    DrawText("Self", (int)selfBtn.x + 7, (int)selfBtn.y + 4, 13, WHITE);
 
     float btnRight = area.x + area.width - 4;
 
@@ -250,18 +243,6 @@ void StargraphEditorPanel::RenderToolbar(Rectangle area) {
         if (isDirty) SaveGraph();
         Close();
         return;
-    }
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        if (CheckCollisionPointRec(mp, selfBtn)) {
-            showSelfActorDetails = !showSelfActorDetails;
-            if (showSelfActorDetails) {
-                selectedNodeId = -1;
-                selectedNodeIds.clear();
-                selectedVariableIndex = -1;
-                actorEditor.ClearSelection();
-            }
-        }
     }
 }
 

@@ -87,6 +87,7 @@ void Actor::SetBehavior(ActorBehavior* newBehavior) {
 
 void Actor::BeginPlay() {
     receivedMovementInput = false;
+    movementDriven = false;
     controlRotation = WrapRotationDegrees(rotation);
     hasBegunPlay = true;
     for (size_t i = 0; i < components.size(); i++) components[i]->InitializeOnce();
@@ -134,6 +135,7 @@ void Actor::ApplyMovementInput(float dt) {
 
     const float inputLenSq = input.x * input.x + input.y * input.y + input.z * input.z;
     if (inputLenSq > 1.0f) input = Vector3Scale(input, 1.0f / sqrtf(inputLenSq));
+    movementDriven = inputLenSq > 1e-6f;
     if (!receivedMovementInput || dt <= 0.0f) return;
 
     PhysicsComponent* physics = GetPhysicsComponent();
@@ -306,6 +308,17 @@ void Actor::AddControlPitchInput(float value) {
 
 void Actor::AddControlRollInput(float value) {
     controlRotation.z = WrapAngleDegrees(controlRotation.z + value);
+}
+
+void Actor::ApplySettings(const ActorSettings& settings) {
+    MovementSpeed = settings.movementSpeed;
+    acceleration = settings.acceleration;
+    brakingDeceleration = settings.brakingDeceleration;
+    mass = settings.mass;
+    showMouseCursor = settings.showMouseCursor;
+    useControlYaw = settings.useControlYaw;
+    useControlPitch = settings.useControlPitch;
+    useControlRoll = settings.useControlRoll;
 }
 
 void Actor::SetVelocity(Vector3 value) {

@@ -1,6 +1,7 @@
 #pragma once
 #include "Object.h"
 #include "ActorBehavior.h"
+#include "ActorSettings.h"
 #include "Components/MeshComponent.h"
 #include "Components/CollisionComponent.h"
 #include "Components/AudioComponent.h"
@@ -56,21 +57,21 @@ public:
     Vector3 rotation{ 0, 0, 0 };
     Vector3 scale{ 1, 1, 1 };
 
-    bool showMouseCursor = true;
+    bool showMouseCursor = ActorDefaults::ShowMouseCursor;
 
     bool hasBegunPlay = false;
 
     Vector3 controlRotation{ 0, 0, 0 };
     Vector3 pendingMovementInput{ 0, 0, 0 };
 
-    bool useControlYaw = true;
-    bool useControlPitch = false;
-    bool useControlRoll = false;
+    bool useControlYaw = ActorDefaults::UseControlYaw;
+    bool useControlPitch = ActorDefaults::UseControlPitch;
+    bool useControlRoll = ActorDefaults::UseControlRoll;
 
-    float MovementSpeed = 600.0f;
-    float acceleration = 4000.0f;
-    float brakingDeceleration = 6000.0f;
-    float mass = 1.0f;
+    float MovementSpeed = ActorDefaults::MovementSpeed;
+    float acceleration = ActorDefaults::Acceleration;
+    float brakingDeceleration = ActorDefaults::BrakingDeceleration;
+    float mass = ActorDefaults::Mass;
     Vector3 velocity{ 0, 0, 0 };
 
     void SetControlRotation(Vector3 value);
@@ -78,9 +79,11 @@ public:
     void AddControlPitchInput(float value);
     void AddControlRollInput(float value);
     void AddMovementInput(Vector3 worldDirection, float scaleValue);
+    void ApplySettings(const ActorSettings& settings);
     void SetVelocity(Vector3 value);
     void AddImpulse(Vector3 impulse);
     void MarkVelocityIntegrated() { velocityIntegrated = true; }
+    bool IsMovementDriven() const { return movementDriven; }
 
     void AddComponent(Component* component, Component* parent = nullptr);
     void RemoveComponent(Component* component);
@@ -117,4 +120,5 @@ private:
     uint32_t netId = 0;
     bool velocityIntegrated = false;
     bool receivedMovementInput = false;
+    bool movementDriven = false;
 };

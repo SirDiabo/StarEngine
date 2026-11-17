@@ -22,6 +22,7 @@ using namespace Starscript;
 StarscriptEditorSession::StarscriptEditorSession() {
     ActorClassEditorHost host;
     host.components = [this]() -> std::vector<ComponentDecl>& { return components; };
+    host.settings = [this]() -> ActorSettings& { return actorSettings; };
     host.markDirty = [this]() { isDirty = true; componentsRevision++; };
     host.onComponentSelected = []() {};
     actorEditor.SetHost(std::move(host));
@@ -74,6 +75,7 @@ bool StarscriptEditorSession::Open(const std::string& path) {
     assetName = data.assetName;
     parentClass = data.parentClass;
     components = data.components;
+    actorSettings = data.settings;
 
     std::string source;
     if (auto* content = dynamic_cast<StarscriptContent*>(data.behaviorContent)) source = content->source;
@@ -165,6 +167,7 @@ std::string StarscriptEditorSession::SerializeDocument() {
     data.assetName = assetName;
     data.parentClass = parentClass;
     data.programmingInterface = kInterfaceName;
+    data.settings = actorSettings;
     data.components = components;
     auto* content = new StarscriptContent();
     content->source = code.GetText();
@@ -184,6 +187,7 @@ bool StarscriptEditorSession::Save() {
     data.assetName = assetName;
     data.parentClass = parentClass;
     data.programmingInterface = kInterfaceName;
+    data.settings = actorSettings;
     data.components = components;
     auto* content = new StarscriptContent();
     content->source = code.GetText();
@@ -222,6 +226,7 @@ void StarscriptEditorSession::RestoreUndoState(const std::string& content, const
     if (!ActorAsset::Read(in, data)) return;
 
     components = data.components;
+    actorSettings = data.settings;
     std::string source;
     if (auto* c = dynamic_cast<StarscriptContent*>(data.behaviorContent)) source = c->source;
     code.SetText(source);
