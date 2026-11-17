@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <climits>
 
 static float GetScalarValue(const Pin& p) {
     if (p.type == PinType::Boolean) return p.defaultValue.AsBool() ? 1.0f : 0.0f;
@@ -153,7 +154,7 @@ void RegisterMathNodes() {
                     case '+': result = a + b; break;
                     case '-': result = a - b; break;
                     case '*': result = a * b; break;
-                    case '/': result = (b != 0) ? a / b : 0; break;
+                    case '/': result = (b == 0) ? 0 : (b == -1) ? (a == INT_MIN ? INT_MAX : -a) : a / b; break;
                 }
                 for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = std::to_string(result);
             } else {

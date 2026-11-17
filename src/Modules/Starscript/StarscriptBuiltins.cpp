@@ -133,8 +133,8 @@ Value Fn_min(Runtime&, std::vector<Value>& a) {
 }
 
 Value Fn_max(Runtime&, std::vector<Value>& a) {
-    double r = std::min(std::max(a[0].AsNumber(), a[1].AsNumber()), a[2].AsNumber());
-    return AllInts(a) ? Value::Int((long long)r) : Value::Float(r);
+    if (AllInts(a)) return Value::Int(std::max(a[0].i, a[1].i));
+    return Value::Float(std::max(a[0].AsNumber(), a[1].AsNumber()));
 }
 
 Value Fn_clamp(Runtime&, std::vector<Value>& a) {
