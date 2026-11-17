@@ -164,14 +164,20 @@ std::vector<ContentEntry> ContentBrowserPanel::ScanCurrentFolder() const {
     std::vector<ContentEntry> files;
 
     fs::path folder = GetCurrentFolderPath();
-    if (!fs::exists(folder)) return folders;
+    std::error_code ec;
+    if (!fs::exists(folder, ec) || ec) return folders;
 
-    for (const auto& entry : fs::directory_iterator(folder)) {
+    fs::directory_iterator it(folder, ec);
+    if (ec) return folders;
+ 
+    for (fs::directory_iterator end; !ec && it != end; it.increment(ec)) {
+        const auto& entry = *it;
         ContentEntry item;
         item.fullDiskName = entry.path().filename().string();
         item.extension    = entry.path().extension().string();
 
-        if (entry.is_directory()) {
+        std::error_code entryEc;
+        if (entry.is_directory(entryEc)) {
             if (item.fullDiskName == "_Source") continue;
             item.isFolder = true;
             item.displayName = item.fullDiskName;

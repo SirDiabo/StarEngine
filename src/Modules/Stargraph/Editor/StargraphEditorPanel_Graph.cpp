@@ -302,10 +302,14 @@ bool StargraphEditorPanel::ConnectPins(int outputPinId, int inputPinId) {
         return true;
     }
 
-    Pin* outPin = ActiveGraph().FindPin(outputPinId);
-    Pin* inPin = ActiveGraph().FindPin(inputPinId);
+    Node* outNode = ActiveGraph().FindNodeByPinId(outputPinId);
     Node* inNode = ActiveGraph().FindNodeByPinId(inputPinId);
-    if (!outPin || !inPin || !inNode || inPin->type != PinType::String) return false;
+    if (!outNode || !inNode) return false;
+    Pin* outPin = nullptr;
+    Pin* inPin = nullptr;
+    for (Pin& p : outNode->outputs) if (p.id == outputPinId) { outPin = &p; break; }
+    for (Pin& p : inNode->inputs) if (p.id == inputPinId) { inPin = &p; break; }
+    if (!outPin || !inPin || inPin->type != PinType::String) return false;
 
     const char* conversionType = StringConversionNodeType(outPin->type);
     if (!conversionType || !NodeRegistry::Get().GetTemplate(conversionType)) return false;

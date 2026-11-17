@@ -375,6 +375,7 @@ void ProjectSettingsTab::RenderRenderingCategory(Rectangle area) {
         renderScaleField->onTextCommitted = [this](const std::string& text) {
             float pct = (float)atof(text.c_str());
             if (pct < 10.0f) pct = 10.0f;
+            if (pct > 400.0f) pct = 400.0f;
             RenderSettings::Get().SetRenderScale(pct / 100.0f);
         };
         root->AddChild(renderScaleField);
