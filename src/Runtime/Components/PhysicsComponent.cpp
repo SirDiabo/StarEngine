@@ -41,7 +41,6 @@ void PhysicsComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddBool("Use Gravity", &useGravity);
     outProperties.AddFloat("Gravity", &gravity);
     outProperties.AddFloat("Gravity Scale", &gravityScale);
-    outProperties.AddFloat("Mass", &mass);
     outProperties.AddFloat("Linear Drag", &linearDrag);
     outProperties.AddFloat("Ground Friction", &groundFriction);
     outProperties.AddFloat("Max Fall Speed", &maxFallSpeed);
@@ -50,20 +49,10 @@ void PhysicsComponent::GetEditorProperties(PropertyList& outProperties) {
     outProperties.AddFloat("Skin Width", &skinWidth);
     outProperties.AddFloat("Ground Snap Smoothing", &groundSnapSmoothing);
     outProperties.AddFloat("Bounciness", &bounciness);
-    outProperties.AddVector3("Velocity", &velocity.x);
     outProperties.AddBool("Grounded", &grounded, true);
 }
 
-void PhysicsComponent::SetVelocity(const Vector3& newVelocity) {
-    velocity = newVelocity;
-}
-
-void PhysicsComponent::AddImpulse(const Vector3& impulse) {
-    float m = mass > 0.0001f ? mass : 0.0001f;
-    velocity = Plus(velocity, Times(impulse, 1.0f / m));
-}
-
-Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate) {
+Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate, Vector3& velocity) {
     Vector3 moved{ 0.0f, 0.0f, 0.0f };
     float smoothT = 1.0f - powf(1.0f - groundSnapSmoothing, dtForDepenetrate * 60.0f);
     for (int iter = 0; iter < 4; iter++) {
@@ -87,7 +76,7 @@ Vector3 PhysicsComponent::Depenetrate(CollisionTrace::Shape& shape, const Collis
     return moved;
 }
 
-Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vector3& delta, const CollisionTrace::QueryParams& params) {
+Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vector3& delta, const CollisionTrace::QueryParams& params, Vector3& velocity) {
     Vector3 applied{ 0.0f, 0.0f, 0.0f };
     Vector3 remaining = delta;
     Vector3 planes[3];
@@ -128,7 +117,7 @@ Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vecto
     return applied;
 }
 
-Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround) {
+Vector3 PhysicsComponent::UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround, Vector3& velocity) {
     grounded = false;
     groundNormal = Vector3{ 0.0f, 1.0f, 0.0f };
     Vector3 applied{ 0.0f, 0.0f, 0.0f };
@@ -167,6 +156,8 @@ void PhysicsComponent::Update(float deltaTime) {
     float dt = deltaTime > 0.05f ? 0.05f : deltaTime;
     if (dt <= 0.0f) return;
 
+    Vector3& velocity = actor->velocity;
+
     if (useGravity && !(grounded && velocity.y <= 0.0f)) {
         velocity.y -= gravity * gravityScale * dt;
     }
@@ -184,6 +175,7 @@ void PhysicsComponent::Update(float deltaTime) {
     CollisionTrace::Shape shape;
     if (!body || !CollisionTrace::GetComponentShape(actor, body, shape)) {
         actor->position = Plus(actor->position, Times(velocity, dt));
+        actor->MarkVelocityIntegrated();
         grounded = false;
         return;
     }
@@ -200,18 +192,19 @@ void PhysicsComponent::Update(float deltaTime) {
     Vector3 total;
     {
         PROFILE_SCOPE("Depenetrate");
-        total = Depenetrate(shape, params, dt);
+        total = Depenetrate(shape, params, dt, velocity);
     }
     {
         PROFILE_SCOPE("Move And Slide");
-        total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params));
+        total = Plus(total, MoveAndSlide(shape, Times(velocity, dt), params, velocity));
     }
     {
         PROFILE_SCOPE("Update Ground");
-        total = Plus(total, UpdateGround(shape, params, wasGrounded, dt));
+        total = Plus(total, UpdateGround(shape, params, wasGrounded, dt, velocity));
     }
 
     actor->position = Plus(actor->position, total);
+    actor->MarkVelocityIntegrated();
 
     if (!wasGrounded && grounded) {
         velocity = Vector3{ preMoveVelocity.x, 0.0f, preMoveVelocity.z };
@@ -247,7 +240,6 @@ ComponentRegistrar registrar_PhysicsComponent({
         BoolField("UseGravity", "Use Gravity", true, &PhysicsComponent::useGravity),
         FloatField("Gravity", "Gravity", 980.0f, &PhysicsComponent::gravity),
         FloatField("GravityScale", "Gravity Scale", 1.0f, &PhysicsComponent::gravityScale),
-        FloatField("Mass", "Mass", 1.0f, &PhysicsComponent::mass),
         FloatField("LinearDrag", "Linear Drag", 0.0f, &PhysicsComponent::linearDrag),
         FloatField("GroundFriction", "Ground Friction", 0.0f, &PhysicsComponent::groundFriction),
         FloatField("MaxFallSpeed", "Max Fall Speed", 0.0f, &PhysicsComponent::maxFallSpeed),

@@ -65,6 +65,11 @@ void Actor::GetProperties(PropertyList& outProperties) {
     outProperties.AddBool("Use Control Yaw", &useControlYaw);
     outProperties.AddBool("Use Control Pitch", &useControlPitch);
     outProperties.AddBool("Use Control Roll", &useControlRoll);
+    outProperties.AddVector3("Velocity", &velocity.x);
+    outProperties.AddFloat("Movement Speed", &MovementSpeed);
+    outProperties.AddFloat("Acceleration", &acceleration);
+    outProperties.AddFloat("Braking Deceleration", &brakingDeceleration);
+    outProperties.AddFloat("Mass", &mass);
 }
 
 void Actor::SaveState(const std::string& saveFile) {
@@ -81,6 +86,7 @@ void Actor::SetBehavior(ActorBehavior* newBehavior) {
 }
 
 void Actor::BeginPlay() {
+    receivedMovementInput = false;
     controlRotation = WrapRotationDegrees(rotation);
     hasBegunPlay = true;
     for (size_t i = 0; i < components.size(); i++) components[i]->InitializeOnce();
@@ -89,6 +95,7 @@ void Actor::BeginPlay() {
 }
 
 void Actor::Tick(float deltaTime) {
+    velocityIntegrated = false;
     {
         PROFILE_SCOPE("Native OnTick");
         OnTick(deltaTime);
@@ -107,18 +114,40 @@ void Actor::Tick(float deltaTime) {
         if (cam->useControlRoll)  cam->rotation.z = AngleDeltaDegrees(rotation.z, controlRotation.z);
     }
 
-    float moveLenSq = pendingMovementInput.x * pendingMovementInput.x
-                     + pendingMovementInput.y * pendingMovementInput.y
-                     + pendingMovementInput.z * pendingMovementInput.z;
-    if (moveLenSq > 1.0f) pendingMovementInput = Vector3Scale(pendingMovementInput, 1.0f / sqrtf(moveLenSq));
-    position = Vector3Add(position, Vector3Scale(pendingMovementInput * MovementSpeed, deltaTime));
+    const float dt = deltaTime > 0.05f ? 0.05f : deltaTime;
+    ApplyMovementInput(dt);
+
+    {
+        PROFILE_SCOPE("Components");
+        for (Component* c : components) {
+            PROFILE_SCOPE_DYN(ProfilerLabels::ForComponent(*c));
+            c->Update(deltaTime);
+        }
+    }
+
+    if (!velocityIntegrated && dt > 0.0f) position = Vector3Add(position, Vector3Scale(velocity, dt));
+}
+
+void Actor::ApplyMovementInput(float dt) {
+    Vector3 input = pendingMovementInput;
     pendingMovementInput = { 0, 0, 0 };
 
-    PROFILE_SCOPE("Components");
-    for (Component* c : components) {
-        PROFILE_SCOPE_DYN(ProfilerLabels::ForComponent(*c));
-        c->Update(deltaTime);
-    }
+    const float inputLenSq = input.x * input.x + input.y * input.y + input.z * input.z;
+    if (inputLenSq > 1.0f) input = Vector3Scale(input, 1.0f / sqrtf(inputLenSq));
+    if (!receivedMovementInput || dt <= 0.0f) return;
+
+    PhysicsComponent* physics = GetPhysicsComponent();
+    const bool gravityActive = physics && physics->simulatePhysics && physics->useGravity;
+
+    Vector3 difference = Vector3Subtract(Vector3Scale(input, MovementSpeed), velocity);
+    if (gravityActive) difference.y = 0.0f;
+    const float differenceLength = Vector3Length(difference);
+    if (differenceLength <= 1e-6f) return;
+
+    const float rate = inputLenSq > 1e-6f ? acceleration : brakingDeceleration;
+    const float step = rate > 0.0f ? rate * dt : differenceLength;
+    const float fraction = step >= differenceLength ? 1.0f : step / differenceLength;
+    velocity = Vector3Add(velocity, Vector3Scale(difference, fraction));
 }
 
 void Actor::EndPlay() {
@@ -279,7 +308,17 @@ void Actor::AddControlRollInput(float value) {
     controlRotation.z = WrapAngleDegrees(controlRotation.z + value);
 }
 
+void Actor::SetVelocity(Vector3 value) {
+    velocity = value;
+}
+
+void Actor::AddImpulse(Vector3 impulse) {
+    const float m = mass > 0.0001f ? mass : 0.0001f;
+    velocity = Vector3Add(velocity, Vector3Scale(impulse, 1.0f / m));
+}
+
 void Actor::AddMovementInput(Vector3 worldDirection, float scaleValue) {
+    receivedMovementInput = true;
     float len = Vector3Length(worldDirection);
     if (len > 0.0001f) worldDirection = Vector3Scale(worldDirection, 1.0f / len);
     pendingMovementInput = Vector3Add(pendingMovementInput, Vector3Scale(worldDirection, scaleValue));

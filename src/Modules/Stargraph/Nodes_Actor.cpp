@@ -16,6 +16,57 @@
 #include <fstream>
 #include "ObjectPinRef.h"
 
+namespace {
+
+Actor* ResolveTargetActor(Node& node, ExecutionContext& ctx) {
+    for (const Pin& p : node.inputs) {
+        if (p.name == "Target" && !p.defaultValue.empty()) {
+            return ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
+        }
+    }
+    return ctx.actor;
+}
+
+void RegisterActorFloatProperty(const std::string& getType, const std::string& setType, const std::string& pinName, const std::string& defaultText, float Actor::* member) {
+    NodeTemplate getter;
+    getter.type = getType;
+    getter.category = "Actor";
+    getter.moduleName = "Stargraph";
+    getter.createPins = [pinName](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->outputs.push_back({pinName, PinType::Float, false, true});
+    };
+    getter.execute = [pinName, member](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ResolveTargetActor(node, ctx);
+        if (!target) return;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%g", target->*member);
+        for (Pin& p : node.outputs) if (p.name == pinName) p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getter);
+
+    NodeTemplate setter;
+    setter.type = setType;
+    setter.category = "Actor";
+    setter.moduleName = "Stargraph";
+    setter.createPins = [pinName, defaultText](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->inputs.push_back({pinName, PinType::Float, true, false, 0, defaultText});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setter.execute = [pinName, member](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ResolveTargetActor(node, ctx);
+        if (!target) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == pinName) target->*member = p.defaultValue.AsFloat();
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setter);
+}
+
+}
+
 void RegisterActorNodes() {
     NodeTemplate getActorLocation;
     getActorLocation.type = "Get_Actor_Location";
@@ -497,7 +548,6 @@ void RegisterActorNodes() {
         for (const Pin& p : node.inputs) {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = ObjectPinRef::ResolveAs<Actor>(node, p.defaultValue, "Actor", ctx);
-                break;
             }
             if (p.name == "World Direction") ReadVec3(p, dir.x, dir.y, dir.z);
             if (p.name == "Scale Value") scaleValue = p.defaultValue.AsFloat();
@@ -513,7 +563,7 @@ void RegisterActorNodes() {
     getMovementSpeed.moduleName = "Stargraph";
     getMovementSpeed.createPins = [](Node* node) {
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
-        node->outputs.push_back({"Speed",           PinType::Float, true, false, 0, "0.0"});
+        node->outputs.push_back({"Speed",           PinType::Float, false, true, 0, "0.0"});
     };
     getMovementSpeed.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         Actor* target = ctx.actor;
@@ -552,6 +602,73 @@ void RegisterActorNodes() {
         target->MovementSpeed = newSpeed;
     };
     NodeRegistry::Get().RegisterNode(setMovementSpeed);
+
+    RegisterActorFloatProperty("Get_Movement_Acceleration", "Set_Movement_Acceleration", "Acceleration", "4000.0", &Actor::acceleration);
+    RegisterActorFloatProperty("Get_Braking_Deceleration", "Set_Braking_Deceleration", "Braking Deceleration", "6000.0", &Actor::brakingDeceleration);
+    RegisterActorFloatProperty("Get_Mass", "Set_Mass", "Mass", "1.0", &Actor::mass);
+
+    NodeTemplate getVelocity;
+    getVelocity.type = "Get_Velocity";
+    getVelocity.category = "Actor";
+    getVelocity.moduleName = "Stargraph";
+    getVelocity.createPins = [](Node* node) {
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->outputs.push_back({"Velocity", PinType::Vec3, false, true});
+    };
+    getVelocity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ResolveTargetActor(node, ctx);
+        if (!target) return;
+        char buf[96];
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", target->velocity.x, target->velocity.y, target->velocity.z);
+        for (Pin& p : node.outputs) if (p.name == "Velocity") p.defaultValue = buf;
+    };
+    NodeRegistry::Get().RegisterNode(getVelocity);
+
+    NodeTemplate setVelocity;
+    setVelocity.type = "Set_Velocity";
+    setVelocity.category = "Actor";
+    setVelocity.moduleName = "Stargraph";
+    setVelocity.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->inputs.push_back({"Velocity", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    setVelocity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ResolveTargetActor(node, ctx);
+        if (!target) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Velocity") {
+                Vector3 v;
+                ReadVec3(p, v.x, v.y, v.z);
+                target->SetVelocity(v);
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(setVelocity);
+
+    NodeTemplate addImpulse;
+    addImpulse.type = "Add_Impulse";
+    addImpulse.category = "Actor";
+    addImpulse.moduleName = "Stargraph";
+    addImpulse.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Exec, true, false});
+        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "Actor"});
+        node->inputs.push_back({"Impulse", PinType::Vec3, true, false, 0, "0,0,0"});
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+    };
+    addImpulse.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        Actor* target = ResolveTargetActor(node, ctx);
+        if (!target) return;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Impulse") {
+                Vector3 v;
+                ReadVec3(p, v.x, v.y, v.z);
+                target->AddImpulse(v);
+            }
+        }
+    };
+    NodeRegistry::Get().RegisterNode(addImpulse);
 
     NodeTemplate addControlYawInput;
     addControlYawInput.type = "Add_Control_Yaw_Input";

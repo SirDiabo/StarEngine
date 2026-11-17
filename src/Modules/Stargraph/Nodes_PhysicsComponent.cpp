@@ -34,54 +34,6 @@ void SetOutput(Node& node, const char* name, const std::string& value) {
 }
 
 void RegisterPhysicsComponentNodes() {
-    NodeTemplate setVelocity;
-    setVelocity.type = "Set_Velocity";
-    setVelocity.category = "Physics";
-    setVelocity.moduleName = "Stargraph";
-    setVelocity.hideFromContextMenu = true;
-    setVelocity.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
-        node->inputs.push_back({"Velocity", PinType::Vec3, true, false, 0, "0,0,0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    setVelocity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        PhysicsComponent* target = ResolvePhysics(node, ctx);
-        if (!target) return;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Velocity") {
-                Vector3 v;
-                ReadVec3(p, v.x, v.y, v.z);
-                target->SetVelocity(v);
-            }
-        }
-    };
-    NodeRegistry::Get().RegisterNode(setVelocity);
-
-    NodeTemplate addImpulse;
-    addImpulse.type = "Add_Impulse";
-    addImpulse.category = "Physics";
-    addImpulse.moduleName = "Stargraph";
-    addImpulse.hideFromContextMenu = true;
-    addImpulse.createPins = [](Node* node) {
-        node->inputs.push_back({"In", PinType::Exec, true, false});
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
-        node->inputs.push_back({"Impulse", PinType::Vec3, true, false, 0, "0,0,0"});
-        node->outputs.push_back({"Out", PinType::Exec, false, true});
-    };
-    addImpulse.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        PhysicsComponent* target = ResolvePhysics(node, ctx);
-        if (!target) return;
-        for (const Pin& p : node.inputs) {
-            if (p.name == "Impulse") {
-                Vector3 v;
-                ReadVec3(p, v.x, v.y, v.z);
-                target->AddImpulse(v);
-            }
-        }
-    };
-    NodeRegistry::Get().RegisterNode(addImpulse);
-
     NodeTemplate setSimulate;
     setSimulate.type = "Set_Simulate_Physics";
     setSimulate.category = "Physics";
@@ -101,21 +53,6 @@ void RegisterPhysicsComponentNodes() {
         }
     };
     NodeRegistry::Get().RegisterNode(setSimulate);
-
-    NodeTemplate getVelocity;
-    getVelocity.type = "Get_Velocity";
-    getVelocity.category = "Physics";
-    getVelocity.moduleName = "Stargraph";
-    getVelocity.hideFromContextMenu = true;
-    getVelocity.createPins = [](Node* node) {
-        node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "PhysicsComponent"});
-        node->outputs.push_back({"Velocity", PinType::Vec3, false, true});
-    };
-    getVelocity.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
-        PhysicsComponent* target = ResolvePhysics(node, ctx);
-        SetOutput(node, "Velocity", target ? FormatVec3(target->velocity) : "0,0,0");
-    };
-    NodeRegistry::Get().RegisterNode(getVelocity);
 
     NodeTemplate isGrounded;
     isGrounded.type = "Is_Grounded";

@@ -68,12 +68,19 @@ public:
     bool useControlRoll = false;
 
     float MovementSpeed = 600.0f;
+    float acceleration = 4000.0f;
+    float brakingDeceleration = 6000.0f;
+    float mass = 1.0f;
+    Vector3 velocity{ 0, 0, 0 };
 
     void SetControlRotation(Vector3 value);
     void AddControlYawInput(float value);
     void AddControlPitchInput(float value);
     void AddControlRollInput(float value);
     void AddMovementInput(Vector3 worldDirection, float scaleValue);
+    void SetVelocity(Vector3 value);
+    void AddImpulse(Vector3 impulse);
+    void MarkVelocityIntegrated() { velocityIntegrated = true; }
 
     void AddComponent(Component* component, Component* parent = nullptr);
     void RemoveComponent(Component* component);
@@ -93,6 +100,8 @@ protected:
     virtual void OnEndPlay() {}
 
 private:
+    void ApplyMovementInput(float dt);
+
     template<typename T>
     T* FindComponentOfType() const {
         for (Component* c : components) {
@@ -106,4 +115,6 @@ private:
     std::vector<Component*> components;
     Component* rootComponent = nullptr;
     uint32_t netId = 0;
+    bool velocityIntegrated = false;
+    bool receivedMovementInput = false;
 };

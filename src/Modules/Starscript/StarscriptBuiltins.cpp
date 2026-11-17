@@ -355,6 +355,9 @@ Value M_actor_add_movement_input(Runtime&, Value& s, std::vector<Value>& a) {
     RequireActor(s, "add_movement_input")->AddMovementInput(ToV3(a[0]), a.size() > 1 ? (float)a[1].AsNumber() : 1.0f);
     return Value::Void();
 }
+Value M_actor_add_impulse(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_impulse")->AddImpulse(ToV3(a[0])); return Value::Void(); }
+Value M_actor_set_velocity(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "set_velocity")->SetVelocity(ToV3(a[0])); return Value::Void(); }
+Value M_actor_get_velocity(Runtime&, Value& s, std::vector<Value>&) { return V3(RequireActor(s, "get_velocity")->velocity); }
 Value M_actor_add_yaw(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_yaw_input")->AddControlYawInput((float)a[0].AsNumber()); return Value::Void(); }
 Value M_actor_add_pitch(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_pitch_input")->AddControlPitchInput((float)a[0].AsNumber()); return Value::Void(); }
 Value M_actor_add_roll(Runtime&, Value& s, std::vector<Value>& a) { RequireActor(s, "add_control_roll_input")->AddControlRollInput((float)a[0].AsNumber()); return Value::Void(); }
@@ -375,7 +378,6 @@ MeshComponent* RequireMesh(const Value& v, const char* what) {
     return c;
 }
 
-Value M_phys_add_impulse(Runtime&, Value& s, std::vector<Value>& a) { RequirePhysics(s, "add_impulse")->AddImpulse(ToV3(a[0])); return Value::Void(); }
 Value M_audio_play(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "play")->Play(); return Value::Void(); }
 Value M_audio_stop(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "stop")->Stop(); return Value::Void(); }
 Value M_audio_pause(Runtime&, Value& s, std::vector<Value>&) { RequireAudio(s, "pause")->Pause(); return Value::Void(); }
@@ -659,9 +661,15 @@ Value P_actor_get_control_rotation(Runtime&, const Value& s) { return V3(Require
 void P_actor_set_control_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "control_rotation")->SetControlRotation(ToV3(v)); }
 Value P_actor_get_movement_speed(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "movement_speed")->MovementSpeed); }
 void P_actor_set_movement_speed(Runtime&, const Value& s, const Value& v) { RequireActor(s, "movement_speed")->MovementSpeed = (float)v.AsNumber(); }
+Value P_actor_get_acceleration(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "acceleration")->acceleration); }
+void P_actor_set_acceleration(Runtime&, const Value& s, const Value& v) { RequireActor(s, "acceleration")->acceleration = (float)v.AsNumber(); }
+Value P_actor_get_braking(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "braking_deceleration")->brakingDeceleration); }
+void P_actor_set_braking(Runtime&, const Value& s, const Value& v) { RequireActor(s, "braking_deceleration")->brakingDeceleration = (float)v.AsNumber(); }
+Value P_actor_get_mass(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "mass")->mass); }
+void P_actor_set_mass(Runtime&, const Value& s, const Value& v) { RequireActor(s, "mass")->mass = (float)v.AsNumber(); }
+Value P_actor_get_velocity(Runtime&, const Value& s) { return V3(RequireActor(s, "velocity")->velocity); }
+void P_actor_set_velocity(Runtime&, const Value& s, const Value& v) { RequireActor(s, "velocity")->SetVelocity(ToV3(v)); }
 
-Value P_phys_get_velocity(Runtime&, const Value& s) { return V3(RequirePhysics(s, "velocity")->velocity); }
-void P_phys_set_velocity(Runtime&, const Value& s, const Value& v) { RequirePhysics(s, "velocity")->SetVelocity(ToV3(v)); }
 Value P_phys_get_grounded(Runtime&, const Value& s) { return Value::Bool(RequirePhysics(s, "grounded")->grounded); }
 Value P_phys_get_ground_normal(Runtime&, const Value& s) { return V3(RequirePhysics(s, "ground_normal")->groundNormal); }
 
@@ -762,10 +770,12 @@ const std::vector<MethodDef>& Methods() {
         { Kind::Vec3, "length", {}, 0, T(Kind::Float), RetRule::Fixed, false, M_vec_length },
         { Kind::Vec3, "normalized", {}, 0, T(Kind::Vec3), RetRule::Fixed, false, M_vec_normalized },
         { Kind::Actor, "add_movement_input", { T(Kind::Vec3), T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_movement_input },
+        { Kind::Actor, "add_impulse", { T(Kind::Vec3) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_impulse },
+        { Kind::Actor, "set_velocity", { T(Kind::Vec3) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_set_velocity },
+        { Kind::Actor, "get_velocity", {}, 0, T(Kind::Vec3), RetRule::Fixed, false, M_actor_get_velocity },
         { Kind::Actor, "add_control_yaw_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_yaw },
         { Kind::Actor, "add_control_pitch_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_pitch },
         { Kind::Actor, "add_control_roll_input", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, M_actor_add_roll },
-        { Kind::Component, "add_impulse", { T(Kind::Vec3) }, 1, T(Kind::Void), RetRule::Fixed, false, M_phys_add_impulse, "PhysicsComponent" },
         { Kind::Component, "play", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_play, "AudioComponent" },
         { Kind::Component, "stop", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_stop, "AudioComponent" },
         { Kind::Component, "pause", {}, 0, T(Kind::Void), RetRule::Fixed, false, M_audio_pause, "AudioComponent" },
@@ -836,7 +846,10 @@ const std::vector<PropertyDef>& Properties() {
         { Kind::Actor, "show_mouse_cursor", T(Kind::Bool), P_actor_get_show_cursor, P_actor_set_show_cursor },
         { Kind::Actor, "control_rotation", T(Kind::Vec3), P_actor_get_control_rotation, P_actor_set_control_rotation },
         { Kind::Actor, "movement_speed", T(Kind::Float), P_actor_get_movement_speed, P_actor_set_movement_speed },
-        { Kind::Component, "velocity", T(Kind::Vec3), P_phys_get_velocity, P_phys_set_velocity, "PhysicsComponent" },
+        { Kind::Actor, "acceleration", T(Kind::Float), P_actor_get_acceleration, P_actor_set_acceleration },
+        { Kind::Actor, "braking_deceleration", T(Kind::Float), P_actor_get_braking, P_actor_set_braking },
+        { Kind::Actor, "mass", T(Kind::Float), P_actor_get_mass, P_actor_set_mass },
+        { Kind::Actor, "velocity", T(Kind::Vec3), P_actor_get_velocity, P_actor_set_velocity },
         { Kind::Component, "grounded", T(Kind::Bool), P_phys_get_grounded, nullptr, "PhysicsComponent" },
         { Kind::Component, "ground_normal", T(Kind::Vec3), P_phys_get_ground_normal, nullptr, "PhysicsComponent" },
         { Kind::Hit, "did_hit", T(Kind::Bool), P_hit_did_hit, nullptr },

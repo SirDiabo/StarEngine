@@ -9,7 +9,6 @@ public:
     bool useGravity = true;
     float gravity = 980.0f;
     float gravityScale = 1.0f;
-    float mass = 1.0f;
     float linearDrag = 0.0f;
     float groundFriction = 0.0f;
     float maxFallSpeed = 0.0f;
@@ -19,7 +18,6 @@ public:
     float groundSnapSmoothing = 0.4f;
     float bounciness = 0.0f;
 
-    Vector3 velocity = {0.0f, 0.0f, 0.0f};
     bool grounded = false;
     Vector3 groundNormal = {0.0f, 1.0f, 0.0f};
 
@@ -27,13 +25,11 @@ public:
     void GetEditorProperties(PropertyList& outProperties) override;
     void Update(float deltaTime) override;
 
-    void SetVelocity(const Vector3& newVelocity);
-    void AddImpulse(const Vector3& impulse);
 
 private:
-    Vector3 Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate);
-    Vector3 MoveAndSlide(CollisionTrace::Shape& shape, const Vector3& delta, const CollisionTrace::QueryParams& params);
-    Vector3 UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround);
+    Vector3 Depenetrate(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, float dtForDepenetrate, Vector3& velocity);
+    Vector3 MoveAndSlide(CollisionTrace::Shape& shape, const Vector3& delta, const CollisionTrace::QueryParams& params, Vector3& velocity);
+    Vector3 UpdateGround(CollisionTrace::Shape& shape, const CollisionTrace::QueryParams& params, bool wasGrounded, float dtForGround, Vector3& velocity);
 
     std::vector<CollisionTrace::HitResult> scratchHits;
 };

@@ -57,8 +57,6 @@ Value ReadByIdentifier(const Value& self, const char* identifier, const char* wh
     return ReadComponentField(self, field->key);
 }
 
-Value M_phys_set_velocity(Runtime&, Value& s, std::vector<Value>& a) { RequirePhysicsComp(s, "set_velocity")->SetVelocity(ToV3(a[0])); return Value::Void(); }
-Value M_phys_get_velocity(Runtime&, Value& s, std::vector<Value>&) { return V3(RequirePhysicsComp(s, "get_velocity")->velocity); }
 Value M_phys_is_grounded(Runtime&, Value& s, std::vector<Value>&) { return Value::Bool(RequirePhysicsComp(s, "is_grounded")->grounded); }
 Value M_phys_ground_normal(Runtime&, Value& s, std::vector<Value>&) { return V3(RequirePhysicsComp(s, "get_ground_normal")->groundNormal); }
 Value M_phys_set_simulate(Runtime&, Value& s, std::vector<Value>& a) { RequirePhysicsComp(s, "set_simulate_physics")->simulatePhysics = a[0].b; return Value::Void(); }
@@ -148,8 +146,6 @@ Value M_input_get_device(Runtime&, Value& s, std::vector<Value>&) { return Value
 
 const std::vector<MethodDef>& ComponentMethods() {
     static const std::vector<MethodDef> table = {
-        { Kind::Component, "set_velocity", { T(Kind::Vec3) }, 1, T(Kind::Void), RetRule::Fixed, false, M_phys_set_velocity, "PhysicsComponent" },
-        { Kind::Component, "get_velocity", {}, 0, T(Kind::Vec3), RetRule::Fixed, false, M_phys_get_velocity, "PhysicsComponent" },
         { Kind::Component, "is_grounded", {}, 0, T(Kind::Bool), RetRule::Fixed, false, M_phys_is_grounded, "PhysicsComponent" },
         { Kind::Component, "get_ground_normal", {}, 0, T(Kind::Vec3), RetRule::Fixed, false, M_phys_ground_normal, "PhysicsComponent" },
         { Kind::Component, "set_simulate_physics", { T(Kind::Bool) }, 1, T(Kind::Void), RetRule::Fixed, false, M_phys_set_simulate, "PhysicsComponent" },
