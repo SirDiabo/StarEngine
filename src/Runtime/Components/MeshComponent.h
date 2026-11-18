@@ -10,6 +10,7 @@ public:
     std::string meshPath;
     std::vector<std::string> materialPaths; // parallel to the mesh asset's material slots
     bool castsShadow = true;
+    float maxDrawDistance = 0.0f;
 
     enum CollisionMode { CollisionMesh, CollisionNone };
     CollisionMode collisionMode = CollisionMesh;
@@ -35,6 +36,8 @@ public:
     void SetAnimPlayRate(float rate);
 
     Model* GetCachedModel();
+    bool GetLocalBounds(BoundingBox& out);
+    void EnsurePose();
     void InvalidateCachedModel();
 
     ~MeshComponent();
@@ -58,5 +61,6 @@ private:
     int cachedAnimFrameCount = 0;
 
     ModelAnimation* GetCurrentAnimation();
+    bool poseStale = false;
 };
 

@@ -370,6 +370,24 @@ void ActorClassEditor::BuildSelfRows(std::vector<PropertyRow>& rows) {
     rows.push_back(BoolRow("self.pitch", "Use Control Pitch", s.useControlPitch, [this](bool v) { Settings().useControlPitch = v; MarkDirty(); }));
     rows.push_back(BoolRow("self.roll", "Use Control Roll", s.useControlRoll, [this](bool v) { Settings().useControlRoll = v; MarkDirty(); }));
     rows.push_back(BoolRow("self.cursor", "Show Mouse Cursor", s.showMouseCursor, [this](bool v) { Settings().showMouseCursor = v; MarkDirty(); }));
+
+    rows.push_back(HeaderRow("self.culling", "Culling And Update"));
+    rows.push_back(FloatRow("self.drawdist", "Max Draw Distance (0 = no limit)", s.maxDrawDistance, false, [this, clampValue](float v) {
+        Settings().maxDrawDistance = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.tickrate", "Tick Rate Hz (0 = every frame)", s.tickRate, false, [this, clampValue](float v) {
+        Settings().tickRate = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.tickdist", "Max Tick Distance (0 = always tick)", s.maxTickDistance, false, [this, clampValue](float v) {
+        Settings().maxTickDistance = clampValue(v);
+        MarkDirty();
+    }));
+    rows.push_back(FloatRow("self.fartick", "Far Tick Rate Hz (0 = no tick)", s.farTickRate, false, [this, clampValue](float v) {
+        Settings().farTickRate = clampValue(v);
+        MarkDirty();
+    }));
 }
 
 void ActorClassEditor::BuildComponentRows(std::vector<PropertyRow>& rows, int idx) {

@@ -3,6 +3,7 @@
 #include "Runtime/StarMap.h"
 #include "Runtime/ActorAsset.h"
 #include "BasicActorDefs.h"
+#include "Core/Culling.h"
 #include "GizmoRenderer.h"
 #include "raylib.h"
 #include <string>
@@ -69,6 +70,7 @@ private:
     bool ToolbarIconToggle(Rectangle r, const std::string& iconFile, bool active);
 
     Camera3D camera{};
+    Culling::Frustum viewFrustum;
     RenderTexture2D renderTarget{};
     int renderTargetWidth = 0;
     int renderTargetHeight = 0;

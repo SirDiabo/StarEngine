@@ -10,6 +10,10 @@ constexpr bool ShowMouseCursor = true;
 constexpr bool UseControlYaw = true;
 constexpr bool UseControlPitch = false;
 constexpr bool UseControlRoll = false;
+constexpr float TickRate = 0.0f;
+constexpr float MaxTickDistance = 0.0f;
+constexpr float FarTickRate = 0.0f;
+constexpr float MaxDrawDistance = 0.0f;
 
 }
 
@@ -22,12 +26,18 @@ struct ActorSettings {
     bool useControlYaw = ActorDefaults::UseControlYaw;
     bool useControlPitch = ActorDefaults::UseControlPitch;
     bool useControlRoll = ActorDefaults::UseControlRoll;
+    float tickRate = ActorDefaults::TickRate;
+    float maxTickDistance = ActorDefaults::MaxTickDistance;
+    float farTickRate = ActorDefaults::FarTickRate;
+    float maxDrawDistance = ActorDefaults::MaxDrawDistance;
 
     bool operator==(const ActorSettings& o) const {
         return movementSpeed == o.movementSpeed && acceleration == o.acceleration
             && brakingDeceleration == o.brakingDeceleration && mass == o.mass
             && showMouseCursor == o.showMouseCursor && useControlYaw == o.useControlYaw
-            && useControlPitch == o.useControlPitch && useControlRoll == o.useControlRoll;
+            && useControlPitch == o.useControlPitch && useControlRoll == o.useControlRoll
+            && tickRate == o.tickRate && maxTickDistance == o.maxTickDistance
+            && farTickRate == o.farTickRate && maxDrawDistance == o.maxDrawDistance;
     }
     bool operator!=(const ActorSettings& o) const { return !(*this == o); }
 };

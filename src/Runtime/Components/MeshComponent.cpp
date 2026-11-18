@@ -5,11 +5,14 @@
 #include <cstdlib>
 #include "Runtime/ComponentRegistry.h"
 #include "CollisionFilterFields.h"
+#include "Core/Culling.h"
+#include "Core/SafeParse.h"
 
 void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
     outProperties.AddString("Static Mesh", &meshPath);
     outProperties.AddBool("Casts Shadow", &castsShadow);
+    outProperties.AddFloat("Max Draw Distance", &maxDrawDistance);
     outProperties.AddString("Current Anim", &currentAnimPath);
     outProperties.AddBool("Anim Playing", &animPlaying, true);
     outProperties.AddBool("Anim Looping", &animLooping);
@@ -62,8 +65,30 @@ void MeshComponent::Update(float deltaTime) {
         } else { animTime = 0.0f; animPlaying = false; }
     }
 
-    float frame = animTime * cachedAnimFps;
-    UpdateModelAnimation(*model, *anim, frame);
+    poseStale = true;
+}
+
+void MeshComponent::EnsurePose() {
+    if (!poseStale) return;
+    poseStale = false;
+    if (currentAnimPath.empty()) return;
+    Model* model = GetCachedModel();
+    ModelAnimation* anim = GetCurrentAnimation();
+    if (!model || !anim || cachedAnimFrameCount <= 0 || cachedAnimFps <= 0.0f) return;
+    UpdateModelAnimation(*model, *anim, animTime * cachedAnimFps);
+}
+
+bool MeshComponent::GetLocalBounds(BoundingBox& out) {
+    Model* model = GetCachedModel();
+    if (!model || model->meshCount <= 0) return false;
+    BoundingBox box = AssetCache::Get().GetOrComputeModelBounds(model);
+    if (!Culling::IsValidBox(box)) return false;
+    if (hasAnimModelInstance) {
+        float dx = box.max.x - box.min.x, dy = box.max.y - box.min.y, dz = box.max.z - box.min.z;
+        box = Culling::Inflate(box, fmaxf(dx, fmaxf(dy, dz)));
+    }
+    out = box;
+    return true;
 }
 
 void MeshComponent::SetMeshPath(const std::string& path) {
@@ -179,6 +204,12 @@ ComponentRegistrar registrar_MeshComponent({
             [](const Component& c) { return static_cast<const MeshComponent&>(c).meshPath; }),
         ComponentField::Bln("MeshCastsShadow", "Casts Shadow", true,
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).castsShadow = d.Get("MeshCastsShadow", "true") == "true"; }, [](const Component& c) { return ComponentField::BoolStr(static_cast<const MeshComponent&>(c).castsShadow); }),
+        ComponentField::Flt("MeshMaxDrawDistance", "Max Draw Distance", 0.0f,
+            [](Component& c, const ComponentDecl& d) {
+                float v = SafeParse::ToFloat(d.Get("MeshMaxDrawDistance", "0"));
+                static_cast<MeshComponent&>(c).maxDrawDistance = (std::isfinite(v) && v > 0.0f) ? v : 0.0f;
+            },
+            [](const Component& c) { return ComponentField::FloatStr(static_cast<const MeshComponent&>(c).maxDrawDistance); }),
         ComponentField::Enm("MeshCollision", "Collision", {"Mesh", "None"}, "Mesh",
             [](Component& c, const ComponentDecl& d) {
                 static_cast<MeshComponent&>(c).collisionMode = d.Get("MeshCollision", "Mesh") == "None"

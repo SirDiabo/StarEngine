@@ -319,6 +319,47 @@ void Actor::ApplySettings(const ActorSettings& settings) {
     useControlYaw = settings.useControlYaw;
     useControlPitch = settings.useControlPitch;
     useControlRoll = settings.useControlRoll;
+    tickRate = settings.tickRate;
+    maxTickDistance = settings.maxTickDistance;
+    farTickRate = settings.farTickRate;
+    maxDrawDistance = settings.maxDrawDistance;
+}
+
+bool Actor::PrepareTick(const TickViewers& viewers, float deltaTime, float& outStep) {
+    outStep = deltaTime;
+    const bool distanceLimited = maxTickDistance > 0.0f && viewers.count > 0;
+    if (!(tickRate > 0.0f) && !distanceLimited) {
+        tickAccumulator = 0.0f;
+        return true;
+    }
+
+    float rate = tickRate;
+    if (distanceLimited) {
+        float nearestSq = INFINITY;
+        for (int i = 0; i < viewers.count; i++) {
+            Vector3 d = Vector3Subtract(position, viewers.points[i]);
+            float sq = d.x * d.x + d.y * d.y + d.z * d.z;
+            if (sq < nearestSq) nearestSq = sq;
+        }
+        if (nearestSq > maxTickDistance * maxTickDistance) {
+            rate = farTickRate;
+            if (!(rate > 0.0f)) {
+                tickAccumulator = 0.0f;
+                return false;
+            }
+        }
+    }
+
+    if (!(rate > 0.0f)) {
+        tickAccumulator = 0.0f;
+        return true;
+    }
+
+    tickAccumulator += deltaTime;
+    if (tickAccumulator + 1e-6f < 1.0f / rate) return false;
+    outStep = tickAccumulator;
+    tickAccumulator = 0.0f;
+    return true;
 }
 
 void Actor::SetVelocity(Vector3 value) {

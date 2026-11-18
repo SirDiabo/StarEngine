@@ -174,6 +174,14 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
         }
     }
 
+    if (model && !selected) {
+        BoundingBox localBounds = AssetCache::Get().GetOrComputeModelBounds(model);
+        if (Culling::IsValidBox(localBounds)) {
+            Matrix world = MatrixMultiply(MatrixMultiply(MatrixScale(scale.x, scale.y, scale.z), ComposeRotationDegrees(rot)), MatrixTranslate(pos.x, pos.y, pos.z));
+            if (!Culling::Intersects(viewFrustum, Culling::TransformBox(localBounds, world))) return;
+        }
+    }
+
     if (model) {
         {
             PROFILE_SCOPE("Apply Transform And Materials");
@@ -621,6 +629,7 @@ void ViewportPanel::RenderScene() {
     rlSetClipPlanes(5.0, 400000.0);
     DebugDraw::viewportHeight = (float)renderTargetHeight;
     BeginMode3D(camera);
+    viewFrustum = Culling::FromGLState();
     {
         PROFILE_RENDER_SCOPE("Update Light Uniforms");
         ShadingModel::UpdateLightUniforms();

@@ -7,6 +7,7 @@
 #include "Core/SaveFileFormat.h"
 #include "AudioCore.h"
 #include "Networking/ReplicationManager.h"
+#include "Networking/NetworkBackend.h"
 #include "PrintMessageLog.h"
 #include "raylib.h"
 #include <algorithm>
@@ -143,9 +144,22 @@ void World::Tick(float deltaTime) {
 
     {
         PROFILE_SCOPE("Actors");
+        TickViewers viewers;
+        if (!NetworkBackendRegistry::Get().GetActive()) {
+            if (viewTarget) {
+                if (CameraComponent* cam = viewTarget->GetCameraComponent()) {
+                    viewers.points[viewers.count++] = viewTarget->GetComponentWorldPosition(cam);
+                } else {
+                    viewers.points[viewers.count++] = viewTarget->position;
+                }
+            }
+            if (inputFocus && inputFocus != viewTarget) viewers.points[viewers.count++] = inputFocus->position;
+        }
         for (size_t i = 0; i < actors.size(); i++) {
+            float step = deltaTime;
+            if (!actors[i]->PrepareTick(viewers, deltaTime, step)) continue;
             PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actors[i]));
-            actors[i]->Tick(deltaTime);
+            actors[i]->Tick(step);
         }
     }
 

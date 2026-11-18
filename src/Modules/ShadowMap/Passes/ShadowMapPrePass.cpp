@@ -3,6 +3,8 @@
 #include "Core/ProfilerRender.h"
 #include "Core/ShadingModel.h"
 #include "Core/SceneSnapshot.h"
+#include "Core/Culling.h"
+#include "Runtime/AssetCache.h"
 #include "Core/RenderSettings.h"
 #include "Modules/ShadowMap/ShadowMapSettings.h"
 #include "Runtime/World.h"
@@ -222,11 +224,13 @@ void BuildCubeFaceCamera(Vector3 lightPos, int face, Camera3D& outLightCamera) {
     outLightCamera.projection = CAMERA_PERSPECTIVE;
 }
 
-void DrawShadowCasters(const void* excludeOwner) {
+void DrawShadowCasters(const void* excludeOwner, const Culling::Frustum& frustum) {
     rlEnableBackfaceCulling();
     if (const SceneSnapshot* snapshot = SceneSnapshotSource::Get()) {
         for (const SceneShadowCaster& caster : snapshot->casters) {
             if (!caster.model || (excludeOwner && caster.owner == excludeOwner)) continue;
+            BoundingBox localBounds = AssetCache::Get().GetOrComputeModelBounds(caster.model);
+            if (Culling::IsValidBox(localBounds) && !Culling::Intersects(frustum, Culling::TransformBox(localBounds, caster.transform))) continue;
             for (int i = 0; i < caster.model->meshCount; i++) {
                 DrawMesh(caster.model->meshes[i], depthMaterial, caster.transform);
             }
@@ -251,6 +255,10 @@ void DrawShadowCasters(const void* excludeOwner) {
             Matrix localTransform = MatrixMultiply(scaleMatrix, rotationMatrix);
             Matrix worldTransform = MatrixMultiply(localTransform, MatrixTranslate(pos.x, pos.y, pos.z));
 
+            BoundingBox localBounds;
+            if (mc->GetLocalBounds(localBounds) && !Culling::Intersects(frustum, Culling::TransformBox(localBounds, worldTransform))) continue;
+            mc->EnsurePose();
+
             for (int i = 0; i < model->meshCount; i++) {
                 DrawMesh(model->meshes[i], depthMaterial, worldTransform);
             }
@@ -269,7 +277,7 @@ void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, const void* 
 
     {
         PROFILE_SCOPE("Draw Shadow Casters");
-        DrawShadowCasters(excludeOwner);
+        DrawShadowCasters(excludeOwner, Culling::FromViewProjection(MatrixMultiply(lightView, lightProj)));
     }
 
     EndMode3D();
@@ -301,7 +309,7 @@ void RunCubePass(Vector3 lightPos, const void* excludeOwner, float shadowStrengt
 
         {
             PROFILE_SCOPE("Draw Shadow Casters");
-            DrawShadowCasters(excludeOwner);
+            DrawShadowCasters(excludeOwner, Culling::FromViewProjection(MatrixMultiply(faceView, faceProj)));
         }
 
         EndMode3D();

@@ -41,6 +41,10 @@ void WriteSettings(std::ostream& out, const ActorSettings& settings) {
     if (settings.useControlYaw != defaults.useControlYaw) out << "UseControlYaw=" << (settings.useControlYaw ? "true" : "false") << "\n";
     if (settings.useControlPitch != defaults.useControlPitch) out << "UseControlPitch=" << (settings.useControlPitch ? "true" : "false") << "\n";
     if (settings.useControlRoll != defaults.useControlRoll) out << "UseControlRoll=" << (settings.useControlRoll ? "true" : "false") << "\n";
+    if (settings.tickRate != defaults.tickRate) out << "TickRate=" << settings.tickRate << "\n";
+    if (settings.maxTickDistance != defaults.maxTickDistance) out << "MaxTickDistance=" << settings.maxTickDistance << "\n";
+    if (settings.farTickRate != defaults.farTickRate) out << "FarTickRate=" << settings.farTickRate << "\n";
+    if (settings.maxDrawDistance != defaults.maxDrawDistance) out << "MaxDrawDistance=" << settings.maxDrawDistance << "\n";
     out << "\n";
 }
 
@@ -147,6 +151,10 @@ ActorSettings ReadSettings(const std::vector<ParsedSection>& sections) {
         settings.useControlYaw = ReadSettingBool(section, "UseControlYaw", settings.useControlYaw);
         settings.useControlPitch = ReadSettingBool(section, "UseControlPitch", settings.useControlPitch);
         settings.useControlRoll = ReadSettingBool(section, "UseControlRoll", settings.useControlRoll);
+        settings.tickRate = ReadSettingFloat(section, "TickRate", settings.tickRate);
+        settings.maxTickDistance = ReadSettingFloat(section, "MaxTickDistance", settings.maxTickDistance);
+        settings.farTickRate = ReadSettingFloat(section, "FarTickRate", settings.farTickRate);
+        settings.maxDrawDistance = ReadSettingFloat(section, "MaxDrawDistance", settings.maxDrawDistance);
         break;
     }
     return settings;

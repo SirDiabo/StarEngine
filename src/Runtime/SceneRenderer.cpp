@@ -1,4 +1,5 @@
 #include "Core/RotationMath.h"
+#include "Core/Culling.h"
 #include "Core/ProfilerRender.h"
 #include "ProfilerLabels.h"
 #include "SceneRenderer.h"
@@ -11,13 +12,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
-static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, Vector3 rot, Vector3 scale) {
+static void DrawMeshComponent(MeshComponent* mc, Vector3 pos, const Matrix& localTransform) {
     Model* model = mc->GetCachedModel();
     if (!model) return;
-
-    Matrix scaleMatrix = MatrixScale(scale.x, scale.y, scale.z);
-    Matrix rotationMatrix = ComposeRotationDegrees(rot);
-    Matrix localTransform = MatrixMultiply(scaleMatrix, rotationMatrix);
 
     Matrix savedTransform = model->transform;
     model->transform = localTransform;
@@ -36,15 +33,36 @@ static void DrawBillboardComponent(BillboardComponent* bc, Vector3 pos, Camera3D
                       pos, {bc->width, bc->height}, WHITE);
 }
 
+static SceneRenderer::Stats lastStats;
+
+const SceneRenderer::Stats& SceneRenderer::GetLastStats() {
+    return lastStats;
+}
+
 void SceneRenderer::DrawWorldActors(Camera3D camera) {
+    const Culling::Frustum frustum = Culling::FromGLState();
+    SceneRenderer::Stats stats;
     for (const auto& actor : World::Get().GetActors()) {
         for (Component* comp : actor->GetComponents()) {
             if (MeshComponent* mc = dynamic_cast<MeshComponent*>(comp)) {
-                PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
-                PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, ProfilerLabels::ForActor(*actor));
                 Vector3 pos, rot, scl;
                 actor->GetComponentWorldTransform(comp, pos, rot, scl);
-                DrawMeshComponent(mc, pos, rot, scl);
+                Matrix localTransform = MatrixMultiply(MatrixScale(scl.x, scl.y, scl.z), ComposeRotationDegrees(rot));
+
+                BoundingBox localBounds;
+                if (mc->GetLocalBounds(localBounds)) {
+                    Matrix world = MatrixMultiply(localTransform, MatrixTranslate(pos.x, pos.y, pos.z));
+                    BoundingBox worldBounds = Culling::TransformBox(localBounds, world);
+                    if (!Culling::Intersects(frustum, worldBounds)) { stats.culledByFrustum++; continue; }
+                    float maxDistance = mc->maxDrawDistance > 0.0f ? mc->maxDrawDistance : actor->maxDrawDistance;
+                    if (Culling::BeyondDistance(camera.position, worldBounds, maxDistance)) { stats.culledByDistance++; continue; }
+                }
+
+                PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
+                PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, ProfilerLabels::ForActor(*actor));
+                mc->EnsurePose();
+                DrawMeshComponent(mc, pos, localTransform);
+                stats.drawn++;
             } else if (BillboardComponent* bc = dynamic_cast<BillboardComponent*>(comp)) {
                 PROFILE_SCOPE_DYN(ProfilerLabels::ForActor(*actor));
                 PROFILE_GPU_SCOPE_DYN_L(Profiler::DetailVerbose, ProfilerLabels::ForActor(*actor));
@@ -54,4 +72,5 @@ void SceneRenderer::DrawWorldActors(Camera3D camera) {
             }
         }
     }
+    lastStats = stats;
 }

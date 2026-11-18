@@ -14,6 +14,11 @@
 
 class Component;
 
+struct TickViewers {
+    Vector3 points[2]{};
+    int count = 0;
+};
+
 class Actor : public Object {
 public:
     Actor();
@@ -74,6 +79,12 @@ public:
     float mass = ActorDefaults::Mass;
     Vector3 velocity{ 0, 0, 0 };
 
+    float tickRate = ActorDefaults::TickRate;
+    float maxTickDistance = ActorDefaults::MaxTickDistance;
+    float farTickRate = ActorDefaults::FarTickRate;
+    float maxDrawDistance = ActorDefaults::MaxDrawDistance;
+    bool PrepareTick(const TickViewers& viewers, float deltaTime, float& outStep);
+
     void SetControlRotation(Vector3 value);
     void AddControlYawInput(float value);
     void AddControlPitchInput(float value);
@@ -121,4 +132,5 @@ private:
     bool velocityIntegrated = false;
     bool receivedMovementInput = false;
     bool movementDriven = false;
+    float tickAccumulator = 0.0f;
 };

@@ -54,3 +54,6 @@ star_add_test(test_trust_cache
         "${STAR_SRC}/Core/TrustStore.cpp"
         "${STAR_SRC}/Core/BuildCacheGuard.cpp"
         "${STAR_SRC}/Core/PathSafety.cpp")
+
+star_add_test(test_culling
+    LIBRARIES raylib)
