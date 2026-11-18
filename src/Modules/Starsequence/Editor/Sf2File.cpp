@@ -12,7 +12,7 @@ namespace Sf2 {
 
 namespace {
 
-constexpr uintmax_t kMaxSf2Size = 1024ull * 1024ull * 1024ull;
+constexpr uintmax_t kMaxSf2Size = 5ull * 1024ull * 1024ull * 1024ull;
 constexpr size_t kMaxZonesPerPreset = 4096;
 
 enum GeneratorId {
@@ -203,7 +203,7 @@ bool LoadSf2File(const std::string& path, File& out, std::vector<Diagnostic>& di
     }
     std::streamoff length = in.tellg();
     if (length <= 0 || (uintmax_t)length > kMaxSf2Size) {
-        diagnostics.push_back({ true, "The SoundFont is empty or larger than 1 GB" });
+        diagnostics.push_back({ true, "The SoundFont is empty or larger than 5 GB" });
         return false;
     }
     std::vector<uint8_t> bytes((size_t)length);
