@@ -197,8 +197,26 @@ uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matNormal;
 
+in mat4 instanceTransform;
+uniform int useInstancing;
+
 out vec2 fragTexCoord;
 out vec4 fragColor;
+
+vec4 StarClipPosition(vec3 p) {
+    if (useInstancing != 0) return mvp * (instanceTransform * vec4(p, 1.0));
+    return mvp * vec4(p, 1.0);
+}
+
+vec3 StarWorldPosition(vec3 p) {
+    if (useInstancing != 0) return vec3(instanceTransform * vec4(p, 1.0));
+    return vec3(matModel * vec4(p, 1.0));
+}
+
+vec3 StarWorldNormal(vec3 n) {
+    if (useInstancing != 0) return normalize(transpose(inverse(mat3(instanceTransform))) * n);
+    return normalize(vec3(matNormal * vec4(n, 0.0)));
+}
 )glsl";
 
 const char* kSampleAndOutput = R"glsl(
@@ -227,9 +245,9 @@ out vec3 fragWorldNormal;
 void main() {
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
-    fragWorldPos = vec3(matModel * vec4(vertexPosition, 1.0));
-    fragWorldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    fragWorldPos = StarWorldPosition(vertexPosition);
+    fragWorldNormal = StarWorldNormal(vertexNormal);
+    gl_Position = StarClipPosition(vertexPosition);
 }
 )glsl";
 
@@ -239,11 +257,11 @@ void main() {
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
 
-    vec3 worldPos = vec3(matModel * vec4(vertexPosition, 1.0));
-    vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
+    vec3 worldPos = StarWorldPosition(vertexPosition);
+    vec3 worldNormal = StarWorldNormal(vertexNormal);
 
     fragLight = ComputeLighting(worldPos, worldNormal, 1.0);
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    gl_Position = StarClipPosition(vertexPosition);
 }
 )glsl";
 }
@@ -278,7 +296,7 @@ const char* kVertexUnlit = R"glsl(
 void main() {
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    gl_Position = StarClipPosition(vertexPosition);
 }
 )glsl";
 

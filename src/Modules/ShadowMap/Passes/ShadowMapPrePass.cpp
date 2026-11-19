@@ -4,6 +4,7 @@
 #include "Core/ShadingModel.h"
 #include "Core/SceneSnapshot.h"
 #include "Core/Culling.h"
+#include "Core/MeshInstancing.h"
 #include "Runtime/AssetCache.h"
 #include "Core/RenderSettings.h"
 #include "Modules/ShadowMap/ShadowMapSettings.h"
@@ -13,6 +14,7 @@
 #include "Runtime/Components/LightComponent.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include <vector>
 
 namespace {
 
@@ -63,7 +65,12 @@ void EnsureResourcesLoaded() {
     }
     if (!depthMaterialLoaded) {
         depthShader = LoadShaderFromMemory(
-            "#version 330\nin vec3 vertexPosition;\nuniform mat4 mvp;\nvoid main() { gl_Position = mvp * vec4(vertexPosition, 1.0); }\n",
+            "#version 330\nin vec3 vertexPosition;\nin mat4 instanceTransform;\nuniform mat4 mvp;\nuniform int useInstancing;\n"
+            "void main() {\n"
+            "    vec4 p = vec4(vertexPosition, 1.0);\n"
+            "    if (useInstancing != 0) p = instanceTransform * p;\n"
+            "    gl_Position = mvp * p;\n"
+            "}\n",
             "#version 330\nvoid main() { }\n");
         depthMaterial = LoadMaterialDefault();
         depthMaterial.shader = depthShader;
@@ -224,17 +231,59 @@ void BuildCubeFaceCamera(Vector3 lightPos, int face, Camera3D& outLightCamera) {
     outLightCamera.projection = CAMERA_PERSPECTIVE;
 }
 
+struct ShadowBatch {
+    Model* model = nullptr;
+    std::vector<Matrix> worlds;
+};
+
+std::vector<ShadowBatch> shadowBatchPool;
+size_t shadowBatchCount = 0;
+const size_t kMinShadowInstances = 4;
+
+void AddToShadowBatch(Model* model, const Matrix& world) {
+    for (size_t i = 0; i < shadowBatchCount; i++) {
+        if (shadowBatchPool[i].model == model) {
+            shadowBatchPool[i].worlds.push_back(world);
+            return;
+        }
+    }
+    if (shadowBatchCount == shadowBatchPool.size()) shadowBatchPool.emplace_back();
+    ShadowBatch& batch = shadowBatchPool[shadowBatchCount++];
+    batch.model = model;
+    batch.worlds.clear();
+    batch.worlds.push_back(world);
+}
+
+void FlushShadowBatches(bool instancing) {
+    for (size_t b = 0; b < shadowBatchCount; b++) {
+        ShadowBatch& batch = shadowBatchPool[b];
+        Model* model = batch.model;
+        if (instancing && batch.worlds.size() >= kMinShadowInstances) {
+            for (int i = 0; i < model->meshCount; i++) {
+                MeshInstancing::Draw(model->meshes[i], depthMaterial, batch.worlds.data(), (int)batch.worlds.size());
+            }
+        } else {
+            for (const Matrix& world : batch.worlds) {
+                for (int i = 0; i < model->meshCount; i++) {
+                    DrawMesh(model->meshes[i], depthMaterial, world);
+                }
+            }
+        }
+    }
+}
+
 void DrawShadowCasters(const void* excludeOwner, const Culling::Frustum& frustum) {
     rlEnableBackfaceCulling();
+    const bool instancing = MeshInstancing::Supported();
+    shadowBatchCount = 0;
     if (const SceneSnapshot* snapshot = SceneSnapshotSource::Get()) {
         for (const SceneShadowCaster& caster : snapshot->casters) {
             if (!caster.model || (excludeOwner && caster.owner == excludeOwner)) continue;
             BoundingBox localBounds = AssetCache::Get().GetOrComputeModelBounds(caster.model);
             if (Culling::IsValidBox(localBounds) && !Culling::Intersects(frustum, Culling::TransformBox(localBounds, caster.transform))) continue;
-            for (int i = 0; i < caster.model->meshCount; i++) {
-                DrawMesh(caster.model->meshes[i], depthMaterial, caster.transform);
-            }
+            AddToShadowBatch(caster.model, caster.transform);
         }
+        FlushShadowBatches(instancing);
         return;
     }
     for (const auto& actorPtr : World::Get().GetActors()) {
@@ -257,13 +306,19 @@ void DrawShadowCasters(const void* excludeOwner, const Culling::Frustum& frustum
 
             BoundingBox localBounds;
             if (mc->GetLocalBounds(localBounds) && !Culling::Intersects(frustum, Culling::TransformBox(localBounds, worldTransform))) continue;
-            mc->EnsurePose();
 
+            if (instancing && mc->IsInstanceable()) {
+                AddToShadowBatch(model, worldTransform);
+                continue;
+            }
+
+            mc->EnsurePose();
             for (int i = 0; i < model->meshCount; i++) {
                 DrawMesh(model->meshes[i], depthMaterial, worldTransform);
             }
         }
     }
+    FlushShadowBatches(instancing);
 }
 
 void RunSinglePass(Camera3D lightCamera, Vector3 lightDirToSurface, const void* excludeOwner, float shadowStrength, int aaMethod) {

@@ -123,9 +123,9 @@ void AnimationPreviewTab::Render(float x, float y, float width, float height) {
     ry += 30;
 
     if (compatibleMeshPaths.empty()) {
-        DrawText("No compatible skeletal", (int)rightPanel.x + 10, (int)ry, 10, theme.danger);
+        DrawText("No compatible meshes with", (int)rightPanel.x + 10, (int)ry, 10, theme.danger);
         ry += 14;
-        DrawText("meshes found in Content.", (int)rightPanel.x + 10, (int)ry, 10, theme.danger);
+        DrawText("bones found in Content.", (int)rightPanel.x + 10, (int)ry, 10, theme.danger);
         ry += 18;
     }
 

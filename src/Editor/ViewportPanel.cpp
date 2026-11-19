@@ -6,6 +6,7 @@
 #include "Runtime/Actor.h"
 #include "Runtime/CollisionDebug.h"
 #include "Runtime/AssetCache.h"
+#include "Runtime/SceneRenderer.h"
 #include "Runtime/DebugDraw.h"
 #include "Runtime/CollisionTrace.h"
 #include "Runtime/Components/CollisionComponent.h"
@@ -178,9 +179,13 @@ void ViewportPanel::DrawInstanceOrMesh(const std::string& meshAssetPath, const s
         BoundingBox localBounds = AssetCache::Get().GetOrComputeModelBounds(model);
         if (Culling::IsValidBox(localBounds)) {
             Matrix world = MatrixMultiply(MatrixMultiply(MatrixScale(scale.x, scale.y, scale.z), ComposeRotationDegrees(rot)), MatrixTranslate(pos.x, pos.y, pos.z));
-            if (!Culling::Intersects(viewFrustum, Culling::TransformBox(localBounds, world))) return;
+            if (!Culling::Intersects(viewFrustum, Culling::TransformBox(localBounds, world))) {
+                meshesCulled++;
+                return;
+            }
         }
     }
+    if (model) meshesDrawn++;
 
     if (model) {
         {
@@ -630,6 +635,9 @@ void ViewportPanel::RenderScene() {
     DebugDraw::viewportHeight = (float)renderTargetHeight;
     BeginMode3D(camera);
     viewFrustum = Culling::FromGLState();
+    meshesDrawn = 0;
+    meshesCulled = 0;
+    meshesInstanced = 0;
     {
         PROFILE_RENDER_SCOPE("Update Light Uniforms");
         ShadingModel::UpdateLightUniforms();
@@ -831,13 +839,16 @@ void ViewportPanel::RenderToolbar() {
 
         if (fpsStatsDirty) {
             char valueBuf[48];
-            char statsBuf[128];
+            char statsBuf[192];
             if (fpsSampleValid) {
                 float minFps = fpsWorstFrameMs > 0.0f ? 1000.0f / fpsWorstFrameMs : 0.0f;
                 float maxFps = fpsBestFrameMs > 0.0f ? 1000.0f / fpsBestFrameMs : 0.0f;
                 snprintf(valueBuf, sizeof(valueBuf), "%d fps (%.2f ms)", (int)(fpsWindowFps + 0.5f), fpsWindowAvgMs);
-                snprintf(statsBuf, sizeof(statsBuf), "| min %d fps | max %d fps | avg %.0f fps",
-                         (int)(minFps + 0.5f), (int)(maxFps + 0.5f), fpsSessionAvgFps);
+                char instancedBuf[32] = "";
+                if (meshesInstanced > 0) snprintf(instancedBuf, sizeof(instancedBuf), " (%d instanced)", meshesInstanced);
+                snprintf(statsBuf, sizeof(statsBuf), "| min %d fps | max %d fps | avg %.0f fps | meshes %d/%d%s",
+                         (int)(minFps + 0.5f), (int)(maxFps + 0.5f), fpsSessionAvgFps,
+                         meshesDrawn, meshesDrawn + meshesCulled, instancedBuf);
             } else {
                 snprintf(valueBuf, sizeof(valueBuf), "-- fps");
                 statsBuf[0] = '\0';
@@ -1045,6 +1056,12 @@ void ViewportPanel::Render() {
             }
 
             RenderPipeline::Render(camera, pieRenderTarget, clearColor);
+            {
+                const SceneRenderer::Stats& sceneStats = SceneRenderer::GetLastStats();
+                meshesDrawn = sceneStats.drawn;
+                meshesCulled = sceneStats.culledByFrustum + sceneStats.culledByDistance;
+                meshesInstanced = sceneStats.instanced;
+            }
 
             {
                 PROFILE_RENDER_SCOPE("PIE Composite");

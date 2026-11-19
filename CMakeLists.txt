@@ -112,11 +112,21 @@ else()
     add_executable(AssetPacker src/Tools/AssetPacker.cpp src/Core/StarPak.cpp)
     target_include_directories(AssetPacker PRIVATE src)
 
-    add_custom_command(TARGET StarEngine POST_BUILD
-        COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE:StarEngine>" ${STARENGINE_MODULE_ASSET_DIRS}
-        COMMENT "Embedding Assets/ into StarEngine executable"
-        VERBATIM
-    )
+    if(APPLE)
+        add_custom_command(TARGET StarEngine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E remove -f "$<TARGET_FILE_DIR:StarEngine>/StarEngine.pak"
+            COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:StarEngine>/StarEngine.pak"
+            COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE_DIR:StarEngine>/StarEngine.pak" ${STARENGINE_MODULE_ASSET_DIRS}
+            COMMENT "Packing Assets/ into StarEngine.pak"
+            VERBATIM
+        )
+    else()
+        add_custom_command(TARGET StarEngine POST_BUILD
+            COMMAND "$<TARGET_FILE:AssetPacker>" "${CMAKE_SOURCE_DIR}/Assets" "$<TARGET_FILE:StarEngine>" ${STARENGINE_MODULE_ASSET_DIRS}
+            COMMENT "Embedding Assets/ into StarEngine executable"
+            VERBATIM
+        )
+    endif()
     add_dependencies(StarEngine AssetPacker)
 endif()
 

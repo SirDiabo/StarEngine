@@ -1,4 +1,5 @@
 #include "EmbeddedAssets.h"
+#include "EngineRoot.h"
 #include <filesystem>
 #include <fstream>
 
@@ -13,6 +14,16 @@ void EmbeddedAssets::Init(const std::string& exePath) {
     if (initialized) return;
     initialized = true;
     if (!exePath.empty()) pakLoaded = pak.LoadFromExecutable(exePath);
+    if (!pakLoaded) {
+        for (const std::string& candidate : EngineRoot::ExternalPakCandidates(exePath)) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec)) continue;
+            if (pak.LoadFromExecutable(candidate)) {
+                pakLoaded = true;
+                break;
+            }
+        }
+    }
 }
 
 std::string EmbeddedAssets::FindLooseAssetsDir() const {

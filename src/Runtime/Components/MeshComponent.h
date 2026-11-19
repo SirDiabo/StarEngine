@@ -37,6 +37,7 @@ public:
 
     Model* GetCachedModel();
     bool GetLocalBounds(BoundingBox& out);
+    bool IsInstanceable();
     void EnsurePose();
     void InvalidateCachedModel();
 

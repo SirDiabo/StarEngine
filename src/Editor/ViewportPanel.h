@@ -71,6 +71,9 @@ private:
 
     Camera3D camera{};
     Culling::Frustum viewFrustum;
+    int meshesDrawn = 0;
+    int meshesCulled = 0;
+    int meshesInstanced = 0;
     RenderTexture2D renderTarget{};
     int renderTargetWidth = 0;
     int renderTargetHeight = 0;

@@ -27,7 +27,7 @@ static void BuildStaticMeshRows(ActorInstance& inst, std::vector<PropertyRow>& r
     PropertyRow meshRow;
     meshRow.id = "mesh";
     meshRow.kind = PropertyRowKind::Asset;
-    meshRow.label = "Static Mesh";
+    meshRow.label = "Mesh";
     meshRow.stringValue = AssetDisplayName(inst.meshAssetPath);
     meshRow.assetExtension = ".starasset";
     rows.push_back(meshRow);

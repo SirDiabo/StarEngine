@@ -3,22 +3,13 @@ name: Build
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'CMakeLists.txt'
-      - 'cmake/**'
-      - 'src/**'
-      - 'Assets/**'
-      - '.gitmodules'
-      - '.github/workflows/build.yml'
+    branches: ['**']
   pull_request:
     branches: [main]
-    paths:
-      - 'CMakeLists.txt'
-      - 'cmake/**'
-      - 'src/**'
-      - 'Assets/**'
-      - '.gitmodules'
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -76,9 +67,53 @@ jobs:
             echo "ℹ️ Version unchanged: $CURRENT"
           fi
 
+  test:
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            sanitize: "ON"
+
+          - os: windows-2022
+            name: windows
+            sanitize: "OFF"
+            generator: "Visual Studio 17 2022"
+            arch: "-A x64"
+
+          - os: macos-latest
+            name: macos
+            sanitize: "OFF"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libglfw3-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxinerama-dev libxi-dev libxext-dev libxfixes-dev \
+            libwayland-dev libxkbcommon-dev libopenal-dev libvorbis-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -B build ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} ${{ matrix.arch != '' && matrix.arch || '' }} -DCMAKE_BUILD_TYPE=Release -DSTARENGINE_BUILD_TESTS=ON -DSTARENGINE_TEST_SANITIZE=${{ matrix.sanitize }}
+
+      - name: Build Tests
+        run: cmake --build build --config Release --target star_tests
+
+      - name: Run Tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
   lint:
     needs: check-version
-    if: needs.check-version.outputs.version-changed == 'true'
+    if: needs.check-version.outputs.version-changed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     name: Code Quality
     steps:
@@ -103,8 +138,8 @@ jobs:
           cppcheck --enable=all --suppress=missingIncludeSystem src/ 2>&1 || true
 
   build:
-    needs: [check-version, lint]
-    if: needs.check-version.outputs.version-changed == 'true'
+    needs: [check-version, test, lint]
+    if: needs.check-version.outputs.version-changed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -115,6 +150,7 @@ jobs:
           - os: windows-2022
             name: windows
             artifact-name: StarEngine.exe
+            binary-path: build/Release/StarEngine.exe
             artifact-path: build/Release/StarEngine.exe
             generator: "Visual Studio 17 2022"
             arch: "-A x64"
@@ -122,12 +158,15 @@ jobs:
           - os: ubuntu-latest
             name: linux
             artifact-name: StarEngine
+            binary-path: build/StarEngine
             artifact-path: build/StarEngine
 
           - os: macos-latest
             name: macos
             artifact-name: StarEngine
-            artifact-path: build/StarEngine
+            binary-path: build/StarEngine
+            artifact-path: StarEngine-macos.zip
+            extra-cmake-args: '-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0'
 
     name: Build (${{ matrix.name }})
     steps:
@@ -176,7 +215,7 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B build ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} ${{ matrix.arch != '' && matrix.arch || '' }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install
+          cmake -B build ${{ matrix.generator != '' && format('-G "{0}"', matrix.generator) || '' }} ${{ matrix.arch != '' && matrix.arch || '' }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install ${{ matrix.extra-cmake-args }}
 
       - name: Build
         run: cmake --build build --config Release
@@ -184,12 +223,83 @@ jobs:
       - name: Verify Build Artifacts
         shell: bash
         run: |
-          if [ ! -f "${{ matrix.artifact-path }}" ]; then
-            echo "❌ Artifact not found: ${{ matrix.artifact-path }}"
+          if [ ! -f "${{ matrix.binary-path }}" ]; then
+            echo "❌ Artifact not found: ${{ matrix.binary-path }}"
             ls -la build/ || true
             exit 1
           fi
           echo "✅ Build verified: ${{ matrix.artifact-name }}"
+
+      # The macOS release is a StarEngine.app bundle. It is signed ad hoc, because there is no Apple Developer ID
+      # certificate in this repository, so it is not notarized (see the release notes for the first launch).
+      - name: Package macOS App
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.check-version.outputs.current-version }}"
+          APP="StarEngine.app"
+          RES="$APP/Contents/Resources"
+
+          test -f build/StarEngine.pak || { echo "❌ build/StarEngine.pak missing"; ls -la build; exit 1; }
+
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$RES/Source"
+          cp build/StarEngine "$APP/Contents/MacOS/StarEngine"
+          chmod +x "$APP/Contents/MacOS/StarEngine"
+          cp build/StarEngine.pak "$RES/StarEngine.pak"
+
+          cp CMakeLists.txt "$RES/Source/"
+          cp -R cmake src external "$RES/Source/"
+          find "$RES/Source" -name ".git" -prune -exec rm -rf {} + 2>/dev/null || true
+
+          ICON_KEY=""
+          if sips -s format png src/Resources/StarEngine.ico --out icon-source.png >/dev/null 2>&1; then
+            rm -rf StarEngine.iconset && mkdir StarEngine.iconset
+            for size in 16 32 64 128 256 512; do
+              sips -z $size $size icon-source.png --out "StarEngine.iconset/icon_${size}.png" >/dev/null
+            done
+            cd StarEngine.iconset
+            mv icon_16.png icon_16x16.png
+            cp icon_32.png icon_16x16@2x.png && mv icon_32.png icon_32x32.png
+            cp icon_64.png icon_32x32@2x.png && rm icon_64.png
+            cp icon_256.png icon_128x128@2x.png && mv icon_128.png icon_128x128.png
+            cp icon_512.png icon_256x256@2x.png && mv icon_256.png icon_256x256.png
+            mv icon_512.png icon_512x512.png
+            cd ..
+            if iconutil -c icns StarEngine.iconset -o "$RES/StarEngine.icns"; then
+              ICON_KEY="<key>CFBundleIconFile</key><string>StarEngine</string>"
+            fi
+          fi
+          if [ -z "$ICON_KEY" ]; then echo "⚠️ Could not build an app icon, continuing without one"; fi
+
+          cat > "$APP/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key><string>StarEngine</string>
+              <key>CFBundleDisplayName</key><string>StarEngine</string>
+              <key>CFBundleIdentifier</key><string>io.github.sirdiabo.starengine</string>
+              <key>CFBundleExecutable</key><string>StarEngine</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+              <key>CFBundleVersion</key><string>${{ github.run_number }}</string>
+              <key>LSMinimumSystemVersion</key><string>11.0</string>
+              <key>NSHighResolutionCapable</key><true/>
+              <key>NSPrincipalClass</key><string>NSApplication</string>
+              ${ICON_KEY}
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$APP/Contents/Info.plist"
+
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          lipo -archs "$APP/Contents/MacOS/StarEngine"
+
+          ditto -c -k --keepParent "$APP" StarEngine-macos.zip
+          ls -lh StarEngine-macos.zip
 
       - name: Upload Artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -280,19 +390,15 @@ jobs:
           cp -r engine-source/Source staging/StarEngine/Source
           (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip StarEngine/ && rm -rf StarEngine)
           
-          # macOS
-          mkdir -p staging/StarEngine
-          MACOS_EXE=$(find artifacts/star-engine-macos -type f -name "StarEngine" ! -name "*.exe" 2>/dev/null | head -1)
-          if [ -z "$MACOS_EXE" ]; then
-            echo "❌ macOS executable not found in star-engine-macos artifact"
+          # macOS (StarEngine.app, already assembled, signed and zipped on a macOS runner)
+          MACOS_ZIP=$(find artifacts/star-engine-macos -type f -name "StarEngine-macos.zip" 2>/dev/null | head -1)
+          if [ -z "$MACOS_ZIP" ]; then
+            echo "❌ macOS app zip not found in star-engine-macos artifact"
             ls -laR artifacts/star-engine-macos/ 2>/dev/null || echo "artifact directory not found"
             exit 1
           fi
-          cp "$MACOS_EXE" staging/StarEngine/StarEngine
-          chmod +x staging/StarEngine/StarEngine
-          cp -r engine-source/Source staging/StarEngine/Source
-          (cd staging && zip -r ../release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip StarEngine/ && rm -rf StarEngine)
-          
+          cp "$MACOS_ZIP" release/StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip
+
           rm -rf staging engine-source
           ls -lh release/
 
@@ -309,7 +415,7 @@ jobs:
           du -sh release/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.TAG }}
           name: Release ${{ steps.version.outputs.VERSION }}
@@ -326,10 +432,12 @@ jobs:
             ## Downloads
             - **Windows x64:** `StarEngine-${{ steps.version.outputs.VERSION }}-windows.zip`
             - **Linux x64:** `StarEngine-${{ steps.version.outputs.VERSION }}-linux.zip`
-            - **macOS:** `StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip`
+            - **macOS (Apple Silicon and Intel):** `StarEngine-${{ steps.version.outputs.VERSION }}-macos.zip`
             
             ## Installation
             Extract the zip file for your platform and run the executable.
+            
+            **macOS:** extract the zip and move `StarEngine.app` to your Applications folder. The app is signed ad hoc but not notarized, so macOS blocks the first launch. Right-click the app and choose Open, then confirm. On newer macOS versions open System Settings, Privacy and Security, and choose Open Anyway. Or run `xattr -dr com.apple.quarantine /Applications/StarEngine.app` once in a terminal.
             
             ---
             *Automatically built by GitHub Actions*

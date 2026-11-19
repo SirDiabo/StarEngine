@@ -78,6 +78,11 @@ void MeshComponent::EnsurePose() {
     UpdateModelAnimation(*model, *anim, animTime * cachedAnimFps);
 }
 
+bool MeshComponent::IsInstanceable() {
+    Model* model = GetCachedModel();
+    return model && !hasAnimModelInstance;
+}
+
 bool MeshComponent::GetLocalBounds(BoundingBox& out) {
     Model* model = GetCachedModel();
     if (!model || model->meshCount <= 0) return false;
@@ -199,7 +204,7 @@ ComponentRegistrar registrar_MeshComponent({
     "MeshComponent",
     []() -> Component* { return new MeshComponent(); },
     {
-        ComponentField::Asset("Mesh", "Static Mesh", ".starasset",
+        ComponentField::Asset("Mesh", "Mesh", ".starasset",
             [](Component& c, const ComponentDecl& d) { static_cast<MeshComponent&>(c).SetMeshPath(d.Get("Mesh")); },
             [](const Component& c) { return static_cast<const MeshComponent&>(c).meshPath; }),
         ComponentField::Bln("MeshCastsShadow", "Casts Shadow", true,
