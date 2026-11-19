@@ -1,4 +1,5 @@
 #include "DockArea.h"
+#include "PanelCache.h"
 #include "raylib.h"
 #include "UITheme.h"
 #include "Core/ProfilerRender.h"
@@ -104,12 +105,15 @@ void DockArea::LayoutNode(DockNode* node, Rectangle area) {
 
 // Main render: panel content only, no overlays
 
-void DockArea::RenderPanel(Panel* panel) {
+void DockArea::RenderPanel(Panel* panel, bool cacheable) {
     const void* previousScope = WidgetInput::GetInputScope();
     WidgetInput::SetInputScope(panel);
     {
         PROFILE_RENDER_SCOPE_DYN(std::string("Panel: ") + panel->GetName());
-        panel->Render();
+        if (!cacheable || !PanelCache::TryDraw(panel)) {
+            panel->Render();
+            if (cacheable) PanelCache::Capture(panel);
+        }
     }
     WidgetInput::SetInputScope(previousScope);
 }
@@ -304,7 +308,7 @@ void DockArea::RenderOverlays() {
         }
 
         p->bounds = content;
-        RenderPanel(p);
+        RenderPanel(p, false);
     }
     WidgetInput::SetInputScope(nullptr);
 

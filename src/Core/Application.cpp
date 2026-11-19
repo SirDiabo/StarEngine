@@ -3,6 +3,7 @@
 #include "ProfilerRender.h"
 #include "ProfilerCapture.h"
 #include "Editor/Editor.h"
+#include "Editor/PanelCache.h"
 #include "Editor/LogPanel.h"
 #include "Core/Project.h"
 #include "Core/ProjectCreation.h"
@@ -276,6 +277,7 @@ void Application::Run() {
 
         BeginDrawing();
         ClearBackground({20, 20, 20, 255});
+        PanelCache::BeginFrame();
         float deltaTime = GetFrameTime();
         {
             PROFILE_SCOPE("Module Updates");

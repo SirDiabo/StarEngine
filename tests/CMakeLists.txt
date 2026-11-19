@@ -62,3 +62,5 @@ star_add_test(test_engine_root
     SOURCES
         "${STAR_SRC}/Core/EngineRoot.cpp"
         "${STAR_SRC}/Core/ExecutablePath.cpp")
+
+star_add_test(test_panel_cache)

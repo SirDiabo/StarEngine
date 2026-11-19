@@ -11,6 +11,7 @@ public:
 
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.25f; }
 
     std::function<void(const BasicActorDef&, Vector2 dropPos)> onActorDragged;
 

@@ -9,6 +9,7 @@ class OutlinerPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.1f; }
     ~OutlinerPanel() override;
 
     const StarMap* starMap = nullptr;

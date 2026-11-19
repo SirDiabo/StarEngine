@@ -58,7 +58,7 @@ private:
     void RenderNode(DockNode* node);
     void RenderSplitter(DockNode* node);
     void RenderTabBar(DockNode* node);
-    void RenderPanel(Panel* panel);
+    void RenderPanel(Panel* panel, bool cacheable = true);
     void UpdateFocus();
     Panel* FindPanelAt(Vector2 pos) const;
     Panel* FindPanelByOwner(const void* owner) const;

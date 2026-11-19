@@ -33,6 +33,7 @@ class ContentBrowserPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.1f; }
     ~ContentBrowserPanel() override;
 
     std::function<void(const std::string& fullPath, const std::string& extension)> onAssetOpened;

@@ -14,6 +14,7 @@ class ProfilerPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.05f; }
     ~ProfilerPanel() override;
 
 private:
