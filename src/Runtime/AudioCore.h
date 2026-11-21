@@ -21,7 +21,7 @@ public:
 
     void Tick(float deltaTime);
 
-    std::shared_ptr<const SampleData> GetSampleData(const std::string& resolvedWavPath);
+    std::shared_ptr<const SampleData> GetSampleData(const std::string& contentPath, std::shared_ptr<const std::vector<uint8_t>> preloaded = nullptr);
     void ClearSampleCache();
 
     int PlayAsset(const std::string& assetPath, float volume = 1.0f, float pitch = 1.0f, bool looping = false, const std::string& busName = std::string());

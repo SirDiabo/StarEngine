@@ -9,6 +9,9 @@
 #include "IconBuilder.h"
 #include "BuildDiagnostics.h"
 #include "AudioConfig.h"
+#include "BakedKey.h"
+#include "CookedModelRaylib.h"
+#include "MainThreadQueue.h"
 #include "Runtime/PackagedGameConfig.h"
 #include "RenderSettings.h"
 #include "ShadingTechniqueRegistry.h"
@@ -48,15 +51,16 @@ std::string DescribeCookedPak(const CookResult& cookResult, const PackageOptions
                 std::to_string(cookResult.filesCooked) + " files compressed, " + FormatByteSize(cookResult.rawBytes) + " -> " +
                 FormatByteSize(cookResult.storedBytes) + " (" + std::to_string(percent) + "%).\n";
     }
-    text += "Obfuscation: " + CookCiphers::ChaCha12 + ".\n";
+    text += "Obfuscation: " + options.cipher + ".\n";
     text += "Integrity: CRC-32 recorded for " + std::to_string(cookResult.filesCooked) + " entries.\n";
     return text;
 }
 
 std::string ValidateCodecs(const PackageOptions& options) {
     if (options.format == PackageFormat::SingleFile) {
+        if (options.cipher == CookCiphers::None) return "Single-file packages must be obfuscated. Pick an obfuscation method, or use the loose Content folder format for debugging.";
         CookCipherInfo cipherInfo;
-        if (!CookCipherRegistry::Get().Find(CookCiphers::ChaCha12, cipherInfo)) return "Unknown obfuscation method: " + CookCiphers::ChaCha12;
+        if (!CookCipherRegistry::Get().Find(options.cipher, cipherInfo)) return "Unknown obfuscation method: " + options.cipher;
         if (!CookCipherRegistry::Get().IsAvailable(cipherInfo)) return "Obfuscation method \"" + cipherInfo.displayName + "\" needs the " + cipherInfo.moduleName + " module, which is not enabled.";
     }
 
@@ -175,6 +179,16 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         return result;
     }
 
+    PackageCooker::MeshCooker meshCooker = [](const std::string& diskPath, std::vector<uint8_t>& out, std::string& error) {
+        bool cooked = false;
+        const bool ran = MainThreadQueue::Run([&]() { cooked = CookedModelRaylib::CookSourceFile(diskPath, out, error); });
+        if (!ran) {
+            error = "the editor closed before the mesh could be cooked";
+            return false;
+        }
+        return cooked;
+    };
+
     fs::path engineRoot = GetEngineRoot();
     if (!fs::exists(engineRoot / "CMakeLists.txt")) {
         result.error = "Could not locate the engine source tree to build from (looked in \"" + engineRoot.string() +
@@ -260,6 +274,53 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
 
     bool isWeb = options.platform == PackagePlatform::Web;
 
+    const std::string cipherId = options.format == PackageFormat::SingleFile ? options.cipher : CookCiphers::None;
+    const std::string cipherKey = GenerateCookKey(cipherId);
+    {
+        std::error_code keyEc;
+        fs::create_directories(buildDir, keyEc);
+        std::string headerText = BakedKey::BuildEmptyHeaderText();
+        if (options.format == PackageFormat::SingleFile) {
+            std::vector<uint8_t> blob;
+            if (cipherKey.empty() || !BakedKey::Encode({cipherId, cipherKey}, CookRandomBytes(32), blob)) {
+                result.error = "Could not prepare the content key for this package.";
+                return result;
+            }
+            headerText = BakedKey::BuildHeaderText(blob);
+        }
+        std::ofstream keyHeader(buildDir / "PackageKey.generated.h", std::ios::binary | std::ios::trunc);
+        keyHeader << headerText;
+        keyHeader.flush();
+        if (!keyHeader.good()) {
+            result.error = "Could not write the content key header into the build folder.";
+            return result;
+        }
+    }
+
+    std::string sizeFlagsFile;
+    {
+        const fs::path flagsPath = buildDir / "star_size_flags.cmake";
+        std::ofstream flags(flagsPath, std::ios::binary | std::ios::trunc);
+        flags <<
+            "get_property(STAR_SIZE_FLAGS_DONE GLOBAL PROPERTY STAR_SIZE_FLAGS_DONE)\n"
+            "if(NOT STAR_SIZE_FLAGS_DONE)\n"
+            "    set_property(GLOBAL PROPERTY STAR_SIZE_FLAGS_DONE TRUE)\n"
+            "    if(MSVC)\n"
+            "        set(CMAKE_EXE_LINKER_FLAGS \"${CMAKE_EXE_LINKER_FLAGS} /DEBUG:NONE /INCREMENTAL:NO /OPT:REF /OPT:ICF\")\n"
+            "    elseif(CMAKE_CXX_COMPILER_ID MATCHES \"GNU|Clang\")\n"
+            "        set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections\")\n"
+            "        set(CMAKE_CXX_FLAGS \"${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections\")\n"
+            "        if(APPLE)\n"
+            "            set(CMAKE_EXE_LINKER_FLAGS \"${CMAKE_EXE_LINKER_FLAGS} -Wl,-dead_strip -Wl,-x -Wl,-S\")\n"
+            "        elseif(NOT EMSCRIPTEN)\n"
+            "            set(CMAKE_EXE_LINKER_FLAGS \"${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections -s\")\n"
+            "        endif()\n"
+            "    endif()\n"
+            "endif()\n";
+        flags.flush();
+        if (flags.good()) sizeFlagsFile = wslBuildDir + "/star_size_flags.cmake";
+    }
+
     std::vector<std::string> configureArgs;
     if (useWsl) configureArgs.push_back("wsl");
     if (isWeb) configureArgs.push_back("emcmake");
@@ -270,6 +331,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     configureArgs.push_back(wslBuildDir);
     configureArgs.push_back("-DSTARENGINE_BUILD_GAME=ON");
     configureArgs.push_back("-DCMAKE_BUILD_TYPE=Release");
+    if (!sizeFlagsFile.empty()) configureArgs.push_back("-DCMAKE_PROJECT_INCLUDE=" + sizeFlagsFile);
     if (!windowsIconFile.empty()) configureArgs.push_back("-DSTAR_GAME_ICON_ICO=" + windowsIconFile);
     if (!wslToolchainFile.empty()) {
         configureArgs.push_back("-DCMAKE_TOOLCHAIN_FILE=" + wslToolchainFile);
@@ -385,8 +447,6 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         }
 
         fs::path contentRoot = fs::path(options.projectRoot) / "Content";
-        const std::string cipherId = options.format == PackageFormat::SingleFile ? CookCiphers::ChaCha12 : CookCiphers::None;
-        std::string cipherKey = GenerateCookKey(cipherId);
 
         fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
         std::vector<uint8_t> inputMappingsBytes;
@@ -405,8 +465,6 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
         bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
         bootConfig.renderer = rendererKey;
-        bootConfig.cipher = cipherId;
-        bootConfig.cipherKey = cipherKey;
 
         const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
         if (activeTechnique && activeTechnique->collectPackagedSettings) {
@@ -423,7 +481,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             extraFiles.push_back({StarPak::kAudioConfigPath, audioConfigBytes});
 
             CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                                cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
+                                                                cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression, meshCooker);
             if (!cookResult.success) {
                 result.error = "Cooking failed: " + cookResult.error;
                 return result;
@@ -499,8 +557,6 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     }
 
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
-    const std::string cipherId = options.format == PackageFormat::SingleFile ? CookCiphers::ChaCha12 : CookCiphers::None;
-    std::string cipherKey = GenerateCookKey(cipherId);
 
     fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
     std::vector<uint8_t> inputMappingsBytes;
@@ -519,8 +575,6 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
     bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
     bootConfig.renderer = rendererKey;
-    bootConfig.cipher = cipherId;
-    bootConfig.cipherKey = cipherKey;
 
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
     if (activeTechnique && activeTechnique->collectPackagedSettings) {
@@ -538,7 +592,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         if (haveIcon) extraFiles.push_back({StarPak::kIconPath, gameIcon.png});
 
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                            cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
+                                                            cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression, meshCooker);
         if (!cookResult.success) {
             result.error = "Cooking failed: " + cookResult.error;
             return result;

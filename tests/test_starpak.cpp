@@ -3,6 +3,7 @@
 #include "Core/StarPak.h"
 #include "Core/Crc32.h"
 #include "Core/Sha256.h"
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -325,29 +326,6 @@ TEST(starpak_keeps_compression_metadata) {
     CHECK(packed.size == 30);
     CHECK(defaulted.compression == StarPak::kNoCompression);
     CHECK_BYTES(reader.ReadEntry("packed.bin"), stored);
-}
-
-TEST(starpak_siblings_group_by_directory) {
-    TempDir dir;
-    std::vector<Sample> samples = {
-        { "a/b/1.txt", { 1 } },
-        { "a/b/2.txt", { 2 } },
-        { "a/c/1.txt", { 3 } },
-        { "root.txt", { 4 } },
-        { "other.txt", { 5 } },
-    };
-    std::vector<uint8_t> bytes = BuildPakBytes(samples, dir);
-    StarPak::Reader reader;
-    REQUIRE(reader.LoadBuffer(bytes));
-
-    std::vector<std::string> inB = reader.SiblingsOf("a/b/1.txt");
-    REQUIRE(inB.size() == 2);
-    CHECK(inB[0] == "a/b/1.txt");
-    CHECK(inB[1] == "a/b/2.txt");
-    CHECK(reader.SiblingsOf("a/c/1.txt").size() == 1);
-    CHECK(reader.SiblingsOf("root.txt").size() == 2);
-    CHECK(reader.SiblingsOf("a/b/unlisted.txt").size() == 2);
-    CHECK(reader.SiblingsOf("nowhere/x.txt").empty());
 }
 
 TEST(starpak_writer_creates_missing_directories) {
@@ -729,6 +707,147 @@ TEST(starpak_survives_mutated_executables) {
         REQUIRE(test::WriteFile(dir.Path("mut.bin"), data));
         StarPak::Reader reader;
         if (reader.LoadFromExecutable(dir.Str("mut.bin"))) CheckReaderBounded(reader, paths);
+    }
+}
+
+std::vector<uint8_t> BuildKeyedPakBytes(const std::vector<Sample>& samples, const TempDir& dir, const std::string& key) {
+    StarPak::Writer writer;
+    writer.SetIndexKey(key);
+    for (const Sample& s : samples) writer.AddFile(s.path, s.bytes);
+    std::string file = dir.Str("keyed.pak");
+    writer.WriteToFile(file);
+    return test::ReadFile(file);
+}
+
+bool Contains(const std::vector<uint8_t>& haystack, const std::string& needle) {
+    if (needle.empty() || haystack.size() < needle.size()) return false;
+    return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end()) != haystack.end();
+}
+
+TEST(starpak_keyed_index_round_trips_with_the_right_key) {
+    TempDir dir;
+    std::vector<Sample> samples = StandardSamples();
+    std::vector<uint8_t> bytes = BuildKeyedPakBytes(samples, dir, "correct horse");
+    CHECK(std::memcmp(bytes.data(), "STARPAK4", 8) == 0);
+
+    StarPak::Reader reader;
+    REQUIRE(reader.LoadBuffer(bytes, "correct horse"));
+    for (const Sample& s : samples) {
+        std::vector<uint8_t> out;
+        std::string error;
+        CHECK_MSG(reader.ReadEntryVerified(s.path, out, error), s.path + ": " + error);
+        CHECK_BYTES(out, s.bytes);
+    }
+
+    StarPak::Reader fromFile;
+    REQUIRE(fromFile.LoadFile(dir.Path("keyed.pak").string(), "correct horse"));
+    CHECK(fromFile.HasEntry("__boot__"));
+}
+
+TEST(starpak_keyed_index_hides_names_and_rejects_wrong_keys) {
+    TempDir dir;
+    std::vector<Sample> samples = StandardSamples();
+    std::vector<uint8_t> bytes = BuildKeyedPakBytes(samples, dir, "correct horse");
+
+    for (const Sample& s : samples) {
+        if (s.path.size() < 6) continue;
+        CHECK_MSG(!Contains(bytes, s.path), "path visible: " + s.path);
+    }
+    CHECK(!Contains(bytes, "Content/"));
+    CHECK(!Contains(bytes, "Deflate"));
+
+    for (const char* wrong : { "", "correct horse ", "Correct horse", "wrong", "correct  horse" }) {
+        StarPak::Reader reader;
+        CHECK_MSG(!reader.LoadBuffer(bytes, wrong), wrong);
+        CHECK(!reader.HasEntry("__boot__"));
+    }
+}
+
+TEST(starpak_keyed_index_keeps_plain_paks_readable_without_a_key) {
+    TempDir dir;
+    std::vector<Sample> samples = StandardSamples();
+    std::vector<uint8_t> plain = BuildPakBytes(samples, dir);
+    CHECK(std::memcmp(plain.data(), "STARPAK3", 8) == 0);
+    CHECK(Contains(plain, "Content/Textures/wall.png"));
+
+    StarPak::Reader noKey;
+    CHECK(noKey.LoadBuffer(plain));
+    StarPak::Reader ignoredKey;
+    CHECK(ignoredKey.LoadBuffer(plain, "anything"));
+    CHECK(ignoredKey.HasEntry("__boot__"));
+}
+
+TEST(starpak_keyed_index_detects_any_index_damage) {
+    TempDir dir;
+    std::vector<Sample> samples = {
+        { "a.txt", ToBytes("hello") },
+        { "b.bin", Pattern(40, 2) },
+    };
+    std::vector<uint8_t> bytes = BuildKeyedPakBytes(samples, dir, "key");
+
+    size_t headerEnd = 9;
+    while (bytes[headerEnd] != '\n') headerEnd++;
+    headerEnd++;
+    const size_t blobStart = bytes.size() - 45;
+    REQUIRE(blobStart > headerEnd);
+
+    for (size_t i = 0; i < blobStart; i++) {
+        for (int bit = 0; bit < 8; bit += 3) {
+            std::vector<uint8_t> damaged = bytes;
+            damaged[i] ^= (uint8_t)(1 << bit);
+            StarPak::Reader reader;
+            if (i < 9) {
+                CHECK_MSG(!reader.LoadBuffer(damaged, "key"), "magic byte " + std::to_string(i));
+                continue;
+            }
+            const bool loaded = reader.LoadBuffer(damaged, "key");
+            if (i >= headerEnd) CHECK_MSG(!loaded, "index byte " + std::to_string(i) + " bit " + std::to_string(bit));
+        }
+    }
+}
+
+TEST(starpak_keyed_index_rejects_malformed_headers) {
+    const std::string body(64, 'x');
+    const std::vector<std::pair<const char*, std::string>> cases = {
+        { "magic only", "STARPAK4" },
+        { "no newline after header", "STARPAK4\n10\t00000000" },
+        { "missing crc", "STARPAK4\n10\n" + body },
+        { "extra field", "STARPAK4\n10\t00000000\t1\n" + body },
+        { "empty size", "STARPAK4\n\t00000000\n" + body },
+        { "non digit size", "STARPAK4\n1x\t00000000\n" + body },
+        { "negative size", "STARPAK4\n-5\t00000000\n" + body },
+        { "zero size", "STARPAK4\n0\t00000000\n" + body },
+        { "size beyond buffer", "STARPAK4\n99999\t00000000\n" + body },
+        { "size overflow", "STARPAK4\n99999999999999999999999\t00000000\n" + body },
+        { "crc too short", "STARPAK4\n10\t1234567\n" + body },
+        { "crc not hex", "STARPAK4\n10\t1234567z\n" + body },
+        { "wrong crc", "STARPAK4\n10\t00000000\n" + body },
+    };
+    for (const auto& c : cases) {
+        StarPak::Reader reader;
+        std::vector<uint8_t> buffer(c.second.begin(), c.second.end());
+        CHECK_MSG(!reader.LoadBuffer(buffer, "key"), c.first);
+        CHECK_MSG(!reader.HasEntry("a"), c.first);
+    }
+}
+
+TEST(starpak_keyed_index_survives_random_damage_without_crashing) {
+    TempDir dir;
+    std::vector<uint8_t> bytes = BuildKeyedPakBytes(StandardSamples(), dir, "fuzz key");
+    test::Rng rng(31337);
+    for (int round = 0; round < 400; round++) {
+        std::vector<uint8_t> damaged = bytes;
+        const int edits = 1 + (int)rng.Below(6);
+        for (int e = 0; e < edits; e++) damaged[rng.Below((uint32_t)damaged.size())] = (uint8_t)rng.Next();
+        if (rng.Below(4) == 0) damaged.resize(rng.Below((uint32_t)damaged.size()));
+
+        StarPak::Reader reader;
+        if (!reader.LoadBuffer(damaged, "fuzz key")) continue;
+        for (const Sample& s : StandardSamples()) {
+            std::vector<uint8_t> out;
+            std::string error;
+            reader.ReadEntryVerified(s.path, out, error);
+        }
     }
 }
 

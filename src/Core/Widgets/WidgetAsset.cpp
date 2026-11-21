@@ -50,13 +50,12 @@ bool WriteWidgetAsset(std::ostream& out, const WidgetAssetData& data, bool inclu
 }
 
 bool LoadWidgetAsset(const std::string& path, WidgetAssetData& outData) {
-    std::string openPath = CookedFile::Open(path);
-    std::ifstream in(openPath);
-    if (!in.is_open()) {
-        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", openPath.c_str());
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) {
+        TraceLog(LOG_WARNING, "WidgetAsset: failed to open \"%s\" for reading", path.c_str());
         return false;
     }
-    return ReadWidgetAsset(in, outData);
+    return ReadWidgetAsset(*stream, outData);
 }
 
 bool DeserializeWidgetAsset(const std::string& text, WidgetAssetData& outData, bool loadBehavior) {

@@ -1,6 +1,10 @@
 #include "PackageTab.h"
 #include "MenuBar.h"
 #include "NativeFileDialog.h"
+#include "Core/SafeProcess.h"
+#include "Core/Widgets/Widget.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "Core/Widgets/TextElement.h"
 #include "Core/PackageRunner.h"
 #include "Core/ProjectTrust.h"
 #include "LoadingPanel.h"
@@ -102,6 +106,10 @@ static void PackageTabScrollableLog(Rectangle r, const std::string& content, flo
     }
 }
 
+PackageTab::~PackageTab() {
+    delete outputChrome;
+}
+
 void PackageTab::ChooseDefaultPlatform() {
     selectedPlatformIndex = -1;
 
@@ -190,7 +198,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     float fy = y + 16;
     float fw = width - 32 > 640.0f ? 640.0f : width - 32;
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
-                               formatPopup.IsOpen() || compressionPopup.IsOpen() || unsavedLevelPopup.IsOpen() || trustPopup.IsOpen();
+                               formatPopup.IsOpen() || compressionPopup.IsOpen() || cipherPopup.IsOpen() || unsavedLevelPopup.IsOpen() || trustPopup.IsOpen();
 
     DrawText("Package Project", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 26;
@@ -230,26 +238,8 @@ void PackageTab::Render(float x, float y, float width, float height) {
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
-    // Encryption
-    const bool singleFile = format == PackageFormat::SingleFile;
-    DrawText("Content Obfuscation", (int)fx, (int)fy, 11, theme.textSecondary);
-    fy += 14;
-    Rectangle cipherRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(cipherRow, theme.fieldBg);
-    DrawRectangleLinesEx(cipherRow, 1, theme.fieldBorder);
-    CookCipherInfo selectedCipher;
-    const bool cipherKnown = CookCipherRegistry::Get().Find(CookCiphers::ChaCha12, selectedCipher);
-    std::string cipherLabel = !singleFile ? "None (loose folder is never obfuscated)" : (cipherKnown ? selectedCipher.displayName + " (always on)" : CookCiphers::ChaCha12 + " (not available)");
-    DrawText(cipherLabel.c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12,
-             singleFile ? theme.textPrimary : theme.textSecondary);
-    fy += 20;
-    std::string cipherHelp = !singleFile ? "The loose Content folder is the debug format and stays readable."
-        : (cipherKnown ? selectedCipher.description : "This method is not registered.");
-    DrawText(PackageTabFitText(cipherHelp, 10, fw).c_str(),
-              (int)fx, (int)fy, 10, theme.textSecondary);
-    fy += 24;
-
     // Format
+    const bool singleFile = format == PackageFormat::SingleFile;
     DrawText("Packaging Format", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle formatRow = SelectRow(fx, fy, fw, 22);
@@ -265,60 +255,121 @@ void PackageTab::Render(float x, float y, float width, float height) {
         });
     }
     fy += 20;
-    DrawText("Single file ships one exe with no loose Content/ folder. Loose folder is faster to re-package for testing.",
+    DrawText(PackageTabFitText(singleFile
+                 ? "One exe with no loose Content folder. Content is obfuscated, checked and loaded from memory."
+                 : "Readable Content folder next to the exe. Faster to re-package for testing.", 10, fw).c_str(),
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
-    DrawText("Compression", (int)fx, (int)fy, 11, theme.textSecondary);
-    fy += 14;
-    Rectangle compressionRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(compressionRow, theme.fieldBg);
-    DrawRectangleLinesEx(compressionRow, 1, theme.fieldBorder);
-    PackCompressionInfo selectedCompression;
-    bool compressionKnown = PackCompressionRegistry::Get().Find(compression, selectedCompression);
-    std::string compressionLabel = !singleFile ? "None (single file only)" : (compressionKnown ? selectedCompression.displayName : compression + " (not available)");
-    DrawText(compressionLabel.c_str(), (int)compressionRow.x + 6, (int)compressionRow.y + 5, 12,
-             singleFile ? theme.textPrimary : theme.textSecondary);
-    if (singleFile && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, compressionRow) && !anyPopupOpen) {
-        std::vector<ChoiceOption> options;
-        compressionChoiceIds.clear();
-        for (const PackCompressionInfo& c : PackCompressionRegistry::Get().GetAll()) {
-            bool available = PackCompressionRegistry::Get().IsAvailable(c);
-            options.push_back({c.displayName, available, available ? "" : PackageTabUnavailableReason(c.moduleName)});
-            compressionChoiceIds.push_back(c.id);
+    if (singleFile) {
+        DrawText("Compression", (int)fx, (int)fy, 11, theme.textSecondary);
+        fy += 14;
+        Rectangle compressionRow = SelectRow(fx, fy, fw, 22);
+        DrawRectangleRec(compressionRow, theme.fieldBg);
+        DrawRectangleLinesEx(compressionRow, 1, theme.fieldBorder);
+        PackCompressionInfo selectedCompression;
+        bool compressionKnown = PackCompressionRegistry::Get().Find(compression, selectedCompression);
+        std::string compressionLabel = compressionKnown ? selectedCompression.displayName : compression + " (not available)";
+        DrawText(compressionLabel.c_str(), (int)compressionRow.x + 6, (int)compressionRow.y + 5, 12, theme.textPrimary);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, compressionRow) && !anyPopupOpen) {
+            std::vector<ChoiceOption> options;
+            compressionChoiceIds.clear();
+            for (const PackCompressionInfo& c : PackCompressionRegistry::Get().GetAll()) {
+                bool available = PackCompressionRegistry::Get().IsAvailable(c);
+                options.push_back({c.displayName, available, available ? "" : PackageTabUnavailableReason(c.moduleName)});
+                compressionChoiceIds.push_back(c.id);
+            }
+            compressionPopup.Open({compressionRow.x, compressionRow.y + compressionRow.height}, fw, options);
         }
-        compressionPopup.Open({compressionRow.x, compressionRow.y + compressionRow.height}, fw, options);
-    }
-    fy += 20;
-    DrawText(PackageTabFitText(compressionKnown ? selectedCompression.description : "This method is not registered. Enable the module that provides it.", 10, fw).c_str(),
-              (int)fx, (int)fy, 10, theme.textSecondary);
-    fy += 24;
+        fy += 20;
+        DrawText(PackageTabFitText(compressionKnown ? selectedCompression.description : "This method is not registered. Enable the module that provides it.", 10, fw).c_str(),
+                  (int)fx, (int)fy, 10, theme.textSecondary);
+        fy += 24;
 
-    DrawText("Integrity Check", (int)fx, (int)fy, 11, theme.textSecondary);
-    fy += 14;
-    Rectangle integrityRow = SelectRow(fx, fy, fw, 22);
-    DrawRectangleRec(integrityRow, theme.fieldBg);
-    DrawRectangleLinesEx(integrityRow, 1, theme.fieldBorder);
-    std::string integrityLabel = !singleFile ? "None (single file only)" : "CRC-32 (always on, verified when loaded)";
-    DrawText(integrityLabel.c_str(), (int)integrityRow.x + 6, (int)integrityRow.y + 5, 12,
-             singleFile ? theme.textPrimary : theme.textSecondary);
-    fy += 20;
-    DrawText("Detects damaged or truncated package entries. A checksum alone does not stop a determined attacker.",
-              (int)fx, (int)fy, 10, theme.textSecondary);
-    fy += 24;
+        int selectableCiphers = 0;
+        for (const CookCipherInfo& c : CookCipherRegistry::Get().GetAll()) {
+            if (c.id != CookCiphers::None) selectableCiphers++;
+        }
+        if (selectableCiphers > 1) {
+            DrawText("Content Obfuscation", (int)fx, (int)fy, 11, theme.textSecondary);
+            fy += 14;
+            Rectangle cipherRow = SelectRow(fx, fy, fw, 22);
+            DrawRectangleRec(cipherRow, theme.fieldBg);
+            DrawRectangleLinesEx(cipherRow, 1, theme.fieldBorder);
+            CookCipherInfo selectedCipher;
+            bool cipherKnown = CookCipherRegistry::Get().Find(cipher, selectedCipher);
+            std::string cipherLabel = cipherKnown ? selectedCipher.displayName : cipher + " (not available)";
+            DrawText(cipherLabel.c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12, theme.textPrimary);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, cipherRow) && !anyPopupOpen) {
+                std::vector<ChoiceOption> options;
+                cipherChoiceIds.clear();
+                for (const CookCipherInfo& c : CookCipherRegistry::Get().GetAll()) {
+                    if (c.id == CookCiphers::None) continue;
+                    bool available = CookCipherRegistry::Get().IsAvailable(c);
+                    options.push_back({c.displayName, available, available ? "" : PackageTabUnavailableReason(c.moduleName)});
+                    cipherChoiceIds.push_back(c.id);
+                }
+                cipherPopup.Open({cipherRow.x, cipherRow.y + cipherRow.height}, fw, options);
+            }
+            fy += 20;
+            DrawText(PackageTabFitText(cipherKnown ? selectedCipher.description : "This method is not registered. Enable the module that provides it.", 10, fw).c_str(),
+                      (int)fx, (int)fy, 10, theme.textSecondary);
+            fy += 24;
+        }
+    }
 
     // Output folder
     DrawText("Output Folder", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
-    float browseWidth = 70.0f;
-    Rectangle outputRow = SelectRow(fx, fy, fw - browseWidth - 6, 22);
-    DrawRectangleRec(outputRow, theme.fieldBg);
-    DrawRectangleLinesEx(outputRow, 1, theme.fieldBorder);
-    DrawText(outputDir.c_str(), (int)outputRow.x + 6, (int)outputRow.y + 5, 11, theme.textPrimary);
-    Rectangle browseButton = {outputRow.x + outputRow.width + 6, fy, browseWidth, 22};
+    const float buttonWidth = 70.0f;
+    Rectangle outputRow = SelectRow(fx, fy, fw - (buttonWidth + 6.0f) * 2.0f, 22);
+    if (!outputChrome) {
+        outputChrome = new Widget();
+        auto* root = new WidgetElement();
+        outputChrome->SetRoot(root);
+        outputField = new TextElement();
+        outputField->editable = true;
+        outputField->fontSize = 12.0f;
+        outputField->backgroundColor = theme.fieldBg;
+        outputField->borderColor = theme.fieldBorder;
+        outputField->editingBorderColor = theme.accent;
+        outputField->onTextCommitted = [this](const std::string& text) {
+            size_t first = text.find_first_not_of(" \t");
+            size_t last = text.find_last_not_of(" \t");
+            if (first == std::string::npos) return;
+            outputDir = text.substr(first, last - first + 1);
+        };
+        root->AddChild(outputField);
+    }
+    if (!outputField->isEditing) outputField->text = outputDir;
+    outputField->size = { outputRow.width, outputRow.height };
+    outputField->offset = { outputRow.x, outputRow.y };
+    {
+        const float dt = GetFrameTime();
+        const Rectangle chromeArea = {0, 0, x + width, y + height};
+        outputChrome->Tick(dt, chromeArea, 1.0f);
+        if (!anyPopupOpen) WidgetInput::ProcessInput(outputChrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
+        outputChrome->Draw(chromeArea, 1.0f);
+    }
+    Rectangle browseButton = {outputRow.x + outputRow.width + 6, fy, buttonWidth, 22};
     if (PackageTabButton(browseButton, "Browse...") && !anyPopupOpen) {
         std::string chosen = NativeFileDialog::OpenFolder("Choose Output Folder", outputDir);
         if (!chosen.empty()) outputDir = chosen;
+    }
+    std::error_code outputEc;
+    const bool outputExists = !outputDir.empty() && fs::is_directory(fs::path(outputDir), outputEc);
+    Rectangle openButton = {browseButton.x + buttonWidth + 6, fy, buttonWidth, 22};
+    if (PackageTabButton(openButton, "Open Dir", outputExists) && !anyPopupOpen) {
+        std::string log;
+        std::vector<std::string> argv;
+#ifdef _WIN32
+        argv = {"explorer", fs::path(outputDir).make_preferred().string()};
+#elif defined(__APPLE__)
+        argv = {"open", outputDir};
+#else
+        argv = {"xdg-open", outputDir};
+#endif
+        SafeProcess::Run(argv, log);
     }
     fy += 34;
 
@@ -375,6 +426,11 @@ void PackageTab::Render(float x, float y, float width, float height) {
         format = formatChoice == 1 ? PackageFormat::LooseFolder : PackageFormat::SingleFile;
     }
 
+    int cipherChoice = 0;
+    if (cipherPopup.Render(cipherChoice)) {
+        if (cipherChoice >= 0 && cipherChoice < (int)cipherChoiceIds.size()) cipher = cipherChoiceIds[cipherChoice];
+    }
+
     int compressionChoice = 0;
     if (compressionPopup.Render(compressionChoice)) {
         if (compressionChoice >= 0 && compressionChoice < (int)compressionChoiceIds.size()) compression = compressionChoiceIds[compressionChoice];
@@ -417,6 +473,7 @@ void PackageTab::RunPackage() {
     options.renderer = renderer;
     options.format = format;
     options.compression = format == PackageFormat::SingleFile ? compression : PackCompressions::None;
+    options.cipher = cipher;
 
     hasResult = false;
     packageRunning = true;

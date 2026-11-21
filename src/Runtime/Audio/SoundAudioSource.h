@@ -52,7 +52,9 @@ private:
     bool prepared = false;
     bool failed = false;
     bool streaming = false;
+    std::string sourcePath;
     std::string resolvedPath;
+    std::shared_ptr<const std::vector<uint8_t>> memory;
     WavInfo info;
     std::shared_ptr<const SampleData> sample;
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <fstream>
+#include <istream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,7 +36,9 @@ struct WavInfo {
 namespace WavFile {
 
 bool ReadInfo(const std::string& path, WavInfo& info, std::string& error);
-uint64_t ReadFrames(std::ifstream& file, const WavInfo& info, uint64_t startFrame, uint64_t count, float* out, int outChannels);
+bool ReadInfoFromMemory(const uint8_t* bytes, size_t size, WavInfo& info, std::string& error);
+uint64_t ReadFrames(std::istream& file, const WavInfo& info, uint64_t startFrame, uint64_t count, float* out, int outChannels);
 std::shared_ptr<SampleData> LoadAll(const std::string& path, std::string& error);
+std::shared_ptr<SampleData> LoadAllFromMemory(const uint8_t* bytes, size_t size, std::string& error);
 
 }

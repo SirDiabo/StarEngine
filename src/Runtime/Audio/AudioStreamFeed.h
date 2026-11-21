@@ -16,6 +16,7 @@ public:
     static constexpr uint64_t kChunk = 8192;
 
     StreamFeed(const std::string& path, const WavInfo& wavInfo);
+    StreamFeed(std::shared_ptr<const std::vector<uint8_t>> bytes, const WavInfo& wavInfo);
 
     bool IsOpen() const { return opened; }
     const WavInfo& Info() const { return info; }
@@ -34,7 +35,7 @@ public:
 
 private:
     WavInfo info;
-    std::ifstream file;
+    std::unique_ptr<std::istream> file;
     bool opened = false;
 
     std::vector<float> ring;

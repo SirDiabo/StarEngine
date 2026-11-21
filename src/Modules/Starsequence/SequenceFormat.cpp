@@ -597,14 +597,16 @@ std::string WriteSequence(const Sequence& s) {
 }
 
 bool LoadSequenceFile(const std::string& path, ParseResult& result) {
-    std::string resolved = CookedFile::Open(path);
-    std::ifstream in(resolved.empty() ? path : resolved, std::ios::binary);
-    if (!in.is_open()) {
-        result = ParseResult();
-        result.diagnostics.push_back({ 0, true, "Could not open " + path });
-        return false;
+    std::string text;
+    if (!CookedFile::ReadText(path, text)) {
+        std::ifstream in(path, std::ios::binary);
+        if (CookedFile::IsUsingPak() || !in.is_open()) {
+            result = ParseResult();
+            result.diagnostics.push_back({ 0, true, "Could not open " + path });
+            return false;
+        }
+        text.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     }
-    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     result = ParseSequence(text);
     return result.ok;
 }

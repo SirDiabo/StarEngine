@@ -1,4 +1,5 @@
 add_custom_target(star_tests)
+find_package(Threads REQUIRED)
 
 set(STAR_SRC "${CMAKE_SOURCE_DIR}/src")
 
@@ -31,8 +32,66 @@ endfunction()
 star_add_test(test_crypto
     SOURCES
         TestModuleStub.cpp
-        "${STAR_SRC}/Core/ChaCha12.cpp"
         "${STAR_SRC}/Core/PackageCipher.cpp")
+
+star_add_test(test_baked_key
+    SOURCES
+        "${STAR_SRC}/Core/BakedKey.cpp")
+
+star_add_test(test_cooked_text
+    SOURCES
+        "${STAR_SRC}/Core/CookedText.cpp")
+
+star_add_test(test_cooked_model
+    SOURCES
+        "${STAR_SRC}/Core/CookedModel.cpp")
+
+star_add_test(test_main_thread_queue
+    SOURCES
+        "${STAR_SRC}/Core/MainThreadQueue.cpp"
+    LIBRARIES Threads::Threads)
+
+star_add_test(test_wav_memory
+    SOURCES
+        "${STAR_SRC}/Runtime/Audio/WavFile.cpp"
+    LIBRARIES Threads::Threads)
+
+star_add_test(test_cooked_entry
+    SOURCES
+        TestModuleStub.cpp
+        "${STAR_SRC}/Core/CookedEntry.cpp"
+        "${STAR_SRC}/Core/StarPak.cpp"
+        "${STAR_SRC}/Core/PackageCipher.cpp"
+        "${STAR_SRC}/Core/PackageCompression.cpp"
+        "${STAR_SRC}/Core/Profiler.cpp"
+    LIBRARIES raylib)
+
+star_add_test(test_package_cooker
+    SOURCES
+        TestModuleStub.cpp
+        "${STAR_SRC}/Core/PackageCooker.cpp"
+        "${STAR_SRC}/Core/ObjMtlParser.cpp"
+        "${STAR_SRC}/Core/PathSafety.cpp"
+        "${STAR_SRC}/Core/StarPak.cpp"
+        "${STAR_SRC}/Core/PackageCipher.cpp"
+        "${STAR_SRC}/Core/PackageCompression.cpp"
+        "${STAR_SRC}/Core/CookedText.cpp"
+        "${STAR_SRC}/Core/CookedEntry.cpp"
+        "${STAR_SRC}/Core/Profiler.cpp"
+    LIBRARIES raylib)
+
+star_add_test(test_cooked_file
+    SOURCES
+        TestModuleStub.cpp
+        "${STAR_SRC}/Core/CookedFile.cpp"
+        "${STAR_SRC}/Core/CookedEntry.cpp"
+        "${STAR_SRC}/Core/ContentPathResolver.cpp"
+        "${STAR_SRC}/Core/CookedText.cpp"
+        "${STAR_SRC}/Core/StarPak.cpp"
+        "${STAR_SRC}/Core/PackageCipher.cpp"
+        "${STAR_SRC}/Core/PackageCompression.cpp"
+        "${STAR_SRC}/Core/Profiler.cpp"
+    LIBRARIES raylib)
 
 star_add_test(test_inflate
     SOURCES

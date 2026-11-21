@@ -1,4 +1,5 @@
 #include "PackageCooker.h"
+#include "CookedText.h"
 #include "StarPak.h"
 #include "ObjMtlParser.h"
 #include "PathSafety.h"
@@ -28,6 +29,18 @@ bool IsTextProjectFile(const fs::path& p) {
     return false;
 }
 
+bool IsMeshSource(const fs::path& p) {
+    std::string ext = p.extension().string();
+    for (char& c : ext) c = (char)std::tolower((unsigned char)c);
+    return ext == ".obj" || ext == ".gltf" || ext == ".glb";
+}
+
+bool IsMtlSource(const fs::path& p) {
+    std::string ext = p.extension().string();
+    for (char& c : ext) c = (char)std::tolower((unsigned char)c);
+    return ext == ".mtl";
+}
+
 std::vector<uint8_t> ReadBytes(const fs::path& p) {
     std::ifstream in(p, std::ios::binary);
     return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -55,7 +68,7 @@ std::string UniqueImportedName(const fs::path& source, std::unordered_set<std::s
 using CookSink = std::function<void(const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t rawSize, const std::string& compression)>;
 
 CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, const std::string& cipherKey,
-                         const std::string& compression, const CookSink& sink) {
+                         const std::string& compression, const PackageCooker::MeshCooker* meshCooker, const CookSink& sink) {
     CookResult result;
     fs::path importedDirRelative = "_Imported";
 
@@ -136,7 +149,15 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
         std::string virtualPath = relative.generic_string();
 
         std::vector<uint8_t> bytes;
-        if (IsTextProjectFile(entry.path())) {
+        if (meshCooker != nullptr && IsMtlSource(entry.path())) continue;
+
+        if (meshCooker != nullptr && IsMeshSource(entry.path())) {
+            std::string cookError;
+            if (!(*meshCooker)(entry.path().u8string(), bytes, cookError)) {
+                result.error = "Could not cook mesh " + virtualPath + ": " + cookError;
+                return result;
+            }
+        } else if (IsTextProjectFile(entry.path())) {
             std::ifstream in(entry.path());
             std::vector<std::string> lines;
             std::string line;
@@ -153,7 +174,16 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
             std::ostringstream rewritten;
             for (const std::string& l : lines) rewritten << rewriteLine(l, vendoredFallback) << "\n";
             std::string text = rewritten.str();
-            bytes.assign(text.begin(), text.end());
+            if (meshCooker != nullptr) {
+                const std::vector<uint8_t> seedBytes = CookRandomBytes(4);
+                const uint32_t seed = (uint32_t)seedBytes[0] | ((uint32_t)seedBytes[1] << 8) | ((uint32_t)seedBytes[2] << 16) | ((uint32_t)seedBytes[3] << 24);
+                if (!CookedText::Pack(text, seed, bytes)) {
+                    result.error = "Could not pack " + virtualPath;
+                    return result;
+                }
+            } else {
+                bytes.assign(text.begin(), text.end());
+            }
         } else {
             bytes = ReadBytes(entry.path());
         }
@@ -166,7 +196,20 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
         std::string virtualPath = importQueue[i].second;
 
         fs::path sourcePath(source);
-        std::vector<uint8_t> bytes = ReadBytes(sourcePath);
+        std::vector<uint8_t> bytes;
+
+        if (meshCooker != nullptr && IsMeshSource(sourcePath)) {
+            std::string cookError;
+            if (!(*meshCooker)(sourcePath.u8string(), bytes, cookError)) {
+                result.error = "Could not cook mesh " + source + ": " + cookError;
+                return result;
+            }
+            finish(virtualPath, std::move(bytes));
+            continue;
+        }
+        if (meshCooker != nullptr && IsMtlSource(sourcePath)) continue;
+
+        bytes = ReadBytes(sourcePath);
 
         if (ObjMtlParser::IsObjFile(sourcePath)) {
             for (const std::string& mtlName : ObjMtlParser::ParseMtllibReferences(bytes)) {
@@ -194,7 +237,7 @@ CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std
     std::error_code ec;
     fs::create_directories(outputContentDir, ec);
 
-    return CookInternal(fs::path(contentRootStr), CookCiphers::None, std::string(), PackCompressions::None,
+    return CookInternal(fs::path(contentRootStr), CookCiphers::None, std::string(), PackCompressions::None, nullptr,
         [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t, const std::string&) {
             WriteBytes(outputContentDir / virtualPath, bytes);
         });
@@ -204,11 +247,13 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
                                      const std::string& cipher, const std::string& cipherKey,
                                      const std::string& bootConfigText,
                                      const std::vector<ExtraPakFile>& extraFiles,
-                                     const std::string& compression) {
+                                     const std::string& compression,
+                                     const MeshCooker& meshCooker) {
     StarPak::Writer writer;
+    writer.SetIndexKey(cipherKey);
 
     std::string rejectedPath;
-    CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey, compression,
+    CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey, compression, &meshCooker,
         [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t rawSize, const std::string& used) {
             if (!writer.AddEntry(virtualPath, bytes, rawSize, used) && rejectedPath.empty()) rejectedPath = virtualPath;
         });
@@ -219,11 +264,21 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
         return result;
     }
 
-    writer.AddFile(StarPak::kBootConfigPath,
-                   std::vector<uint8_t>(bootConfigText.begin(), bootConfigText.end()));
+    auto cipherImpl = CreateCookCipher(cipher);
+    if (!cipherImpl) {
+        result.success = false;
+        result.error = "Unknown obfuscation method: " + cipher;
+        return result;
+    }
+
+    std::vector<uint8_t> bootBytes(bootConfigText.begin(), bootConfigText.end());
+    cipherImpl->Encrypt(bootBytes, cipherKey, StarPak::kBootConfigPath);
+    writer.AddFile(StarPak::kBootConfigPath, bootBytes);
 
     for (const ExtraPakFile& extra : extraFiles) {
-        if (!writer.AddFile(extra.virtualPath, extra.bytes)) {
+        std::vector<uint8_t> extraBytes = extra.bytes;
+        cipherImpl->Encrypt(extraBytes, cipherKey, extra.virtualPath);
+        if (!writer.AddFile(extra.virtualPath, extraBytes)) {
             result.success = false;
             result.error = "Invalid file name in package: " + extra.virtualPath;
             return result;

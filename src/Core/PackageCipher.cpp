@@ -1,5 +1,5 @@
 #include "PackageCipher.h"
-#include "ChaCha12.h"
+#include "ChaCha12Keyed.h"
 #include "Module.h"
 #include "Sha256.h"
 #include <chrono>
@@ -16,19 +16,8 @@ public:
 
 class ChaCha12Cipher : public ICookCipher {
 public:
-    void Encrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { Apply(data, key, context); }
-    void Decrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { Apply(data, key, context); }
-
-private:
-    static void Apply(std::vector<uint8_t>& data, const std::string& key, const std::string& context) {
-        if (data.empty()) return;
-
-        Sha256::Digest keyBytes = Sha256::Compute(key);
-        std::string nonceInput = "StarPak-ChaCha12:" + context;
-        Sha256::Digest nonce = Sha256::Hmac(keyBytes.bytes, 32, nonceInput.data(), nonceInput.size());
-
-        ChaCha12::Xor(keyBytes.bytes, nonce.bytes, 0, data.data(), data.size());
-    }
+    void Encrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { ChaCha12::ApplyKeyed(data, key, context); }
+    void Decrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { ChaCha12::ApplyKeyed(data, key, context); }
 };
 
 std::vector<uint8_t> RandomBytes(size_t count) {
@@ -85,6 +74,10 @@ std::string RandomHexKey(size_t byteCount) {
     return key;
 }
 
+}
+
+std::vector<uint8_t> CookRandomBytes(size_t count) {
+    return RandomBytes(count);
 }
 
 CookCipherRegistry& CookCipherRegistry::Get() {

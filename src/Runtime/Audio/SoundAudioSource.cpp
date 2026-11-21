@@ -60,16 +60,25 @@ bool SoundAudioSource::Prepare() {
         return false;
     }
 
-    resolvedPath = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolvedPath.empty() || !std::filesystem::exists(resolvedPath)) {
+    sourcePath = asset.ResolveSourcePath();
+    if (!CookedFile::Exists(sourcePath)) {
         TraceLog(LOG_ERROR, "Audio: sound file for '%s' was not found", assetPath.c_str());
         failed = true;
         return false;
     }
 
-    std::string error;
-    if (!WavFile::ReadInfo(resolvedPath, info, error)) {
+    std::string error = "could not read the file";
+    bool haveInfo = false;
+    if (CookedFile::IsUsingPak()) {
+        memory = CookedFile::ReadShared(sourcePath);
+        haveInfo = memory && WavFile::ReadInfoFromMemory(memory->data(), memory->size(), info, error);
+    } else {
+        resolvedPath = CookedFile::DiskPath(sourcePath);
+        haveInfo = !resolvedPath.empty() && WavFile::ReadInfo(resolvedPath, info, error);
+    }
+    if (!haveInfo) {
         TraceLog(LOG_ERROR, "Audio: could not read '%s': %s", assetPath.c_str(), error.c_str());
+        memory.reset();
         failed = true;
         return false;
     }
@@ -78,7 +87,8 @@ bool SoundAudioSource::Prepare() {
     streaming = mode == SoundLoadMode::Stream || (mode == SoundLoadMode::Auto && info.DurationSeconds() > kAutoStreamSeconds);
 
     if (!streaming) {
-        sample = AudioCore::Get().GetSampleData(resolvedPath);
+        sample = AudioCore::Get().GetSampleData(sourcePath, memory);
+        memory.reset();
         if (!sample) {
             failed = true;
             return false;
@@ -102,7 +112,7 @@ void SoundAudioSource::Play() {
     start.chain = ActiveChain();
 
     if (streaming) {
-        auto feed = std::make_shared<StreamFeed>(resolvedPath, info);
+        auto feed = memory ? std::make_shared<StreamFeed>(memory, info) : std::make_shared<StreamFeed>(resolvedPath, info);
         voice = AudioMixer::Get().PlayStream(feed, start);
     } else {
         voice = AudioMixer::Get().PlayMemory(sample, start);

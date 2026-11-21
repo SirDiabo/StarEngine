@@ -55,7 +55,7 @@ void SoundPreviewTab::BuildWaveform() {
 
     StarAsset asset;
     if (!StarAsset::LoadFromFile(assetPath, asset)) return;
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
+    std::string resolved = CookedFile::DiskPath(asset.ResolveSourcePath());
     WavInfo info;
     std::string error;
     if (resolved.empty() || !WavFile::ReadInfo(resolved, info, error)) {

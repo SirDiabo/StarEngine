@@ -1,11 +1,19 @@
 #include "AudioStreamFeed.h"
+#include "Core/MemoryStream.h"
 #include <algorithm>
 #include <chrono>
 
 StreamFeed::StreamFeed(const std::string& path, const WavInfo& wavInfo)
     : info(wavInfo), ring((size_t)(kCapacity * 2), 0.0f), scratch((size_t)(kChunk * 2), 0.0f) {
-    file.open(path, std::ios::binary);
-    opened = file.is_open();
+    auto stream = std::unique_ptr<std::ifstream>(new std::ifstream(path, std::ios::binary));
+    opened = stream->is_open();
+    file = std::move(stream);
+}
+
+StreamFeed::StreamFeed(std::shared_ptr<const std::vector<uint8_t>> bytes, const WavInfo& wavInfo)
+    : info(wavInfo), ring((size_t)(kCapacity * 2), 0.0f), scratch((size_t)(kChunk * 2), 0.0f) {
+    opened = bytes != nullptr && !bytes->empty();
+    if (opened) file = std::unique_ptr<std::istream>(new MemoryStream(std::move(bytes)));
 }
 
 uint64_t StreamFeed::Available() {
@@ -68,7 +76,7 @@ bool StreamFeed::Refill() {
     if (freeFrames < kChunk) return false;
 
     uint64_t position = filePosition.load(std::memory_order_relaxed);
-    uint64_t got = WavFile::ReadFrames(file, info, position, kChunk, scratch.data(), 2);
+    uint64_t got = WavFile::ReadFrames(*file, info, position, kChunk, scratch.data(), 2);
     for (uint64_t i = 0; i < got; i++) {
         uint64_t index = (w + i) & kMask;
         ring[(size_t)(index * 2)] = scratch[(size_t)(i * 2)];

@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "MainThreadQueue.h"
 #include "UndoManager.h"
 #include "ProfilerRender.h"
 #include "ProfilerCapture.h"
@@ -68,6 +69,7 @@ bool Application::Initialize(int argc, char* argv[]) {
     SetTraceLogLevel(LOG_ALL);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, "StarEngine " STARENGINE_VERSION);
+    MainThreadQueue::MarkMainThread();
     SetExitKey(0);
     SetTargetFPS(60);
     AudioCore::Get().InitDevice();
@@ -225,6 +227,7 @@ bool Application::Initialize(int argc, char* argv[]) {
 void Application::Run() {
     while (!WindowShouldClose() && running) {
         Profiler::BeginFrame();
+        MainThreadQueue::Pump();
         ProfilerGpu::Pump();
         ProfilerCapture::Pump();
 
@@ -301,6 +304,7 @@ void Application::Run() {
 }
 
 void Application::Shutdown() {
+    MainThreadQueue::Shutdown();
     delete editor;
     editor = nullptr;
     AudioCore::Get().CloseDevice();

@@ -266,14 +266,16 @@ bool Read(std::istream& in, ActorAssetData& outData, bool loadBehavior) {
 }
 
 bool Load(const std::string& path, ActorAssetData& outData, bool loadBehavior) {
-    std::ifstream in(CookedFile::Open(path));
-    if (!in.is_open()) return false;
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) return false;
+    std::istream& in = *stream;
     return Read(in, outData, loadBehavior);
 }
 
 std::string PeekInterface(const std::string& path) {
-    std::ifstream in(CookedFile::Open(path));
-    if (!in.is_open()) return std::string();
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) return std::string();
+    std::istream& in = *stream;
     ActorAssetHeader header = ReadHeader(SectionFileIO::ParseSections(in));
     return header.found ? header.programmingInterface : std::string();
 }

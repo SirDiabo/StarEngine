@@ -15,9 +15,12 @@
 #include <vector>
 
 class MenuBar;
+class Widget;
+class TextElement;
 
 class PackageTab : public EditorTab {
 public:
+    ~PackageTab() override;
     void Initialize() override;
     void Render(float x, float y, float width, float height) override;
     void BuildMenus(MenuBar* menuBar) override;
@@ -34,16 +37,21 @@ private:
     std::shared_ptr<PackagePlatformProbe> platformProbe;
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
+    std::string cipher = CookCiphers::ChaCha12;
+    std::vector<std::string> cipherChoiceIds;
     std::string compression = PackCompressions::Deflate;
     std::vector<std::string> compressionChoiceIds;
     PackageFormat format = PackageFormat::SingleFile;
     std::string outputDir;
+    Widget* outputChrome = nullptr;
+    TextElement* outputField = nullptr;
 
     ChoicePopup platformPopup;
     ChoicePopup rendererPopup;
     
     ChoicePopup formatPopup;
     ChoicePopup compressionPopup;
+    ChoicePopup cipherPopup;
     ConfirmPopup unsavedLevelPopup;
     TrustProjectPopup trustPopup;
 

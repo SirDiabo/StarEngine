@@ -1,4 +1,5 @@
 #include "AudioCore.h"
+#include "Core/CookedFile.h"
 #include "Audio/AudioMixer.h"
 #include "Core/AudioBusRegistry.h"
 #include "Core/AudioEffectRegistry.h"
@@ -204,17 +205,20 @@ void AudioCore::Tick(float deltaTime) {
     }
 }
 
-std::shared_ptr<const SampleData> AudioCore::GetSampleData(const std::string& resolvedWavPath) {
-    auto it = sampleCache.find(resolvedWavPath);
+std::shared_ptr<const SampleData> AudioCore::GetSampleData(const std::string& contentPath, std::shared_ptr<const std::vector<uint8_t>> preloaded) {
+    const std::string key = CookedFile::Key(contentPath);
+    auto it = sampleCache.find(key);
     if (it != sampleCache.end()) return it->second;
 
-    std::string error;
-    std::shared_ptr<SampleData> loaded = WavFile::LoadAll(resolvedWavPath, error);
+    if (!preloaded) preloaded = CookedFile::ReadShared(contentPath);
+    std::string error = "could not read the file";
+    std::shared_ptr<SampleData> loaded;
+    if (preloaded) loaded = WavFile::LoadAllFromMemory(preloaded->data(), preloaded->size(), error);
     if (!loaded) {
-        TraceLog(LOG_ERROR, "Audio: could not load '%s': %s", resolvedWavPath.c_str(), error.c_str());
+        TraceLog(LOG_ERROR, "Audio: could not load '%s': %s", contentPath.c_str(), error.c_str());
         return nullptr;
     }
-    sampleCache[resolvedWavPath] = loaded;
+    sampleCache[key] = loaded;
     return loaded;
 }
 

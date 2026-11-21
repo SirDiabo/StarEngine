@@ -2,6 +2,7 @@
 #include "PackageCipher.h"
 #include "PackageCompression.h"
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -22,8 +23,11 @@ namespace PackageCooker {
         std::vector<uint8_t> bytes;
     };
 
+    using MeshCooker = std::function<bool(const std::string& diskPath, std::vector<uint8_t>& out, std::string& error)>;
+
     CookResult CookToPak(const std::string& contentRoot, const std::string& outputPakFile,
                          const std::string& cipher, const std::string& cipherKey, const std::string& bootConfigText,
-                         const std::vector<ExtraPakFile>& extraFiles = {},
-                         const std::string& compression = PackCompressions::None);
+                         const std::vector<ExtraPakFile>& extraFiles,
+                         const std::string& compression,
+                         const MeshCooker& meshCooker);
 }

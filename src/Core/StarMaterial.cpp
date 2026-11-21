@@ -18,8 +18,9 @@ bool StarMaterial::SaveToFile(const std::string& path) const {
 }
 
 bool StarMaterial::LoadFromFile(const std::string& path, StarMaterial& outMaterial) {
-    std::ifstream in(CookedFile::Open(path));
-    if (!in.is_open()) return false;
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) return false;
+    std::istream& in = *stream;
 
     std::string line;
     while (std::getline(in, line)) {

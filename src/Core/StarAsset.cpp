@@ -71,8 +71,9 @@ bool StarAsset::SaveToFile(const std::string& path) const {
 }
 
 bool StarAsset::LoadFromFile(const std::string& path, StarAsset& outAsset) {
-    std::ifstream in(CookedFile::Open(path));
-    if (!in.is_open()) return false;
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) return false;
+    std::istream& in = *stream;
 
     int materialSlotCount = 0;
     int skeletonBoneCount = 0;

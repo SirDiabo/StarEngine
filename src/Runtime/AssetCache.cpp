@@ -2,9 +2,64 @@
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
 #include "Core/CookedFile.h"
+#include "Core/CookedModel.h"
+#include "Core/CookedModelRaylib.h"
 #include "Core/ShadingModel.h"
 #include "CollisionPrivate.h"
 #include <cmath>
+
+namespace {
+
+bool LoadModelFromContent(const std::string& path, Model& out) {
+    out = Model{};
+    if (CookedFile::IsUsingPak()) {
+        std::vector<uint8_t> bytes;
+        if (!CookedFile::ReadBytes(path, bytes)) return false;
+
+        CookedModel::Data data;
+        std::string error;
+        if (!CookedModel::Deserialize(bytes.data(), bytes.size(), data, error)) {
+            TraceLog(LOG_ERROR, "AssetCache: %s is not a valid cooked model: %s", path.c_str(), error.c_str());
+            return false;
+        }
+        if (!data.hasModel) return false;
+        if (!CookedModelRaylib::BuildModel(data, out, error)) {
+            TraceLog(LOG_ERROR, "AssetCache: could not build %s: %s", path.c_str(), error.c_str());
+            out = Model{};
+            return false;
+        }
+        return true;
+    }
+
+    std::string disk = CookedFile::DiskPath(path);
+    if (disk.empty()) disk = path;
+    if (!FileExists(disk.c_str())) return false;
+    out = LoadModel(disk.c_str());
+    return true;
+}
+
+ModelAnimation* LoadAnimationsFromContent(const std::string& path, int& count) {
+    count = 0;
+    if (CookedFile::IsUsingPak()) {
+        std::vector<uint8_t> bytes;
+        if (!CookedFile::ReadBytes(path, bytes)) return nullptr;
+
+        CookedModel::Data data;
+        std::string error;
+        if (!CookedModel::Deserialize(bytes.data(), bytes.size(), data, error)) {
+            TraceLog(LOG_ERROR, "AssetCache: %s is not a valid cooked model: %s", path.c_str(), error.c_str());
+            return nullptr;
+        }
+        return CookedModelRaylib::BuildAnimations(data, count);
+    }
+
+    std::string disk = CookedFile::DiskPath(path);
+    if (disk.empty()) disk = path;
+    if (!FileExists(disk.c_str())) return nullptr;
+    return LoadModelAnimations(disk.c_str(), &count);
+}
+
+}
 
 AssetCache& AssetCache::Get() {
     static AssetCache instance;
@@ -20,8 +75,7 @@ const MeshSourceInfo* AssetCache::GetMeshSource(const std::string& meshAssetPath
         MeshSourceInfo& info = it->second;
         if (now - info.lastValidated < kRevalidateSeconds) return info.valid ? &info : nullptr;
         info.lastValidated = now;
-        std::string opened = CookedFile::Open(meshAssetPath);
-        long modTime = opened.empty() ? 0 : GetFileModTime(opened.c_str());
+        long modTime = CookedFile::ModifiedTime(meshAssetPath);
         if (modTime == info.modTime && (info.valid || modTime == 0)) return info.valid ? &info : nullptr;
     }
 
@@ -29,8 +83,7 @@ const MeshSourceInfo* AssetCache::GetMeshSource(const std::string& meshAssetPath
     info = MeshSourceInfo{};
     info.lastValidated = now;
 
-    std::string opened = CookedFile::Open(meshAssetPath);
-    info.modTime = opened.empty() ? 0 : GetFileModTime(opened.c_str());
+    info.modTime = CookedFile::ModifiedTime(meshAssetPath);
 
     StarAsset asset;
     if (!StarAsset::LoadFromFile(meshAssetPath, asset)) return nullptr;
@@ -49,8 +102,7 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
     auto rawHit = meshRawLookup.find(sourceMeshPath);
     if (rawHit != meshRawLookup.end()) return rawHit->second;
 
-    std::string normalized = CookedFile::Open(sourceMeshPath);
-    if (normalized.empty()) normalized = sourceMeshPath;
+    std::string normalized = CookedFile::Key(sourceMeshPath);
 
     auto it = meshCache.find(normalized);
     if (it != meshCache.end()) {
@@ -58,9 +110,10 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
         return &it->second;
     }
 
-    if (normalized.empty() || !FileExists(normalized.c_str())) return nullptr;
+    if (normalized.empty()) return nullptr;
 
-    Model model = LoadModel(normalized.c_str());
+    Model model;
+    if (!LoadModelFromContent(sourceMeshPath, model)) return nullptr;
     if (model.meshCount == 0) {
         UnloadModel(model);
         return nullptr;
@@ -75,12 +128,8 @@ Model* AssetCache::GetOrLoadModel(const std::string& sourceMeshPath) {
 }
 
 Model AssetCache::LoadPrivateModel(const std::string& sourceMeshPath) {
-    std::string normalized = CookedFile::Open(sourceMeshPath);
-    if (normalized.empty()) normalized = sourceMeshPath;
-
-    if (normalized.empty() || !FileExists(normalized.c_str())) return Model{};
-
-    Model model = LoadModel(normalized.c_str());
+    Model model;
+    if (!LoadModelFromContent(sourceMeshPath, model)) return Model{};
     if (model.meshCount == 0) {
         UnloadModel(model);
         return Model{};
@@ -95,10 +144,14 @@ Texture2D* AssetCache::GetOrLoadTexture(const std::string& textureAssetPath) {
     StarAsset asset;
     if (!StarAsset::LoadFromFile(textureAssetPath, asset) || asset.assetType != "Texture") return nullptr;
 
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+    const std::string sourcePath = asset.ResolveSourcePath();
+    std::vector<uint8_t> bytes;
+    if (!CookedFile::ReadBytes(sourcePath, bytes) || bytes.empty()) return nullptr;
 
-    Texture2D tex = LoadTexture(resolved.c_str());
+    Image image = LoadImageFromMemory(GetFileExtension(sourcePath.c_str()), bytes.data(), (int)bytes.size());
+    if (image.data == nullptr) return nullptr;
+    Texture2D tex = LoadTextureFromImage(image);
+    UnloadImage(image);
     if (tex.id == 0) return nullptr;
 
     auto inserted = textureCache.emplace(textureAssetPath, tex);
@@ -134,13 +187,14 @@ ModelAnimation* AssetCache::GetOrLoadAnimation(const std::string& animAssetPath)
     StarAsset asset;
     if (!StarAsset::LoadFromFile(animAssetPath, asset) || asset.assetType != "Animation") return nullptr;
 
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolved.empty() || !FileExists(resolved.c_str())) return nullptr;
+    const std::string sourcePath = asset.ResolveSourcePath();
+    if (!CookedFile::Exists(sourcePath)) return nullptr;
+    const std::string resolved = CookedFile::Key(sourcePath);
 
     auto srcIt = animationSourceCache.find(resolved);
     if (srcIt == animationSourceCache.end()) {
         LoadedAnimationSet set;
-        set.animations = LoadModelAnimations(resolved.c_str(), &set.count);
+        set.animations = LoadAnimationsFromContent(sourcePath, set.count);
         if (set.animations == nullptr || set.count <= 0) return nullptr;
         srcIt = animationSourceCache.emplace(resolved, set).first;
     }
@@ -163,8 +217,7 @@ void AssetCache::ReloadAnimation(const std::string& animAssetPath) {
     StarAsset asset;
     std::string resolved;
     if (StarAsset::LoadFromFile(animAssetPath, asset)) {
-        resolved = CookedFile::Open(asset.ResolveSourcePath());
-        if (resolved.empty()) resolved = asset.ResolveSourcePath();
+        resolved = CookedFile::Key(asset.ResolveSourcePath());
     }
 
     if (!resolved.empty()) {
@@ -201,8 +254,7 @@ BoundingBox AssetCache::GetOrComputeModelBounds(Model* model) {
 }
 
 std::shared_ptr<const CollisionPrivate::ModelBVH> AssetCache::GetOrBuildModelBVH(const std::string& sourceMeshPath) {
-    std::string normalized = CookedFile::Open(sourceMeshPath);
-    if (normalized.empty()) normalized = sourceMeshPath;
+    std::string normalized = CookedFile::Key(sourceMeshPath);
 
     auto it = bvhCache.find(normalized);
     if (it != bvhCache.end()) return it->second;
@@ -223,8 +275,7 @@ int AssetCache::SlotOffsetForSource(const std::string& sourceMeshPath) {
 
 void AssetCache::RegisterModelInstance(Model* model, const std::string& sourceMeshPath) {
     if (!model) return;
-    std::string normalized = CookedFile::Open(sourceMeshPath);
-    if (normalized.empty()) normalized = sourceMeshPath;
+    std::string normalized = CookedFile::Key(sourceMeshPath);
     modelDefaultColors.erase(model);
     modelDefaultTextures.erase(model);
     modelSlotOffset[model] = SlotOffsetForSource(normalized);
@@ -286,8 +337,7 @@ void AssetCache::ApplyMaterialSlots(Model* model, const std::vector<std::string>
 }
 
 void AssetCache::ReloadModel(const std::string& sourceMeshPath) {
-    std::string normalized = CookedFile::Open(sourceMeshPath);
-    if (normalized.empty()) normalized = sourceMeshPath;
+    std::string normalized = CookedFile::Key(sourceMeshPath);
 
     bvhCache.erase(normalized);
     ++collisionGeneration;

@@ -25,6 +25,7 @@ struct Entry {
 
 class Writer {
 public:
+    void SetIndexKey(const std::string& key) { indexKey = key; encryptIndex = true; }
     bool AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes);
     bool AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression);
     bool WriteToFile(const std::string& outputPath) const;
@@ -32,24 +33,27 @@ public:
 private:
     std::vector<Entry> entries;
     std::vector<uint8_t> blob;
+    std::string indexKey;
+    bool encryptIndex = false;
 };
 
 class Reader {
 public:
-    bool LoadFile(const std::string& pakPath);
-    bool LoadFromExecutable(const std::string& exePath);
-    bool LoadBuffer(const std::vector<uint8_t>& buffer);
+    bool LoadFile(const std::string& pakPath, const std::string& indexKey = std::string());
+    bool LoadFromExecutable(const std::string& exePath, const std::string& indexKey = std::string());
+    bool LoadBuffer(const std::vector<uint8_t>& buffer, const std::string& indexKey = std::string());
 
     bool HasEntry(const std::string& virtualPath) const;
     bool GetEntryInfo(const std::string& virtualPath, Entry& out) const;
     std::vector<uint8_t> ReadEntry(const std::string& virtualPath) const;
+    bool CopyEntry(const std::string& virtualPath, std::vector<uint8_t>& out, Entry& info, std::string& error) const;
+    bool VerifyEntryBytes(const Entry& info, const std::vector<uint8_t>& bytes, std::string& error) const;
     bool ReadEntryVerified(const std::string& virtualPath, std::vector<uint8_t>& out, std::string& error) const;
     void SetVerifyOnRead(bool enabled) { verifyOnRead = enabled; }
 
-    std::vector<std::string> SiblingsOf(const std::string& virtualPath) const;
 
 private:
-    bool ParseFromBuffer(std::vector<uint8_t>&& buffer);
+    bool ParseFromBuffer(std::vector<uint8_t>&& buffer, const std::string& indexKey);
 
     std::vector<Entry> entries;
     std::unordered_map<std::string, size_t> indexByPath;

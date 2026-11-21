@@ -112,8 +112,9 @@ namespace {
 }
 
 bool StarMap::LoadFromFile(const std::string& path) {
-    std::ifstream in(CookedFile::Open(path));
-    if (!in.is_open()) return false;
+    std::unique_ptr<std::istream> stream = CookedFile::OpenStream(path);
+    if (!stream) return false;
+    std::istream& in = *stream;
     return LoadFromStream(in);
 }
 

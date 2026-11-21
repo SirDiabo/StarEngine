@@ -44,7 +44,7 @@ void ImportDetailsPanel::LoadFromAsset() {
     if (asset.assetType == "Sound") {
         WavInfo info;
         std::string error;
-        std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
+        std::string resolved = CookedFile::DiskPath(asset.ResolveSourcePath());
         if (!resolved.empty() && WavFile::ReadInfo(resolved, info, error)) {
             char buf[160];
             snprintf(buf, sizeof(buf), "%.2f s, %d Hz, %s, %d-bit", info.DurationSeconds(), info.sampleRate,

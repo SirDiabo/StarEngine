@@ -1,6 +1,8 @@
 #include "Core/Module.h"
 #include "Core/ContentPathResolver.h"
 #include "Core/SavePaths.h"
+#include "Core/BakedKey.h"
+#include "Core/CookedEntry.h"
 #include "Core/CookedFile.h"
 #include "Core/PackageCipher.h"
 #include "Core/StarPak.h"
@@ -72,10 +74,34 @@ static std::string FetchTextSync(const std::string& url) {
 }
 #endif
 
-static void LoadAudioConfigFromPak(StarPak::Reader& reader) {
-    if (!reader.HasEntry(StarPak::kAudioConfigPath)) return;
-    std::vector<uint8_t> bytes = reader.ReadEntry(StarPak::kAudioConfigPath);
-    AudioConfig::LoadPakText(std::string(bytes.begin(), bytes.end()));
+static bool ReadPakEntry(const StarPak::Reader& pak, const BakedKey::Material& material, const char* path, std::vector<uint8_t>& out) {
+    std::string error;
+    if (CookedEntry::Read(pak, material.cipher, material.key, path, out, error)) return true;
+    TraceLog(LOG_ERROR, "GameMain: could not read %s from the package: %s", path, error.c_str());
+    return false;
+}
+
+static bool UsePackedContent(StarPak::Reader&& pak, const BakedKey::Material& material, PackagedGameConfig* bootInto, std::vector<uint8_t>& embeddedIcon) {
+    std::vector<uint8_t> bytes;
+    if (bootInto != nullptr) {
+        if (!ReadPakEntry(pak, material, StarPak::kBootConfigPath, bytes) || bytes.empty()) {
+            TraceLog(LOG_ERROR, "GameMain: pak loaded but boot config entry was empty");
+            return false;
+        }
+        if (!PackagedGameConfig::LoadFromText(std::string(bytes.begin(), bytes.end()), *bootInto)) {
+            TraceLog(LOG_ERROR, "GameMain: failed to parse boot config from pak");
+            return false;
+        }
+    }
+    if (pak.HasEntry(StarPak::kInputMappingsPath) && ReadPakEntry(pak, material, StarPak::kInputMappingsPath, bytes)) {
+        InputMappingRegistry::Get().LoadFromText(std::string(bytes.begin(), bytes.end()));
+    }
+    if (pak.HasEntry(StarPak::kAudioConfigPath) && ReadPakEntry(pak, material, StarPak::kAudioConfigPath, bytes)) {
+        AudioConfig::LoadPakText(std::string(bytes.begin(), bytes.end()));
+    }
+    if (pak.HasEntry(StarPak::kIconPath)) ReadPakEntry(pak, material, StarPak::kIconPath, embeddedIcon);
+    CookedFile::SetActivePak(std::move(pak), material.cipher, material.key);
+    return true;
 }
 
 int main(int argc, char* argv[]) {
@@ -96,24 +122,12 @@ int main(int argc, char* argv[]) {
     PackagedGameConfig config;
     std::vector<uint8_t> embeddedIcon;
 
+    BakedKey::Material material;
+    const bool haveKey = BakedKey::Get(material);
+
     StarPak::Reader pak;
-    if (!exePath.empty() && pak.LoadFromExecutable(exePath.string())) {
-        std::vector<uint8_t> bootBytes = pak.ReadEntry(StarPak::kBootConfigPath);
-        if (bootBytes.empty()) {
-            TraceLog(LOG_ERROR, "GameMain: pak loaded but boot config entry was empty");
-            return 1;
-        }
-        if (!PackagedGameConfig::LoadFromText(std::string(bootBytes.begin(), bootBytes.end()), config)) {
-            TraceLog(LOG_ERROR, "GameMain: failed to parse boot config from pak");
-            return 1;
-        }
-        if (pak.HasEntry(StarPak::kInputMappingsPath)) {
-            std::vector<uint8_t> mappingBytes = pak.ReadEntry(StarPak::kInputMappingsPath);
-            InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
-        }
-        LoadAudioConfigFromPak(pak);
-        if (pak.HasEntry(StarPak::kIconPath)) embeddedIcon = pak.ReadEntry(StarPak::kIconPath);
-        CookedFile::SetActivePak(std::move(pak), config.cipher, config.cipherKey);
+    if (!exePath.empty() && haveKey && pak.LoadFromExecutable(exePath.string(), material.key)) {
+        if (!UsePackedContent(std::move(pak), material, &config, embeddedIcon)) return 1;
         TraceLog(LOG_INFO, "GameMain: loaded pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
     } else {
 #ifdef _WIN32
@@ -155,16 +169,9 @@ int main(int argc, char* argv[]) {
             for (int i = 0; i < 600 && !g_webPakReady; ++i) emscripten_sleep(50);
             if (g_webPakReady) {
                 StarPak::Reader sibling;
-                if (sibling.LoadBuffer(g_webPakBytes)) {
-                    pakLoaded = true;
-                    if (sibling.HasEntry(StarPak::kInputMappingsPath)) {
-                        std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
-                        InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
-                    }
-                    LoadAudioConfigFromPak(sibling);
-                    if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
-                    CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
-                    TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
+                if (haveKey && sibling.LoadBuffer(g_webPakBytes, material.key)) {
+                    pakLoaded = UsePackedContent(std::move(sibling), material, nullptr, embeddedIcon);
+                    if (pakLoaded) TraceLog(LOG_INFO, "GameMain: loaded sibling pak async, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
                 }
             }
         }
@@ -189,14 +196,7 @@ int main(int argc, char* argv[]) {
         fs::path siblingPak = bootstrapDir / "content.starpak";
         if (fs::exists(siblingPak)) {
             StarPak::Reader sibling;
-            if (sibling.LoadFile(siblingPak.string())) {
-                if (sibling.HasEntry(StarPak::kInputMappingsPath)) {
-                    std::vector<uint8_t> mappingBytes = sibling.ReadEntry(StarPak::kInputMappingsPath);
-                    InputMappingRegistry::Get().LoadFromText(std::string(mappingBytes.begin(), mappingBytes.end()));
-                }
-                LoadAudioConfigFromPak(sibling);
-                if (sibling.HasEntry(StarPak::kIconPath)) embeddedIcon = sibling.ReadEntry(StarPak::kIconPath);
-                CookedFile::SetActivePak(std::move(sibling), config.cipher, config.cipherKey);
+            if (haveKey && sibling.LoadFile(siblingPak.string(), material.key) && UsePackedContent(std::move(sibling), material, nullptr, embeddedIcon)) {
                 TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             } else {
                 ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());

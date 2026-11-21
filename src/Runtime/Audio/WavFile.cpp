@@ -1,4 +1,5 @@
 #include "WavFile.h"
+#include "Core/MemoryStream.h"
 #include <algorithm>
 #include <cstring>
 
@@ -40,10 +41,8 @@ float DecodeSample(const unsigned char* p, const WavInfo& info) {
 
 namespace WavFile {
 
-bool ReadInfo(const std::string& path, WavInfo& info, std::string& error) {
+static bool ReadInfoStream(std::istream& file, uint64_t fileSize, WavInfo& info, std::string& error) {
     info = WavInfo();
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) { error = "could not open file"; return false; }
 
     unsigned char header[12];
     file.read((char*)header, 12);
@@ -103,8 +102,6 @@ bool ReadInfo(const std::string& path, WavInfo& info, std::string& error) {
     uint64_t bytesPerFrame = (uint64_t)info.channels * (uint64_t)(info.bitsPerSample / 8);
     info.frameCount = bytesPerFrame ? info.dataBytes / bytesPerFrame : 0;
 
-    std::ifstream sizeProbe(path, std::ios::binary | std::ios::ate);
-    uint64_t fileSize = sizeProbe ? (uint64_t)sizeProbe.tellg() : 0;
     if (fileSize > 0 && info.dataOffset + info.dataBytes > fileSize) {
         uint64_t available = fileSize > info.dataOffset ? fileSize - info.dataOffset : 0;
         info.dataBytes = available;
@@ -114,7 +111,24 @@ bool ReadInfo(const std::string& path, WavInfo& info, std::string& error) {
     return info.frameCount > 0;
 }
 
-uint64_t ReadFrames(std::ifstream& file, const WavInfo& info, uint64_t startFrame, uint64_t count, float* out, int outChannels) {
+bool ReadInfo(const std::string& path, WavInfo& info, std::string& error) {
+    info = WavInfo();
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) { error = "could not open file"; return false; }
+    const uint64_t fileSize = (uint64_t)file.tellg();
+    file.seekg(0);
+    return ReadInfoStream(file, fileSize, info, error);
+}
+
+bool ReadInfoFromMemory(const uint8_t* bytes, size_t size, WavInfo& info, std::string& error) {
+    info = WavInfo();
+    if (bytes == nullptr || size == 0) { error = "no data"; return false; }
+    MemoryStreamBuf buffer(reinterpret_cast<const char*>(bytes), size);
+    std::istream stream(&buffer);
+    return ReadInfoStream(stream, (uint64_t)size, info, error);
+}
+
+uint64_t ReadFrames(std::istream& file, const WavInfo& info, uint64_t startFrame, uint64_t count, float* out, int outChannels) {
     if (startFrame >= info.frameCount || count == 0) return 0;
     count = std::min<uint64_t>(count, info.frameCount - startFrame);
 
@@ -136,9 +150,9 @@ uint64_t ReadFrames(std::ifstream& file, const WavInfo& info, uint64_t startFram
     return framesRead;
 }
 
-std::shared_ptr<SampleData> LoadAll(const std::string& path, std::string& error) {
-    WavInfo info;
-    if (!ReadInfo(path, info, error)) return nullptr;
+namespace {
+
+std::shared_ptr<SampleData> LoadAllStream(std::istream& file, const WavInfo& info) {
 
     auto data = std::make_shared<SampleData>();
     data->channels = info.channels >= 2 ? 2 : 1;
@@ -149,7 +163,6 @@ std::shared_ptr<SampleData> LoadAll(const std::string& path, std::string& error)
     data->rootNote = info.rootNote;
     data->frames.resize((size_t)(info.frameCount * data->channels));
 
-    std::ifstream file(path, std::ios::binary);
     uint64_t read = 0;
     const uint64_t chunk = 65536;
     while (read < info.frameCount) {
@@ -161,6 +174,23 @@ std::shared_ptr<SampleData> LoadAll(const std::string& path, std::string& error)
     data->frames.resize((size_t)(read * data->channels));
     if (data->hasLoop && data->loopEnd >= data->frameCount) data->hasLoop = false;
     return data;
+}
+
+}
+
+std::shared_ptr<SampleData> LoadAll(const std::string& path, std::string& error) {
+    WavInfo info;
+    if (!ReadInfo(path, info, error)) return nullptr;
+    std::ifstream file(path, std::ios::binary);
+    return LoadAllStream(file, info);
+}
+
+std::shared_ptr<SampleData> LoadAllFromMemory(const uint8_t* bytes, size_t size, std::string& error) {
+    WavInfo info;
+    if (!ReadInfoFromMemory(bytes, size, info, error)) return nullptr;
+    MemoryStreamBuf buffer(reinterpret_cast<const char*>(bytes), size);
+    std::istream stream(&buffer);
+    return LoadAllStream(stream, info);
 }
 
 }

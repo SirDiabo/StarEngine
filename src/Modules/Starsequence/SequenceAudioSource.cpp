@@ -16,9 +16,9 @@ namespace Starsequence {
 bool LoadStarsoundSample(const std::string& assetPath, LoadedSample& out) {
     StarAsset asset;
     if (!StarAsset::LoadFromFile(assetPath, asset) || asset.assetType != "Sound") return false;
-    std::string resolved = CookedFile::Open(asset.ResolveSourcePath());
-    if (resolved.empty() || !std::filesystem::exists(resolved)) return false;
-    out.data = AudioCore::Get().GetSampleData(resolved);
+    const std::string sourcePath = asset.ResolveSourcePath();
+    if (!CookedFile::Exists(sourcePath)) return false;
+    out.data = AudioCore::Get().GetSampleData(sourcePath);
     out.assetGain = std::clamp(asset.soundVolume, 0.0f, 4.0f);
     return out.data != nullptr;
 }

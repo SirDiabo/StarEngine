@@ -46,4 +46,5 @@ private:
 };
 
 std::unique_ptr<ICookCipher> CreateCookCipher(const std::string& id);
+std::vector<uint8_t> CookRandomBytes(size_t count);
 std::string GenerateCookKey(const std::string& id);

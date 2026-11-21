@@ -1,4 +1,5 @@
 #include "StarPak.h"
+#include "ChaCha12Keyed.h"
 #include "Crc32.h"
 #include "Sha256.h"
 #include <algorithm>
@@ -15,7 +16,10 @@ namespace {
 
 constexpr char kMagicV1[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '1'};
 constexpr char kMagicV2[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '2'};
-constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '3'};
+constexpr char kMagicV3[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '3'};
+constexpr char kMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', '4'};
+constexpr size_t kMaxIndexBytes = 256u * 1024u * 1024u;
+constexpr const char* kIndexContext = "StarPak/index";
 constexpr char kFooterMagic[8] = {'S', 'T', 'A', 'R', 'P', 'A', 'K', 'F'};
 
 #pragma pack(push, 1)
@@ -63,11 +67,6 @@ private:
     std::function<void()> action;
 };
 
-std::string ParentOf(const std::string& virtualPath) {
-    size_t slash = virtualPath.find_last_of('/');
-    return slash == std::string::npos ? std::string() : virtualPath.substr(0, slash);
-}
-
 } // namespace
 
 namespace StarPak {
@@ -98,16 +97,27 @@ bool Writer::WriteToFile(const std::string& outputPath) const {
     std::ofstream out(outputPath, std::ios::binary);
     if (!out.is_open()) return false;
 
-    out.write(kMagic, sizeof(kMagic));
-    out << "\n" << entries.size() << "\n";
+    std::string index = std::to_string(entries.size()) + "\n";
     for (const auto& e : entries) {
-        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << e.compression << "\t" << Crc32::ToHex(e.crc32) << "\n";
+        index += e.path + "\t" + std::to_string(e.offset) + "\t" + std::to_string(e.size) + "\t" + std::to_string(e.rawSize) + "\t" + e.compression + "\t" + Crc32::ToHex(e.crc32) + "\n";
+    }
+
+    if (!encryptIndex) {
+        out.write(kMagicV3, sizeof(kMagicV3));
+        out << "\n" << index;
+    } else {
+        std::vector<uint8_t> sealed(index.begin(), index.end());
+        const uint32_t crc = Crc32::Compute(sealed);
+        ChaCha12::ApplyKeyed(sealed, indexKey, kIndexContext);
+        out.write(kMagic, sizeof(kMagic));
+        out << "\n" << sealed.size() << "\t" << Crc32::ToHex(crc) << "\n";
+        out.write(reinterpret_cast<const char*>(sealed.data()), (std::streamsize)sealed.size());
     }
     out.write(reinterpret_cast<const char*>(blob.data()), (std::streamsize)blob.size());
     return out.good();
 }
 
-bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
+bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer, const std::string& indexKey) try {
     entries.clear();
     indexByPath.clear();
     blob.clear();
@@ -118,21 +128,53 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
     });
 
     size_t pos = 0;
+    const std::vector<uint8_t>* lines = &buffer;
+    std::vector<uint8_t> decryptedIndex;
     auto readLine = [&](std::string& line) -> bool {
-        if (pos >= buffer.size()) return false;
+        if (pos >= lines->size()) return false;
         size_t nl = pos;
-        while (nl < buffer.size() && buffer[nl] != '\n') nl++;
-        line.assign(reinterpret_cast<const char*>(buffer.data()) + pos, nl - pos);
-        pos = (nl < buffer.size()) ? nl + 1 : nl;
+        while (nl < lines->size() && (*lines)[nl] != '\n') nl++;
+        line.assign(reinterpret_cast<const char*>(lines->data()) + pos, nl - pos);
+        pos = (nl < lines->size()) ? nl + 1 : nl;
         return true;
     };
 
     if (buffer.size() < sizeof(kMagic)) return false;
     bool versionOne = std::memcmp(buffer.data(), kMagicV1, sizeof(kMagicV1)) == 0;
     bool versionTwo = std::memcmp(buffer.data(), kMagicV2, sizeof(kMagicV2)) == 0;
-    if (!versionOne && !versionTwo && std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) != 0) return false;
+    bool versionThree = std::memcmp(buffer.data(), kMagicV3, sizeof(kMagicV3)) == 0;
+    bool versionFour = std::memcmp(buffer.data(), kMagic, sizeof(kMagic)) == 0;
+    if (!versionOne && !versionTwo && !versionThree && !versionFour) return false;
     pos = sizeof(kMagic);
     if (pos < buffer.size() && buffer[pos] == '\n') pos++;
+
+    size_t blobStart = 0;
+    if (versionFour) {
+        size_t nl = pos;
+        while (nl < buffer.size() && buffer[nl] != '\n') nl++;
+        if (nl >= buffer.size()) return false;
+        std::vector<std::string> header = SplitTabs(std::string(reinterpret_cast<const char*>(buffer.data()) + pos, nl - pos));
+        if (header.size() != 2) return false;
+        size_t indexSize = 0;
+        uint32_t expectedCrc = 0;
+        try {
+            if (header[0].empty() || header[0].find_first_not_of("0123456789") != std::string::npos) return false;
+            indexSize = (size_t)std::stoull(header[0]);
+        } catch (...) {
+            return false;
+        }
+        if (!Crc32::FromHex(header[1], expectedCrc)) return false;
+        const size_t indexStart = nl + 1;
+        if (indexSize == 0 || indexSize > kMaxIndexBytes || indexSize > buffer.size() - indexStart) return false;
+
+        decryptedIndex.assign(buffer.begin() + (std::ptrdiff_t)indexStart, buffer.begin() + (std::ptrdiff_t)(indexStart + indexSize));
+        ChaCha12::ApplyKeyed(decryptedIndex, indexKey, kIndexContext);
+        if (Crc32::Compute(decryptedIndex) != expectedCrc) return false;
+
+        lines = &decryptedIndex;
+        pos = 0;
+        blobStart = indexStart + indexSize;
+    }
 
     std::string countLine;
     if (!readLine(countLine)) return false;
@@ -143,7 +185,7 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
         return false;
     }
 
-    if (count > (buffer.size() - pos) / 6) return false;
+    if (count > (lines->size() - pos) / 6) return false;
     entries.reserve(std::min<size_t>(count, 65536));
     for (size_t i = 0; i < count; i++) {
         std::string line;
@@ -194,7 +236,12 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
         entries.push_back(std::move(e));
     }
 
-    blob.assign(buffer.begin() + (std::ptrdiff_t)pos, buffer.end());
+    if (versionFour) {
+        if (pos != decryptedIndex.size()) return false;
+    } else {
+        blobStart = pos;
+    }
+    blob.assign(buffer.begin() + (std::ptrdiff_t)blobStart, buffer.end());
     rollback.Dismiss();
     return true;
 } catch (const std::exception&) {
@@ -204,21 +251,21 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
     return false;
 }
 
-bool Reader::LoadFile(const std::string& pakPath) try {
+bool Reader::LoadFile(const std::string& pakPath, const std::string& indexKey) try {
     std::ifstream in(pakPath, std::ios::binary);
     if (!in.is_open()) return false;
 
     std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    return ParseFromBuffer(std::move(buffer));
+    return ParseFromBuffer(std::move(buffer), indexKey);
 } catch (const std::exception&) {
     return false;
 }
 
-bool Reader::LoadBuffer(const std::vector<uint8_t>& buffer) {
-    return ParseFromBuffer(std::vector<uint8_t>(buffer));
+bool Reader::LoadBuffer(const std::vector<uint8_t>& buffer, const std::string& indexKey) {
+    return ParseFromBuffer(std::vector<uint8_t>(buffer), indexKey);
 }
 
-bool Reader::LoadFromExecutable(const std::string& exePath) try {
+bool Reader::LoadFromExecutable(const std::string& exePath, const std::string& indexKey) try {
     std::ifstream in(exePath, std::ios::binary);
     if (!in.is_open()) return false;
 
@@ -241,7 +288,7 @@ bool Reader::LoadFromExecutable(const std::string& exePath) try {
     in.read(reinterpret_cast<char*>(buffer.data()), (std::streamsize)footer.pakSize);
     if (!in) return false;
 
-    return ParseFromBuffer(std::move(buffer));
+    return ParseFromBuffer(std::move(buffer), indexKey);
 } catch (const std::exception&) {
     return false;
 }
@@ -257,7 +304,7 @@ bool Reader::GetEntryInfo(const std::string& virtualPath, Entry& out) const {
     return true;
 }
 
-bool Reader::ReadEntryVerified(const std::string& virtualPath, std::vector<uint8_t>& out, std::string& error) const {
+bool Reader::CopyEntry(const std::string& virtualPath, std::vector<uint8_t>& out, Entry& info, std::string& error) const {
     out.clear();
     auto it = indexByPath.find(virtualPath);
     if (it == indexByPath.end()) {
@@ -272,18 +319,31 @@ bool Reader::ReadEntryVerified(const std::string& virtualPath, std::vector<uint8
     }
 
     out.assign(blob.begin() + (std::ptrdiff_t)e.offset, blob.begin() + (std::ptrdiff_t)(e.offset + e.size));
-    if (verifyOnRead && e.hasCrc32 && Crc32::Compute(out) != e.crc32) {
-        out.clear();
+    info = e;
+    return true;
+}
+
+bool Reader::VerifyEntryBytes(const Entry& info, const std::vector<uint8_t>& bytes, std::string& error) const {
+    if (verifyOnRead && info.hasCrc32 && Crc32::Compute(bytes) != info.crc32) {
         error = "integrity check failed (crc32 mismatch)";
         return false;
     }
-    if (verifyOnRead && !e.sha256.empty()) {
+    if (verifyOnRead && !info.sha256.empty()) {
         Sha256::Digest expected;
-        if (!Sha256::FromHex(e.sha256, expected) || !Sha256::Equal(expected, Sha256::Compute(out))) {
-            out.clear();
+        if (!Sha256::FromHex(info.sha256, expected) || !Sha256::Equal(expected, Sha256::Compute(bytes))) {
             error = "integrity check failed (sha256 mismatch)";
             return false;
         }
+    }
+    return true;
+}
+
+bool Reader::ReadEntryVerified(const std::string& virtualPath, std::vector<uint8_t>& out, std::string& error) const {
+    Entry info;
+    if (!CopyEntry(virtualPath, out, info, error)) return false;
+    if (!VerifyEntryBytes(info, out, error)) {
+        out.clear();
+        return false;
     }
     return true;
 }
@@ -293,15 +353,6 @@ std::vector<uint8_t> Reader::ReadEntry(const std::string& virtualPath) const {
     std::string error;
     if (!ReadEntryVerified(virtualPath, bytes, error)) return {};
     return bytes;
-}
-
-std::vector<std::string> Reader::SiblingsOf(const std::string& virtualPath) const {
-    std::string parent = ParentOf(virtualPath);
-    std::vector<std::string> result;
-    for (const auto& e : entries) {
-        if (ParentOf(e.path) == parent) result.push_back(e.path);
-    }
-    return result;
 }
 
 bool AppendPakToExecutable(const std::string& exePath, const std::string& pakPath) {
