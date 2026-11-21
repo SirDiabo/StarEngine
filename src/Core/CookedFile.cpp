@@ -156,15 +156,6 @@ namespace {
     }
 }
 
-void CookedFile::SetActiveCipher(const std::string& cipher, const std::string& key) {
-    usingPak = false;
-    activeCipher = cipher.empty() ? CookCiphers::None : cipher;
-    activeKey = key;
-    decipheredPaths.clear();
-    extractedDirs.clear();
-    mirrorDirs.clear();
-}
-
 void CookedFile::SetActivePak(StarPak::Reader&& pak, const std::string& cipher, const std::string& key) {
     activePak = std::move(pak);
     usingPak = true;
@@ -177,45 +168,5 @@ void CookedFile::SetActivePak(StarPak::Reader&& pak, const std::string& cipher, 
 
 std::string CookedFile::Open(const std::string& path) {
     if (usingPak) return OpenFromPak(path);
-
-    std::string resolved = ContentPathResolver::Resolve(path);
-    if (activeCipher == CookCiphers::None || resolved.empty()) return resolved;
-
-    auto cached = decipheredPaths.find(resolved);
-    if (cached != decipheredPaths.end()) return cached->second;
-
-    fs::path resolvedPath(resolved);
-    fs::path sourceDir = resolvedPath.parent_path();
-    std::error_code ec;
-    if (!fs::exists(sourceDir, ec)) return resolved;
-
-    const std::string mirrorKey = "loose:" + sourceDir.string();
-    const bool alreadyMirrored = mirrorDirs.count(mirrorKey) > 0;
-    fs::path mirroredDir = MirrorDirFor(mirrorKey);
-    if (mirroredDir.empty()) return resolved;
-
-    if (!alreadyMirrored) {
-        auto looseCipher = CreateCookCipher(activeCipher);
-        if (!looseCipher) {
-            TraceLog(LOG_ERROR, "CookedFile: obfuscation method '%s' is not available. Is the module that provides it enabled?", activeCipher.c_str());
-            return resolved;
-        }
-        for (const auto& entry : fs::directory_iterator(sourceDir, ec)) {
-            if (!entry.is_regular_file()) continue;
-
-            std::ifstream in(entry.path(), std::ios::binary);
-            if (!in.is_open()) continue;
-            std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            in.close();
-
-            looseCipher->Decrypt(data, activeKey, ContentPathResolver::MakeRelative(entry.path().string()));
-
-            std::ofstream out(mirroredDir / entry.path().filename(), std::ios::binary);
-            out.write(reinterpret_cast<const char*>(data.data()), (std::streamsize)data.size());
-        }
-    }
-
-    fs::path tempPath = mirroredDir / resolvedPath.filename();
-    decipheredPaths.emplace(resolved, tempPath.string());
-    return tempPath.string();
+    return ContentPathResolver::Resolve(path);
 }

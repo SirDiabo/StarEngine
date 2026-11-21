@@ -31,7 +31,7 @@ endfunction()
 star_add_test(test_crypto
     SOURCES
         TestModuleStub.cpp
-        "${STAR_SRC}/Core/Aes256.cpp"
+        "${STAR_SRC}/Core/ChaCha12.cpp"
         "${STAR_SRC}/Core/PackageCipher.cpp")
 
 star_add_test(test_inflate

@@ -1,7 +1,8 @@
 #include "PackageCipher.h"
-#include "Aes256.h"
+#include "ChaCha12.h"
 #include "Module.h"
 #include "Sha256.h"
+#include <chrono>
 #include <cstring>
 #include <random>
 
@@ -13,21 +14,7 @@ public:
     void Decrypt(std::vector<uint8_t>&, const std::string&, const std::string&) const override {}
 };
 
-class XorSimpleCipher : public ICookCipher {
-public:
-    void Encrypt(std::vector<uint8_t>& data, const std::string& key, const std::string&) const override { Apply(data, key); }
-    void Decrypt(std::vector<uint8_t>& data, const std::string& key, const std::string&) const override { Apply(data, key); }
-
-private:
-    static void Apply(std::vector<uint8_t>& data, const std::string& key) {
-        if (key.empty() || data.empty()) return;
-        for (size_t i = 0; i < data.size(); i++) {
-            data[i] = (uint8_t)(data[i] ^ (uint8_t)key[i % key.size()]);
-        }
-    }
-};
-
-class Aes256CtrCipher : public ICookCipher {
+class ChaCha12Cipher : public ICookCipher {
 public:
     void Encrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { Apply(data, key, context); }
     void Decrypt(std::vector<uint8_t>& data, const std::string& key, const std::string& context) const override { Apply(data, key, context); }
@@ -37,32 +24,62 @@ private:
         if (data.empty()) return;
 
         Sha256::Digest keyBytes = Sha256::Compute(key);
-        std::string nonceInput = "StarPak-CTR:" + context;
+        std::string nonceInput = "StarPak-ChaCha12:" + context;
         Sha256::Digest nonce = Sha256::Hmac(keyBytes.bytes, 32, nonceInput.data(), nonceInput.size());
 
-        Aes256::Key expanded;
-        Aes256::ExpandKey(keyBytes.bytes, expanded);
-        Aes256::CtrXor(expanded, nonce.bytes, data.data(), data.size());
+        ChaCha12::Xor(keyBytes.bytes, nonce.bytes, 0, data.data(), data.size());
     }
 };
 
+std::vector<uint8_t> RandomBytes(size_t count) {
+    std::random_device rd;
+    std::vector<uint8_t> out;
+    out.reserve(count + 32);
+    uint64_t block = 0;
+    while (out.size() < count) {
+        std::vector<uint8_t> material;
+        material.reserve(16 * 4 + 24);
+        for (int i = 0; i < 16; i++) {
+            uint32_t word = rd();
+            for (int b = 0; b < 4; b++) material.push_back((uint8_t)(word >> (8 * b)));
+        }
+        const uint64_t ticks = (uint64_t)std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        const uint64_t address = (uint64_t)(uintptr_t)&material;
+        for (int b = 0; b < 8; b++) material.push_back((uint8_t)(ticks >> (8 * b)));
+        for (int b = 0; b < 8; b++) material.push_back((uint8_t)(address >> (8 * b)));
+        for (int b = 0; b < 8; b++) material.push_back((uint8_t)(block >> (8 * b)));
+        block++;
+        Sha256::Digest digest = Sha256::Compute(material.data(), material.size());
+        out.insert(out.end(), digest.bytes, digest.bytes + 32);
+    }
+    out.resize(count);
+    return out;
+}
+
 std::string RandomAlphanumericKey(size_t length) {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    std::random_device rd;
-    std::uniform_int_distribution<int> dist(0, (int)sizeof(alphabet) - 2);
-    std::string key(length, ' ');
-    for (char& c : key) c = alphabet[dist(rd)];
+    const size_t alphabetSize = sizeof(alphabet) - 1;
+    const size_t limit = 256 - (256 % alphabetSize);
+    std::string key;
+    key.reserve(length);
+    while (key.size() < length) {
+        std::vector<uint8_t> bytes = RandomBytes(length * 2 + 16);
+        for (uint8_t value : bytes) {
+            if (value >= limit) continue;
+            key += alphabet[value % alphabetSize];
+            if (key.size() == length) break;
+        }
+    }
     return key;
 }
 
 std::string RandomHexKey(size_t byteCount) {
     static const char hex[] = "0123456789abcdef";
-    std::random_device rd;
+    std::vector<uint8_t> bytes = RandomBytes(byteCount);
     std::string key;
     key.reserve(byteCount * 2);
-    for (size_t i = 0; i < byteCount; i++) {
-        uint32_t value = rd();
-        key += hex[(value >> 4) & 15];
+    for (uint8_t value : bytes) {
+        key += hex[value >> 4];
         key += hex[value & 15];
     }
     return key;
@@ -84,21 +101,13 @@ CookCipherRegistry::CookCipherRegistry() {
     none.create = []() { return std::unique_ptr<ICookCipher>(new NullCipher()); };
     ciphers.push_back(none);
 
-    CookCipherInfo xorCipher;
-    xorCipher.id = CookCiphers::XorSimple;
-    xorCipher.displayName = "XOR (light)";
-    xorCipher.description = "Scrambles content with a fresh key for every package. Deters casual browsing only, the key ships inside the game.";
-    xorCipher.create = []() { return std::unique_ptr<ICookCipher>(new XorSimpleCipher()); };
-    xorCipher.generateKey = []() { return RandomAlphanumericKey(24); };
-    ciphers.push_back(xorCipher);
-
-    CookCipherInfo aes;
-    aes.id = CookCiphers::Aes256Ctr;
-    aes.displayName = "AES-256 (CTR)";
-    aes.description = "Scrambles content with AES-256 using a fresh random key per package and a unique nonce per file. Raises the effort to extract assets but cannot stop a determined person, because the key ships inside the game and the game has to decrypt content to run.";
-    aes.create = []() { return std::unique_ptr<ICookCipher>(new Aes256CtrCipher()); };
-    aes.generateKey = []() { return RandomHexKey(32); };
-    ciphers.push_back(aes);
+    CookCipherInfo chacha;
+    chacha.id = CookCiphers::ChaCha12;
+    chacha.displayName = "ChaCha12";
+    chacha.description = "Obfuscates content with ChaCha12, using a fresh random key for every package and a unique nonce per file. The key ships inside the game, so this deters casual extraction but is not copy protection.";
+    chacha.create = []() { return std::unique_ptr<ICookCipher>(new ChaCha12Cipher()); };
+    chacha.generateKey = []() { return RandomHexKey(32); };
+    ciphers.push_back(chacha);
 }
 
 void CookCipherRegistry::Register(const CookCipherInfo& info) {

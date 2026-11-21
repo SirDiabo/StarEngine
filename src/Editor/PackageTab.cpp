@@ -190,7 +190,7 @@ void PackageTab::Render(float x, float y, float width, float height) {
     float fy = y + 16;
     float fw = width - 32 > 640.0f ? 640.0f : width - 32;
     const bool anyPopupOpen = platformPopup.IsOpen() || rendererPopup.IsOpen() ||
-                               cipherPopup.IsOpen() || formatPopup.IsOpen() || compressionPopup.IsOpen() || integrityPopup.IsOpen() || unsavedLevelPopup.IsOpen() || trustPopup.IsOpen();
+                               formatPopup.IsOpen() || compressionPopup.IsOpen() || unsavedLevelPopup.IsOpen() || trustPopup.IsOpen();
 
     DrawText("Package Project", (int)fx, (int)fy, 14, theme.sectionHeader);
     fy += 26;
@@ -231,27 +231,21 @@ void PackageTab::Render(float x, float y, float width, float height) {
     fy += 24;
 
     // Encryption
+    const bool singleFile = format == PackageFormat::SingleFile;
     DrawText("Content Obfuscation", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle cipherRow = SelectRow(fx, fy, fw, 22);
     DrawRectangleRec(cipherRow, theme.fieldBg);
     DrawRectangleLinesEx(cipherRow, 1, theme.fieldBorder);
     CookCipherInfo selectedCipher;
-    bool cipherKnown = CookCipherRegistry::Get().Find(cipher, selectedCipher);
-    std::string cipherLabel = cipherKnown ? selectedCipher.displayName : cipher + " (not available)";
-    DrawText(cipherLabel.c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12, theme.textPrimary);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, cipherRow) && !anyPopupOpen) {
-        std::vector<ChoiceOption> options;
-        cipherChoiceIds.clear();
-        for (const CookCipherInfo& c : CookCipherRegistry::Get().GetAll()) {
-            bool available = CookCipherRegistry::Get().IsAvailable(c);
-            options.push_back({c.displayName, available, available ? "" : PackageTabUnavailableReason(c.moduleName)});
-            cipherChoiceIds.push_back(c.id);
-        }
-        cipherPopup.Open({cipherRow.x, cipherRow.y + cipherRow.height}, fw, options);
-    }
+    const bool cipherKnown = CookCipherRegistry::Get().Find(CookCiphers::ChaCha12, selectedCipher);
+    std::string cipherLabel = !singleFile ? "None (loose folder is never obfuscated)" : (cipherKnown ? selectedCipher.displayName + " (always on)" : CookCiphers::ChaCha12 + " (not available)");
+    DrawText(cipherLabel.c_str(), (int)cipherRow.x + 6, (int)cipherRow.y + 5, 12,
+             singleFile ? theme.textPrimary : theme.textSecondary);
     fy += 20;
-    DrawText(PackageTabFitText(cipherKnown ? selectedCipher.description : "This method is not registered. Enable the module that provides it.", 10, fw).c_str(),
+    std::string cipherHelp = !singleFile ? "The loose Content folder is the debug format and stays readable."
+        : (cipherKnown ? selectedCipher.description : "This method is not registered.");
+    DrawText(PackageTabFitText(cipherHelp, 10, fw).c_str(),
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
@@ -275,7 +269,6 @@ void PackageTab::Render(float x, float y, float width, float height) {
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
-    const bool singleFile = format == PackageFormat::SingleFile;
     DrawText("Compression", (int)fx, (int)fy, 11, theme.textSecondary);
     fy += 14;
     Rectangle compressionRow = SelectRow(fx, fy, fw, 22);
@@ -306,17 +299,11 @@ void PackageTab::Render(float x, float y, float width, float height) {
     Rectangle integrityRow = SelectRow(fx, fy, fw, 22);
     DrawRectangleRec(integrityRow, theme.fieldBg);
     DrawRectangleLinesEx(integrityRow, 1, theme.fieldBorder);
-    std::string integrityLabel = !singleFile ? "None (single file only)" : (integrity ? "SHA-256 (verified when loaded)" : "None");
+    std::string integrityLabel = !singleFile ? "None (single file only)" : "CRC-32 (always on, verified when loaded)";
     DrawText(integrityLabel.c_str(), (int)integrityRow.x + 6, (int)integrityRow.y + 5, 12,
              singleFile ? theme.textPrimary : theme.textSecondary);
-    if (singleFile && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mp, integrityRow) && !anyPopupOpen) {
-        integrityPopup.Open({integrityRow.x, integrityRow.y + integrityRow.height}, fw, {
-            {"SHA-256 (verified when loaded)", true, ""},
-            {"None", true, ""},
-        });
-    }
     fy += 20;
-    DrawText("Detects damaged or edited package entries. A checksum alone does not stop a determined attacker.",
+    DrawText("Detects damaged or truncated package entries. A checksum alone does not stop a determined attacker.",
               (int)fx, (int)fy, 10, theme.textSecondary);
     fy += 24;
 
@@ -383,11 +370,6 @@ void PackageTab::Render(float x, float y, float width, float height) {
         Project::Get().GetSettings().renderer = renderer;
     }
 
-    int cipherChoice = 0;
-    if (cipherPopup.Render(cipherChoice)) {
-        if (cipherChoice >= 0 && cipherChoice < (int)cipherChoiceIds.size()) cipher = cipherChoiceIds[cipherChoice];
-    }
-
     int formatChoice = 0;
     if (formatPopup.Render(formatChoice)) {
         format = formatChoice == 1 ? PackageFormat::LooseFolder : PackageFormat::SingleFile;
@@ -396,11 +378,6 @@ void PackageTab::Render(float x, float y, float width, float height) {
     int compressionChoice = 0;
     if (compressionPopup.Render(compressionChoice)) {
         if (compressionChoice >= 0 && compressionChoice < (int)compressionChoiceIds.size()) compression = compressionChoiceIds[compressionChoice];
-    }
-
-    int integrityChoice = 0;
-    if (integrityPopup.Render(integrityChoice)) {
-        integrity = integrityChoice == 0;
     }
 
     bool trustDecision = false;
@@ -438,10 +415,8 @@ void PackageTab::RunPackage() {
     options.outputDir = outputDir;
     options.platform = platforms[selectedPlatformIndex].platform;
     options.renderer = renderer;
-    options.cipher = cipher;
     options.format = format;
     options.compression = format == PackageFormat::SingleFile ? compression : PackCompressions::None;
-    options.integrity = format == PackageFormat::SingleFile && integrity;
 
     hasResult = false;
     packageRunning = true;

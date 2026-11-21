@@ -189,13 +189,12 @@ CookResult CookInternal(const fs::path& contentRoot, const std::string& cipher, 
 
 } // namespace
 
-CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std::string& outputContentDirStr,
-                                     const std::string& cipher, const std::string& cipherKey) {
+CookResult PackageCooker::CookLoose(const std::string& contentRootStr, const std::string& outputContentDirStr) {
     fs::path outputContentDir(outputContentDirStr);
     std::error_code ec;
     fs::create_directories(outputContentDir, ec);
 
-    return CookInternal(fs::path(contentRootStr), cipher, cipherKey, PackCompressions::None,
+    return CookInternal(fs::path(contentRootStr), CookCiphers::None, std::string(), PackCompressions::None,
         [&](const std::string& virtualPath, std::vector<uint8_t>&& bytes, uint64_t, const std::string&) {
             WriteBytes(outputContentDir / virtualPath, bytes);
         });
@@ -205,9 +204,8 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
                                      const std::string& cipher, const std::string& cipherKey,
                                      const std::string& bootConfigText,
                                      const std::vector<ExtraPakFile>& extraFiles,
-                                     const std::string& compression, bool hashEntries) {
+                                     const std::string& compression) {
     StarPak::Writer writer;
-    writer.SetHashEntries(hashEntries);
 
     std::string rejectedPath;
     CookResult result = CookInternal(fs::path(contentRootStr), cipher, cipherKey, compression,
@@ -220,7 +218,6 @@ CookResult PackageCooker::CookToPak(const std::string& contentRootStr, const std
         result.error = "A file name contains a tab or line break and cannot be packaged: " + rejectedPath;
         return result;
     }
-    if (hashEntries) result.filesHashed = result.filesCooked;
 
     writer.AddFile(StarPak::kBootConfigPath,
                    std::vector<uint8_t>(bootConfigText.begin(), bootConfigText.end()));

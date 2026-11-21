@@ -48,15 +48,17 @@ std::string DescribeCookedPak(const CookResult& cookResult, const PackageOptions
                 std::to_string(cookResult.filesCooked) + " files compressed, " + FormatByteSize(cookResult.rawBytes) + " -> " +
                 FormatByteSize(cookResult.storedBytes) + " (" + std::to_string(percent) + "%).\n";
     }
-    if (options.cipher != CookCiphers::None) text += "Obfuscation: " + options.cipher + ".\n";
-    if (cookResult.filesHashed > 0) text += "Integrity: SHA-256 recorded for " + std::to_string(cookResult.filesHashed) + " entries.\n";
+    text += "Obfuscation: " + CookCiphers::ChaCha12 + ".\n";
+    text += "Integrity: CRC-32 recorded for " + std::to_string(cookResult.filesCooked) + " entries.\n";
     return text;
 }
 
 std::string ValidateCodecs(const PackageOptions& options) {
-    CookCipherInfo cipherInfo;
-    if (!CookCipherRegistry::Get().Find(options.cipher, cipherInfo)) return "Unknown obfuscation method: " + options.cipher;
-    if (!CookCipherRegistry::Get().IsAvailable(cipherInfo)) return "Obfuscation method \"" + cipherInfo.displayName + "\" needs the " + cipherInfo.moduleName + " module, which is not enabled.";
+    if (options.format == PackageFormat::SingleFile) {
+        CookCipherInfo cipherInfo;
+        if (!CookCipherRegistry::Get().Find(CookCiphers::ChaCha12, cipherInfo)) return "Unknown obfuscation method: " + CookCiphers::ChaCha12;
+        if (!CookCipherRegistry::Get().IsAvailable(cipherInfo)) return "Obfuscation method \"" + cipherInfo.displayName + "\" needs the " + cipherInfo.moduleName + " module, which is not enabled.";
+    }
 
     PackCompressionInfo compressionInfo;
     if (!PackCompressionRegistry::Get().Find(options.compression, compressionInfo)) return "Unknown compression method: " + options.compression;
@@ -383,7 +385,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         }
 
         fs::path contentRoot = fs::path(options.projectRoot) / "Content";
-        std::string cipherKey = GenerateCookKey(options.cipher);
+        const std::string cipherId = options.format == PackageFormat::SingleFile ? CookCiphers::ChaCha12 : CookCiphers::None;
+        std::string cipherKey = GenerateCookKey(cipherId);
 
         fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
         std::vector<uint8_t> inputMappingsBytes;
@@ -402,7 +405,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
         bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
         bootConfig.renderer = rendererKey;
-        bootConfig.cipher = options.cipher;
+        bootConfig.cipher = cipherId;
         bootConfig.cipherKey = cipherKey;
 
         const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
@@ -420,7 +423,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
             extraFiles.push_back({StarPak::kAudioConfigPath, audioConfigBytes});
 
             CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                                options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression, options.integrity);
+                                                                cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
             if (!cookResult.success) {
                 result.error = "Cooking failed: " + cookResult.error;
                 return result;
@@ -434,8 +437,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         } else {
             fs::path outputContentDir = fs::path(options.outputDir) / "Content";
 
-            CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string(),
-                                                                options.cipher, cipherKey);
+            CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string());
             if (!cookResult.success) {
                 result.error = "Cooking failed: " + cookResult.error;
                 return result;
@@ -497,7 +499,8 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     }
 
     fs::path contentRoot = fs::path(options.projectRoot) / "Content";
-    std::string cipherKey = GenerateCookKey(options.cipher);
+    const std::string cipherId = options.format == PackageFormat::SingleFile ? CookCiphers::ChaCha12 : CookCiphers::None;
+    std::string cipherKey = GenerateCookKey(cipherId);
 
     fs::path inputMappingsSource = fs::path(options.projectRoot) / "Config" / "InputMappings.cfg";
     std::vector<uint8_t> inputMappingsBytes;
@@ -516,7 +519,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     bootConfig.lightingQuality = LightingQualityName(RenderSettings::Get().GetLightingQuality());
     bootConfig.defaultMap = RewriteToContentRelative(settings.gameDefaultMapPath, contentRoot);
     bootConfig.renderer = rendererKey;
-    bootConfig.cipher = options.cipher;
+    bootConfig.cipher = cipherId;
     bootConfig.cipherKey = cipherKey;
 
     const ShadingTechnique* activeTechnique = ShadingTechniqueRegistry::Get().FindAvailable(bootConfig.shadingType);
@@ -535,7 +538,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
         if (haveIcon) extraFiles.push_back({StarPak::kIconPath, gameIcon.png});
 
         CookResult cookResult = PackageCooker::CookToPak(contentRoot.string(), pakTempPath.string(),
-                                                            options.cipher, cipherKey, bootConfig.ToText(), extraFiles, options.compression, options.integrity);
+                                                            cipherId, cipherKey, bootConfig.ToText(), extraFiles, options.compression);
         if (!cookResult.success) {
             result.error = "Cooking failed: " + cookResult.error;
             return result;
@@ -550,8 +553,7 @@ PackageResult PackageRunner::Package(const PackageOptions& options,
     } else {
         fs::path outputContentDir = fs::path(options.outputDir) / "Content";
 
-        CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string(),
-                                                            options.cipher, cipherKey);
+        CookResult cookResult = PackageCooker::CookLoose(contentRoot.string(), outputContentDir.string());
         if (!cookResult.success) {
             result.error = "Cooking failed: " + cookResult.error;
             return result;

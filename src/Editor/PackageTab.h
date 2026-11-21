@@ -34,21 +34,16 @@ private:
     std::shared_ptr<PackagePlatformProbe> platformProbe;
     int selectedPlatformIndex = 0;
     GameRenderer renderer = GameRenderer::Hardware;
-    std::string cipher = CookCiphers::None;
     std::string compression = PackCompressions::Deflate;
-    bool integrity = true;
-    std::vector<std::string> cipherChoiceIds;
     std::vector<std::string> compressionChoiceIds;
     PackageFormat format = PackageFormat::SingleFile;
     std::string outputDir;
 
     ChoicePopup platformPopup;
     ChoicePopup rendererPopup;
-    ChoicePopup cipherPopup;
     
     ChoicePopup formatPopup;
     ChoicePopup compressionPopup;
-    ChoicePopup integrityPopup;
     ConfirmPopup unsavedLevelPopup;
     TrustProjectPopup trustPopup;
 

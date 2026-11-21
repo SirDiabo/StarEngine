@@ -1,6 +1,7 @@
 #include "TestHelper.h"
 #include "TestFiles.h"
 #include "Core/StarPak.h"
+#include "Core/Crc32.h"
 #include "Core/Sha256.h"
 #include <cstdint>
 #include <cstring>
@@ -40,9 +41,8 @@ std::vector<Sample> StandardSamples() {
     };
 }
 
-std::vector<uint8_t> BuildPakBytes(const std::vector<Sample>& samples, const TempDir& dir, bool hashes = true) {
+std::vector<uint8_t> BuildPakBytes(const std::vector<Sample>& samples, const TempDir& dir) {
     StarPak::Writer writer;
-    writer.SetHashEntries(hashes);
     for (const Sample& s : samples) writer.AddFile(s.path, s.bytes);
     std::string file = dir.Str("build.pak");
     writer.WriteToFile(file);
@@ -112,7 +112,9 @@ TEST(starpak_round_trip_through_file) {
         CHECK(info.size == s.bytes.size());
         CHECK(info.rawSize == s.bytes.size());
         CHECK(info.compression == StarPak::kNoCompression);
-        CHECK_EQ_STR(info.sha256, Sha256::ToHex(Sha256::Compute(s.bytes)));
+        CHECK(info.sha256.empty());
+        CHECK(info.hasCrc32);
+        CHECK(info.crc32 == Crc32::Compute(s.bytes));
 
         std::vector<uint8_t> out;
         std::string error;
@@ -166,30 +168,36 @@ TEST(starpak_on_disk_format_is_stable) {
 
     std::string expected =
         "STARPAK3\n2\n"
-        "a.txt\t0\t5\t5\tNone\t2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n"
-        "dir/b.bin\t5\t10\t40\tDeflate\t1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab3\n";
+        "a.txt\t0\t5\t5\tNone\t3610a686\n"
+        "dir/b.bin\t5\t10\t40\tDeflate\t456cd746\n";
     std::vector<uint8_t> expectedBytes = ToBytes(expected);
     expectedBytes.insert(expectedBytes.end(), { 'h', 'e', 'l', 'l', 'o' });
     expectedBytes.insert(expectedBytes.end(), ten.begin(), ten.end());
     CHECK_BYTES(test::ReadFile(dir.Path("golden.pak")), expectedBytes);
 }
 
-TEST(starpak_without_hashes_has_empty_hash_field) {
+TEST(starpak_writer_always_records_crc32_in_the_hash_field) {
     TempDir dir;
     StarPak::Writer writer;
-    writer.SetHashEntries(false);
     REQUIRE(writer.AddFile("a.txt", ToBytes("hello")));
-    REQUIRE(writer.WriteToFile(dir.Str("nohash.pak")));
+    REQUIRE(writer.AddFile("empty.bin", {}));
+    REQUIRE(writer.WriteToFile(dir.Str("crc.pak")));
+
+    std::vector<uint8_t> bytes = test::ReadFile(dir.Path("crc.pak"));
+    std::string text(bytes.begin(), bytes.end());
+    CHECK(text.find("a.txt\t0\t5\t5\tNone\t3610a686\n") != std::string::npos);
+    CHECK(text.find("empty.bin\t5\t0\t0\tNone\t00000000\n") != std::string::npos);
 
     StarPak::Reader reader;
-    REQUIRE(reader.LoadFile(dir.Str("nohash.pak")));
+    REQUIRE(reader.LoadBuffer(bytes));
     StarPak::Entry info;
     REQUIRE(reader.GetEntryInfo("a.txt", info));
+    CHECK(info.hasCrc32);
+    CHECK(info.crc32 == 0x3610A686u);
     CHECK(info.sha256.empty());
-    std::vector<uint8_t> out;
-    std::string error;
-    CHECK(reader.ReadEntryVerified("a.txt", out, error));
-    CHECK_BYTES(out, ToBytes("hello"));
+    REQUIRE(reader.GetEntryInfo("empty.bin", info));
+    CHECK(info.hasCrc32);
+    CHECK(info.crc32 == 0u);
 }
 
 TEST(starpak_detects_payload_tampering) {
@@ -212,7 +220,7 @@ TEST(starpak_detects_payload_tampering) {
     CHECK(reader.ReadEntryVerified("first.bin", out, error));
     CHECK(!reader.ReadEntryVerified("second.bin", out, error));
     CHECK(out.empty());
-    CHECK(error.find("sha256") != std::string::npos);
+    CHECK(error.find("crc32") != std::string::npos);
     CHECK(reader.ReadEntryVerified("third.bin", out, error));
     CHECK(reader.ReadEntry("second.bin").empty());
 
@@ -228,6 +236,27 @@ TEST(starpak_detects_payload_tampering) {
     REQUIRE(reader2.LoadBuffer(lastByte));
     CHECK(!reader2.ReadEntryVerified("third.bin", out, error));
     CHECK(reader2.ReadEntryVerified("first.bin", out, error));
+}
+
+TEST(starpak_detects_truncated_entries_through_crc32) {
+    TempDir dir;
+    std::vector<Sample> samples = {
+        { "first.bin", Pattern(100, 1) },
+        { "second.bin", Pattern(200, 2) },
+    };
+    std::vector<uint8_t> bytes = BuildPakBytes(samples, dir);
+    std::vector<uint8_t> shifted = bytes;
+    size_t blobStart = bytes.size() - 300;
+    shifted.erase(shifted.begin() + (std::ptrdiff_t)blobStart);
+    shifted.push_back(0);
+
+    StarPak::Reader reader;
+    REQUIRE(reader.LoadBuffer(shifted));
+    std::vector<uint8_t> out;
+    std::string error;
+    CHECK(!reader.ReadEntryVerified("first.bin", out, error));
+    CHECK(!reader.ReadEntryVerified("second.bin", out, error));
+    CHECK(error.find("crc32") != std::string::npos);
 }
 
 TEST(starpak_entry_bounds_are_enforced) {
@@ -398,9 +427,29 @@ TEST(starpak_reads_legacy_version_two) {
 
 TEST(starpak_reads_current_version_with_and_without_hash) {
     std::string hash = Sha256::ToHex(Sha256::Compute(std::string("x")));
-    StarPak::Reader withHash;
-    CHECK(LoadText(withHash, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + hash + "\nx"));
-    CHECK_BYTES(withHash.ReadEntry("a"), std::vector<uint8_t>({ 'x' }));
+    std::string crc = Crc32::ToHex(Crc32::Compute(std::string("x")));
+
+    StarPak::Reader withSha;
+    CHECK(LoadText(withSha, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + hash + "\nx"));
+    CHECK_BYTES(withSha.ReadEntry("a"), std::vector<uint8_t>({ 'x' }));
+    StarPak::Entry info;
+    REQUIRE(withSha.GetEntryInfo("a", info));
+    CHECK(info.sha256 == hash);
+    CHECK(!info.hasCrc32);
+
+    StarPak::Reader withCrc;
+    CHECK(LoadText(withCrc, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + crc + "\nx"));
+    CHECK_BYTES(withCrc.ReadEntry("a"), std::vector<uint8_t>({ 'x' }));
+    REQUIRE(withCrc.GetEntryInfo("a", info));
+    CHECK(info.sha256.empty());
+    CHECK(info.hasCrc32);
+    CHECK(info.crc32 == Crc32::Compute(std::string("x")));
+
+    std::string upper = crc;
+    for (char& c : upper) if (c >= 'a' && c <= 'f') c = (char)(c - 'a' + 'A');
+    StarPak::Reader upperCrc;
+    CHECK(LoadText(upperCrc, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + upper + "\nx"));
+    CHECK_BYTES(upperCrc.ReadEntry("a"), std::vector<uint8_t>({ 'x' }));
 
     StarPak::Reader withoutHash;
     CHECK(LoadText(withoutHash, "STARPAK3\n1\na\t0\t1\t1\tNone\nx"));
@@ -408,10 +457,27 @@ TEST(starpak_reads_current_version_with_and_without_hash) {
 
     StarPak::Reader emptyHashField;
     CHECK(LoadText(emptyHashField, "STARPAK3\n1\na\t0\t1\t1\tNone\t\nx"));
+    CHECK_BYTES(emptyHashField.ReadEntry("a"), std::vector<uint8_t>({ 'x' }));
 
-    StarPak::Reader wrongHash;
-    REQUIRE(LoadText(wrongHash, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + std::string(64, '0') + "\nx"));
-    CHECK(wrongHash.ReadEntry("a").empty());
+    StarPak::Reader wrongSha;
+    REQUIRE(LoadText(wrongSha, "STARPAK3\n1\na\t0\t1\t1\tNone\t" + std::string(64, '0') + "\nx"));
+    std::vector<uint8_t> out = { 1 };
+    std::string error;
+    CHECK(!wrongSha.ReadEntryVerified("a", out, error));
+    CHECK(out.empty());
+    CHECK(error.find("sha256") != std::string::npos);
+    CHECK(wrongSha.ReadEntry("a").empty());
+
+    StarPak::Reader wrongCrc;
+    REQUIRE(LoadText(wrongCrc, "STARPAK3\n1\na\t0\t1\t1\tNone\t00000000\nx"));
+    out = { 1 };
+    CHECK(!wrongCrc.ReadEntryVerified("a", out, error));
+    CHECK(out.empty());
+    CHECK(error.find("crc32") != std::string::npos);
+    CHECK(wrongCrc.ReadEntry("a").empty());
+
+    wrongCrc.SetVerifyOnRead(false);
+    CHECK(wrongCrc.ReadEntryVerified("a", out, error));
 }
 
 TEST(starpak_rejects_malformed_buffers) {
@@ -443,6 +509,13 @@ TEST(starpak_rejects_malformed_buffers) {
         { "v2 too few fields", "STARPAK2\n1\na\t0\t1\t1\nx" },
         { "v2 method not numeric", "STARPAK2\n1\na\t0\t1\t1\tq\nx" },
         { "only tabs", "STARPAK3\n1\n\t\t\t\t\nx" },
+        { "crc too short", "STARPAK3\n1\na\t0\t1\t1\tNone\t1234567\nx" },
+        { "crc too long", "STARPAK3\n1\na\t0\t1\t1\tNone\t123456789\nx" },
+        { "crc not hex", "STARPAK3\n1\na\t0\t1\t1\tNone\t1234567z\nx" },
+        { "crc with prefix", "STARPAK3\n1\na\t0\t1\t1\tNone\t0x123456\nx" },
+        { "crc negative", "STARPAK3\n1\na\t0\t1\t1\tNone\t-1234567\nx" },
+        { "hash length between crc and sha", "STARPAK3\n1\na\t0\t1\t1\tNone\t" + std::string(32, 'a') + "\nx" },
+        { "hash too long", "STARPAK3\n1\na\t0\t1\t1\tNone\t" + std::string(65, 'a') + "\nx" },
     };
     for (const auto& c : cases) {
         StarPak::Reader reader;

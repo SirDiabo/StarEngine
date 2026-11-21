@@ -1,4 +1,5 @@
 #include "StarPak.h"
+#include "Crc32.h"
 #include "Sha256.h"
 #include <algorithm>
 #include <cstring>
@@ -83,7 +84,8 @@ bool Writer::AddEntry(const std::string& virtualPath, const std::vector<uint8_t>
     e.size = storedBytes.size();
     e.rawSize = rawSize;
     e.compression = compression.empty() ? std::string(kNoCompression) : compression;
-    if (hashEntries) e.sha256 = Sha256::ToHex(Sha256::Compute(storedBytes));
+    e.crc32 = Crc32::Compute(storedBytes);
+    e.hasCrc32 = true;
     entries.push_back(std::move(e));
     blob.insert(blob.end(), storedBytes.begin(), storedBytes.end());
     return true;
@@ -99,7 +101,7 @@ bool Writer::WriteToFile(const std::string& outputPath) const {
     out.write(kMagic, sizeof(kMagic));
     out << "\n" << entries.size() << "\n";
     for (const auto& e : entries) {
-        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << e.compression << "\t" << e.sha256 << "\n";
+        out << e.path << "\t" << e.offset << "\t" << e.size << "\t" << e.rawSize << "\t" << e.compression << "\t" << Crc32::ToHex(e.crc32) << "\n";
     }
     out.write(reinterpret_cast<const char*>(blob.data()), (std::streamsize)blob.size());
     return out.good();
@@ -171,9 +173,16 @@ bool Reader::ParseFromBuffer(std::vector<uint8_t>&& buffer) try {
                     if (fields[4].empty()) return false;
                     e.compression = fields[4];
                     if (fields.size() > 5 && !fields[5].empty()) {
-                        Sha256::Digest parsed;
-                        if (!Sha256::FromHex(fields[5], parsed)) return false;
-                        e.sha256 = fields[5];
+                        if (fields[5].size() == 64) {
+                            Sha256::Digest parsed;
+                            if (!Sha256::FromHex(fields[5], parsed)) return false;
+                            e.sha256 = fields[5];
+                        } else if (fields[5].size() == 8) {
+                            if (!Crc32::FromHex(fields[5], e.crc32)) return false;
+                            e.hasCrc32 = true;
+                        } else {
+                            return false;
+                        }
                     }
                 }
             }
@@ -263,6 +272,11 @@ bool Reader::ReadEntryVerified(const std::string& virtualPath, std::vector<uint8
     }
 
     out.assign(blob.begin() + (std::ptrdiff_t)e.offset, blob.begin() + (std::ptrdiff_t)(e.offset + e.size));
+    if (verifyOnRead && e.hasCrc32 && Crc32::Compute(out) != e.crc32) {
+        out.clear();
+        error = "integrity check failed (crc32 mismatch)";
+        return false;
+    }
     if (verifyOnRead && !e.sha256.empty()) {
         Sha256::Digest expected;
         if (!Sha256::FromHex(e.sha256, expected) || !Sha256::Equal(expected, Sha256::Compute(out))) {

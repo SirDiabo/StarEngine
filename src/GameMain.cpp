@@ -171,7 +171,6 @@ int main(int argc, char* argv[]) {
 
         if (!pakLoaded) {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-            CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
             AudioConfig::LoadLoose(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
@@ -201,14 +200,12 @@ int main(int argc, char* argv[]) {
                 TraceLog(LOG_INFO, "GameMain: loaded sibling pak, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             } else {
                 ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-                CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
                 InputMappingRegistry::Get().Load(bootstrapDir.string());
                 AudioConfig::LoadLoose(bootstrapDir.string());
                 TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());
             }
         } else {
             ContentPathResolver::SetContentRoot((bootstrapDir / "Content").string());
-            CookedFile::SetActiveCipher(config.cipher, config.cipherKey);
             InputMappingRegistry::Get().Load(bootstrapDir.string());
             AudioConfig::LoadLoose(bootstrapDir.string());
             TraceLog(LOG_INFO, "GameMain: loaded loose bootstrap, name=%s defaultMap=%s", config.name.c_str(), config.defaultMap.c_str());

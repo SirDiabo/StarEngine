@@ -40,12 +40,53 @@ def run_openssl(args, data):
     return result.stdout
 
 
-def aes_ecb(key, block):
-    return run_openssl(["enc", "-aes-256-ecb", "-nopad", "-K", key.hex()], block)
+def rotl32(v, n):
+    return ((v << n) | (v >> (32 - n))) & 0xFFFFFFFF
 
 
-def aes_ctr(key, counter, data):
-    return run_openssl(["enc", "-aes-256-ctr", "-K", key.hex(), "-iv", counter.hex()], data)
+def chacha_block(key, nonce, counter, rounds):
+    assert len(key) == 32 and len(nonce) == 8
+    counter &= 0xFFFFFFFFFFFFFFFF
+    state = [0x61707865, 0x3320646E, 0x79622D32, 0x6B206574]
+    state += [int.from_bytes(key[i:i + 4], "little") for i in range(0, 32, 4)]
+    state += [counter & 0xFFFFFFFF, counter >> 32]
+    state += [int.from_bytes(nonce[i:i + 4], "little") for i in range(0, 8, 4)]
+    x = list(state)
+
+    def quarter(a, b, c, d):
+        x[a] = (x[a] + x[b]) & 0xFFFFFFFF
+        x[d] = rotl32(x[d] ^ x[a], 16)
+        x[c] = (x[c] + x[d]) & 0xFFFFFFFF
+        x[b] = rotl32(x[b] ^ x[c], 12)
+        x[a] = (x[a] + x[b]) & 0xFFFFFFFF
+        x[d] = rotl32(x[d] ^ x[a], 8)
+        x[c] = (x[c] + x[d]) & 0xFFFFFFFF
+        x[b] = rotl32(x[b] ^ x[c], 7)
+
+    for _ in range(rounds // 2):
+        quarter(0, 4, 8, 12)
+        quarter(1, 5, 9, 13)
+        quarter(2, 6, 10, 14)
+        quarter(3, 7, 11, 15)
+        quarter(0, 5, 10, 15)
+        quarter(1, 6, 11, 12)
+        quarter(2, 7, 8, 13)
+        quarter(3, 4, 9, 14)
+    return b"".join(((x[i] + state[i]) & 0xFFFFFFFF).to_bytes(4, "little") for i in range(16))
+
+
+def chacha_xor(key, nonce, counter, data, rounds=12):
+    out = bytearray()
+    for index in range(0, len(data), 64):
+        stream = chacha_block(key, nonce, counter + index // 64, rounds)
+        chunk = data[index:index + 64]
+        out += bytes(a ^ b for a, b in zip(chunk, stream))
+    return bytes(out)
+
+
+def openssl_chacha20(key, nonce, counter, data):
+    iv = (counter & 0xFFFFFFFFFFFFFFFF).to_bytes(8, "little") + nonce
+    return run_openssl(["enc", "-chacha20", "-K", key.hex(), "-iv", iv.hex()], data)
 
 
 def hex_literal(data):
@@ -68,49 +109,70 @@ def raw_deflate(data, level=6, strategy=zlib.Z_DEFAULT_STRATEGY, wbits=15, mem_l
 def generate_crypto():
     lines = ["#pragma once", "", "namespace vectors {", ""]
 
-    fips_key = bytes(range(32))
-    fips_plain = bytes.fromhex("00112233445566778899aabbccddeeff")
-    fips_cipher = aes_ecb(fips_key, fips_plain)
-    assert fips_cipher.hex() == "8ea2b7ca516745bfeafc49904b496089"
+    rfc_key = bytes(range(32))
+    rfc_counter = 1 | (0x09000000 << 32)
+    rfc_nonce = bytes.fromhex("0000004a00000000")
+    rfc_block = chacha_block(rfc_key, rfc_nonce, rfc_counter, 20)
+    assert rfc_block.hex().startswith("10f1e7e4d13b5915500fdd1fa32071c4c7d1f4c733c068030422aa9ac3d46c4e")
+    assert chacha_block(bytes(32), bytes(8), 0, 8).hex().startswith("3e00ef2f895f40d67f5bb8e81f09a5a1")
+    assert chacha_block(bytes(32), bytes(8), 0, 12).hex().startswith("9bf49a6a0755f953811fce125f2683d5")
+    assert chacha_block(bytes(32), bytes(8), 0, 20).hex().startswith("76b8e0ada0f13d90405d6ae55386bd28")
 
-    ecb_cases = [(fips_key, fips_plain)]
-    for seed in range(1, 7):
-        ecb_cases.append((lcg_bytes(32, seed), lcg_bytes(16, seed + 100)))
-    ecb_cases.append((bytes(32), bytes(16)))
-    ecb_cases.append((bytes([0xFF] * 32), bytes([0xFF] * 16)))
-    lines.append("struct AesBlockVector { const char* key; const char* plain; const char* cipher; };")
-    lines.append("static const AesBlockVector kAesBlocks[] = {")
-    for key, plain in ecb_cases:
-        lines.append("    { %s, %s, %s }," % (hex_literal(key), hex_literal(plain), hex_literal(aes_ecb(key, plain))))
+    check_cases = [
+        (bytes(32), bytes(8), 0, lcg_bytes(200, 61)),
+        (rfc_key, rfc_nonce, rfc_counter, lcg_bytes(130, 62)),
+        (lcg_bytes(32, 63), lcg_bytes(8, 64), 0xFFFFFFFF, lcg_bytes(300, 65)),
+        (lcg_bytes(32, 66), lcg_bytes(8, 67), 0xFFFFFFFFFFFFFFFF, lcg_bytes(129, 68)),
+        (lcg_bytes(32, 69), lcg_bytes(8, 70), 0x100000000, lcg_bytes(64, 71)),
+    ]
+    for key, nonce, counter, data in check_cases:
+        expected = openssl_chacha20(key, nonce, counter, data)
+        assert expected == chacha_xor(key, nonce, counter, data, 20)
+
+    block_cases = [
+        (bytes(32), bytes(8), 0),
+        (bytes([0xFF] * 32), bytes([0xFF] * 8), 0xFFFFFFFFFFFFFFFF),
+        (rfc_key, rfc_nonce, rfc_counter),
+        (lcg_bytes(32, 81), lcg_bytes(8, 82), 1),
+        (lcg_bytes(32, 83), lcg_bytes(8, 84), 0xFFFFFFFF),
+        (lcg_bytes(32, 85), lcg_bytes(8, 86), 0x100000000),
+        (lcg_bytes(32, 87), lcg_bytes(8, 88), 0x123456789ABCDEF0),
+    ]
+    lines.append("struct ChaChaBlockVector { const char* key; const char* nonce; unsigned long long counter; int rounds; const char* block; };")
+    lines.append("static const ChaChaBlockVector kChaChaBlocks[] = {")
+    for key, nonce, counter in block_cases:
+        for rounds in (8, 12, 20):
+            lines.append("    { %s, %s, %dULL, %d, %s }," % (hex_literal(key), hex_literal(nonce), counter, rounds, hex_literal(chacha_block(key, nonce, counter, rounds))))
     lines.append("};")
     lines.append("")
 
-    sp_key = bytes.fromhex("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4")
-    sp_counter = bytes.fromhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
-    sp_plain = bytes.fromhex("6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e5130c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710")
-    sp_cipher = aes_ctr(sp_key, sp_counter, sp_plain)
-    assert sp_cipher.hex() == "601ec313775789a5b7a7f504bbf3d228f443e3ca4d62b59aca84e990cacaf5c52b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6"
-
-    ctr_cases = [(sp_key, sp_counter, sp_plain)]
-    carry_counters = [
-        bytes.fromhex("000000000000000000000000fffffffe"),
-        bytes.fromhex("00000000000000000000ffffffffffff"),
-        bytes.fromhex("ffffffffffffffffffffffffffffffff"),
-        bytes.fromhex("0102030405060708090a0b0c0d0e0fff"),
-        bytes(16),
+    xor_cases = [
+        (bytes(32), bytes(8), 0, b"\x00" * 64),
+        (lcg_bytes(32, 91), lcg_bytes(8, 92), 0, lcg_bytes(1, 93)),
     ]
-    sizes = [1, 15, 16, 17, 31, 33, 100, 257]
-    for index, counter in enumerate(carry_counters):
-        key = lcg_bytes(32, 50 + index)
-        data = lcg_bytes(sizes[index % len(sizes)] + 48, 70 + index)
-        ctr_cases.append((key, counter, data))
-    for size in sizes:
-        ctr_cases.append((lcg_bytes(32, 900 + size), lcg_bytes(16, 800 + size), lcg_bytes(size, 700 + size)))
-    ctr_cases.append((lcg_bytes(32, 33), bytes.fromhex("ffffffffffffffffffffffffffffff00"), lcg_bytes(5000, 34)))
-    lines.append("struct AesCtrVector { const char* key; const char* counter; const char* plain; const char* cipher; };")
-    lines.append("static const AesCtrVector kAesCtr[] = {")
-    for key, counter, data in ctr_cases:
-        lines.append("    { %s, %s, %s, %s }," % (hex_literal(key), hex_literal(counter), hex_literal(data), hex_literal(aes_ctr(key, counter, data))))
+    for index, size in enumerate([15, 63, 64, 65, 127, 128, 129, 300, 1000]):
+        xor_cases.append((lcg_bytes(32, 100 + index), lcg_bytes(8, 120 + index), 0, lcg_bytes(size, 140 + index)))
+    xor_cases.append((lcg_bytes(32, 151), lcg_bytes(8, 152), 0xFFFFFFFF, lcg_bytes(257, 153)))
+    xor_cases.append((lcg_bytes(32, 154), lcg_bytes(8, 155), 0xFFFFFFFFFFFFFFFF, lcg_bytes(200, 156)))
+    xor_cases.append((lcg_bytes(32, 157), lcg_bytes(8, 158), 7, lcg_bytes(5000, 159)))
+    lines.append("struct ChaChaXorVector { const char* key; const char* nonce; unsigned long long counter; const char* plain; const char* cipher; };")
+    lines.append("static const ChaChaXorVector kChaChaXor[] = {")
+    for key, nonce, counter, data in xor_cases:
+        lines.append("    { %s, %s, %dULL, %s, %s }," % (hex_literal(key), hex_literal(nonce), counter, hex_literal(data), hex_literal(chacha_xor(key, nonce, counter, data))))
+    lines.append("};")
+    lines.append("")
+
+    assert zlib.crc32(b"123456789") == 0xCBF43926
+    assert zlib.crc32(b"") == 0
+    crc_messages = [b"", b"a", b"abc", b"123456789", b"The quick brown fox jumps over the lazy dog"]
+    for length in [2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 255, 256, 257, 1000, 4096]:
+        crc_messages.append(lcg_bytes(length, 200 + length))
+    crc_messages.append(bytes(100))
+    crc_messages.append(bytes([0xFF] * 100))
+    lines.append("struct CrcVector { const char* data; unsigned crc; };")
+    lines.append("static const CrcVector kCrc[] = {")
+    for data in crc_messages:
+        lines.append("    { %s, 0x%08xu }," % (hex_literal(data), zlib.crc32(data)))
     lines.append("};")
     lines.append("")
 
@@ -163,8 +225,8 @@ def generate_crypto():
     lines.append("static const CookCipherVector kCookCipher[] = {")
     for key, context, data in cipher_cases:
         key_bytes = hashlib.sha256(key.encode()).digest()
-        nonce = hmac.new(key_bytes, ("StarPak-CTR:" + context).encode(), hashlib.sha256).digest()
-        encrypted = aes_ctr(key_bytes, nonce[:16], data)
+        nonce = hmac.new(key_bytes, ("StarPak-ChaCha12:" + context).encode(), hashlib.sha256).digest()[:8]
+        encrypted = chacha_xor(key_bytes, nonce, 0, data)
         lines.append('    { "%s", "%s", %s, %s },' % (key, context, hex_literal(data), hex_literal(encrypted)))
     lines.append("};")
     lines.append("")

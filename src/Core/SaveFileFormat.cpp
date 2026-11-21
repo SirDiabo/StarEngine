@@ -191,8 +191,8 @@ public:
                 if (!file.dirty) continue;
                 std::string text = SerializeEntries(file.entries);
                 std::vector<uint8_t> raw(text.begin(), text.end());
-                if (file.encrypted) {
-                    auto cipher = CreateCookCipher(CookCiphers::XorSimple);
+                if (file.encrypted && !file.encryptionKey.empty()) {
+                    auto cipher = CreateCookCipher(CookCiphers::ChaCha12);
                     cipher->Encrypt(raw, file.encryptionKey, kv.first);
                 }
                 jobs.emplace_back(kv.first, std::move(raw));
@@ -266,8 +266,8 @@ private:
         CachedFile file;
         std::vector<uint8_t> raw = ReadRawFile(path);
         if (!raw.empty()) {
-            if (encrypted) {
-                auto cipher = CreateCookCipher(CookCiphers::XorSimple);
+            if (encrypted && !key.empty()) {
+                auto cipher = CreateCookCipher(CookCiphers::ChaCha12);
                 cipher->Decrypt(raw, key, path);
             }
             file.entries = ParseEntries(std::string(raw.begin(), raw.end()));

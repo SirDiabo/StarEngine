@@ -19,19 +19,19 @@ struct Entry {
     uint64_t rawSize = 0;
     std::string compression = kNoCompression;
     std::string sha256;
+    uint32_t crc32 = 0;
+    bool hasCrc32 = false;
 };
 
 class Writer {
 public:
     bool AddFile(const std::string& virtualPath, const std::vector<uint8_t>& bytes);
     bool AddEntry(const std::string& virtualPath, const std::vector<uint8_t>& storedBytes, uint64_t rawSize, const std::string& compression);
-    void SetHashEntries(bool enabled) { hashEntries = enabled; }
     bool WriteToFile(const std::string& outputPath) const;
 
 private:
     std::vector<Entry> entries;
     std::vector<uint8_t> blob;
-    bool hashEntries = true;
 };
 
 class Reader {

@@ -8,8 +8,7 @@
 
 namespace CookCiphers {
     inline const std::string None = "None";
-    inline const std::string XorSimple = "XorSimple";
-    inline const std::string Aes256Ctr = "Aes256Ctr";
+    inline const std::string ChaCha12 = "ChaCha12";
 }
 
 class ICookCipher {
