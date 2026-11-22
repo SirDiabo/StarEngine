@@ -65,6 +65,13 @@ struct Data {
     std::vector<Animation> animations;
 };
 
+struct SkinningBuffers {
+    std::vector<float> positions;
+    std::vector<float> normals;
+};
+
+SkinningBuffers MakeSkinningBuffers(const Mesh& mesh);
+
 bool LooksCooked(const uint8_t* data, size_t size);
 bool Serialize(const Data& data, std::vector<uint8_t>& out, std::string& error);
 bool Deserialize(const uint8_t* data, size_t size, Data& out, std::string& error);

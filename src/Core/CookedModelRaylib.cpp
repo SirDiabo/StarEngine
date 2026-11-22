@@ -218,6 +218,9 @@ bool CookedModelRaylib::BuildModel(const CookedModel::Data& data, Model& out, st
         mesh.boneCount = (int)source.boneCount;
         mesh.boneIndices = AllocCopy(source.boneIndices);
         mesh.boneWeights = AllocCopy(source.boneWeights);
+        const CookedModel::SkinningBuffers skinning = CookedModel::MakeSkinningBuffers(source);
+        mesh.animVertices = AllocCopy(skinning.positions);
+        mesh.animNormals = AllocCopy(skinning.normals);
         UploadMesh(&mesh, false);
         model.meshes[i] = mesh;
         model.meshMaterial[i] = source.materialIndex;

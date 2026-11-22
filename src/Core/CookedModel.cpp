@@ -129,6 +129,16 @@ bool ValidMeshArrays(const Mesh& m, std::string& error) {
 
 }
 
+SkinningBuffers MakeSkinningBuffers(const Mesh& mesh) {
+    SkinningBuffers buffers;
+    if (mesh.boneIndices.empty() || mesh.boneWeights.empty() || mesh.vertices.empty()) return buffers;
+    buffers.positions = mesh.vertices;
+    buffers.normals.assign(mesh.vertices.size(), 0.0f);
+    const size_t shared = mesh.normals.size() < buffers.normals.size() ? mesh.normals.size() : buffers.normals.size();
+    for (size_t i = 0; i < shared; i++) buffers.normals[i] = mesh.normals[i];
+    return buffers;
+}
+
 bool LooksCooked(const uint8_t* data, size_t size) {
     return data != nullptr && size >= sizeof(kMagic) && std::memcmp(data, kMagic, sizeof(kMagic)) == 0;
 }

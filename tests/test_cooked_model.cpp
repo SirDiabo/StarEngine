@@ -331,4 +331,38 @@ TEST(cooked_model_survives_random_damage) {
     }
 }
 
+TEST(cooked_model_skinned_meshes_get_cpu_skinning_buffers) {
+    Mesh skinned = MakeMesh(12, 4, 0, true, true, 4, 3);
+    SkinningBuffers buffers = MakeSkinningBuffers(skinned);
+    CHECK(buffers.positions == skinned.vertices);
+    CHECK(buffers.normals == skinned.normals);
+    CHECK(buffers.positions.data() != skinned.vertices.data());
+    CHECK(buffers.normals.data() != skinned.normals.data());
+}
+
+TEST(cooked_model_skinning_buffers_cover_meshes_without_normals) {
+    Mesh skinned = MakeMesh(12, 4, 0, true, true, 4, 3);
+    skinned.normals.clear();
+    SkinningBuffers buffers = MakeSkinningBuffers(skinned);
+    CHECK(buffers.positions == skinned.vertices);
+    CHECK(buffers.normals.size() == skinned.vertices.size());
+    bool allZero = true;
+    for (float f : buffers.normals) if (f != 0.0f) allZero = false;
+    CHECK(allZero);
+}
+
+TEST(cooked_model_static_and_half_skinned_meshes_get_no_skinning_buffers) {
+    Mesh staticMesh = MakeMesh(12, 4, 0, false, true, 5, 3);
+    CHECK(MakeSkinningBuffers(staticMesh).positions.empty());
+    CHECK(MakeSkinningBuffers(staticMesh).normals.empty());
+
+    Mesh noWeights = MakeMesh(12, 4, 0, true, true, 6, 3);
+    noWeights.boneWeights.clear();
+    CHECK(MakeSkinningBuffers(noWeights).positions.empty());
+
+    Mesh noIndices = MakeMesh(12, 4, 0, true, true, 7, 3);
+    noIndices.boneIndices.clear();
+    CHECK(MakeSkinningBuffers(noIndices).positions.empty());
+}
+
 TEST_MAIN()
