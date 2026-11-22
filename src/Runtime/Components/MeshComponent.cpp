@@ -10,7 +10,7 @@
 
 void MeshComponent::GetEditorProperties(PropertyList& outProperties) {
     SceneComponent::GetEditorProperties(outProperties);
-    outProperties.AddString("Static Mesh", &meshPath);
+    outProperties.AddString("Mesh", &meshPath);
     outProperties.AddBool("Casts Shadow", &castsShadow);
     outProperties.AddFloat("Max Draw Distance", &maxDrawDistance);
     outProperties.AddString("Current Anim", &currentAnimPath);

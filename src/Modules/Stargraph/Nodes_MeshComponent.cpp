@@ -17,7 +17,7 @@ void RegisterMeshComponentNodes() {
     setStaticMesh.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Target", PinType::Object, true, false, 0, "", false, "MeshComponent"});
-        node->inputs.push_back({"Static Mesh", PinType::String, true, false, 0, ""});
+        node->inputs.push_back({"Mesh", PinType::String, true, false, 0, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
     };
     setStaticMesh.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
@@ -27,7 +27,7 @@ void RegisterMeshComponentNodes() {
             if (p.name == "Target" && !p.defaultValue.empty()) {
                 target = ObjectPinRef::ResolveAs<Component>(node, p.defaultValue, "MeshComponent", ctx);
             }
-            if (p.name == "Static Mesh") path = p.defaultValue;
+            if (p.name == "Mesh") path = p.defaultValue;
         }
         if (!target) return;
         if (MeshComponent* mc = dynamic_cast<MeshComponent*>(target)) {

@@ -7,6 +7,7 @@
 #include "Core/ShadingModel.h"
 #include "CollisionPrivate.h"
 #include <cmath>
+#include <unordered_set>
 
 namespace {
 
@@ -36,6 +37,12 @@ bool LoadModelFromContent(const std::string& path, Model& out) {
     if (!FileExists(disk.c_str())) return false;
     out = LoadModel(disk.c_str());
     return true;
+}
+
+void WarnAnimationOnce(const std::string& animAssetPath, const char* reason, const std::string& sourcePath) {
+    static std::unordered_set<std::string> warned;
+    if (!warned.insert(animAssetPath).second) return;
+    TraceLog(LOG_WARNING, "AssetCache: animation %s cannot play, %s (%s)", animAssetPath.c_str(), reason, sourcePath.c_str());
 }
 
 ModelAnimation* LoadAnimationsFromContent(const std::string& path, int& count) {
@@ -188,14 +195,20 @@ ModelAnimation* AssetCache::GetOrLoadAnimation(const std::string& animAssetPath)
     if (!StarAsset::LoadFromFile(animAssetPath, asset) || asset.assetType != "Animation") return nullptr;
 
     const std::string sourcePath = asset.ResolveSourcePath();
-    if (!CookedFile::Exists(sourcePath)) return nullptr;
+    if (!CookedFile::Exists(sourcePath)) {
+        WarnAnimationOnce(animAssetPath, "its source file is missing", sourcePath);
+        return nullptr;
+    }
     const std::string resolved = CookedFile::Key(sourcePath);
 
     auto srcIt = animationSourceCache.find(resolved);
     if (srcIt == animationSourceCache.end()) {
         LoadedAnimationSet set;
         set.animations = LoadAnimationsFromContent(sourcePath, set.count);
-        if (set.animations == nullptr || set.count <= 0) return nullptr;
+        if (set.animations == nullptr || set.count <= 0) {
+            WarnAnimationOnce(animAssetPath, "its source file has no readable animations", sourcePath);
+            return nullptr;
+        }
         srcIt = animationSourceCache.emplace(resolved, set).first;
     }
 

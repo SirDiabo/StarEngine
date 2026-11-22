@@ -19,7 +19,8 @@ namespace {
 bool IsTextProjectFile(const fs::path& p) {
     std::string ext = p.extension().string();
     if (ext == ".starasset" || ext == ".starmat" || ext == ".starmap" ||
-        ext == ".staractor" || ext == ".startex" || ext == ".starwidget") return true;
+        ext == ".staractor" || ext == ".startex" || ext == ".starwidget" ||
+        ext == ".staranim" || ext == ".starsound") return true;
     for (const ModuleEntry& entry : ModuleManager::Get().GetEntries()) {
         if (!entry.hasManifest) continue;
         for (const std::string& declared : entry.manifest.assetTypes) {

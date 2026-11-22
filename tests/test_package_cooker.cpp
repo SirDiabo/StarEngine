@@ -217,4 +217,113 @@ TEST(loose_cook_is_the_readable_debug_format) {
     CHECK_BYTES(test::ReadFile(dir.Path("loose/Textures/wall.png")), Bytes("PNG-BYTES-1234567890"));
 }
 
+std::string UnpackedEntry(const StarPak::Reader& pak, const std::string& key, const std::string& path) {
+    std::string error;
+    std::vector<uint8_t> raw = ReadEntry(pak, key, path, error);
+    std::string text;
+    if (raw.empty() || !CookedText::LooksCooked(raw.data(), raw.size()) || !CookedText::Unpack(raw.data(), raw.size(), text)) return std::string();
+    return text;
+}
+
+bool HasLine(const std::string& text, const std::string& line) {
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find('\n', start);
+        if (end == std::string::npos) end = text.size();
+        if (text.compare(start, end - start, line) == 0 && end - start == line.size()) return true;
+        start = end + 1;
+    }
+    return false;
+}
+
+TEST(cooker_packs_animation_assets_and_pulls_their_outside_source_into_the_pak) {
+    TempDir dir;
+    const std::string external = dir.Str("External/wave.glb");
+    test::WriteFile(dir.Path("External/wave.glb"), Bytes("EXTERNAL-GLB"));
+    test::WriteText(dir.Path("Content/Animations/Wave.staranim"),
+        "[StarAsset]\nType=Animation\nSource=" + external + "\nVendoredSource=\nAnimName=Wave\nAnimSourceIndex=0\n");
+
+    const std::string key = "anim key";
+    std::vector<std::string> seen;
+    CookResult result;
+    REQUIRE(Cook(dir, key, PackCompressions::None, FakeMeshCooker(&seen), result));
+
+    StarPak::Reader pak;
+    REQUIRE(pak.LoadFile(dir.Str("out/game.starpak"), key));
+    const std::string text = UnpackedEntry(pak, key, "Animations/Wave.staranim");
+    REQUIRE(!text.empty());
+    CHECK(HasLine(text, "Source=_Imported/wave.glb"));
+    CHECK(HasLine(text, "AnimName=Wave"));
+    CHECK(!Contains(Bytes(text), external));
+
+    std::string error;
+    CHECK_BYTES(ReadEntry(pak, key, "_Imported/wave.glb", error), Bytes("COOKED-MODEL:wave.glb"));
+    CHECK(seen.size() == 1);
+}
+
+TEST(cooker_points_animation_assets_at_their_vendored_copy_when_there_is_one) {
+    TempDir dir;
+    const std::string external = dir.Str("External/wave.glb");
+    test::WriteFile(dir.Path("External/wave.glb"), Bytes("EXTERNAL-GLB"));
+    test::WriteFile(dir.Path("Content/_Source/Wave_Wave/wave.glb"), Bytes("VENDORED-GLB"));
+    test::WriteText(dir.Path("Content/Animations/Wave.staranim"),
+        "[StarAsset]\nType=Animation\nSource=" + external + "\nVendoredSource=_Source/Wave_Wave/wave.glb\nAnimName=Wave\n");
+
+    const std::string key = "anim key";
+    CookResult result;
+    REQUIRE(Cook(dir, key, PackCompressions::None, FakeMeshCooker(nullptr), result));
+
+    StarPak::Reader pak;
+    REQUIRE(pak.LoadFile(dir.Str("out/game.starpak"), key));
+    const std::string text = UnpackedEntry(pak, key, "Animations/Wave.staranim");
+    REQUIRE(!text.empty());
+    CHECK(HasLine(text, "Source=_Source/Wave_Wave/wave.glb"));
+    CHECK(HasLine(text, "VendoredSource=_Source/Wave_Wave/wave.glb"));
+    CHECK(!pak.HasEntry("_Imported/wave.glb"));
+    CHECK(!Contains(Bytes(text), external));
+}
+
+TEST(cooker_packs_sound_assets_and_pulls_their_outside_source_into_the_pak) {
+    TempDir dir;
+    const std::string external = dir.Str("External/hit.wav");
+    test::WriteFile(dir.Path("External/hit.wav"), Bytes("RIFF-EXTERNAL-WAV"));
+    test::WriteText(dir.Path("Content/Sounds/Hit.starsound"),
+        "[StarAsset]\nType=Sound\nSource=" + external + "\nVendoredSource=\nSoundVolume=0.5\n");
+
+    const std::string key = "sound key";
+    CookResult result;
+    REQUIRE(Cook(dir, key, PackCompressions::None, FakeMeshCooker(nullptr), result));
+
+    StarPak::Reader pak;
+    REQUIRE(pak.LoadFile(dir.Str("out/game.starpak"), key));
+    const std::string text = UnpackedEntry(pak, key, "Sounds/Hit.starsound");
+    REQUIRE(!text.empty());
+    CHECK(HasLine(text, "Source=_Imported/hit.wav"));
+    CHECK(HasLine(text, "SoundVolume=0.5"));
+
+    std::string error;
+    CHECK_BYTES(ReadEntry(pak, key, "_Imported/hit.wav", error), Bytes("RIFF-EXTERNAL-WAV"));
+}
+
+TEST(cooker_shares_one_cooked_copy_between_a_mesh_asset_and_its_animation_assets) {
+    TempDir dir;
+    const std::string external = dir.Str("External/hero.glb");
+    test::WriteFile(dir.Path("External/hero.glb"), Bytes("EXTERNAL-GLB"));
+    test::WriteText(dir.Path("Content/Meshes/Hero.starasset"), "[StarAsset]\nType=StaticMesh\nSource=" + external + "\nVendoredSource=\n");
+    test::WriteText(dir.Path("Content/Animations/Hero_Run.staranim"), "[StarAsset]\nType=Animation\nSource=" + external + "\nVendoredSource=\nAnimName=Run\n");
+    test::WriteText(dir.Path("Content/Animations/Hero_Idle.staranim"), "[StarAsset]\nType=Animation\nSource=" + external + "\nVendoredSource=\nAnimName=Idle\n");
+
+    const std::string key = "share key";
+    std::vector<std::string> seen;
+    CookResult result;
+    REQUIRE(Cook(dir, key, PackCompressions::None, FakeMeshCooker(&seen), result));
+
+    StarPak::Reader pak;
+    REQUIRE(pak.LoadFile(dir.Str("out/game.starpak"), key));
+    CHECK(HasLine(UnpackedEntry(pak, key, "Meshes/Hero.starasset"), "Source=_Imported/hero.glb"));
+    CHECK(HasLine(UnpackedEntry(pak, key, "Animations/Hero_Run.staranim"), "Source=_Imported/hero.glb"));
+    CHECK(HasLine(UnpackedEntry(pak, key, "Animations/Hero_Idle.staranim"), "Source=_Imported/hero.glb"));
+    CHECK(seen.size() == 1);
+}
+
 TEST_MAIN()
