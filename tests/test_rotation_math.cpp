@@ -267,9 +267,9 @@ TEST(make_rot_from_invalid_second_axis_still_gives_valid_rotation) {
 
 TEST(make_rot_from_vertical_single_axis_keeps_yaw_zero) {
     Vector3 up = MakeRotFromZ({ 0, 1, 0 });
-    CHECK(Dist(up, { -90, 0, 0 }) < 1e-3f);
+    CHECK(Dist(up, { 90, 0, 0 }) < 1e-3f);
     Vector3 down = MakeRotFromZ({ 0, -1, 0 });
-    CHECK(Dist(down, { 90, 0, 0 }) < 1e-3f);
+    CHECK(Dist(down, { -90, 0, 0 }) < 1e-3f);
     CHECK(Dist(MakeRotFromY({ 0, 1, 0 }), { 0, 0, 0 }) < 1e-4f);
     CHECK(Dist(MakeRotFromX({ -1, 0, 0 }), { 0, 0, 0 }) < 1e-4f);
 }
@@ -292,6 +292,85 @@ TEST(shortest_path_helpers_do_not_wrap_automatically) {
     CHECK(MatrixDistance(a, b) < 1e-4f);
     CHECK(WrapAngleDegrees(270.0f) == -90.0f);
     CHECK(std::fabs(AngleDeltaDegrees(170.0f, -170.0f) - 20.0f) < 1e-4f);
+}
+
+TEST(convention_positive_pitch_looks_up) {
+    CHECK(Dist(RotationForwardVector({ 90, 0, 0 }), { 0, 1, 0 }) < 1e-5f);
+    CHECK(Dist(RotationForwardVector({ -90, 0, 0 }), { 0, -1, 0 }) < 1e-5f);
+    Vector3 f = RotationForwardVector({ 10, 0, 0 });
+    CHECK(f.y > 0.17f && f.y < 0.18f);
+}
+
+TEST(convention_positive_yaw_turns_right) {
+    Vector3 right = RotationRightVector({ 0, 0, 0 });
+    for (float yaw : { 5.0f, 30.0f, 90.0f, 170.0f }) {
+        Vector3 f = RotationForwardVector({ 0, yaw, 0 });
+        Vector3 expected = { right.x * std::sin(yaw * DEG2RAD), 0.0f, std::cos(yaw * DEG2RAD) };
+        CHECK(Dist(f, expected) < 1e-5f);
+    }
+    CHECK(Dist(RotationForwardVector({ 0, 90, 0 }), RotationRightVector({ 0, 0, 0 })) < 1e-5f);
+    CHECK(Dist(RotationForwardVector({ 0, -90, 0 }), Scaled(RotationRightVector({ 0, 0, 0 }), -1.0f)) < 1e-5f);
+}
+
+TEST(convention_positive_roll_is_clockwise) {
+    Vector3 right = RotationRightVector({ 0, 0, 0 });
+    CHECK(Dist(RotationUpVector({ 0, 0, 90 }), right) < 1e-5f);
+    CHECK(Dist(RotationRightVector({ 0, 0, 90 }), Scaled(RotationUpVector({ 0, 0, 0 }), -1.0f)) < 1e-5f);
+    CHECK(Dist(RotationForwardVector({ 0, 0, 90 }), { 0, 0, 1 }) < 1e-6f);
+}
+
+TEST(convention_yaw_then_pitch_then_roll_order) {
+    Vector3 f = RotationForwardVector({ 30, 90, 45 });
+    Vector3 yawOnly = RotationForwardVector({ 0, 90, 0 });
+    CHECK(Dist(Scaled(yawOnly, std::cos(30 * DEG2RAD)), { f.x, 0, f.z }) < 1e-5f);
+    CHECK(f.y > 0.49f && f.y < 0.51f);
+}
+
+TEST(look_at_matches_convention) {
+    CHECK(Dist(LookAtRotationDegrees({ 0, 0, 0 }, { 0, 0, 1 }), { 0, 0, 0 }) < 1e-4f);
+    CHECK(Dist(LookAtRotationDegrees({ 0, 0, 0 }, { 0, 5, 0 }), { 90, 0, 0 }) < 1e-3f);
+    CHECK(Dist(LookAtRotationDegrees({ 0, 0, 0 }, { 0, -5, 0 }), { -90, 0, 0 }) < 1e-3f);
+    Vector3 right = RotationRightVector({ 0, 0, 0 });
+    Vector3 toRight = Scaled(right, 3.0f);
+    CHECK(Dist(LookAtRotationDegrees({ 0, 0, 0 }, toRight), { 0, 90, 0 }) < 1e-3f);
+    CHECK(Dist(LookAtRotationDegrees({ 0, 0, 0 }, Scaled(toRight, -1.0f)), { 0, -90, 0 }) < 1e-3f);
+    test::Rng rng(61);
+    for (int i = 0; i < 5000; i++) {
+        Vector3 from = { Range(rng, -50, 50), Range(rng, -50, 50), Range(rng, -50, 50) };
+        Vector3 to = { Range(rng, -50, 50), Range(rng, -50, 50), Range(rng, -50, 50) };
+        Vector3 d = { to.x - from.x, to.y - from.y, to.z - from.z };
+        Vector3 n = d;
+        if (!RotationAxes::Normalize3(n, 1e-2f)) continue;
+        Vector3 look = LookAtRotationDegrees(from, to);
+        CHECK(Dist(RotationForwardVector(look), n) < 1e-4f);
+        CHECK(std::fabs(look.z) < 1e-6f);
+    }
+}
+
+TEST(rotate_around_world_axis_matches_matrix_product) {
+    test::Rng rng(62);
+    const Vector3 axes[] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, { 0.3f, -0.5f, 0.8f } };
+    for (int i = 0; i < 4000; i++) {
+        Vector3 rot = RandomRotation(rng);
+        Vector3 axis = axes[i % 4];
+        float delta = Range(rng, -180.0f, 180.0f);
+        Vector3 result = RotateRotationAroundAxisDegrees(rot, axis, delta);
+        Matrix expected = MatrixMultiply(ComposeRotationDegrees(rot), MatrixRotate(axis, delta * DEG2RAD));
+        CHECK(MatrixDistance(ComposeRotationDegrees(result), expected) < 5e-4f);
+        CHECK(InCanonicalRange(result));
+        Vector3 back = RotateRotationAroundAxisDegrees(result, axis, -delta);
+        CHECK(SameOrientation(back, rot, 2e-3f));
+    }
+}
+
+TEST(rotation_from_matrix_round_trips_compose) {
+    test::Rng rng(63);
+    for (int i = 0; i < 5000; i++) {
+        Vector3 rot = RandomRotation(rng);
+        Vector3 back = RotationFromMatrixDegrees(ComposeRotationDegrees(rot));
+        CHECK(SameOrientation(rot, back, 2e-4f));
+        CHECK(InCanonicalRange(back));
+    }
 }
 
 TEST_MAIN()

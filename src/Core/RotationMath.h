@@ -5,8 +5,8 @@
 
 inline Matrix ComposeRotationDegrees(float pitchDeg, float yawDeg, float rollDeg) {
     Matrix rz = MatrixRotateZ(DEG2RAD * rollDeg);
-    Matrix rx = MatrixRotateX(DEG2RAD * pitchDeg);
-    Matrix ry = MatrixRotateY(DEG2RAD * yawDeg);
+    Matrix rx = MatrixRotateX(-DEG2RAD * pitchDeg);
+    Matrix ry = MatrixRotateY(-DEG2RAD * yawDeg);
     return MatrixMultiply(MatrixMultiply(rz, rx), ry);
 }
 
@@ -37,8 +37,8 @@ inline Vector3 LookAtRotationDegrees(const Vector3& from, const Vector3& to) {
     float sinPitch = dir.y / length;
     if (sinPitch > 1.0f) sinPitch = 1.0f;
     if (sinPitch < -1.0f) sinPitch = -1.0f;
-    float pitch = -std::asin(sinPitch) * RAD2DEG;
-    float yaw = std::atan2(dir.x, dir.z) * RAD2DEG;
+    float pitch = std::asin(sinPitch) * RAD2DEG;
+    float yaw = 0.0f - std::atan2(dir.x, dir.z) * RAD2DEG;
     return { WrapAngleDegrees(pitch), WrapAngleDegrees(yaw), 0.0f };
 }
 
@@ -73,7 +73,16 @@ inline Vector3 RotationFromBasisDegrees(const Vector3& right, const Vector3& up,
         yaw = 0.0f;
         roll = std::atan2(m9 > 0.0f ? -m2 : m2, m0) * RAD2DEG;
     }
-    return { WrapAngleDegrees(pitch), WrapAngleDegrees(yaw), WrapAngleDegrees(roll) };
+    return { WrapAngleDegrees(0.0f - pitch), WrapAngleDegrees(0.0f - yaw), WrapAngleDegrees(roll) };
+}
+
+inline Vector3 RotationFromMatrixDegrees(const Matrix& m) {
+    return RotationFromBasisDegrees({ -m.m0, -m.m1, -m.m2 }, { m.m4, m.m5, m.m6 }, { m.m8, m.m9, m.m10 });
+}
+
+inline Vector3 RotateRotationAroundAxisDegrees(const Vector3& rotation, const Vector3& axis, float deltaDegrees) {
+    Matrix delta = MatrixRotate(axis, deltaDegrees * DEG2RAD);
+    return RotationFromMatrixDegrees(MatrixMultiply(ComposeRotationDegrees(rotation), delta));
 }
 
 namespace RotationAxes {

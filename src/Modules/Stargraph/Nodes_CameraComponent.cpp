@@ -1,4 +1,5 @@
 #include "Runtime/Components/CameraComponent.h"
+#include "Core/RotationMath.h"
 #include "NodeRegistry.h"
 #include "Stargraph.h"
 #include "Core/SafeParse.h"
@@ -206,9 +207,7 @@ void RegisterCameraComponentNodes() {
             CameraComponent* cc = targetActor->GetCameraComponent();
             Vector3 compPos = targetActor->GetComponentWorldPosition(cc);
             Vector3 compRot = targetActor->GetComponentWorldRotation(cc);
-            float yr = compRot.y * DEG2RAD;
-            float pr = compRot.x * DEG2RAD;
-            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            Vector3 forward = RotationForwardVector(compRot);
             cam.position = compPos;
             cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
             cam.fovy = cc->fov;
@@ -216,7 +215,7 @@ void RegisterCameraComponentNodes() {
             nearClip = cc->nearClip;
             farClip = cc->farClip;
         } else {
-            Vector3 forward = {cosf(targetActor->rotation.y * DEG2RAD), 0, sinf(targetActor->rotation.y * DEG2RAD)};
+            Vector3 forward = RotationForwardVector(targetActor->rotation);
             cam.position = targetActor->position;
             cam.target = {targetActor->position.x + forward.x, targetActor->position.y + forward.y, targetActor->position.z + forward.z};
             cam.fovy = 50.0f;

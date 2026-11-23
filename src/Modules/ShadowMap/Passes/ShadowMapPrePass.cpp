@@ -106,9 +106,7 @@ struct ShadowCasterLight {
 };
 
 Vector3 DirectionFromRotation(Vector3 rot) {
-    float yr = rot.y * DEG2RAD;
-    float pr = rot.x * DEG2RAD;
-    return Vector3Normalize({cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)});
+    return Vector3Normalize(RotationForwardVector(rot));
 }
 
 bool FindShadowCasterLight(Vector3 aroundPos, ShadowCasterLight& outCaster) {

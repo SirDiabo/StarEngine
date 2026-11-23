@@ -1323,23 +1323,10 @@ void RegisterMathNodes() {
         mat.m8 = newForward.x; mat.m9 = newForward.y; mat.m10 = newForward.z; mat.m11 = 0.0f;
         mat.m12 = 0.0f; mat.m13 = 0.0f; mat.m14 = 0.0f; mat.m15 = 1.0f;
 
-        float m9v = mat.m9;
-        if (m9v > 1.0f) m9v = 1.0f;
-        if (m9v < -1.0f) m9v = -1.0f;
-        float pitchPrincipal = asinf(-m9v);
-        float yawRad, pitchRad, rollRad;
-        if (mat.m5 >= 0.0f) {
-            pitchRad = pitchPrincipal;
-            yawRad = atan2f(mat.m8, mat.m10);
-            rollRad = atan2f(mat.m1, mat.m5);
-        } else {
-            pitchRad = (pitchPrincipal >= 0.0f) ? (PI - pitchPrincipal) : (-PI - pitchPrincipal);
-            yawRad = atan2f(-mat.m8, -mat.m10);
-            rollRad = atan2f(-mat.m1, -mat.m5);
-        }
+        Vector3 alignedRotation = RotationFromMatrixDegrees(mat);
 
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", pitchRad * RAD2DEG, yawRad * RAD2DEG, rollRad * RAD2DEG);
+        snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", alignedRotation.x, alignedRotation.y, alignedRotation.z);
         for (Pin& p : node.outputs) {
             if (p.name == "Rotation") p.defaultValue = buf;
         }

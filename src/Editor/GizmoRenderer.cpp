@@ -264,12 +264,7 @@ bool UpdateDrag(Camera3D camera, int fboW, int fboH, GizmoMode mode, GizmoSpace 
         GetGizmoAxes(space, state.dragStartRot, axisX, axisY, axisZ);
         Vector3 axes[3] = {axisX, axisY, axisZ};
 
-        Quaternion startQuat = QuaternionFromEuler(state.dragStartRot.x * DEG2RAD, state.dragStartRot.y * DEG2RAD, state.dragStartRot.z * DEG2RAD);
-        Quaternion deltaQuat = QuaternionFromAxisAngle(axes[state.dragAxis], deltaDeg * DEG2RAD);
-        Quaternion newQuat = QuaternionMultiply(deltaQuat, startQuat);
-        Vector3 newRotRad = QuaternionToEuler(newQuat);
-
-        rot = {newRotRad.x * RAD2DEG, newRotRad.y * RAD2DEG, newRotRad.z * RAD2DEG};
+        rot = RotateRotationAroundAxisDegrees(state.dragStartRot, axes[state.dragAxis], deltaDeg);
     }
 
     changed = true;

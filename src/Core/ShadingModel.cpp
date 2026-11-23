@@ -1,4 +1,5 @@
 #include "ShadingModel.h"
+#include "Core/RotationMath.h"
 #include "Module.h"
 #include "RenderSettings.h"
 #include "ShadingTechniqueRegistry.h"
@@ -406,9 +407,7 @@ LitVariant& ActiveVariant() {
 }
 
 Vector3 DirectionFromRotation(Vector3 rot) {
-    float yr = rot.y * DEG2RAD;
-    float pr = rot.x * DEG2RAD;
-    return {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+    return RotationForwardVector(rot);
 }
 
 } // namespace

@@ -1,4 +1,5 @@
 #include "Nodes_Utility.h"
+#include "Core/RotationMath.h"
 #include "NodeRegistry.h"
 #include "Core/InputKeyNames.h"
 #include "Core/Utf8.h"
@@ -986,15 +987,13 @@ void RegisterUtilityNodes() {
             CameraComponent* cc = viewTarget->GetCameraComponent();
             Vector3 compPos = viewTarget->GetComponentWorldPosition(cc);
             Vector3 compRot = viewTarget->GetComponentWorldRotation(cc);
-            float yr = compRot.y * DEG2RAD;
-            float pr = compRot.x * DEG2RAD;
-            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            Vector3 forward = RotationForwardVector(compRot);
             cam.position = compPos;
             cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
             cam.fovy = cc->fov;
             cam.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
         } else if (ctx.actor) {
-            Vector3 forward = {cosf(ctx.actor->rotation.y * DEG2RAD), 0, sinf(ctx.actor->rotation.y * DEG2RAD)};
+            Vector3 forward = RotationForwardVector(ctx.actor->rotation);
             cam.position = ctx.actor->position;
             cam.target = {ctx.actor->position.x + forward.x, ctx.actor->position.y + forward.y, ctx.actor->position.z + forward.z};
             cam.fovy = 50.0f;
@@ -1042,15 +1041,13 @@ void RegisterUtilityNodes() {
             CameraComponent* cc = viewTarget->GetCameraComponent();
             Vector3 compPos = viewTarget->GetComponentWorldPosition(cc);
             Vector3 compRot = viewTarget->GetComponentWorldRotation(cc);
-            float yr = compRot.y * DEG2RAD;
-            float pr = compRot.x * DEG2RAD;
-            Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+            Vector3 forward = RotationForwardVector(compRot);
             cam.position = compPos;
             cam.target = {compPos.x + forward.x, compPos.y + forward.y, compPos.z + forward.z};
             cam.fovy = cc->fov;
             cam.projection = cc->orthographic ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
         } else if (ctx.actor) {
-            Vector3 forward = {cosf(ctx.actor->rotation.y * DEG2RAD), 0, sinf(ctx.actor->rotation.y * DEG2RAD)};
+            Vector3 forward = RotationForwardVector(ctx.actor->rotation);
             cam.position = ctx.actor->position;
             cam.target = {ctx.actor->position.x + forward.x, ctx.actor->position.y + forward.y, ctx.actor->position.z + forward.z};
             cam.fovy = 50.0f;

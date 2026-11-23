@@ -1,4 +1,5 @@
 #include "ShadowPass.h"
+#include "Core/RotationMath.h"
 #include "Core/ProfilerRender.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
@@ -45,9 +46,7 @@ void GatherShadowLights(std::vector<ShadowLight>& outLights) {
 
             if (lc->lightType == LightComponent::Sun) {
                 Vector3 rot = actor->GetComponentWorldRotation(lc);
-                float yr = rot.y * DEG2RAD;
-                float pr = rot.x * DEG2RAD;
-                Vector3 dir = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+                Vector3 dir = RotationForwardVector(rot);
                 outLights.push_back({true, {0, 0, 0}, dir});
                 continue;
             }

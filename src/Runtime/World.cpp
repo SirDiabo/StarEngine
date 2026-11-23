@@ -1,4 +1,5 @@
 #include <cmath>
+#include "Core/RotationMath.h"
 #include "World.h"
 #include "ProfilerLabels.h"
 #include "Core/Profiler.h"
@@ -173,9 +174,7 @@ void World::Tick(float deltaTime) {
         CameraComponent* listenerCamera = viewTarget ? viewTarget->GetCameraComponent() : nullptr;
         if (listenerCamera) {
             Vector3 rotation = viewTarget->GetComponentWorldRotation(listenerCamera);
-            float yaw = rotation.y * DEG2RAD;
-            float pitch = rotation.x * DEG2RAD;
-            Vector3 forward = { cosf(pitch) * sinf(yaw), sinf(pitch), cosf(pitch) * cosf(yaw) };
+            Vector3 forward = RotationForwardVector(rotation);
             float length = sqrtf(forward.x * forward.x + forward.z * forward.z);
             Vector3 right = length > 0.0001f ? Vector3{ -forward.z / length, 0.0f, forward.x / length } : Vector3{ 1.0f, 0.0f, 0.0f };
             AudioCore::Get().SetListener(viewTarget->GetComponentWorldPosition(listenerCamera), right, viewTarget);

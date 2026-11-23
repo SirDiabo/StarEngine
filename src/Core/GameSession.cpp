@@ -1,4 +1,5 @@
 #include "GameSession.h"
+#include "Core/RotationMath.h"
 #include "Runtime/World.h"
 #include "Runtime/Actor.h"
 #include "Runtime/StarMap.h"
@@ -39,9 +40,7 @@ void UpdateActiveCamera(Camera3D& camera) {
 
     Vector3 compPos = camActor->GetComponentWorldPosition(cc);
     Vector3 compRot = camActor->GetComponentWorldRotation(cc);
-    float yr = compRot.y * DEG2RAD;
-    float pr = compRot.x * DEG2RAD;
-    Vector3 forward = {cosf(pr) * sinf(yr), sinf(pr), cosf(pr) * cosf(yr)};
+    Vector3 forward = RotationForwardVector(compRot);
     camera.position = compPos;
     camera.target = Vector3Add(compPos, forward);
     camera.up = {0, 1, 0};

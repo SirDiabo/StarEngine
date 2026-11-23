@@ -215,7 +215,7 @@ void Actor::SetComponentWorldPosition(Component* comp, Vector3 worldPos) {
     Vector3 pPos, pRot, pScale;
     GetComponentWorldTransform(comp->parent, pPos, pRot, pScale);
     Vector3 rotatedLocalPos = Vector3Subtract(worldPos, pPos);
-    Matrix rotationMatrix = MatrixRotateXYZ(Vector3{ DEG2RAD * pRot.x, DEG2RAD * pRot.y, DEG2RAD * pRot.z });
+    Matrix rotationMatrix = ComposeRotationDegrees(pRot);
     Matrix invRot = MatrixInvert(rotationMatrix);
     Vector3 scaledLocalPos = Vector3Transform(rotatedLocalPos, invRot);
     comp->position = {
