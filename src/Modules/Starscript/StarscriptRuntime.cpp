@@ -63,6 +63,8 @@ void Instance::Step() {
 
 Value Instance::Coerce(const SType& target, Value value) const {
     if (target.kind == Kind::Float && value.kind == Kind::Int) return Value::Float((double)value.i);
+    if (target.kind == Kind::Rotator && value.kind == Kind::Vec3) return Value::Rotator(value.x, value.y, value.z);
+    if (target.kind == Kind::Vec3 && value.kind == Kind::Rotator) return Value::Vec3(value.x, value.y, value.z);
     if (target.kind == Kind::Array && target.elem == Kind::Float && value.arr) {
         for (Value& e : *value.arr) if (e.kind == Kind::Int) e = Value::Float((double)e.i);
     }
@@ -729,7 +731,7 @@ Value Instance::BinaryOp(Tok op, const Value& l, const Value& r) {
         if (isNum(l) && isNum(r)) eq = l.AsNumber() == r.AsNumber();
         else if (l.kind == Kind::Bool) eq = l.b == r.b;
         else if (l.kind == Kind::String) eq = l.s == r.s;
-        else if (l.kind == Kind::Vec3) eq = l.x == r.x && l.y == r.y && l.z == r.z;
+        else if (l.kind == Kind::Vec3 || l.kind == Kind::Rotator) eq = l.x == r.x && l.y == r.y && l.z == r.z;
         else if (l.kind == Kind::Actor || l.kind == Kind::Component || l.kind == Kind::Element) eq = l.objectId == r.objectId;
         return Value::Bool(op == Tok::Eq ? eq : !eq);
     }
@@ -748,23 +750,29 @@ Value Instance::BinaryOp(Tok op, const Value& l, const Value& r) {
 
     if (l.kind == Kind::String && op == Tok::Plus) return Value::String(l.s + r.s);
 
-    if (l.kind == Kind::Vec3 || r.kind == Kind::Vec3) {
-        if (l.kind == Kind::Vec3 && r.kind == Kind::Vec3) {
+    auto isVec = [](const Value& v) { return v.kind == Kind::Vec3 || v.kind == Kind::Rotator; };
+    if (isVec(l) || isVec(r)) {
+        auto make = [](Kind kind, float x, float y, float z) {
+            return kind == Kind::Rotator ? Value::Rotator(x, y, z) : Value::Vec3(x, y, z);
+        };
+        if (isVec(l) && isVec(r)) {
             switch (op) {
-                case Tok::Plus: return Value::Vec3(l.x + r.x, l.y + r.y, l.z + r.z);
-                case Tok::Minus: return Value::Vec3(l.x - r.x, l.y - r.y, l.z - r.z);
-                case Tok::Star: return Value::Vec3(l.x * r.x, l.y * r.y, l.z * r.z);
+                case Tok::Plus: return make(l.kind, l.x + r.x, l.y + r.y, l.z + r.z);
+                case Tok::Minus: return make(l.kind, l.x - r.x, l.y - r.y, l.z - r.z);
+                case Tok::Star:
+                    if (l.kind == Kind::Vec3) return Value::Vec3(l.x * r.x, l.y * r.y, l.z * r.z);
+                    break;
                 default: break;
             }
-        } else if (l.kind == Kind::Vec3) {
+        } else if (isVec(l)) {
             float s = (float)r.AsNumber();
-            if (op == Tok::Star) return Value::Vec3(l.x * s, l.y * s, l.z * s);
-            if (op == Tok::Slash) return Value::Vec3(l.x / s, l.y / s, l.z / s);
+            if (op == Tok::Star) return make(l.kind, l.x * s, l.y * s, l.z * s);
+            if (op == Tok::Slash) return make(l.kind, l.x / s, l.y / s, l.z / s);
         } else if (op == Tok::Star) {
             float s = (float)l.AsNumber();
-            return Value::Vec3(r.x * s, r.y * s, r.z * s);
+            return make(r.kind, r.x * s, r.y * s, r.z * s);
         }
-        throw ScriptError{ "Unsupported Vec3 operation" };
+        throw ScriptError{ "Unsupported " + std::string(l.kind == Kind::Rotator || r.kind == Kind::Rotator ? "Rotator" : "Vec3") + " operation" };
     }
 
     if (l.kind == Kind::Int && r.kind == Kind::Int) {
@@ -820,6 +828,7 @@ Value Instance::Eval(const Expr& e, Frame& frame) {
             if (e.op == Tok::KwNot) return Value::Bool(!v.b);
             if (v.kind == Kind::Int) return Value::Int(-v.i);
             if (v.kind == Kind::Float) return Value::Float(-v.f);
+            if (v.kind == Kind::Rotator) return Value::Rotator(-v.x, -v.y, -v.z);
             return Value::Vec3(-v.x, -v.y, -v.z);
         }
         case ExprKind::Binary: {
@@ -884,6 +893,10 @@ Value Instance::EvalCall(const Expr& e, Frame& frame) {
         case Resolution::Vec3Constructor: {
             for (const ExprPtr& a : e.args) args.push_back(Eval(*a, frame));
             return Value::Vec3((float)args[0].AsNumber(), (float)args[1].AsNumber(), (float)args[2].AsNumber());
+        }
+        case Resolution::RotatorConstructor: {
+            for (const ExprPtr& a : e.args) args.push_back(Eval(*a, frame));
+            return Value::Rotator((float)args[0].AsNumber(), (float)args[1].AsNumber(), (float)args[2].AsNumber());
         }
         case Resolution::UserFunction: {
             for (const ExprPtr& a : e.args) args.push_back(Eval(*a, frame));

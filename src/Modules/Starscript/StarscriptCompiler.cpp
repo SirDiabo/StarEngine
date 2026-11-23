@@ -28,8 +28,8 @@ SType EventTypeToScript(const ComponentEventParam& param) {
         case EventValueType::Bool: return MakeType(Kind::Bool);
         case EventValueType::Int: return MakeType(Kind::Int);
         case EventValueType::Float: return MakeType(Kind::Float);
-        case EventValueType::Vec3:
-        case EventValueType::Rotator: return MakeType(Kind::Vec3);
+        case EventValueType::Vec3: return MakeType(Kind::Vec3);
+        case EventValueType::Rotator: return MakeType(Kind::Rotator);
         case EventValueType::Object:
             if (param.objectKind.empty() || param.objectKind == "Actor") return MakeObjectType(Kind::Actor, "Actor");
             return MakeObjectType(Kind::Component, param.objectKind);
@@ -515,6 +515,8 @@ private:
             Error(s.line, s.column, "Cannot store " + result.ToString() + " in " + targetType.ToString());
     }
 
+    static bool IsVecLike(Kind k) { return k == Kind::Vec3 || k == Kind::Rotator; }
+
     SType BinaryType(Tok op, const SType& l, const SType& r, int line, int col) {
         auto bad = [&]() {
             Error(line, col, "Operator is not defined for " + l.ToString() + " and " + r.ToString());
@@ -524,21 +526,21 @@ private:
             case Tok::Plus:
                 if (l.IsNumeric() && r.IsNumeric()) return (l.kind == Kind::Int && r.kind == Kind::Int) ? MakeType(Kind::Int) : MakeType(Kind::Float);
                 if (l.kind == Kind::String && r.kind == Kind::String) return MakeType(Kind::String);
-                if (l.kind == Kind::Vec3 && r.kind == Kind::Vec3) return MakeType(Kind::Vec3);
+                if (IsVecLike(l.kind) && IsVecLike(r.kind)) return MakeType(l.kind);
                 return bad();
             case Tok::Minus:
                 if (l.IsNumeric() && r.IsNumeric()) return (l.kind == Kind::Int && r.kind == Kind::Int) ? MakeType(Kind::Int) : MakeType(Kind::Float);
-                if (l.kind == Kind::Vec3 && r.kind == Kind::Vec3) return MakeType(Kind::Vec3);
+                if (IsVecLike(l.kind) && IsVecLike(r.kind)) return MakeType(l.kind);
                 return bad();
             case Tok::Star:
                 if (l.IsNumeric() && r.IsNumeric()) return (l.kind == Kind::Int && r.kind == Kind::Int) ? MakeType(Kind::Int) : MakeType(Kind::Float);
-                if (l.kind == Kind::Vec3 && r.IsNumeric()) return MakeType(Kind::Vec3);
-                if (l.IsNumeric() && r.kind == Kind::Vec3) return MakeType(Kind::Vec3);
-                if (l.kind == Kind::Vec3 && r.kind == Kind::Vec3) return MakeType(Kind::Vec3);
+                if (IsVecLike(l.kind) && r.IsNumeric()) return MakeType(l.kind);
+                if (l.IsNumeric() && IsVecLike(r.kind)) return MakeType(r.kind);
+                if (l.kind == Kind::Vec3 && IsVecLike(r.kind)) return MakeType(Kind::Vec3);
                 return bad();
             case Tok::Slash:
                 if (l.IsNumeric() && r.IsNumeric()) return (l.kind == Kind::Int && r.kind == Kind::Int) ? MakeType(Kind::Int) : MakeType(Kind::Float);
-                if (l.kind == Kind::Vec3 && r.IsNumeric()) return MakeType(Kind::Vec3);
+                if (IsVecLike(l.kind) && r.IsNumeric()) return MakeType(l.kind);
                 return bad();
             case Tok::Percent:
                 if (l.kind == Kind::Int && r.kind == Kind::Int) return MakeType(Kind::Int);
@@ -550,6 +552,7 @@ private:
             case Tok::Eq: case Tok::Ne:
                 if (l.IsNumeric() && r.IsNumeric()) return MakeType(Kind::Bool);
                 if (l.kind == r.kind && l.kind != Kind::Array) return MakeType(Kind::Bool);
+                if (IsVecLike(l.kind) && IsVecLike(r.kind)) return MakeType(Kind::Bool);
                 return bad();
             case Tok::KwAnd: case Tok::KwOr:
                 if (l.kind == Kind::Bool && r.kind == Kind::Bool) return MakeType(Kind::Bool);
@@ -581,7 +584,7 @@ private:
                     if (t.kind != Kind::Bool) { Error(e.line, e.column, "'not' needs a bool"); return MakeType(Kind::Void); }
                     return t;
                 }
-                if (!t.IsNumeric() && t.kind != Kind::Vec3) { Error(e.line, e.column, "Cannot negate " + t.ToString()); return MakeType(Kind::Void); }
+                if (!t.IsNumeric() && !IsVecLike(t.kind)) { Error(e.line, e.column, "Cannot negate " + t.ToString()); return MakeType(Kind::Void); }
                 return t;
             }
             case ExprKind::Binary: {
@@ -671,6 +674,14 @@ private:
             e.slot = e.name[0] - 'x';
             return MakeType(Kind::Float);
         }
+        if (base.kind == Kind::Rotator) {
+            int slot = e.name == "pitch" ? 0 : e.name == "yaw" ? 1 : e.name == "roll" ? 2 : e.name == "x" ? 0 : e.name == "y" ? 1 : e.name == "z" ? 2 : -1;
+            if (slot >= 0) {
+                e.resolution = Resolution::VecField;
+                e.slot = slot;
+                return MakeType(Kind::Float);
+            }
+        }
         if (const PropertyDef* prop = FindProperty(base.kind, e.name, base.objectKind)) {
             e.resolution = Resolution::Property;
             e.property = prop;
@@ -707,6 +718,16 @@ private:
                     if (t.kind != Kind::Void && !t.IsNumeric()) Error(a->line, a->column, "Vec3() arguments must be numbers");
                 }
                 return MakeType(Kind::Vec3);
+            }
+
+            if (name == "Rotator") {
+                e.resolution = Resolution::RotatorConstructor;
+                if (e.args.size() != 3) Error(e.line, e.column, "Rotator() takes 3 numbers (pitch, yaw, roll)");
+                for (ExprPtr& a : e.args) {
+                    SType t = CheckExpr(*a, nullptr);
+                    if (t.kind != Kind::Void && !t.IsNumeric()) Error(a->line, a->column, "Rotator() arguments must be numbers");
+                }
+                return MakeType(Kind::Rotator);
             }
 
             auto fit = program.funcIndex.find(name);

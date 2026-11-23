@@ -14,6 +14,7 @@ std::string SType::ToString() const {
         case Kind::Float: return "float";
         case Kind::String: return "string";
         case Kind::Vec3: return "Vec3";
+        case Kind::Rotator: return "Rotator";
         case Kind::Actor: return objectKind.empty() ? "Actor" : objectKind;
         case Kind::Component: return objectKind.empty() ? "Component" : objectKind;
         case Kind::Element: return objectKind.empty() || objectKind == "WidgetElement" ? "Element" : objectKind;
@@ -58,6 +59,7 @@ static bool ParseElemKind(const std::string& name, Kind& out) {
     if (name == "float") { out = Kind::Float; return true; }
     if (name == "string") { out = Kind::String; return true; }
     if (name == "Vec3") { out = Kind::Vec3; return true; }
+    if (name == "Rotator") { out = Kind::Rotator; return true; }
     if (name == "Actor") { out = Kind::Actor; return true; }
     return false;
 }
@@ -78,6 +80,7 @@ bool ParseTypeName(const std::string& name, SType& out) {
 bool IsAssignable(const SType& to, const SType& from) {
     if (to.kind == Kind::Any) return from.kind != Kind::Void;
     if (to.kind == Kind::Float && from.kind == Kind::Int) return true;
+    if ((to.kind == Kind::Vec3 && from.kind == Kind::Rotator) || (to.kind == Kind::Rotator && from.kind == Kind::Vec3)) return true;
     if (to.kind != from.kind) return false;
     if (to.kind == Kind::Array) return to.elem == from.elem || to.elem == Kind::Void || from.elem == Kind::Void;
     if (to.kind == Kind::Actor || to.kind == Kind::Component || to.kind == Kind::Element) {
@@ -93,6 +96,7 @@ Value Value::Int(long long v) { Value r; r.kind = Kind::Int; r.i = v; return r; 
 Value Value::Float(double v) { Value r; r.kind = Kind::Float; r.f = v; return r; }
 Value Value::String(std::string v) { Value r; r.kind = Kind::String; r.s = std::move(v); return r; }
 Value Value::Vec3(float x, float y, float z) { Value r; r.kind = Kind::Vec3; r.x = x; r.y = y; r.z = z; return r; }
+Value Value::Rotator(float pitch, float yaw, float roll) { Value r; r.kind = Kind::Rotator; r.x = pitch; r.y = yaw; r.z = roll; return r; }
 Value Value::Object(Kind kind, unsigned id) { Value r; r.kind = kind; r.objectId = id; return r; }
 Value Value::Array() { Value r; r.kind = Kind::Array; r.arr = std::make_shared<std::vector<Value>>(); return r; }
 
@@ -103,6 +107,7 @@ Value Value::Default(const SType& type) {
         case Kind::Float: return Float(0.0);
         case Kind::String: return String("");
         case Kind::Vec3: return Vec3(0, 0, 0);
+        case Kind::Rotator: return Rotator(0, 0, 0);
         case Kind::Actor:
         case Kind::Element:
         case Kind::Component: return Object(type.kind, 0);
@@ -136,6 +141,7 @@ std::string ToDisplayString(const Value& v) {
         case Kind::Float: return FormatNumber(v.f);
         case Kind::String: return v.s;
         case Kind::Vec3: return "Vec3(" + FormatNumber(v.x) + ", " + FormatNumber(v.y) + ", " + FormatNumber(v.z) + ")";
+        case Kind::Rotator: return "Rotator(" + FormatNumber(v.x) + ", " + FormatNumber(v.y) + ", " + FormatNumber(v.z) + ")";
         case Kind::Actor: return v.objectId ? "Actor#" + std::to_string(v.objectId) : "null";
         case Kind::Component: return v.objectId ? "Component#" + std::to_string(v.objectId) : "null";
         case Kind::Element: return v.objectId ? "Element#" + std::to_string(v.objectId) : "null";
@@ -160,7 +166,8 @@ std::string Serialize(const Value& v) {
         case Kind::Int: return std::to_string(v.i);
         case Kind::Float: return FormatNumber(v.f);
         case Kind::String: return v.s;
-        case Kind::Vec3: return FormatNumber(v.x) + "," + FormatNumber(v.y) + "," + FormatNumber(v.z);
+        case Kind::Vec3:
+        case Kind::Rotator: return FormatNumber(v.x) + "," + FormatNumber(v.y) + "," + FormatNumber(v.z);
         case Kind::Actor:
         case Kind::Element:
         case Kind::Component: return v.objectId ? std::to_string(v.objectId) : std::string();
@@ -178,6 +185,11 @@ Value Deserialize(const SType& type, const std::string& text) {
             float x = 0, y = 0, z = 0;
             sscanf(text.c_str(), "%f,%f,%f", &x, &y, &z);
             return Value::Vec3(x, y, z);
+        }
+        case Kind::Rotator: {
+            float x = 0, y = 0, z = 0;
+            sscanf(text.c_str(), "%f,%f,%f", &x, &y, &z);
+            return Value::Rotator(x, y, z);
         }
         case Kind::Actor:
         case Kind::Element:

@@ -30,7 +30,7 @@ bool IsKeyword(const std::string& w) {
 }
 
 bool IsTypeName(const std::string& w) {
-    static const std::unordered_set<std::string> set = { "bool", "int", "float", "string", "Vec3", "Actor", "Array", "Component", "Hit" };
+    static const std::unordered_set<std::string> set = { "bool", "int", "float", "string", "Vec3", "Rotator", "Actor", "Array", "Component", "Hit" };
     return set.count(w) > 0;
 }
 

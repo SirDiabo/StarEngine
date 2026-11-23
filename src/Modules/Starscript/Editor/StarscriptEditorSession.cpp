@@ -302,7 +302,7 @@ void StarscriptEditorSession::AppendBlock(const std::string& text, int selectOff
 
 TokenClass StarscriptEditorSession::Classify(const std::string& name, bool afterDot, bool callFollows) const {
     if (afterDot) return callFollows ? TokenClass::Function : TokenClass::Variable;
-    if (FindBuiltin(name) || name == "Vec3" || name == "range") return TokenClass::Builtin;
+    if (FindBuiltin(name) || name == "Vec3" || name == "Rotator" || name == "range") return TokenClass::Builtin;
     for (const ComponentDecl& c : components) if (c.name == name) return TokenClass::Component;
     if (widgetMode) for (const WidgetElementInfo& el : elements) if (el.id == name) return TokenClass::Component;
     if (program) {
@@ -384,6 +384,14 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
             add("y", "y", "float", CompletionKind::Property);
             add("z", "z", "float", CompletionKind::Property);
         }
+        if (known && kind == Kind::Rotator) {
+            add("pitch", "pitch", "float", CompletionKind::Property);
+            add("yaw", "yaw", "float", CompletionKind::Property);
+            add("roll", "roll", "float", CompletionKind::Property);
+            add("x", "x", "float", CompletionKind::Property);
+            add("y", "y", "float", CompletionKind::Property);
+            add("z", "z", "float", CompletionKind::Property);
+        }
 
         if (request.inEventHeader && known && (kind == Kind::Component || kind == Kind::Element)) {
             if (kind == Kind::Component) {
@@ -397,8 +405,8 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
                             case EventValueType::Bool: t = MakeType(Kind::Bool); break;
                             case EventValueType::Int: t = MakeType(Kind::Int); break;
                             case EventValueType::Float: t = MakeType(Kind::Float); break;
-                            case EventValueType::Vec3:
-                            case EventValueType::Rotator: t = MakeType(Kind::Vec3); break;
+                            case EventValueType::Vec3: t = MakeType(Kind::Vec3); break;
+                            case EventValueType::Rotator: t = MakeType(Kind::Rotator); break;
                             case EventValueType::Object: t = d.params[i].objectKind.empty() || d.params[i].objectKind == "Actor" ? MakeObjectType(Kind::Actor, "Actor") : MakeObjectType(Kind::Component, d.params[i].objectKind); break;
                             default: t = MakeType(Kind::String); break;
                         }
@@ -457,7 +465,7 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
         add(k, k, "", CompletionKind::Keyword);
     }
 
-    static const char* types[] = { "bool", "int", "float", "string", "Vec3", "Actor", "Element", "Array[float]", "Array[int]", "Array[string]" };
+    static const char* types[] = { "bool", "int", "float", "string", "Vec3", "Rotator", "Actor", "Element", "Array[float]", "Array[int]", "Array[string]" };
     for (const char* t : types) add(t, t, "type", CompletionKind::Type);
 
     static const char* annotations[] = { "@replicated", "@server_only", "@save(\"|\")", "@reliable" };
@@ -470,6 +478,7 @@ void StarscriptEditorSession::BuildCompletions(const CompletionRequest& request,
 
     add("range", "range(|)", "(int, int?, int?) for loops", CompletionKind::Function);
     add("Vec3", "Vec3(|)", "(float, float, float) -> Vec3", CompletionKind::Function);
+    add("Rotator", "Rotator(|)", "(pitch, yaw, roll) -> Rotator", CompletionKind::Function);
     for (const BuiltinDef& b : AllBuiltins()) {
         if (b.scope == ScopeWidget && !widgetMode) continue;
         if (b.scope == ScopeActor && widgetMode) continue;

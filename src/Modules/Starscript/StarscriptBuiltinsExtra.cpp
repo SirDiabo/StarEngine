@@ -11,6 +11,7 @@
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Core/InputKeyNames.h"
 #include "Core/ObjectKindRegistry.h"
+#include "Core/RotationMath.h"
 #include "Core/SaveFileFormat.h"
 #include "Core/SavePaths.h"
 #include "Core/SaveSlots.h"
@@ -28,6 +29,7 @@ namespace {
 SType T(Kind k) { return MakeType(k); }
 SType CompT() { return MakeObjectType(Kind::Component, "Component"); }
 Value V3(const Vector3& v) { return Value::Vec3(v.x, v.y, v.z); }
+Value R3(const Vector3& v) { return Value::Rotator(v.x, v.y, v.z); }
 Vector3 ToV3(const Value& v) { return { v.x, v.y, v.z }; }
 
 Instance& RequireInstance(Runtime& rt) {
@@ -136,6 +138,39 @@ Value Fn_vec3_interp_to(Runtime&, std::vector<Value>& a) {
                        InterpStep(value.z, target.z, delta, speed, method));
 }
 
+float InterpAngleStep(float value, float target, float delta, float speed, const std::string& method) {
+    float diff = AngleDeltaDegrees(value, target);
+    if (method == "Linear") {
+        float step = fabsf(speed) * delta;
+        if (fabsf(diff) <= step) return value + diff;
+        return value + (diff > 0.0f ? step : -step);
+    }
+    float t = 1.0f - expf(-fabsf(speed) * delta);
+    if (t > 1.0f) t = 1.0f;
+    if (t < 0.0f) t = 0.0f;
+    return value + diff * t;
+}
+
+Value Fn_rotator_interp_to(Runtime&, std::vector<Value>& a) {
+    Vector3 value = ToV3(a[0]), target = ToV3(a[1]);
+    float delta = (float)a[2].AsNumber(), speed = (float)a[3].AsNumber();
+    std::string method = a.size() > 4 ? a[4].s : std::string("Exponential");
+    return Value::Rotator(InterpAngleStep(value.x, target.x, delta, speed, method), InterpAngleStep(value.y, target.y, delta, speed, method),
+                          InterpAngleStep(value.z, target.z, delta, speed, method));
+}
+
+Value Fn_to_rotator(Runtime&, std::vector<Value>& a) { float x = 0, y = 0, z = 0; sscanf(a[0].s.c_str(), "%f,%f,%f", &x, &y, &z); return Value::Rotator(x, y, z); }
+
+Value Fn_make_rot_from_x(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromX(ToV3(a[0]))); }
+Value Fn_make_rot_from_y(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromY(ToV3(a[0]))); }
+Value Fn_make_rot_from_z(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromZ(ToV3(a[0]))); }
+Value Fn_make_rot_from_xy(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromXY(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_make_rot_from_xz(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromXZ(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_make_rot_from_yx(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromYX(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_make_rot_from_yz(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromYZ(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_make_rot_from_zx(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromZX(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_make_rot_from_zy(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromZY(ToV3(a[0]), ToV3(a[1]))); }
+
 Value Fn_fmod(Runtime&, std::vector<Value>& a) { double b = a[1].AsNumber(); return Value::Float(b != 0.0 ? std::fmod(a[0].AsNumber(), b) : 0.0); }
 Value Fn_truncate(Runtime&, std::vector<Value>& a) { return Value::Int((long long)std::trunc(a[0].AsNumber())); }
 Value Fn_random_bool(Runtime&, std::vector<Value>&) { return Value::Bool((rand() & 1) != 0); }
@@ -173,7 +208,7 @@ Value P_comp_world_rotation(Runtime&, const Value& s) {
     Actor* owner = c->GetOwningActor();
     Vector3 p{ 0, 0, 0 }, r{ 0, 0, 0 }, sc{ 1, 1, 1 };
     if (owner) owner->GetComponentWorldTransform(c, p, r, sc);
-    return V3(r);
+    return R3(r);
 }
 void P_comp_set_world_rotation(Runtime&, const Value& s, const Value& v) {
     Component* c = RequireComp(s, "world_rotation");
@@ -425,6 +460,17 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "change_directory", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_change_directory },
         { "interp_to", { T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::String) }, 4, T(Kind::Float), RetRule::Fixed, false, Fn_interp_to },
         { "vec3_interp_to", { T(Kind::Vec3), T(Kind::Vec3), T(Kind::Float), T(Kind::Float), T(Kind::String) }, 4, T(Kind::Vec3), RetRule::Fixed, false, Fn_vec3_interp_to },
+        { "rotator_interp_to", { T(Kind::Rotator), T(Kind::Rotator), T(Kind::Float), T(Kind::Float), T(Kind::String) }, 4, T(Kind::Rotator), RetRule::Fixed, false, Fn_rotator_interp_to },
+        { "to_rotator", { T(Kind::String) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_to_rotator },
+        { "make_rot_from_x", { T(Kind::Vec3) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_x },
+        { "make_rot_from_xy", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_xy },
+        { "make_rot_from_xz", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_xz },
+        { "make_rot_from_y", { T(Kind::Vec3) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_y },
+        { "make_rot_from_yx", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_yx },
+        { "make_rot_from_yz", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_yz },
+        { "make_rot_from_z", { T(Kind::Vec3) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_z },
+        { "make_rot_from_zx", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_zx },
+        { "make_rot_from_zy", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_zy },
         { "fmod", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_fmod },
         { "truncate", { T(Kind::Float) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_truncate },
         { "random_bool", {}, 0, T(Kind::Bool), RetRule::Fixed, false, Fn_random_bool },
@@ -510,7 +556,7 @@ const std::vector<PropertyDef>& ExtraProperties() {
     static const std::vector<PropertyDef> table = {
         { Kind::Actor, "class_name", T(Kind::String), P_actor_class_name, nullptr },
         { Kind::Component, "world_position", T(Kind::Vec3), P_comp_world_position, P_comp_set_world_position },
-        { Kind::Component, "world_rotation", T(Kind::Vec3), P_comp_world_rotation, P_comp_set_world_rotation },
+        { Kind::Component, "world_rotation", T(Kind::Rotator), P_comp_world_rotation, P_comp_set_world_rotation },
         { Kind::Component, "world_scale", T(Kind::Vec3), P_comp_world_scale, P_comp_set_world_scale },
     };
     return table;

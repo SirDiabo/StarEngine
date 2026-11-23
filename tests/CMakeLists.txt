@@ -117,6 +117,9 @@ star_add_test(test_trust_cache
 star_add_test(test_culling
     LIBRARIES raylib)
 
+star_add_test(test_rotation_math
+    LIBRARIES raylib)
+
 star_add_test(test_engine_root
     SOURCES
         "${STAR_SRC}/Core/EngineRoot.cpp"

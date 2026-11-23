@@ -54,6 +54,7 @@ SType T(Kind k) { return MakeType(k); }
 SType ActorT() { return MakeObjectType(Kind::Actor, "Actor"); }
 
 Value V3(const Vector3& v) { return Value::Vec3(v.x, v.y, v.z); }
+Value R3(const Vector3& v) { return Value::Rotator(v.x, v.y, v.z); }
 Vector3 ToV3(const Value& v) { return { v.x, v.y, v.z }; }
 
 std::mt19937& Rng() {
@@ -182,7 +183,8 @@ Value Fn_pi(Runtime&, std::vector<Value>&) { return Value::Float(3.1415926535897
 Value Fn_tau(Runtime&, std::vector<Value>&) { return Value::Float(6.28318530717958647692); }
 Value Fn_wrap_angle(Runtime&, std::vector<Value>& a) { return Value::Float(WrapAngleDegrees((float)a[0].AsNumber())); }
 Value Fn_angle_delta(Runtime&, std::vector<Value>& a) { return Value::Float(AngleDeltaDegrees((float)a[0].AsNumber(), (float)a[1].AsNumber())); }
-Value Fn_look_at_rotation(Runtime&, std::vector<Value>& a) { return V3(LookAtRotationDegrees(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_look_at_rotation(Runtime&, std::vector<Value>& a) { return R3(LookAtRotationDegrees(ToV3(a[0]), ToV3(a[1]))); }
+Value Fn_wrap_rotator(Runtime&, std::vector<Value>& a) { return R3(WrapRotationDegrees(ToV3(a[0]))); }
 Value Fn_lerp(Runtime&, std::vector<Value>& a) { return Value::Float(a[0].AsNumber() + (a[1].AsNumber() - a[0].AsNumber()) * a[2].AsNumber()); }
 
 Value Fn_random(Runtime&, std::vector<Value>&) {
@@ -628,7 +630,7 @@ Value M_arr_contains(Runtime&, Value& s, std::vector<Value>& a) {
         if (e.kind == Kind::Int || e.kind == Kind::Float) same = (a[0].kind == Kind::Int || a[0].kind == Kind::Float) && e.AsNumber() == a[0].AsNumber();
         else if (e.kind == Kind::Bool) same = e.b == a[0].b;
         else if (e.kind == Kind::String) same = e.s == a[0].s;
-        else if (e.kind == Kind::Vec3) same = e.x == a[0].x && e.y == a[0].y && e.z == a[0].z;
+        else if (e.kind == Kind::Vec3 || e.kind == Kind::Rotator) same = e.x == a[0].x && e.y == a[0].y && e.z == a[0].z;
         else if (e.kind == Kind::Actor || e.kind == Kind::Component) same = e.objectId == a[0].objectId;
         if (same) return Value::Bool(true);
     }
@@ -637,7 +639,7 @@ Value M_arr_contains(Runtime&, Value& s, std::vector<Value>& a) {
 
 Value P_actor_get_position(Runtime&, const Value& s) { return V3(RequireActor(s, "position")->position); }
 void P_actor_set_position(Runtime&, const Value& s, const Value& v) { RequireActor(s, "position")->position = ToV3(v); }
-Value P_actor_get_rotation(Runtime&, const Value& s) { return V3(RequireActor(s, "rotation")->rotation); }
+Value P_actor_get_rotation(Runtime&, const Value& s) { return R3(RequireActor(s, "rotation")->rotation); }
 void P_actor_set_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "rotation")->rotation = ToV3(v); }
 Value P_actor_get_scale(Runtime&, const Value& s) { return V3(RequireActor(s, "scale")->scale); }
 void P_actor_set_scale(Runtime&, const Value& s, const Value& v) { RequireActor(s, "scale")->scale = ToV3(v); }
@@ -657,7 +659,7 @@ Value P_actor_get_up(Runtime&, const Value& s) {
 
 Value P_actor_get_show_cursor(Runtime&, const Value& s) { return Value::Bool(RequireActor(s, "show_mouse_cursor")->showMouseCursor); }
 void P_actor_set_show_cursor(Runtime&, const Value& s, const Value& v) { RequireActor(s, "show_mouse_cursor")->showMouseCursor = v.b; }
-Value P_actor_get_control_rotation(Runtime&, const Value& s) { return V3(RequireActor(s, "control_rotation")->controlRotation); }
+Value P_actor_get_control_rotation(Runtime&, const Value& s) { return R3(RequireActor(s, "control_rotation")->controlRotation); }
 void P_actor_set_control_rotation(Runtime&, const Value& s, const Value& v) { RequireActor(s, "control_rotation")->SetControlRotation(ToV3(v)); }
 Value P_actor_get_movement_speed(Runtime&, const Value& s) { return Value::Float(RequireActor(s, "movement_speed")->MovementSpeed); }
 void P_actor_set_movement_speed(Runtime&, const Value& s, const Value& v) { RequireActor(s, "movement_speed")->MovementSpeed = (float)v.AsNumber(); }
@@ -686,7 +688,10 @@ Value P_hit_is_trigger(Runtime&, const Value& s) { return HitField(s, 5); }
 
 Value P_comp_get_position(Runtime&, const Value& s) { return V3(RequireComponent(s, "position")->position); }
 void P_comp_set_position(Runtime&, const Value& s, const Value& v) { RequireComponent(s, "position")->position = ToV3(v); }
-Value P_comp_get_rotation(Runtime&, const Value& s) { return V3(RequireComponent(s, "rotation")->rotation); }
+Value P_comp_get_rotation(Runtime&, const Value& s) { return R3(RequireComponent(s, "rotation")->rotation); }
+Value P_rot_get_forward(Runtime&, const Value& s) { return V3(RotationForwardVector(ToV3(s))); }
+Value P_rot_get_right(Runtime&, const Value& s) { return V3(RotationRightVector(ToV3(s))); }
+Value P_rot_get_up(Runtime&, const Value& s) { return V3(RotationUpVector(ToV3(s))); }
 void P_comp_set_rotation(Runtime&, const Value& s, const Value& v) { RequireComponent(s, "rotation")->rotation = ToV3(v); }
 Value P_comp_get_scale(Runtime&, const Value& s) { return V3(RequireComponent(s, "scale")->scale); }
 void P_comp_set_scale(Runtime&, const Value& s, const Value& v) { RequireComponent(s, "scale")->scale = ToV3(v); }
@@ -728,7 +733,8 @@ const std::vector<BuiltinDef>& Builtins() {
         { "tau", {}, 0, T(Kind::Float), RetRule::Fixed, false, Fn_tau },
         { "wrap_angle", { T(Kind::Float) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_wrap_angle },
         { "angle_delta", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_angle_delta },
-        { "look_at_rotation", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Vec3), RetRule::Fixed, false, Fn_look_at_rotation },
+        { "look_at_rotation", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_look_at_rotation },
+        { "wrap_rotator", { T(Kind::Rotator) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_wrap_rotator },
         { "random", {}, 0, T(Kind::Float), RetRule::Fixed, false, Fn_random },
         { "random_range", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_random_range },
         { "random_int", { T(Kind::Int), T(Kind::Int) }, 2, T(Kind::Int), RetRule::Fixed, false, Fn_random_int },
@@ -736,7 +742,7 @@ const std::vector<BuiltinDef>& Builtins() {
         { "dot", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_dot },
         { "cross", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Vec3), RetRule::Fixed, false, Fn_cross },
         { "distance", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_distance },
-        { "spawn_actor", { T(Kind::String), T(Kind::Vec3), T(Kind::Vec3) }, 1, ActorT(), RetRule::Fixed, false, Fn_spawn_actor },
+        { "spawn_actor", { T(Kind::String), T(Kind::Vec3), T(Kind::Rotator) }, 1, ActorT(), RetRule::Fixed, false, Fn_spawn_actor },
         { "destroy_actor", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_destroy_actor },
         { "send_event", { ActorT(), T(Kind::String), T(Kind::Any) }, 2, T(Kind::Void), RetRule::Fixed, true, Fn_send_event },
         { "delay", { T(Kind::Float) }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_async_misuse, 1 },
@@ -837,14 +843,14 @@ const std::vector<MethodDef>& Methods() {
 const std::vector<PropertyDef>& Properties() {
     static const std::vector<PropertyDef> table = {
         { Kind::Actor, "position", T(Kind::Vec3), P_actor_get_position, P_actor_set_position },
-        { Kind::Actor, "rotation", T(Kind::Vec3), P_actor_get_rotation, P_actor_set_rotation },
+        { Kind::Actor, "rotation", T(Kind::Rotator), P_actor_get_rotation, P_actor_set_rotation },
         { Kind::Actor, "scale", T(Kind::Vec3), P_actor_get_scale, P_actor_set_scale },
         { Kind::Actor, "name", T(Kind::String), P_actor_get_name, nullptr },
         { Kind::Actor, "forward", T(Kind::Vec3), P_actor_get_forward, nullptr },
         { Kind::Actor, "right", T(Kind::Vec3), P_actor_get_right, nullptr },
         { Kind::Actor, "up", T(Kind::Vec3), P_actor_get_up, nullptr },
         { Kind::Actor, "show_mouse_cursor", T(Kind::Bool), P_actor_get_show_cursor, P_actor_set_show_cursor },
-        { Kind::Actor, "control_rotation", T(Kind::Vec3), P_actor_get_control_rotation, P_actor_set_control_rotation },
+        { Kind::Actor, "control_rotation", T(Kind::Rotator), P_actor_get_control_rotation, P_actor_set_control_rotation },
         { Kind::Actor, "movement_speed", T(Kind::Float), P_actor_get_movement_speed, P_actor_set_movement_speed },
         { Kind::Actor, "acceleration", T(Kind::Float), P_actor_get_acceleration, P_actor_set_acceleration },
         { Kind::Actor, "braking_deceleration", T(Kind::Float), P_actor_get_braking, P_actor_set_braking },
@@ -854,12 +860,15 @@ const std::vector<PropertyDef>& Properties() {
         { Kind::Component, "ground_normal", T(Kind::Vec3), P_phys_get_ground_normal, nullptr, "PhysicsComponent" },
         { Kind::Hit, "did_hit", T(Kind::Bool), P_hit_did_hit, nullptr },
         { Kind::Hit, "actor", ActorT(), P_hit_actor, nullptr },
+        { Kind::Rotator, "forward", T(Kind::Vec3), P_rot_get_forward, nullptr },
+        { Kind::Rotator, "right", T(Kind::Vec3), P_rot_get_right, nullptr },
+        { Kind::Rotator, "up", T(Kind::Vec3), P_rot_get_up, nullptr },
         { Kind::Hit, "location", T(Kind::Vec3), P_hit_location, nullptr },
         { Kind::Hit, "normal", T(Kind::Vec3), P_hit_normal, nullptr },
         { Kind::Hit, "distance", T(Kind::Float), P_hit_distance, nullptr },
         { Kind::Hit, "is_trigger", T(Kind::Bool), P_hit_is_trigger, nullptr },
         { Kind::Component, "position", T(Kind::Vec3), P_comp_get_position, P_comp_set_position },
-        { Kind::Component, "rotation", T(Kind::Vec3), P_comp_get_rotation, P_comp_set_rotation },
+        { Kind::Component, "rotation", T(Kind::Rotator), P_comp_get_rotation, P_comp_set_rotation },
         { Kind::Component, "scale", T(Kind::Vec3), P_comp_get_scale, P_comp_set_scale },
         { Kind::Component, "name", T(Kind::String), P_comp_get_name, nullptr },
     };

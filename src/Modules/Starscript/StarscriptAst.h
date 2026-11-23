@@ -27,7 +27,7 @@ struct TypeRef {
 enum class ExprKind { Literal, Ident, SelfRef, Unary, Binary, Call, Member, Index, ArrayLit, Interpolation };
 
 enum class Resolution {
-    None, Local, Global, Component, UserFunction, EventCall, Builtin, Vec3Constructor,
+    None, Local, Global, Component, UserFunction, EventCall, Builtin, Vec3Constructor, RotatorConstructor,
     Method, Property, VecField, ArrayIndex, StringIndex, ComponentField, Element, ElementField
 };
 

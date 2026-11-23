@@ -5,7 +5,7 @@
 
 namespace Starscript {
 
-enum class Kind { Void, Bool, Int, Float, String, Vec3, Actor, Component, Array, Hit, Element, Any };
+enum class Kind { Void, Bool, Int, Float, String, Vec3, Rotator, Actor, Component, Array, Hit, Element, Any };
 
 struct SType {
     Kind kind = Kind::Void;
@@ -44,6 +44,7 @@ struct Value {
     static Value Float(double v);
     static Value String(std::string v);
     static Value Vec3(float x, float y, float z);
+    static Value Rotator(float pitch, float yaw, float roll);
     static Value Object(Kind kind, unsigned id);
     static Value Array();
     static Value Default(const SType& type);
