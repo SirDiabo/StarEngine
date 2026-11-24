@@ -1,4 +1,5 @@
 #include "StargraphEditorPanel.h"
+#include "Modules/Stargraph/NodeRegistry.h"
 #include "Core/InputKeyNames.h"
 #include "Core/InputMappingRegistry.h"
 #include "Core/NamedListRegistry.h"
@@ -367,9 +368,10 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     }
 
     Pin* targetPin = nullptr;
+    Node* ownerNode = nullptr;
     for (Node& node : const_cast<std::deque<Node>&>(ActiveGraph().GetNodes())) {
         for (Pin& pin : node.inputs) {
-            if (pin.id == keyPickerPinId) { targetPin = &pin; break; }
+            if (pin.id == keyPickerPinId) { targetPin = &pin; ownerNode = &node; break; }
         }
         if (targetPin) break;
     }
@@ -385,6 +387,11 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
         case PinPickerKind::FunctionName:  allKeys = GetParameterlessCustomEventNames(graph); break;
         case PinPickerKind::ComponentRef:  allKeys = GetInputComponentNames(graph); break;
         case PinPickerKind::MappingName:   allKeys = GetProjectInputMappingNames(); break;
+        case PinPickerKind::NodeMode: {
+            const NodeTemplate* modeTemplate = ownerNode ? NodeRegistry::Get().GetTemplate(ownerNode->type) : nullptr;
+            if (modeTemplate) allKeys = modeTemplate->modeOptions;
+            break;
+        }
         default:                           allKeys = GetInputKeyNames(); break;
     }
 
@@ -407,6 +414,10 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     std::string picked = searchableKeyPicker.Render(entries, graphArea);
     if (!picked.empty()) {
         targetPin->defaultValue = picked;
+        if (keyPickerKind == PinPickerKind::NodeMode && ownerNode) {
+            ActiveGraph().NormalizeNodePins(*ownerNode);
+            ActiveGraph().RefreshWildcardPins(ownerNode);
+        }
         isDirty = true;
         keyPickerOpen = false;
         keyPickerPinId = 0;

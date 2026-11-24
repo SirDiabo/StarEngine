@@ -12,6 +12,7 @@
 #include "Core/InputKeyNames.h"
 #include "Core/ObjectKindRegistry.h"
 #include "Core/RotationMath.h"
+#include "Core/MapRange.h"
 #include "Core/SaveFileFormat.h"
 #include "Core/SavePaths.h"
 #include "Core/SaveSlots.h"
@@ -170,6 +171,14 @@ Value Fn_make_rot_from_yx(Runtime&, std::vector<Value>& a) { return R3(MakeRotFr
 Value Fn_make_rot_from_yz(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromYZ(ToV3(a[0]), ToV3(a[1]))); }
 Value Fn_make_rot_from_zx(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromZX(ToV3(a[0]), ToV3(a[1]))); }
 Value Fn_make_rot_from_zy(Runtime&, std::vector<Value>& a) { return R3(MakeRotFromZY(ToV3(a[0]), ToV3(a[1]))); }
+
+Value Fn_map_range_unclamped(Runtime&, std::vector<Value>& a) {
+    return Value::Float((double)MapRangeUnclamped((float)a[0].AsNumber(), (float)a[1].AsNumber(), (float)a[2].AsNumber(), (float)a[3].AsNumber(), (float)a[4].AsNumber()));
+}
+
+Value Fn_map_range_clamped(Runtime&, std::vector<Value>& a) {
+    return Value::Float((double)MapRangeClamped((float)a[0].AsNumber(), (float)a[1].AsNumber(), (float)a[2].AsNumber(), (float)a[3].AsNumber(), (float)a[4].AsNumber()));
+}
 
 Value Fn_fmod(Runtime&, std::vector<Value>& a) { double b = a[1].AsNumber(); return Value::Float(b != 0.0 ? std::fmod(a[0].AsNumber(), b) : 0.0); }
 Value Fn_truncate(Runtime&, std::vector<Value>& a) { return Value::Int((long long)std::trunc(a[0].AsNumber())); }
@@ -471,6 +480,8 @@ const std::vector<BuiltinDef>& ExtraBuiltins() {
         { "make_rot_from_z", { T(Kind::Vec3) }, 1, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_z },
         { "make_rot_from_zx", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_zx },
         { "make_rot_from_zy", { T(Kind::Vec3), T(Kind::Vec3) }, 2, T(Kind::Rotator), RetRule::Fixed, false, Fn_make_rot_from_zy },
+        { "map_range_unclamped", { T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::Float) }, 5, T(Kind::Float), RetRule::Fixed, false, Fn_map_range_unclamped },
+        { "map_range_clamped", { T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::Float), T(Kind::Float) }, 5, T(Kind::Float), RetRule::Fixed, false, Fn_map_range_clamped },
         { "fmod", { T(Kind::Float), T(Kind::Float) }, 2, T(Kind::Float), RetRule::Fixed, false, Fn_fmod },
         { "truncate", { T(Kind::Float) }, 1, T(Kind::Int), RetRule::Fixed, false, Fn_truncate },
         { "random_bool", {}, 0, T(Kind::Bool), RetRule::Fixed, false, Fn_random_bool },

@@ -650,17 +650,17 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
         }));
     }
 
-    if (nodeTemplate && !nodeTemplate->dynamicWildcardInputPrefix.empty()) {
+    if (nodeTemplate && HasDynamicWildcardInputs(*nodeTemplate) && (!nodeTemplate->dynamicInputsEnabled || nodeTemplate->dynamicInputsEnabled(*node))) {
         const UIPalette& theme = UITheme::Get();
-        const std::string prefix = nodeTemplate->dynamicWildcardInputPrefix;
         rows.push_back(HeaderRow("n.items.h", "Items"));
         int itemIndex = 0;
         for (const Pin& pin : node->inputs) {
-            if (pin.name.rfind(prefix, 0) != 0) continue;
+            if (!IsDynamicWildcardInputName(*nodeTemplate, pin.name)) continue;
             int pinId = pin.id;
             std::vector<PropertyCell> cells;
             cells.push_back(LabelCell(pin.name, 0.0f));
-            cells.push_back(ButtonCell("X", 22.0f, [this, nodeId, pinId](Rectangle) {
+            bool removable = !(nodeTemplate->dynamicWildcardInputsNumeric && (pin.name == "0" || pin.name == "1"));
+            if (removable) cells.push_back(ButtonCell("X", 22.0f, [this, nodeId, pinId](Rectangle) {
                 Node* n = DetailNode(nodeId);
                 if (n && ActiveGraph().RemoveDynamicWildcardInput(*n, pinId)) {
                     RefreshWildcardPins(n);
@@ -681,6 +681,7 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
     for (const Pin& pin : node->inputs) {
         if (pin.type == PinType::Exec || pin.type == PinType::Array) continue;
         if (pin.name == "Variable_Name" || pin.name == "Component_Name") continue;
+        if (pin.fieldOnly) continue;
         std::string value = pin.defaultValue.c_str();
         bool isInterpNode = node->type == "Float_Interp_To" || node->type == "Int_Interp_To" ||
                              node->type == "Vec3_Interp_To" || node->type == "Rotator_Interp_To";

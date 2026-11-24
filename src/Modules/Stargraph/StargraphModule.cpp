@@ -16,6 +16,7 @@
 #include "Nodes_Flow.h"
 #include "Nodes_Math.h"
 #include "Nodes_Rotator.h"
+#include "Nodes_Select.h"
 #include "Nodes_Actor.h"
 #include "Nodes_Components.h"
 #include "Nodes_Variables.h"
@@ -44,6 +45,7 @@ bool StargraphModule::Initialize() {
     RegisterFlowNodes();
     RegisterMathNodes();
     RegisterRotatorNodes();
+    RegisterSelectNode();
     RegisterArrayNodes();
     RegisterActorNodes();
     RegisterComponentNodes();

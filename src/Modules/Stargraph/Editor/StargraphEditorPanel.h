@@ -203,7 +203,7 @@ private:
     float keyPickerWidth = 0;
     bool keyPickerJustOpened = false;
     SearchableListPopup searchableKeyPicker;
-    enum class PinPickerKind { Key, FunctionName, ComponentRef, MappingName };
+    enum class PinPickerKind { Key, FunctionName, ComponentRef, MappingName, NodeMode };
     PinPickerKind keyPickerKind = PinPickerKind::Key;
 
     static const float minNodeWidth;

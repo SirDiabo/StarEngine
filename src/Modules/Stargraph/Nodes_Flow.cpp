@@ -169,19 +169,19 @@ void RegisterFlowNodes() {
     };
     NodeRegistry::Get().RegisterNode(sequence);
 
-    NodeTemplate selectFromInt;
-    selectFromInt.type = "Select_From_Int";
-    selectFromInt.menuLabel = "Select From Int";
-    selectFromInt.category = "Flow";
-    selectFromInt.moduleName = "Stargraph";
-    selectFromInt.dynamicExecOutputs = true;
-    selectFromInt.dynamicExecFixedPin = "Default";
-    selectFromInt.dynamicExecHeader = "Cases";
-    selectFromInt.dynamicExecAddLabel = "+ Add Case";
-    selectFromInt.dynamicExecPlaceholder = "5 or 1 to 10";
-    selectFromInt.normalizeExecCase = NormalizeIntCase;
-    selectFromInt.execCasePinName = [](const std::string& spec, int) { return spec; };
-    selectFromInt.newExecCaseDefault = [](const std::vector<std::string>& existing) {
+    NodeTemplate switchFromInt;
+    switchFromInt.type = "Switch_From_Int";
+    switchFromInt.menuLabel = "Switch From Int";
+    switchFromInt.category = "Flow";
+    switchFromInt.moduleName = "Stargraph";
+    switchFromInt.dynamicExecOutputs = true;
+    switchFromInt.dynamicExecFixedPin = "Default";
+    switchFromInt.dynamicExecHeader = "Cases";
+    switchFromInt.dynamicExecAddLabel = "+ Add Case";
+    switchFromInt.dynamicExecPlaceholder = "5 or 1 to 10";
+    switchFromInt.normalizeExecCase = NormalizeIntCase;
+    switchFromInt.execCasePinName = [](const std::string& spec, int) { return spec; };
+    switchFromInt.newExecCaseDefault = [](const std::vector<std::string>& existing) {
         int next = 0;
         bool any = false;
         for (const std::string& spec : existing) {
@@ -190,11 +190,11 @@ void RegisterFlowNodes() {
         }
         return std::to_string(next);
     };
-    selectFromInt.createPins = [](Node* node) {
+    switchFromInt.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Value", PinType::Integer, true, false, 0, "0"});
     };
-    selectFromInt.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+    switchFromInt.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         int value = 0;
         for (const Pin& p : node.inputs) if (p.name == "Value") value = p.defaultValue.AsInt();
         for (const std::string& spec : node.execCases) {
@@ -206,31 +206,31 @@ void RegisterFlowNodes() {
         }
         GraphExecutor::RunFromPin(graph, &node, ctx, "Default");
     };
-    NodeRegistry::Get().RegisterNode(selectFromInt);
+    NodeRegistry::Get().RegisterNode(switchFromInt);
 
-    NodeTemplate selectFromString;
-    selectFromString.type = "Select_From_String";
-    selectFromString.menuLabel = "Select From String";
-    selectFromString.category = "Flow";
-    selectFromString.moduleName = "Stargraph";
-    selectFromString.dynamicExecOutputs = true;
-    selectFromString.dynamicExecFixedPin = "Default";
-    selectFromString.dynamicExecHeader = "Cases";
-    selectFromString.dynamicExecAddLabel = "+ Add Case";
-    selectFromString.dynamicExecPlaceholder = "Text to match";
-    selectFromString.normalizeExecCase = [](const std::string& input, std::string& spec) { spec = input; return true; };
-    selectFromString.execCasePinName = [](const std::string& spec, int) { return StringCasePinName(spec); };
-    selectFromString.newExecCaseDefault = [](const std::vector<std::string>& existing) {
+    NodeTemplate switchFromString;
+    switchFromString.type = "Switch_From_String";
+    switchFromString.menuLabel = "Switch From String";
+    switchFromString.category = "Flow";
+    switchFromString.moduleName = "Stargraph";
+    switchFromString.dynamicExecOutputs = true;
+    switchFromString.dynamicExecFixedPin = "Default";
+    switchFromString.dynamicExecHeader = "Cases";
+    switchFromString.dynamicExecAddLabel = "+ Add Case";
+    switchFromString.dynamicExecPlaceholder = "Text to match";
+    switchFromString.normalizeExecCase = [](const std::string& input, std::string& spec) { spec = input; return true; };
+    switchFromString.execCasePinName = [](const std::string& spec, int) { return StringCasePinName(spec); };
+    switchFromString.newExecCaseDefault = [](const std::vector<std::string>& existing) {
         for (int n = (int)existing.size();; n++) {
             std::string candidate = "Case " + std::to_string(n);
             if (std::find(existing.begin(), existing.end(), candidate) == existing.end()) return candidate;
         }
     };
-    selectFromString.createPins = [](Node* node) {
+    switchFromString.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
         node->inputs.push_back({"Value", PinType::String, true, false, 0, ""});
     };
-    selectFromString.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+    switchFromString.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string value;
         for (const Pin& p : node.inputs) if (p.name == "Value") value = p.defaultValue;
         for (const std::string& spec : node.execCases) {
@@ -241,7 +241,7 @@ void RegisterFlowNodes() {
         }
         GraphExecutor::RunFromPin(graph, &node, ctx, "Default");
     };
-    NodeRegistry::Get().RegisterNode(selectFromString);
+    NodeRegistry::Get().RegisterNode(switchFromString);
 
     NodeTemplate doOnce;
     doOnce.type = "Do_Once";

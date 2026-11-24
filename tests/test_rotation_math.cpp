@@ -373,4 +373,35 @@ TEST(rotation_from_matrix_round_trips_compose) {
     }
 }
 
+TEST(euler_extraction_is_stable_on_the_180_degree_branch_cut) {
+    const float noise[] = { 0.0f, 1e-9f, -1e-9f, 1e-7f, -1e-7f, 1e-6f, -1e-6f, 3e-6f, -3e-6f };
+    for (float n : noise) {
+        for (float m : noise) {
+            Vector3 rolled = RotationFromBasisDegrees({ -1.0f, -n, m }, { n, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f });
+            CHECK_MSG(std::fabs(rolled.z - 180.0f) < 1e-3f, "roll noise " + std::to_string(n));
+            CHECK(std::fabs(rolled.x) < 1e-2f && std::fabs(rolled.y) < 1e-2f);
+            Vector3 turned = RotationFromBasisDegrees({ 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { n, 0.0f, -1.0f });
+            CHECK_MSG(std::fabs(turned.y - 180.0f) < 1e-3f, "yaw noise " + std::to_string(n));
+        }
+    }
+    CHECK(CanonicalAngleDegrees(-180.0f) == 180.0f);
+    CHECK(CanonicalAngleDegrees(180.00002f) == 180.0f);
+    CHECK(CanonicalAngleDegrees(-179.99999f) == 180.0f);
+    CHECK(CanonicalAngleDegrees(179.99998f) == 180.0f);
+    CHECK(CanonicalAngleDegrees(179.0f) == 179.0f);
+    CHECK(CanonicalAngleDegrees(-179.0f) == -179.0f);
+    CHECK(CanonicalAngleDegrees(0.0f) == 0.0f);
+}
+
+TEST(upside_down_axes_give_the_same_result_through_every_path) {
+    Vector3 down = { 0, -1, 0 };
+    Vector3 zero = { 0, 0, 0 };
+    Vector3 up = MakeRotFromY(down);
+    CHECK(std::fabs(up.z - 180.0f) < 1e-3f);
+    CHECK(Dist(MakeRotFromYX(down, Scaled(down, -3.0f)), up) < 1e-4f);
+    CHECK(Dist(MakeRotFromYZ(down, zero), up) < 1e-4f);
+    CHECK(Dist(MakeRotFromYX(down, zero), up) < 1e-4f);
+    CHECK(Dist(MakeRotFromYZ(down, Scaled(down, 5.0f)), up) < 1e-4f);
+}
+
 TEST_MAIN()

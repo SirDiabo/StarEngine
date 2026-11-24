@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <unordered_set>
 
+static constexpr int kMaxDynamicWildcardInputs = 256;
+
 static Pin MakeExecOutputPin(const std::string& name, int id) {
     Pin pin;
     pin.name = name;
@@ -56,6 +58,13 @@ static std::string ResolveInputPinAlias(const std::string& nodeType, const std::
     if (!tmpl) return pinName;
     auto it = tmpl->legacyInputPinAliases.find(pinName);
     return it != tmpl->legacyInputPinAliases.end() ? it->second : pinName;
+}
+
+static std::string ResolveOutputPinAlias(const std::string& nodeType, const std::string& pinName) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(nodeType);
+    if (!tmpl) return pinName;
+    auto it = tmpl->legacyOutputPinAliases.find(pinName);
+    return it != tmpl->legacyOutputPinAliases.end() ? it->second : pinName;
 }
 
 static Pin* FindExecCasePin(Node& node, const NodeTemplate& tmpl, int caseIndex) {
@@ -173,10 +182,10 @@ Node* Stargraph::CreateNode(const std::string& type) {
         }
     }
 
-    if (nodeTemplate && !nodeTemplate->dynamicWildcardInputPrefix.empty()) {
+    if (nodeTemplate && HasDynamicWildcardInputs(*nodeTemplate)) {
         for (int i = 0; i < nodeTemplate->dynamicWildcardInputInitial; i++) {
             Pin pin;
-            pin.name = nodeTemplate->dynamicWildcardInputPrefix + std::to_string(i);
+            pin.name = DynamicWildcardInputName(*nodeTemplate, i);
             pin.type = PinType::Wildcard;
             pin.isInput = true;
             pin.isOutput = false;
@@ -225,37 +234,134 @@ std::string Variable::DefaultElementText() const {
     return StarArray::DefaultElementText(type);
 }
 
+void Stargraph::NormalizeNodePins(Node& node) {
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+    if (tmpl && tmpl->normalizePins) tmpl->normalizePins(*this, node);
+}
+
+void Stargraph::RefreshWildcardPins(Node* node) {
+    if (!node) return;
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
+    if (!tmpl || !tmpl->createPins) return;
+
+    Node blank;
+    tmpl->createPins(&blank);
+
+    auto findTemplatePin = [](const std::vector<Pin>& templatePins, const std::string& name) -> const Pin* {
+        for (const Pin& p : templatePins) if (p.name == name) return &p;
+        return nullptr;
+    };
+    auto isWildcardClass = [&](const std::vector<Pin>& templatePins, const std::string& name, bool isInput) {
+        if (const Pin* tp = findTemplatePin(templatePins, name)) return tp->type == PinType::Wildcard;
+        return isInput && IsDynamicWildcardInputName(*tmpl, name);
+    };
+    auto isArrayWildcardClass = [&](const std::vector<Pin>& templatePins, const std::string& name) {
+        const Pin* tp = findTemplatePin(templatePins, name);
+        return tp && tp->type == PinType::Array && tp->elementType == PinType::Wildcard;
+    };
+    auto isOpen = [](const Pin& p) {
+        return p.type == PinType::Wildcard || (p.type == PinType::Array && p.elementType == PinType::Wildcard);
+    };
+
+    bool anyWildcard = false;
+    for (Pin& pin : node->inputs) {
+        if (isWildcardClass(blank.inputs, pin.name, true)) { pin.type = PinType::Wildcard; pin.objectKind.clear(); anyWildcard = true; }
+        else if (isArrayWildcardClass(blank.inputs, pin.name)) { pin.type = PinType::Array; pin.elementType = PinType::Wildcard; anyWildcard = true; }
+    }
+    for (Pin& pin : node->outputs) {
+        if (isWildcardClass(blank.outputs, pin.name, false)) { pin.type = PinType::Wildcard; pin.objectKind.clear(); anyWildcard = true; }
+        else if (isArrayWildcardClass(blank.outputs, pin.name)) { pin.type = PinType::Array; pin.elementType = PinType::Wildcard; anyWildcard = true; }
+    }
+    if (!anyWildcard) return;
+
+    PinType resolved = PinType::None;
+    std::string resolvedKind;
+    auto consider = [&](const Pin& other) {
+        if (resolved != PinType::None) return;
+        PinType candidate = other.type == PinType::Array ? other.elementType : other.type;
+        if (candidate == PinType::Wildcard) return;
+        if (other.type == PinType::Array && candidate == PinType::None) return;
+        resolved = candidate;
+        resolvedKind = other.objectKind;
+    };
+
+    for (const Pin& pin : node->inputs) {
+        if (!isOpen(pin)) continue;
+        for (const Link& lk : links) {
+            if (lk.inputPinId != pin.id) continue;
+            if (const Node* fromNode = FindNodeByPinId(lk.outputPinId)) {
+                for (const Pin& p : fromNode->outputs) if (p.id == lk.outputPinId) consider(p);
+            }
+        }
+    }
+    if (resolved == PinType::None) {
+        for (const Pin& pin : node->outputs) {
+            if (!isOpen(pin)) continue;
+            for (const Link& lk : links) {
+                if (lk.outputPinId != pin.id) continue;
+                if (const Node* toNode = FindNodeByPinId(lk.inputPinId)) {
+                    for (const Pin& p : toNode->inputs) if (p.id == lk.inputPinId) consider(p);
+                }
+            }
+        }
+    }
+    if (resolved == PinType::None) { InvalidateCaches(); return; }
+
+    auto apply = [&](std::vector<Pin>& pins) {
+        for (Pin& pin : pins) {
+            if (pin.type == PinType::Wildcard) {
+                pin.type = resolved;
+                if (resolved == PinType::Object) pin.objectKind = resolvedKind;
+            } else if (pin.type == PinType::Array && pin.elementType == PinType::Wildcard) {
+                pin.elementType = resolved;
+                if (resolved == PinType::Object) pin.objectKind = resolvedKind;
+            }
+        }
+    };
+    apply(node->inputs);
+    apply(node->outputs);
+    InvalidateCaches();
+}
+
 Pin* Stargraph::AddDynamicWildcardInput(Node& node) {
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-    if (!tmpl || tmpl->dynamicWildcardInputPrefix.empty()) return nullptr;
-    const std::string& prefix = tmpl->dynamicWildcardInputPrefix;
+    if (!tmpl || !HasDynamicWildcardInputs(*tmpl)) return nullptr;
+    if (tmpl->dynamicInputsEnabled && !tmpl->dynamicInputsEnabled(node)) return nullptr;
 
     int count = 0;
-    for (const Pin& pin : node.inputs) if (pin.name.rfind(prefix, 0) == 0) count++;
+    for (const Pin& pin : node.inputs) if (IsDynamicWildcardInputName(*tmpl, pin.name)) count++;
+    if (count >= kMaxDynamicWildcardInputs) return nullptr;
 
-    Pin* pin = AddDynamicPin(node, false, prefix + std::to_string(count), PinType::Wildcard);
+    Pin* pin = AddDynamicPin(node, false, DynamicWildcardInputName(*tmpl, count), PinType::Wildcard);
     if (pin) pin->isWildcard = true;
-    return pin;
+    NormalizeNodePins(node);
+    for (Pin& p : node.inputs) if (p.name == DynamicWildcardInputName(*tmpl, count)) return &p;
+    return nullptr;
 }
 
 bool Stargraph::RemoveDynamicWildcardInput(Node& node, int pinId) {
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
-    if (!tmpl || tmpl->dynamicWildcardInputPrefix.empty()) return false;
-    const std::string& prefix = tmpl->dynamicWildcardInputPrefix;
+    if (!tmpl || !HasDynamicWildcardInputs(*tmpl)) return false;
+    if (tmpl->dynamicInputsEnabled && !tmpl->dynamicInputsEnabled(node)) return false;
 
     std::string name;
+    int dynamicCount = 0;
     for (const Pin& pin : node.inputs) {
-        if (pin.id == pinId && pin.name.rfind(prefix, 0) == 0) { name = pin.name; break; }
+        if (!IsDynamicWildcardInputName(*tmpl, pin.name)) continue;
+        dynamicCount++;
+        if (pin.id == pinId) name = pin.name;
     }
     if (name.empty()) return false;
+    if (tmpl->dynamicWildcardInputsNumeric && (name == "0" || dynamicCount <= 2)) return false;
 
     RemoveDynamicPin(node, false, name);
 
     int index = 0;
     for (Pin& pin : node.inputs) {
-        if (pin.name.rfind(prefix, 0) != 0) continue;
-        pin.name = prefix + std::to_string(index++);
+        if (!IsDynamicWildcardInputName(*tmpl, pin.name)) continue;
+        pin.name = DynamicWildcardInputName(*tmpl, index++);
     }
+    NormalizeNodePins(node);
     InvalidateCaches();
     return true;
 }
@@ -876,6 +982,7 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
                 }
             }
 
+            NormalizeNodePins(*node);
             for (Pin& pin : node->inputs)  if (pin.type == PinType::Wildcard) pin.isWildcard = true;
             for (Pin& pin : node->outputs) if (pin.type == PinType::Wildcard) pin.isWildcard = true;
 
@@ -947,8 +1054,9 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
         if (!fromNode || !toNode) continue;
 
         int outputPinId = 0;
+        const std::string resolvedFromPin = ResolveOutputPinAlias(fromNode->type, *fromPinStr);
         for (const Pin& pin : fromNode->outputs) {
-            if (pin.name == *fromPinStr) { outputPinId = pin.id; break; }
+            if (pin.name == resolvedFromPin) { outputPinId = pin.id; break; }
         }
         int inputPinId = 0;
         const std::string resolvedToPin = ResolveInputPinAlias(toNode->type, *toPinStr);

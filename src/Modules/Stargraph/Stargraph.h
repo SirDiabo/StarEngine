@@ -116,6 +116,7 @@ struct Pin {
     bool isWildcard = false;
     std::string objectKind;
     PinType elementType = PinType::None;
+    bool fieldOnly = false;
 };
 
 inline std::string operator+(const std::string& lhs, const PinValue& rhs) { return lhs + (const std::string&)rhs; }
@@ -224,6 +225,8 @@ public:
     void SyncArrayVariables();
     Pin* AddDynamicWildcardInput(Node& node);
     bool RemoveDynamicWildcardInput(Node& node, int pinId);
+    void NormalizeNodePins(Node& node);
+    void RefreshWildcardPins(Node* node);
     void RebuildDynamicExecOutputs(Node& node);
     bool AddExecCase(Node& node, const std::string& input);
     bool RemoveExecCase(Node& node, int caseIndex);

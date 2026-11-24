@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "Core/RotationMath.h"
+#include "Core/MapRange.h"
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -255,17 +256,18 @@ void RegisterMathNodes() {
     rotatorMake.category = "Math";
     rotatorMake.moduleName = "Stargraph";
     rotatorMake.createPins = [](Node* node) {
-        node->inputs.push_back({"X", PinType::Float, true, false, 0, "0.0"});
-        node->inputs.push_back({"Y", PinType::Float, true, false, 0, "0.0"});
-        node->inputs.push_back({"Z", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Pitch", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Yaw", PinType::Float, true, false, 0, "0.0"});
+        node->inputs.push_back({"Roll", PinType::Float, true, false, 0, "0.0"});
         node->outputs.push_back({"Rotator", PinType::Rotator, false, true});
     };
+    rotatorMake.legacyInputPinAliases = { { "X", "Pitch" }, { "Y", "Yaw" }, { "Z", "Roll" } };
     rotatorMake.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
-            if (p.name == "X" && !p.defaultValue.empty()) x = p.defaultValue.AsFloat();
-            if (p.name == "Y" && !p.defaultValue.empty()) y = p.defaultValue.AsFloat();
-            if (p.name == "Z" && !p.defaultValue.empty()) z = p.defaultValue.AsFloat();
+            if (p.name == "Pitch" && !p.defaultValue.empty()) x = p.defaultValue.AsFloat();
+            if (p.name == "Yaw" && !p.defaultValue.empty()) y = p.defaultValue.AsFloat();
+            if (p.name == "Roll" && !p.defaultValue.empty()) z = p.defaultValue.AsFloat();
         }
         char buf[64]; snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f", x, y, z);
         for (Pin& p : node.outputs) if (p.name == "Rotator") p.defaultValue = buf;
@@ -278,10 +280,11 @@ void RegisterMathNodes() {
     rotatorBreak.moduleName = "Stargraph";
     rotatorBreak.createPins = [](Node* node) {
         node->inputs.push_back({"Rotator", PinType::Rotator, true, false, 0, "0,0,0"});
-        node->outputs.push_back({"X", PinType::Float, false, true});
-        node->outputs.push_back({"Y", PinType::Float, false, true});
-        node->outputs.push_back({"Z", PinType::Float, false, true});
+        node->outputs.push_back({"Pitch", PinType::Float, false, true});
+        node->outputs.push_back({"Yaw", PinType::Float, false, true});
+        node->outputs.push_back({"Roll", PinType::Float, false, true});
     };
+    rotatorBreak.legacyOutputPinAliases = { { "X", "Pitch" }, { "Y", "Yaw" }, { "Z", "Roll" } };
     rotatorBreak.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         float x = 0, y = 0, z = 0;
         for (const Pin& p : node.inputs) {
@@ -289,9 +292,9 @@ void RegisterMathNodes() {
         }
         char buf[32];
         for (Pin& p : node.outputs) {
-            if (p.name == "X") { snprintf(buf, sizeof(buf), "%g", x); p.defaultValue = buf; }
-            if (p.name == "Y") { snprintf(buf, sizeof(buf), "%g", y); p.defaultValue = buf; }
-            if (p.name == "Z") { snprintf(buf, sizeof(buf), "%g", z); p.defaultValue = buf; }
+            if (p.name == "Pitch") { snprintf(buf, sizeof(buf), "%g", x); p.defaultValue = buf; }
+            if (p.name == "Yaw") { snprintf(buf, sizeof(buf), "%g", y); p.defaultValue = buf; }
+            if (p.name == "Roll") { snprintf(buf, sizeof(buf), "%g", z); p.defaultValue = buf; }
         }
     };
     NodeRegistry::Get().RegisterNode(rotatorBreak);
@@ -857,6 +860,39 @@ void RegisterMathNodes() {
         for (Pin& p : node.outputs) if (p.name == "Result") p.defaultValue = buf;
     };
     NodeRegistry::Get().RegisterNode(floatLerp);
+
+    auto registerMapRange = [](const char* type, const char* label, bool clamped) {
+        NodeTemplate t;
+        t.type = type;
+        t.menuLabel = label;
+        t.category = "Math";
+        t.moduleName = "Stargraph";
+        t.createPins = [](Node* node) {
+            node->inputs.push_back({"Value", PinType::Float, true, false, 0, "0.0"});
+            node->inputs.push_back({"In Range A", PinType::Float, true, false, 0, "0.0"});
+            node->inputs.push_back({"In Range B", PinType::Float, true, false, 0, "1.0"});
+            node->inputs.push_back({"Out Range A", PinType::Float, true, false, 0, "0.0"});
+            node->inputs.push_back({"Out Range B", PinType::Float, true, false, 0, "1.0"});
+            node->outputs.push_back({"Return Value", PinType::Float, false, true});
+        };
+        t.execute = [clamped](Node& node, Stargraph&, ExecutionContext&) {
+            float value = 0.0f, inA = 0.0f, inB = 1.0f, outA = 0.0f, outB = 1.0f;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "Value") value = GetScalarValue(p);
+                else if (p.name == "In Range A") inA = GetScalarValue(p);
+                else if (p.name == "In Range B") inB = GetScalarValue(p);
+                else if (p.name == "Out Range A") outA = GetScalarValue(p);
+                else if (p.name == "Out Range B") outB = GetScalarValue(p);
+            }
+            float result = clamped ? MapRangeClamped(value, inA, inB, outA, outB) : MapRangeUnclamped(value, inA, inB, outA, outB);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%g", result);
+            for (Pin& p : node.outputs) if (p.name == "Return Value") p.defaultValue = buf;
+        };
+        NodeRegistry::Get().RegisterNode(t);
+    };
+    registerMapRange("Map_Range_Unclamped", "Map Range Unclamped", false);
+    registerMapRange("Map_Range_Clamped", "Map Range Clamped", true);
 
     NodeTemplate floatInterp;
     floatInterp.type = "Float_Interp_To";

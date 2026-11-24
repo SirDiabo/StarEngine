@@ -22,6 +22,12 @@ inline float WrapAngleDegrees(float degrees) {
     return wrapped;
 }
 
+inline float CanonicalAngleDegrees(float degrees) {
+    float wrapped = WrapAngleDegrees(degrees);
+    if (std::fabs(wrapped) > 180.0f - 1e-3f) return 180.0f;
+    return wrapped;
+}
+
 inline float AngleDeltaDegrees(float from, float to) {
     return WrapAngleDegrees(WrapAngleDegrees(to) - WrapAngleDegrees(from));
 }
@@ -73,7 +79,7 @@ inline Vector3 RotationFromBasisDegrees(const Vector3& right, const Vector3& up,
         yaw = 0.0f;
         roll = std::atan2(m9 > 0.0f ? -m2 : m2, m0) * RAD2DEG;
     }
-    return { WrapAngleDegrees(0.0f - pitch), WrapAngleDegrees(0.0f - yaw), WrapAngleDegrees(roll) };
+    return { WrapAngleDegrees(0.0f - pitch), CanonicalAngleDegrees(0.0f - yaw), CanonicalAngleDegrees(roll) };
 }
 
 inline Vector3 RotationFromMatrixDegrees(const Matrix& m) {

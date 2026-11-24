@@ -262,6 +262,7 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
         for (const Pin& pin : node.inputs)  if (pin.id == inputPinId)  { in  = &pin; inNode = &node; }
     }
     if (!out || !in) return false;
+    if (out->fieldOnly || in->fieldOnly) return false;
     if (out->type == PinType::Array || in->type == PinType::Array) {
         if (out->type != PinType::Array || in->type != PinType::Array) return false;
         if (out->elementType == PinType::Wildcard || in->elementType == PinType::Wildcard) return true;
@@ -412,84 +413,7 @@ void StargraphEditorPanel::BeginReroute(int pinId) {
 
 void StargraphEditorPanel::RefreshWildcardPins(Node* node) {
     if (!node) return;
-    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
-    if (!tmpl || !tmpl->createPins) return;
-
-    Node blank;
-    tmpl->createPins(&blank);
-    const std::string& prefix = tmpl->dynamicWildcardInputPrefix;
-
-    auto findTemplatePin = [](const std::vector<Pin>& templatePins, const std::string& name) -> const Pin* {
-        for (const Pin& p : templatePins) if (p.name == name) return &p;
-        return nullptr;
-    };
-    auto isWildcardClass = [&](const std::vector<Pin>& templatePins, const std::string& name, bool isInput) {
-        if (const Pin* tp = findTemplatePin(templatePins, name)) return tp->type == PinType::Wildcard;
-        return isInput && !prefix.empty() && name.rfind(prefix, 0) == 0;
-    };
-    auto isArrayWildcardClass = [&](const std::vector<Pin>& templatePins, const std::string& name) {
-        const Pin* tp = findTemplatePin(templatePins, name);
-        return tp && tp->type == PinType::Array && tp->elementType == PinType::Wildcard;
-    };
-    auto isOpen = [](const Pin& p) {
-        return p.type == PinType::Wildcard || (p.type == PinType::Array && p.elementType == PinType::Wildcard);
-    };
-
-    bool anyWildcard = false;
-    for (Pin& pin : node->inputs) {
-        if (isWildcardClass(blank.inputs, pin.name, true)) { pin.type = PinType::Wildcard; anyWildcard = true; }
-        else if (isArrayWildcardClass(blank.inputs, pin.name)) { pin.type = PinType::Array; pin.elementType = PinType::Wildcard; anyWildcard = true; }
-    }
-    for (Pin& pin : node->outputs) {
-        if (isWildcardClass(blank.outputs, pin.name, false)) { pin.type = PinType::Wildcard; anyWildcard = true; }
-        else if (isArrayWildcardClass(blank.outputs, pin.name)) { pin.type = PinType::Array; pin.elementType = PinType::Wildcard; anyWildcard = true; }
-    }
-    if (!anyWildcard) return;
-
-    PinType resolved = PinType::None;
-    std::string resolvedKind;
-    auto consider = [&](const Pin& other) {
-        PinType candidate = other.type == PinType::Array ? other.elementType : other.type;
-        if (candidate == PinType::Wildcard) return;
-        if (other.type == PinType::Array && candidate == PinType::None) return;
-        resolved = candidate;
-        resolvedKind = other.objectKind;
-    };
-
-    for (const Pin& pin : node->inputs) {
-        if (!isOpen(pin)) continue;
-        for (const Link& lk : ActiveGraph().GetLinks()) {
-            if (lk.inputPinId != pin.id) continue;
-            if (const Node* fromNode = ActiveGraph().FindNodeByPinId(lk.outputPinId)) {
-                for (const Pin& p : fromNode->outputs) if (p.id == lk.outputPinId) consider(p);
-            }
-        }
-    }
-    if (resolved == PinType::None) {
-        for (const Pin& pin : node->outputs) {
-            if (!isOpen(pin)) continue;
-            for (const Link& lk : ActiveGraph().GetLinks()) {
-                if (lk.outputPinId != pin.id) continue;
-                if (const Node* toNode = ActiveGraph().FindNodeByPinId(lk.inputPinId)) {
-                    for (const Pin& p : toNode->inputs) if (p.id == lk.inputPinId) consider(p);
-                }
-            }
-        }
-    }
-    if (resolved == PinType::None) return;
-
-    auto apply = [&](std::vector<Pin>& pins) {
-        for (Pin& pin : pins) {
-            if (pin.type == PinType::Wildcard) {
-                pin.type = resolved;
-            } else if (pin.type == PinType::Array && pin.elementType == PinType::Wildcard) {
-                pin.elementType = resolved;
-                if (resolved == PinType::Object) pin.objectKind = resolvedKind;
-            }
-        }
-    };
-    apply(node->inputs);
-    apply(node->outputs);
+    ActiveGraph().RefreshWildcardPins(node);
 }
 
 namespace {
@@ -651,6 +575,7 @@ Node* InstantiateNode(Stargraph& graph, const ClipNode& clip) {
         }
         for (const std::string& name : stale) graph.RemoveDynamicPin(*node, !isInput, name);
     }
+    graph.NormalizeNodePins(*node);
     return node;
 }
 
@@ -1288,7 +1213,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
             float scaledRadius = pinRadius * canvasState.zoom;
 
-            DrawPinShape(pinPos, scaledRadius, pinColor, linked, pin.type == PinType::Array);
+            if (!pin.fieldOnly) DrawPinShape(pinPos, scaledRadius, pinColor, linked, pin.type == PinType::Array);
 
             if (pin.name == "Variable_Name") {
                 inputY += scaledPinHeight;
@@ -1342,6 +1267,23 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && boolHovered) {
                         pin.defaultValue = !bval ? "true" : "false";
                         isDirty = true;
+                    }
+                } else if (pin.fieldOnly) {
+                    if (!keyPickerOpen || keyPickerPinId != pin.id) {
+                        DrawRectangleRec(fieldRect, {35, 35, 40, 255});
+                        DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
+                        DrawText(pin.defaultValue.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                        DrawText("v", (int)(fieldRect.x + fieldRect.width - 14), (int)fieldRect.y + 5, 11, LIGHTGRAY);
+                    }
+                    if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !keyPickerOpen && !nodeMenuOpen) {
+                        keyPickerKind = PinPickerKind::NodeMode;
+                        keyPickerPinId = pin.id;
+                        keyPickerPos = {fieldRect.x, fieldRect.y + fieldRect.height};
+                        keyPickerWidth = fieldRect.width;
+                        keyPickerJustOpened = true;
+                        keyPickerOpen = true;
+                        editingPinId = 0;
+                        listeningForKeyPinId = 0;
                     }
                 } else if ((node.type == "Input_Key" && pin.name == "Key") ||
                            (node.type == "Override_Input" && pin.name == "New Key")) {
@@ -1542,7 +1484,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 inputY += scaledPinHeight;
             }
 
-            if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+            if (!pin.fieldOnly && CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV(pinPos, scaledRadius + 2, {255, 255, 255, 60});
                 if (pressedInGraph(MOUSE_BUTTON_LEFT)) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
