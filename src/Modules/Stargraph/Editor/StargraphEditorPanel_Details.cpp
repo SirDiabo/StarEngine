@@ -510,28 +510,6 @@ void StargraphEditorPanel::BuildCallCustomEventRows(std::vector<PropertyRow>& ro
         for (Pin& p : n->inputs) if (p.name == "Event Name") { p.defaultValue = value; isDirty = true; }
     }));
 
-    rows.push_back(ButtonRow("cce.refresh", "Refresh Pins", [this, nodeId]() {
-        Node* n = DetailNode(nodeId);
-        if (!n) return;
-        std::string targetName;
-        for (const Pin& p : n->inputs) if (p.name == "Event Name") targetName = p.defaultValue.c_str();
-        Node* targetEvent = graph.FindCustomEventByName(targetName);
-        if (!targetEvent) return;
-        std::vector<std::string> keep = { "Target", "Event Name" };
-        for (const Pin& srcPin : targetEvent->outputs) {
-            if (srcPin.type == PinType::Exec) continue;
-            ActiveGraph().AddDynamicPin(*n, false, srcPin.name, srcPin.type);
-            keep.push_back(srcPin.name);
-        }
-        std::vector<std::string> toRemove;
-        for (const Pin& p : n->inputs) {
-            if (p.type == PinType::Exec) continue;
-            if (std::find(keep.begin(), keep.end(), p.name) == keep.end()) toRemove.push_back(p.name);
-        }
-        for (const std::string& name : toRemove) ActiveGraph().RemoveDynamicPin(*n, false, name);
-        isDirty = true;
-    }));
-
     rows.push_back(HeaderRow("cce.h", "Parameters"));
     int k = 0;
     for (const Pin& pin : node->inputs) {
@@ -552,48 +530,6 @@ void StargraphEditorPanel::BuildCallFunctionRows(std::vector<PropertyRow>& rows,
         Node* n = DetailNode(nodeId);
         if (!n) return;
         for (Pin& p : n->inputs) if (p.name == "Function Name") { p.defaultValue = value; isDirty = true; }
-    }));
-
-    rows.push_back(ButtonRow("cf.refresh", "Refresh Pins", [this, nodeId]() {
-        Node* n = DetailNode(nodeId);
-        if (!n) return;
-        std::string targetName;
-        for (const Pin& p : n->inputs) if (p.name == "Function Name") targetName = p.defaultValue.c_str();
-        FunctionDef* targetFn = graph.FindFunction(targetName);
-        if (!targetFn) return;
-        Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
-        Node* returnNode = targetFn->graph.FindNodeByType("Return");
-
-        std::vector<std::string> keepInputs = { "Function Name" };
-        if (entryNode) {
-            for (const Pin& srcPin : entryNode->outputs) {
-                if (srcPin.type == PinType::Exec) continue;
-                ActiveGraph().AddDynamicPin(*n, false, srcPin.name, srcPin.type);
-                keepInputs.push_back(srcPin.name);
-            }
-        }
-        std::vector<std::string> toRemoveIn;
-        for (const Pin& p : n->inputs) {
-            if (p.type == PinType::Exec) continue;
-            if (std::find(keepInputs.begin(), keepInputs.end(), p.name) == keepInputs.end()) toRemoveIn.push_back(p.name);
-        }
-        for (const std::string& name : toRemoveIn) ActiveGraph().RemoveDynamicPin(*n, false, name);
-
-        std::vector<std::string> keepOutputs;
-        if (returnNode) {
-            for (const Pin& srcPin : returnNode->inputs) {
-                if (srcPin.type == PinType::Exec) continue;
-                ActiveGraph().AddDynamicPin(*n, true, srcPin.name, srcPin.type);
-                keepOutputs.push_back(srcPin.name);
-            }
-        }
-        std::vector<std::string> toRemoveOut;
-        for (const Pin& p : n->outputs) {
-            if (p.type == PinType::Exec) continue;
-            if (std::find(keepOutputs.begin(), keepOutputs.end(), p.name) == keepOutputs.end()) toRemoveOut.push_back(p.name);
-        }
-        for (const std::string& name : toRemoveOut) ActiveGraph().RemoveDynamicPin(*n, true, name);
-        isDirty = true;
     }));
 
     rows.push_back(HeaderRow("cf.in.h", "Inputs"));
@@ -758,6 +694,10 @@ void StargraphEditorPanel::BuildGenericNodeRows(std::vector<PropertyRow>& rows, 
     }
 }
 
+bool StargraphEditorPanel::ResolveNodeDetailTarget(const Node& node, int& kind, int& index) {
+    return graph.ResolveNodeDetailTarget(node, ActiveGraph(), kind, index);
+}
+
 std::string StargraphEditorPanel::DetailsSelectionKey() {
     if (actorEditor.HasDetailsSelection()) return actorEditor.DetailsSelectionKey();
     if (lastValidVariableIndex >= 0 && lastValidVariableIndex < (int)graph.GetVariables().size())
@@ -772,6 +712,11 @@ std::string StargraphEditorPanel::DetailsSelectionKey() {
 
     if (selectedNodeId != -1) {
         Node* selectedNode = ActiveGraph().FindNodeById(selectedNodeId);
+        int targetKind = 0, targetIndex = 0;
+        if (selectedNode && ResolveNodeDetailTarget(*selectedNode, targetKind, targetIndex)) {
+            const char* targetPrefix = targetKind == 0 ? "f" : targetKind == 1 ? "v" : "l";
+            return std::string(targetPrefix) + std::to_string(targetIndex);
+        }
         if (selectedNode) return "n" + std::to_string(selectedNodeId) + ":" + selectedNode->type;
     }
     return "";
@@ -811,7 +756,11 @@ std::vector<PropertyRow> StargraphEditorPanel::BuildDetailsRows() {
     } else if (localVariableSelected) {
         BuildVariableRows(rows, lastValidLocalVariableIndex, true);
     } else if (selectedNode) {
-        if (selectedNode->type == "Custom_Event") BuildCustomEventRows(rows, selectedNodeId);
+        int targetKind = 0, targetIndex = 0;
+        if (ResolveNodeDetailTarget(*selectedNode, targetKind, targetIndex)) {
+            if (targetKind == 0) BuildFunctionRows(rows, targetIndex);
+            else BuildVariableRows(rows, targetIndex, targetKind == 2);
+        } else if (selectedNode->type == "Custom_Event") BuildCustomEventRows(rows, selectedNodeId);
         else if (selectedNode->type == "Call_Custom_Event") BuildCallCustomEventRows(rows, selectedNodeId);
         else if (selectedNode->type == "Call_Function") BuildCallFunctionRows(rows, selectedNodeId);
         else BuildGenericNodeRows(rows, selectedNodeId);

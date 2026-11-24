@@ -58,6 +58,7 @@ public:
     void RenderToolbar(Rectangle area);
     void RenderLeftPanel(Rectangle area);
     void RenderLeftPanelPopups();
+    void RenderNodePopups();
     void RenderGraph(Rectangle area);
     std::vector<PropertyRow> BuildDetailsRows();
     std::string DetailsSelectionKey();
@@ -134,6 +135,14 @@ private:
     ChoicePopup leftContextMenu;
     int leftContextKind = -1;
     int leftContextIndex = -1;
+    ChoicePopup nodeContextMenu;
+    std::vector<std::string> nodeContextActions;
+    int nodeContextNodeId = -1;
+    void OpenNodeContextMenu(Node& node);
+    void RefreshCallEventPins(Node& node);
+    void RefreshCallFunctionPins(Node& node);
+    void BreakNodeLinks(Node& node);
+    bool ResolveNodeDetailTarget(const Node& node, int& kind, int& index);
     void BuildLeftPanelChrome();
     void ClearOtherLeftSelections(int keepKind);
     void RemoveFunctionAt(int index);

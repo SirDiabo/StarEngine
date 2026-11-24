@@ -429,6 +429,36 @@ void StargraphEditorPanel::RenderKeyPickerPopup() {
     }
 }
 
+void StargraphEditorPanel::RenderNodePopups() {
+    if (!nodeContextMenu.IsOpen()) return;
+
+    int choice = -1;
+    if (!nodeContextMenu.Render(choice)) return;
+    if (choice < 0 || choice >= (int)nodeContextActions.size()) return;
+    const std::string action = nodeContextActions[choice];
+
+    std::vector<int> targets = selectedNodeIds;
+    if (selectedNodeId != -1 && std::find(targets.begin(), targets.end(), selectedNodeId) == targets.end()) targets.push_back(selectedNodeId);
+
+    if (action == "Copy") {
+        CopySelectedNodes();
+    } else if (action == "Duplicate") {
+        DuplicateSelected();
+    } else if (action == "Delete") {
+        DeleteSelected();
+    } else if (action == "Break Links") {
+        for (int id : targets) {
+            if (Node* node = ActiveGraph().FindNodeById(id)) BreakNodeLinks(*node);
+        }
+    } else if (action == "Refresh Pins") {
+        if (Node* node = ActiveGraph().FindNodeById(nodeContextNodeId)) {
+            if (node->type == "Call_Function") RefreshCallFunctionPins(*node);
+            else if (node->type == "Call_Custom_Event") RefreshCallEventPins(*node);
+        }
+    }
+    nodeContextNodeId = -1;
+}
+
 void StargraphEditorPanel::RenderLeftPanelPopups() {
     if (!leftContextMenu.IsOpen()) return;
 

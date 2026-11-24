@@ -384,6 +384,92 @@ void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
     if (otherPinId != -1) RefreshWildcardPins(ActiveGraph().FindNodeByPinId(otherPinId));
 }
 
+void StargraphEditorPanel::OpenNodeContextMenu(Node& node) {
+    int id = std::stoi(node.id);
+    bool inSelection = id == selectedNodeId || std::find(selectedNodeIds.begin(), selectedNodeIds.end(), id) != selectedNodeIds.end();
+    if (!inSelection) {
+        selectedNodeIds.clear();
+        selectedNodeId = id;
+    }
+    selectedVariableIndex = -1;
+    lastValidVariableIndex = -1;
+    selectedFunctionIndex = -1;
+    lastValidFunctionIndex = -1;
+    selectedLocalVariableIndex = -1;
+    lastValidLocalVariableIndex = -1;
+    actorEditor.ClearSelection();
+    nodeContextNodeId = id;
+
+    std::vector<int> targets = selectedNodeIds;
+    if (selectedNodeId != -1 && std::find(targets.begin(), targets.end(), selectedNodeId) == targets.end()) targets.push_back(selectedNodeId);
+
+    bool onlyEntry = true;
+    bool anyLink = false;
+    for (int targetId : targets) {
+        Node* target = ActiveGraph().FindNodeById(targetId);
+        if (!target) continue;
+        if (target->type != "Function_Entry") onlyEntry = false;
+        for (const Link& lk : ActiveGraph().GetLinks()) {
+            for (const Pin& p : target->inputs)  if (p.id == lk.inputPinId) anyLink = true;
+            for (const Pin& p : target->outputs) if (p.id == lk.outputPinId) anyLink = true;
+        }
+    }
+
+    std::vector<ChoiceOption> choices;
+    nodeContextActions.clear();
+    auto add = [&](const std::string& label, bool enabled, const std::string& reason) {
+        ChoiceOption option;
+        option.label = label;
+        option.enabled = enabled;
+        option.disabledReason = reason;
+        choices.push_back(option);
+        nodeContextActions.push_back(label);
+    };
+    add("Copy", true, "");
+    add("Duplicate", true, "");
+    add("Delete", !onlyEntry, "The entry node can't be deleted");
+    add("Break Links", anyLink, "");
+    if (node.type == "Call_Custom_Event" || node.type == "Call_Function") {
+        bool found = false;
+        const std::string pinName = node.type == "Call_Function" ? "Function Name" : "Event Name";
+        for (const Pin& p : node.inputs) {
+            if (p.name != pinName) continue;
+            std::string target = p.defaultValue.c_str();
+            found = node.type == "Call_Function" ? graph.FindFunction(target) != nullptr : graph.FindCustomEventByName(target) != nullptr;
+        }
+        add("Refresh Pins", found, node.type == "Call_Function" ? "Function not found" : "Event not found");
+    }
+    nodeContextMenu.Open(GetMousePosition(), 130.0f, choices);
+}
+
+void StargraphEditorPanel::RefreshCallEventPins(Node& n) {
+    graph.RefreshCallEventPins(n, ActiveGraph());
+    isDirty = true;
+}
+
+void StargraphEditorPanel::RefreshCallFunctionPins(Node& n) {
+    graph.RefreshCallFunctionPins(n, ActiveGraph());
+    isDirty = true;
+}
+
+void StargraphEditorPanel::BreakNodeLinks(Node& node) {
+    std::vector<int> pinIds;
+    for (const Pin& p : node.inputs) pinIds.push_back(p.id);
+    for (const Pin& p : node.outputs) pinIds.push_back(p.id);
+
+    std::vector<int> otherPins;
+    for (const Link& lk : ActiveGraph().GetLinks()) {
+        for (int id : pinIds) {
+            if (lk.inputPinId == id) otherPins.push_back(lk.outputPinId);
+            if (lk.outputPinId == id) otherPins.push_back(lk.inputPinId);
+        }
+    }
+    for (int id : pinIds) ActiveGraph().RemoveLink(id);
+    isDirty = true;
+    RefreshWildcardPins(&node);
+    for (int other : otherPins) RefreshWildcardPins(ActiveGraph().FindNodeByPinId(other));
+}
+
 void StargraphEditorPanel::RemoveSpecificLink(int outputPinId, int inputPinId) {
     ActiveGraph().RemoveSpecificLink(outputPinId, inputPinId);
     isDirty = true;
@@ -1125,6 +1211,9 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             DrawText(displayTitle.c_str(), (int)nx + (targetPin ? 16 : 8), (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
+                if (mouseInGraph && IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && !canvasState.didPan && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen() && !nodeContextMenu.IsOpen()) {
+                    OpenNodeContextMenu(node);
+                }
                 if (pressedInGraph(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (IsKeyDown(KEY_LEFT_CONTROL)) {
                         bool found = false;
@@ -1817,7 +1906,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
         }
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && CheckCollisionPointRec(mousePos, graphArea) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen() && !nodeContextMenu.IsOpen()) {
         if (!canvasState.didPan) {
         filterCompatibleWithPin = -1;
         nodeMenuOpen = true;

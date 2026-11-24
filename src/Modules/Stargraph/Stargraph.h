@@ -226,6 +226,9 @@ public:
     Pin* AddDynamicWildcardInput(Node& node);
     bool RemoveDynamicWildcardInput(Node& node, int pinId);
     void NormalizeNodePins(Node& node);
+    bool ResolveNodeDetailTarget(const Node& node, Stargraph& host, int& kind, int& index);
+    void RefreshCallEventPins(Node& callNode, Stargraph& host);
+    void RefreshCallFunctionPins(Node& callNode, Stargraph& host);
     void RefreshWildcardPins(Node* node);
     void RebuildDynamicExecOutputs(Node& node);
     bool AddExecCase(Node& node, const std::string& input);

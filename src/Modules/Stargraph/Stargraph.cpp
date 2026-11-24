@@ -239,6 +239,94 @@ void Stargraph::NormalizeNodePins(Node& node) {
     if (tmpl && tmpl->normalizePins) tmpl->normalizePins(*this, node);
 }
 
+bool Stargraph::ResolveNodeDetailTarget(const Node& node, Stargraph& host, int& kind, int& index) {
+    if (node.type == "Call_Function") {
+        std::string name;
+        for (const Pin& p : node.inputs) if (p.name == "Function Name") name = p.defaultValue.c_str();
+        for (size_t i = 0; i < functions.size(); i++) {
+            if (functions[i].name == name) { kind = 0; index = (int)i; return true; }
+        }
+        return false;
+    }
+    if (node.type == "Get_Variable" || node.type == "Set_Variable") {
+        std::string name;
+        bool external = false;
+        for (const Pin& p : node.inputs) {
+            if (p.name == "Variable_Name") name = p.defaultValue.c_str();
+            if (p.name == "Target" && (!p.defaultValue.empty() || host.GetLinkToPin(p.id))) external = true;
+        }
+        if (external || name.empty()) return false;
+        if (&host != this) {
+            const std::vector<Variable>& locals = host.GetVariables();
+            for (size_t i = 0; i < locals.size(); i++) {
+                if (locals[i].name == name) { kind = 2; index = (int)i; return true; }
+            }
+        }
+        for (size_t i = 0; i < variables.size(); i++) {
+            if (variables[i].name == name) { kind = 1; index = (int)i; return true; }
+        }
+    }
+    return false;
+}
+
+void Stargraph::RefreshCallEventPins(Node& callNode, Stargraph& host) {
+    std::string targetName;
+    for (const Pin& p : callNode.inputs) if (p.name == "Event Name") targetName = p.defaultValue.c_str();
+    Node* targetEvent = FindCustomEventByName(targetName);
+    if (!targetEvent) return;
+    std::vector<std::string> keep = { "Target", "Event Name" };
+    for (const Pin& srcPin : targetEvent->outputs) {
+        if (srcPin.type == PinType::Exec) continue;
+        host.AddDynamicPin(callNode, false, srcPin.name, srcPin.type);
+        keep.push_back(srcPin.name);
+    }
+    std::vector<std::string> toRemove;
+    for (const Pin& p : callNode.inputs) {
+        if (p.type == PinType::Exec) continue;
+        if (std::find(keep.begin(), keep.end(), p.name) == keep.end()) toRemove.push_back(p.name);
+    }
+    for (const std::string& name : toRemove) host.RemoveDynamicPin(callNode, false, name);
+}
+
+void Stargraph::RefreshCallFunctionPins(Node& callNode, Stargraph& host) {
+    std::string targetName;
+    for (const Pin& p : callNode.inputs) if (p.name == "Function Name") targetName = p.defaultValue.c_str();
+    FunctionDef* targetFn = FindFunction(targetName);
+    if (!targetFn) return;
+    Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
+    Node* returnNode = targetFn->graph.FindNodeByType("Return");
+
+    std::vector<std::string> keepInputs = { "Function Name" };
+    if (entryNode) {
+        for (const Pin& srcPin : entryNode->outputs) {
+            if (srcPin.type == PinType::Exec) continue;
+            host.AddDynamicPin(callNode, false, srcPin.name, srcPin.type);
+            keepInputs.push_back(srcPin.name);
+        }
+    }
+    std::vector<std::string> toRemoveIn;
+    for (const Pin& p : callNode.inputs) {
+        if (p.type == PinType::Exec) continue;
+        if (std::find(keepInputs.begin(), keepInputs.end(), p.name) == keepInputs.end()) toRemoveIn.push_back(p.name);
+    }
+    for (const std::string& name : toRemoveIn) host.RemoveDynamicPin(callNode, false, name);
+
+    std::vector<std::string> keepOutputs;
+    if (returnNode) {
+        for (const Pin& srcPin : returnNode->inputs) {
+            if (srcPin.type == PinType::Exec) continue;
+            host.AddDynamicPin(callNode, true, srcPin.name, srcPin.type);
+            keepOutputs.push_back(srcPin.name);
+        }
+    }
+    std::vector<std::string> toRemoveOut;
+    for (const Pin& p : callNode.outputs) {
+        if (p.type == PinType::Exec) continue;
+        if (std::find(keepOutputs.begin(), keepOutputs.end(), p.name) == keepOutputs.end()) toRemoveOut.push_back(p.name);
+    }
+    for (const std::string& name : toRemoveOut) host.RemoveDynamicPin(callNode, true, name);
+}
+
 void Stargraph::RefreshWildcardPins(Node* node) {
     if (!node) return;
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
