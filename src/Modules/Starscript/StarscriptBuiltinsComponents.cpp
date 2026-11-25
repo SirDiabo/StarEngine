@@ -119,7 +119,7 @@ Value M_input_claim(Runtime&, Value& s, std::vector<Value>&) {
 
     if (target->device == "Unclaimed" && !DeviceClaimedByOther("Keyboard+Mouse", target)) {
         for (const std::string& key : GetInputKeyNames()) {
-            if (key.rfind("GAMEPAD_", 0) == 0 || InputKeyIsAnalog(key)) continue;
+            if (key.rfind("GAMEPAD_", 0) == 0 || !InputKeyClaimsDevice(key)) continue;
             float axis = 0.0f;
             if (PollInputKey(key, axis)) { target->device = "Keyboard+Mouse"; break; }
         }
@@ -131,7 +131,7 @@ Value M_input_claim(Runtime&, Value& s, std::vector<Value>&) {
             std::string candidate = "Gamepad " + std::to_string(i);
             if (DeviceClaimedByOther(candidate, target)) continue;
             for (const std::string& key : GetInputKeyNames()) {
-                if (key.rfind("GAMEPAD_", 0) != 0 || InputKeyIsAnalog(key)) continue;
+                if (key.rfind("GAMEPAD_", 0) != 0 || !InputKeyClaimsDevice(key)) continue;
                 float axis = 0.0f;
                 if (PollInputKey(key, axis, i)) { target->device = candidate; break; }
             }

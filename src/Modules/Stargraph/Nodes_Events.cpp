@@ -95,6 +95,17 @@ void RegisterEventNodes() {
     };
     NodeRegistry::Get().RegisterNode(inputKey);
 
+    NodeTemplate anyInput;
+    anyInput.type = "Any_Input";
+    anyInput.category = "Input";
+    anyInput.moduleName = "Stargraph";
+    anyInput.isEvent = true;
+    anyInput.createPins = [](Node* node) {
+        node->outputs.push_back({"Out", PinType::Exec, false, true});
+        node->outputs.push_back({"Key", PinType::String, false, true});
+    };
+    NodeRegistry::Get().RegisterNode(anyInput);
+
     NodeTemplate customEvent;
     customEvent.type = "Custom_Event";
     customEvent.category = "Events";

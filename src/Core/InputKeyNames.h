@@ -7,6 +7,9 @@ std::string InputKeyCodeToName(int code);
 std::vector<std::string> GetInputKeyNames();
 
 bool InputKeyIsAnalog(const std::string& name);
+bool InputKeyIsButton(const std::string& name);
+bool InputKeyClaimsDevice(const std::string& name);
+void CollectDownInputButtons(std::vector<std::string>& out);
 
 bool PollInputKey(const std::string& name, float& outAxis, int gamepadIndex = 0);
 

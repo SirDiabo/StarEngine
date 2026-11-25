@@ -9,6 +9,7 @@ namespace {
 
 const std::vector<std::pair<std::string, int>>& Table() {
     static const std::vector<std::pair<std::string, int>> table = {
+        {"ANY", -41},
         {"A", KEY_A}, {"B", KEY_B}, {"C", KEY_C}, {"D", KEY_D}, {"E", KEY_E},
         {"F", KEY_F}, {"G", KEY_G}, {"H", KEY_H}, {"I", KEY_I}, {"J", KEY_J},
         {"K", KEY_K}, {"L", KEY_L}, {"M", KEY_M}, {"N", KEY_N}, {"O", KEY_O},
@@ -44,9 +45,19 @@ const std::vector<std::pair<std::string, int>>& Table() {
         {"GAMEPAD_RIGHT_STICK_UP", -31}, {"GAMEPAD_RIGHT_STICK_DOWN", -32},
         {"GAMEPAD_RIGHT_STICK_LEFT", -33}, {"GAMEPAD_RIGHT_STICK_RIGHT", -34},
         {"MOUSE_UP", -35}, {"MOUSE_DOWN", -36}, {"MOUSE_LEFT", -37}, {"MOUSE_RIGHT", -38},
+        {"MOUSE_WHEEL_UP", -39}, {"MOUSE_WHEEL_DOWN", -40},
     };
     return table;
-}}
+}
+
+const std::pair<std::string, int>* FindEntry(const std::string& name) {
+    for (const auto& entry : Table()) {
+        if (entry.first == name) return &entry;
+    }
+    return nullptr;
+}
+
+}
 
 int InputKeyNameToCode(const std::string& name) {
     for (const auto& entry : Table()) {
@@ -79,11 +90,50 @@ bool InputKeyIsAnalog(const std::string& name) {
     return false;
 }
 
+bool InputKeyIsButton(const std::string& name) {
+    const auto* entry = FindEntry(name);
+    if (!entry) return false;
+    if (InputKeyIsAnalog(name)) return false;
+    const int code = entry->second;
+    return code >= 0 || (code <= -1 && code >= -3) || (code <= -7 && code >= -22);
+}
+
+bool InputKeyClaimsDevice(const std::string& name) {
+    if (name == "ANY" || name == "MOUSE_WHEEL_UP" || name == "MOUSE_WHEEL_DOWN") return false;
+    return !InputKeyIsAnalog(name);
+}
+
+void CollectDownInputButtons(std::vector<std::string>& out) {
+    out.clear();
+    float axis = 0.0f;
+    for (const auto& entry : Table()) {
+        if (!InputKeyIsButton(entry.first)) continue;
+        if (entry.first.rfind("GAMEPAD_", 0) == 0) continue;
+        if (PollInputKey(entry.first, axis)) out.push_back(entry.first);
+    }
+    for (int pad = 0; pad < 4; pad++) {
+        if (!IsGamepadAvailable(pad)) continue;
+        for (const auto& entry : Table()) {
+            if (!InputKeyIsButton(entry.first)) continue;
+            if (entry.first.rfind("GAMEPAD_", 0) != 0) continue;
+            if (!PollInputKey(entry.first, axis, pad)) continue;
+            bool known = false;
+            for (const std::string& name : out) if (name == entry.first) { known = true; break; }
+            if (!known) out.push_back(entry.first);
+        }
+    }
+}
+
 bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) {
     outAxis = 0.0f;
     bool held = false;
 
-    if (keyName == "LEFT_MOUSE") {
+    if (keyName == "ANY") {
+        std::vector<std::string> down;
+        CollectDownInputButtons(down);
+        held = !down.empty();
+        outAxis = held ? 1.0f : 0.0f;
+    } else if (keyName == "LEFT_MOUSE") {
         held = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
         outAxis = held ? 1.0f : 0.0f;
     } else if (keyName == "RIGHT_MOUSE") {
@@ -97,6 +147,14 @@ bool PollInputKey(const std::string& keyName, float& outAxis, int gamepadIndex) 
         if (outAxis > 1.0f) outAxis = 1.0f;
         if (outAxis < -1.0f) outAxis = -1.0f;
         held = outAxis != 0.0f;
+    } else if (keyName == "MOUSE_WHEEL_UP") {
+        float wheel = GetMouseWheelMove();
+        outAxis = wheel > 0.0f ? (wheel > 1.0f ? 1.0f : wheel) : 0.0f;
+        held = outAxis > 0.0f;
+    } else if (keyName == "MOUSE_WHEEL_DOWN") {
+        float wheel = GetMouseWheelMove();
+        outAxis = wheel < 0.0f ? (wheel < -1.0f ? 1.0f : -wheel) : 0.0f;
+        held = outAxis > 0.0f;
     } else if (keyName == "MOUSE_X") {
         outAxis = GetMouseDelta().x * -1.0f;
         held = outAxis != 0.0f;
@@ -178,6 +236,8 @@ bool InputKeyCodeIsModifier(int keyCode) {
 }
 
 bool InputKeyBelongsToDevice(const std::string& keyName, const std::string& device, int& outGamepadIndex) {
+    if (keyName == "ANY") return device == "Keyboard+Mouse" || device.rfind("Gamepad ", 0) == 0;
+
     bool isGamepadKey = keyName.rfind("GAMEPAD_", 0) == 0;
 
     if (device == "Keyboard+Mouse") return !isGamepadKey;

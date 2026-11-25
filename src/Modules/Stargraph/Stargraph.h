@@ -159,6 +159,8 @@ struct Node {
     // Runtime-only held-input edge state
     bool heldPrevState = false;
 
+    std::vector<std::string> heldKeys;
+
     // Runtime-only wildcard resolution cache
     bool wildcardResolved = false;
 };

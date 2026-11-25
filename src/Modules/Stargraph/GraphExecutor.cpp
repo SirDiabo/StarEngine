@@ -4,7 +4,9 @@
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Runtime/World.h"
 #include "Core/Profiler.h"
+#include "Core/InputKeyNames.h"
 #include "raylib.h"
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -213,6 +215,26 @@ static void ProcessHeldEventNode(Node& node, Stargraph& graph, ExecutionContext&
     }
 }
 
+void GraphExecutor::ProcessAnyInputNode(Stargraph& graph, Node& node, ExecutionContext& ctx) {
+    if (ctx.actor != World::Get().GetInputFocus()) return;
+
+    std::vector<std::string> down;
+    CollectDownInputButtons(down);
+
+    std::vector<std::string> pressed;
+    for (const std::string& key : down) {
+        if (std::find(node.heldKeys.begin(), node.heldKeys.end(), key) == node.heldKeys.end()) pressed.push_back(key);
+    }
+    node.heldKeys = down;
+
+    for (const std::string& key : pressed) {
+        for (Pin& p : node.outputs) {
+            if (p.name == "Key") p.defaultValue = key;
+        }
+        ExecuteFromNode(graph, &node, ctx);
+    }
+}
+
 void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, ExecutionContext ctx) {
     if (!ctx.rootGraph) ctx.rootGraph = &graph;
 
@@ -223,6 +245,9 @@ void GraphExecutor::Run(Stargraph& graph, const std::string& eventType, Executio
         }
         for (Node* node : graph.GetNodesOfType("Input_Mapping")) {
             ProcessHeldEventNode(*node, graph, ctx);
+        }
+        for (Node* node : graph.GetNodesOfType("Any_Input")) {
+            ProcessAnyInputNode(graph, *node, ctx);
         }
     }
 

@@ -81,19 +81,26 @@ Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vecto
     Vector3 remaining = delta;
     Vector3 planes[3];
     int planeCount = 0;
+    Vector3 lift{ 0.0f, 0.0f, 0.0f };
 
     for (int bump = 0; bump < 4; bump++) {
         float len = Vector3Length(remaining);
         if (len < 1e-4f) break;
 
         CollisionTrace::HitResult hit;
-        if (!CollisionTrace::SweepShape(shape, remaining, params, hit)) {
+        const bool lifted = planeCount > 0;
+        bool found = CollisionTrace::SweepShape(lifted ? CollisionTrace::ShapeTranslated(shape, lift) : shape, remaining, params, hit);
+        if (found && lifted && hit.startPenetrating) {
+            found = CollisionTrace::SweepShape(shape, remaining, params, hit);
+        }
+        if (!found) {
             shape = CollisionTrace::ShapeTranslated(shape, remaining);
             applied = Plus(applied, remaining);
             break;
         }
 
-        if (!hit.startPenetrating) {
+        const bool startedInside = hit.startPenetrating;
+        if (!startedInside) {
             float moveDist = hit.distance - skinWidth;
             if (moveDist < 0.0f) moveDist = 0.0f;
             Vector3 step = Times(remaining, moveDist / len);
@@ -113,6 +120,17 @@ Vector3 PhysicsComponent::MoveAndSlide(CollisionTrace::Shape& shape, const Vecto
         if (planeCount < 3) planes[planeCount++] = n;
         velocity = ClipToPlanes(velocity, planes, planeCount);
         remaining = ClipToPlanes(remaining, planes, planeCount);
+
+        if (startedInside) {
+            shape = CollisionTrace::ShapeTranslated(shape, remaining);
+            applied = Plus(applied, remaining);
+            break;
+        }
+
+        Vector3 sum{ 0.0f, 0.0f, 0.0f };
+        for (int i = 0; i < planeCount; i++) sum = Plus(sum, planes[i]);
+        float sumLen = Vector3Length(sum);
+        lift = sumLen > 1e-4f ? Times(sum, skinWidth / sumLen) : Vector3{ 0.0f, 0.0f, 0.0f };
     }
     return applied;
 }

@@ -128,3 +128,8 @@ star_add_test(test_engine_root
         "${STAR_SRC}/Core/ExecutablePath.cpp")
 
 star_add_test(test_panel_cache)
+
+star_add_test(test_input_keys
+    SOURCES
+        "${STAR_SRC}/Core/InputKeyNames.cpp"
+    LIBRARIES raylib)

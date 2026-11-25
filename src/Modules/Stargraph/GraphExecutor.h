@@ -28,4 +28,5 @@ public:
 private:
     static Node* FollowExecLink(Stargraph& graph, Node* fromNode, const std::string& pinName = "Out", int* outPinId = nullptr);
     static void ExecuteFromNode(Stargraph& graph, Node* startNode, ExecutionContext& ctx);
+    static void ProcessAnyInputNode(Stargraph& graph, Node& node, ExecutionContext& ctx);
 };

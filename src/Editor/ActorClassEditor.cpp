@@ -774,6 +774,7 @@ void ActorClassEditor::RenderPickers(Rectangle panel) {
                     std::string category = "Keyboard";
                     if (keyName.rfind("GAMEPAD_", 0) == 0) category = "Gamepad";
                     else if (keyName.find("MOUSE") != std::string::npos) category = "Mouse";
+                    else if (keyName == "ANY") category = "Any";
                     std::string label = keyName;
                     for (char& c : label) if (c == '_') c = ' ';
                     keyEntries.push_back({ category, keyName, label });

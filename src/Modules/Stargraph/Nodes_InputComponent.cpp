@@ -150,7 +150,7 @@ void RegisterInputComponentNodes() {
 
         if (target->device == "Unclaimed" && !IsDeviceClaimedByOther("Keyboard+Mouse", target)) {
             for (const std::string& key : GetInputKeyNames()) {
-                if (key.rfind("GAMEPAD_", 0) == 0 || InputKeyIsAnalog(key)) continue;
+                if (key.rfind("GAMEPAD_", 0) == 0 || !InputKeyClaimsDevice(key)) continue;
                 float axis = 0.0f;
                 if (PollInputKey(key, axis)) { target->device = "Keyboard+Mouse"; break; }
             }
@@ -163,7 +163,7 @@ void RegisterInputComponentNodes() {
                 if (IsDeviceClaimedByOther(candidate, target)) continue;
 
                 for (const std::string& key : GetInputKeyNames()) {
-                    if (key.rfind("GAMEPAD_", 0) != 0 || InputKeyIsAnalog(key)) continue;
+                    if (key.rfind("GAMEPAD_", 0) != 0 || !InputKeyClaimsDevice(key)) continue;
                     float axis = 0.0f;
                     if (PollInputKey(key, axis, i)) { target->device = candidate; break; }
                 }
