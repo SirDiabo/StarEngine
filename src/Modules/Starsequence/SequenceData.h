@@ -108,7 +108,7 @@ struct Sequence {
     int64_t loopEnd = 0;
     int polyphony = 64;
     float layerFade = 0.2f;
-    float volume = 1.0f;
+    float volume = 0.5f;
     std::vector<std::string> effects;
 
     std::vector<TempoPoint> tempo;
