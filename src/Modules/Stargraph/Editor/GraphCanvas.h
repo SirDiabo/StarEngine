@@ -26,6 +26,6 @@ namespace GraphCanvas {
     bool IsPointNearWire(Vector2 point, Vector2 from, Vector2 to);
 
     Rectangle NormalizeBox(Vector2 a, Vector2 b);
-    Vector2 SnapToGrid(Vector2 worldPos, float gridSize = 16.0f);
+    Vector2 SnapToGrid(Vector2 worldPos, float gridSize = 8.0f);
 
 }

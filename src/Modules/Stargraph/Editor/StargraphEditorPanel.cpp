@@ -17,11 +17,11 @@ std::string StargraphPinAssetExtension(const Pin& pin) {
 }
 
 const float StargraphEditorPanel::minNodeWidth   = 160.0f;
-const float StargraphEditorPanel::pinHeight      = 22.0f;
+const float StargraphEditorPanel::pinHeight      = 24.0f;
 const float StargraphEditorPanel::pinRadius      = 5.0f;
-const float StargraphEditorPanel::headerHeight   = 26.0f;
+const float StargraphEditorPanel::headerHeight   = 24.0f;
 const float StargraphEditorPanel::toolbarHeight  = 30.0f;
-const float StargraphEditorPanel::primitiveNodeHeight = 26.0f;
+const float StargraphEditorPanel::primitiveNodeHeight = 24.0f;
 
 StargraphEditorPanel::~StargraphEditorPanel() {
     if (undoDocument) {
