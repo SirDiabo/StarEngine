@@ -16,6 +16,7 @@
 #include "Runtime/CollisionTrace.h"
 #include "Runtime/CollisionDebug.h"
 #include "Core/CollisionLayers.h"
+#include "Core/InputKeyNames.h"
 #include "Core/ObjectKindRegistry.h"
 #include "Runtime/Networking/NetworkBackend.h"
 #include "Core/ObjectRefRegistry.h"
@@ -544,6 +545,16 @@ Value Fn_input_just_pressed(Runtime& rt, std::vector<Value>& a) { const auto& s 
 Value Fn_input_just_released(Runtime& rt, std::vector<Value>& a) { const auto& s = RequireInstance(rt).QueryInput(a[0].s); return Value::Bool(!s.held && s.prevHeld); }
 Value Fn_input_axis(Runtime& rt, std::vector<Value>& a) { return Value::Float(RequireInstance(rt).QueryInput(a[0].s).axis); }
 Value Fn_input_axis_2d(Runtime& rt, std::vector<Value>& a) { const auto& s = RequireInstance(rt).QueryInput(a[0].s); return Value::Vec3(s.x, s.y, 0.0f); }
+Value Fn_any_input_key(Runtime& rt, std::vector<Value>&) {
+    Instance& instance = RequireInstance(rt);
+    std::string pressed;
+    for (const std::string& name : GetInputKeyNames()) {
+        if (!InputKeyIsButton(name)) continue;
+        const auto& s = instance.QueryInput(name);
+        if (pressed.empty() && s.held && !s.prevHeld) pressed = name;
+    }
+    return Value::String(pressed);
+}
 
 Value M_vec_length(Runtime&, Value& s, std::vector<Value>&) { return Value::Float(std::sqrt(s.x * s.x + s.y * s.y + s.z * s.z)); }
 Value M_vec_normalized(Runtime&, Value& s, std::vector<Value>&) {
@@ -758,6 +769,7 @@ const std::vector<BuiltinDef>& Builtins() {
         { "input_just_released", { T(Kind::String) }, 1, T(Kind::Bool), RetRule::Fixed, false, Fn_input_just_released },
         { "input_axis", { T(Kind::String) }, 1, T(Kind::Float), RetRule::Fixed, false, Fn_input_axis },
         { "input_axis_2d", { T(Kind::String) }, 1, T(Kind::Vec3), RetRule::Fixed, false, Fn_input_axis_2d },
+        { "any_input_key", {}, 0, T(Kind::String), RetRule::Fixed, false, Fn_any_input_key },
         { "set_view_target", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_view_target },
         { "get_view_target", {}, 0, ActorT(), RetRule::Fixed, false, Fn_get_view_target },
         { "set_input_focus", { ActorT() }, 1, T(Kind::Void), RetRule::Fixed, false, Fn_set_input_focus },
