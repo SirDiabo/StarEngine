@@ -237,6 +237,25 @@ bool Stargraph::HasLink(int outputPinId, int inputPinId) const {
     return false;
 }
 
+Node* Stargraph::InsertRerouteOnLink(int outputPinId, int inputPinId, float posX, float posY) {
+    if (!HasLink(outputPinId, inputPinId)) return nullptr;
+    Node* reroute = CreateNode("Reroute");
+    if (!reroute) return nullptr;
+    if (reroute->inputs.empty() || reroute->outputs.empty()) {
+        RemoveNode(std::stoi(reroute->id));
+        return nullptr;
+    }
+    reroute->posX = posX;
+    reroute->posY = posY;
+    const int rerouteIn = reroute->inputs[0].id;
+    const int rerouteOut = reroute->outputs[0].id;
+    RemoveSpecificLink(outputPinId, inputPinId);
+    AddLink({outputPinId, rerouteIn});
+    AddLink({rerouteOut, inputPinId});
+    RefreshWildcardPins(reroute);
+    return reroute;
+}
+
 std::vector<int> Stargraph::ReplaceLinksForConnection(int outputPinId, int inputPinId) {
     std::vector<int> affected;
     const Pin* out = FindPin(outputPinId);

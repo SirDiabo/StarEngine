@@ -1138,6 +1138,9 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
 
     BeginScissorMode((int)graphArea.x, (int)graphArea.y, (int)graphArea.width, (int)graphArea.height);
 
+    static double lastWireClickTime = -10.0;
+    static Vector2 lastWireClickPos = {0.0f, 0.0f};
+
     for (const Link& link : ActiveGraph().GetLinks()) {
         const Pin* outPin = nullptr; const Node* outNode = nullptr;
         const Pin* inPin  = nullptr; const Node* inNode  = nullptr;
@@ -1146,6 +1149,30 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             for (const Pin& pin : node.inputs)  if (pin.id == link.inputPinId)  { inPin  = &pin; inNode  = &node; }
         }
         if (!outPin || !inPin || !outNode || !inNode) continue;
+
+        if (!IsKeyDown(KEY_LEFT_ALT) && pressedInGraph(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen &&
+            !actorClassPicker.IsOpen() && !nodeContextMenu.IsOpen() && !GetNodeAtPos(mousePos) &&
+            GraphCanvas::IsPointNearWire(mousePos, GetPinPos(*outNode, *outPin), GetPinPos(*inNode, *inPin))) {
+            const double now = GetTime();
+            const float dx = mousePos.x - lastWireClickPos.x;
+            const float dy = mousePos.y - lastWireClickPos.y;
+            if (now - lastWireClickTime < 0.35 && dx * dx + dy * dy < 36.0f) {
+                Vector2 world = GraphCanvas::ScreenToWorld(canvasState, graphArea, mousePos);
+                Vector2 position = GraphCanvas::SnapToGrid({world.x - kRerouteWidth * 0.5f, world.y - kRerouteHeight * 0.5f});
+                int outId = link.outputPinId;
+                int inId = link.inputPinId;
+                Node* created = ActiveGraph().InsertRerouteOnLink(outId, inId, position.x, position.y);
+                lastWireClickTime = -10.0;
+                if (created) {
+                    isDirty = true;
+                    RefreshWildcardPins(created);
+                    break;
+                }
+            } else {
+                lastWireClickTime = now;
+                lastWireClickPos = mousePos;
+            }
+        }
 
         Vector2 from = GetPinPos(*outNode, *outPin);
         Vector2 to   = GetPinPos(*inNode, *inPin);

@@ -64,11 +64,11 @@ void DrawWire(Vector2 from, Vector2 to, float thickness, Color color) {
 
 bool IsPointNearWire(Vector2 point, Vector2 from, Vector2 to) {
     Vector2 mid = {(from.x + to.x) * 0.5f, (from.y + to.y) * 0.5f};
-    if (CheckCollisionPointCircle(point, mid, 8.0f) ||
-        CheckCollisionPointCircle(point, from, 12.0f) ||
-        CheckCollisionPointCircle(point, to, 12.0f)) {
+    if (CheckCollisionPointCircle(point, mid, 12.0f) ||
+        CheckCollisionPointCircle(point, from, 16.0f) ||
+        CheckCollisionPointCircle(point, to, 16.0f)) {
         return true;
-    }
+}
 
     for (float t = 0.0f; t <= 1.0f; t += 0.1f) {
         float cx1 = from.x + (to.x - from.x) * 0.5f;
@@ -79,7 +79,7 @@ bool IsPointNearWire(Vector2 point, Vector2 from, Vector2 to) {
                    3 * (1 - t) * t * t * cx2 + t * t * t * to.x;
         float by = (1 - t) * (1 - t) * (1 - t) * from.y + 3 * (1 - t) * (1 - t) * t * cy1 +
                    3 * (1 - t) * t * t * cy2 + t * t * t * to.y;
-        if (CheckCollisionPointCircle(point, {bx, by}, 7.0f)) return true;
+        if (CheckCollisionPointCircle(point, {bx, by}, 11.0f)) return true;
     }
     return false;
 }

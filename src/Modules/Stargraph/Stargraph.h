@@ -207,6 +207,7 @@ public:
     void RemoveLink(int pinId);
     void RemoveSpecificLink(int outputPinId, int inputPinId);
     bool HasLink(int outputPinId, int inputPinId) const;
+    Node* InsertRerouteOnLink(int outputPinId, int inputPinId, float posX, float posY);
     std::vector<int> ReplaceLinksForConnection(int outputPinId, int inputPinId);
     bool IsPinHidden(const Node& node, const Pin& pin) const;
     bool HasCollapsiblePins(const Node& node) const;
