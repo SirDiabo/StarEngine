@@ -117,6 +117,7 @@ struct Pin {
     std::string objectKind;
     PinType elementType = PinType::None;
     bool fieldOnly = false;
+    bool collapsed = false;
 };
 
 inline std::string operator+(const std::string& lhs, const PinValue& rhs) { return lhs + (const std::string&)rhs; }
@@ -161,6 +162,8 @@ struct Node {
 
     std::vector<std::string> heldKeys;
 
+    bool expanded = false;
+
     // Runtime-only wildcard resolution cache
     bool wildcardResolved = false;
 };
@@ -203,6 +206,10 @@ public:
     void AddLink(const Link& link);
     void RemoveLink(int pinId);
     void RemoveSpecificLink(int outputPinId, int inputPinId);
+    bool HasLink(int outputPinId, int inputPinId) const;
+    std::vector<int> ReplaceLinksForConnection(int outputPinId, int inputPinId);
+    bool IsPinHidden(const Node& node, const Pin& pin) const;
+    bool HasCollapsiblePins(const Node& node) const;
     void AddVariable(const Variable& var);
     void RemoveVariable(size_t index);
     void RenameVariable(size_t index, const std::string& newName);

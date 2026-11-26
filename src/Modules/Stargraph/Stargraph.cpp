@@ -230,6 +230,50 @@ void Stargraph::RemoveSpecificLink(int outputPinId, int inputPinId) {
     }
 }
 
+bool Stargraph::HasLink(int outputPinId, int inputPinId) const {
+    for (const Link& link : links) {
+        if (link.outputPinId == outputPinId && link.inputPinId == inputPinId) return true;
+    }
+    return false;
+}
+
+std::vector<int> Stargraph::ReplaceLinksForConnection(int outputPinId, int inputPinId) {
+    std::vector<int> affected;
+    const Pin* out = FindPin(outputPinId);
+    const Pin* in = FindPin(inputPinId);
+    if (!out || !in) return affected;
+
+    const bool replaceInputLinks = in->type != PinType::Exec;
+    const bool replaceOutputLinks = out->type == PinType::Exec;
+    for (auto it = links.begin(); it != links.end();) {
+        const bool dropForInput = replaceInputLinks && it->inputPinId == inputPinId;
+        const bool dropForOutput = replaceOutputLinks && it->outputPinId == outputPinId;
+        if (!dropForInput && !dropForOutput) {
+            ++it;
+            continue;
+        }
+        if (dropForInput) affected.push_back(it->outputPinId);
+        if (dropForOutput) affected.push_back(it->inputPinId);
+        it = links.erase(it);
+    }
+    if (!affected.empty()) InvalidateCaches();
+    return affected;
+}
+
+bool Stargraph::IsPinHidden(const Node& node, const Pin& pin) const {
+    if (!pin.collapsed || node.expanded) return false;
+    for (const Link& link : links) {
+        if (link.inputPinId == pin.id || link.outputPinId == pin.id) return false;
+    }
+    return true;
+}
+
+bool Stargraph::HasCollapsiblePins(const Node& node) const {
+    for (const Pin& pin : node.inputs) if (pin.collapsed) return true;
+    for (const Pin& pin : node.outputs) if (pin.collapsed) return true;
+    return false;
+}
+
 std::string Variable::DefaultElementText() const {
     return StarArray::DefaultElementText(type);
 }
@@ -329,6 +373,67 @@ void Stargraph::RefreshCallFunctionPins(Node& callNode, Stargraph& host) {
 
 void Stargraph::RefreshWildcardPins(Node* node) {
     if (!node) return;
+
+    if (node->type == "Reroute") {
+        std::vector<Node*> component;
+        std::vector<Node*> pending = { node };
+        while (!pending.empty()) {
+            Node* current = pending.back();
+            pending.pop_back();
+            if (std::find(component.begin(), component.end(), current) != component.end()) continue;
+            component.push_back(current);
+            for (const Link& lk : links) {
+                Node* from = FindNodeByPinId(lk.outputPinId);
+                Node* to = FindNodeByPinId(lk.inputPinId);
+                if (from == current && to && to->type == "Reroute") pending.push_back(to);
+                if (to == current && from && from->type == "Reroute") pending.push_back(from);
+            }
+        }
+
+        const Pin* source = nullptr;
+        auto consider = [&](const Pin* candidate) {
+            if (source || !candidate) return;
+            if (candidate->type == PinType::Wildcard || candidate->type == PinType::None) return;
+            if (candidate->type == PinType::Array && (candidate->elementType == PinType::Wildcard || candidate->elementType == PinType::None)) return;
+            source = candidate;
+        };
+        for (Node* member : component) {
+            for (const Link& lk : links) {
+                for (const Pin& pin : member->inputs) {
+                    if (pin.id != lk.inputPinId) continue;
+                    Node* from = FindNodeByPinId(lk.outputPinId);
+                    if (from && from->type != "Reroute") consider(FindPin(lk.outputPinId));
+                }
+                for (const Pin& pin : member->outputs) {
+                    if (pin.id != lk.outputPinId) continue;
+                    Node* to = FindNodeByPinId(lk.inputPinId);
+                    if (to && to->type != "Reroute") consider(FindPin(lk.inputPinId));
+                }
+            }
+        }
+
+        for (Node* member : component) {
+            for (std::vector<Pin>* side : { &member->inputs, &member->outputs }) {
+                for (Pin& pin : *side) {
+                    if (source) {
+                        pin.type = source->type;
+                        pin.elementType = source->elementType;
+                        pin.objectKind = source->objectKind;
+                        pin.isWildcard = false;
+                    } else {
+                        pin.type = PinType::Wildcard;
+                        pin.elementType = PinType::None;
+                        pin.objectKind.clear();
+                        pin.isWildcard = true;
+                    }
+                }
+            }
+            member->wildcardResolved = false;
+        }
+        InvalidateCaches();
+        return;
+    }
+
     const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
     if (!tmpl || !tmpl->createPins) return;
 
@@ -1163,6 +1268,10 @@ bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>
         if (idValue > maxLoadedLinkId) maxLoadedLinkId = idValue;
     }
     nextLinkId = maxLoadedLinkId + 1;
+
+    for (Node* created : createdNodes) {
+        if (created->type == "Reroute") RefreshWildcardPins(created);
+    }
 
     return true;
 }

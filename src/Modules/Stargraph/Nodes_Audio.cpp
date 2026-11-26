@@ -74,6 +74,9 @@ void RegisterAudioNodes() {
         node->inputs.push_back({"Follow", PinType::Object, true, false, 0, "", false, ""});
         node->outputs.push_back({"Out", PinType::Exec, false, true});
         node->outputs.push_back({"Sound", PinType::Object, false, true, 0, "", false, "Sound"});
+        for (Pin& pin : node->inputs) {
+            if (pin.name == "Bus" || pin.name == "Attenuation" || pin.name == "Position" || pin.name == "Follow") pin.collapsed = true;
+        }
     };
     playSound.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         std::string path;

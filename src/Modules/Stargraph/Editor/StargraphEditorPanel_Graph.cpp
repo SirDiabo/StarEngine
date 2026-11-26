@@ -109,6 +109,14 @@ Color StargraphEditorPanel::GetPinColor(const Pin& pin) const {
     return GetPinColor(pin.type);
 }
 
+static const float kCollapseBarHeight = 10.0f;
+static const float kRerouteWidth = 40.0f;
+static const float kRerouteHeight = 22.0f;
+
+static bool IsRerouteNode(const Node& node) {
+    return node.type == "Reroute";
+}
+
 static void DrawPinShape(Vector2 center, float radius, Color color, bool filled, bool isArray) {
     if (isArray) {
         Rectangle box = {center.x - radius, center.y - radius, radius * 2.0f, radius * 2.0f};
@@ -148,17 +156,25 @@ Color StargraphEditorPanel::GetNodeHeaderColor(const Node& node) const {
 }
 
 float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
+    if (IsRerouteNode(node)) return kRerouteHeight;
     if (IsPrimitiveNode(node)) return GetPrimitiveNodeHeight();
     size_t visibleInputs = 0;
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
         if (pin.name == "Component_Name") continue;
+        if (ActiveGraph().IsPinHidden(node, pin)) continue;
         visibleInputs++;
     }
-    size_t rows = std::max(visibleInputs, node.outputs.size());
+    size_t visibleOutputs = 0;
+    for (const Pin& pin : node.outputs) {
+        if (ActiveGraph().IsPinHidden(node, pin)) continue;
+        visibleOutputs++;
+    }
+    size_t rows = std::max(visibleInputs, visibleOutputs);
     for (const Pin& pin : node.inputs) {
         if (pin.name == "Variable_Name") continue;
         if (pin.name == "Component_Name") continue;
+        if (ActiveGraph().IsPinHidden(node, pin)) continue;
         if (pin.type != PinType::Exec && pin.type != PinType::Array) {
             bool linked = false;
             for (const Link& lk : ActiveGraph().GetLinks()) {
@@ -167,13 +183,16 @@ float StargraphEditorPanel::GetNodeHeight(const Node& node) const {
             if (!linked) rows++;
         }
     }
-    return headerHeight + rows * pinHeight + 6;
+    float collapseBar = ActiveGraph().HasCollapsiblePins(node) ? kCollapseBarHeight : 0.0f;
+    return headerHeight + rows * pinHeight + 6 + collapseBar;
 }
 
 float StargraphEditorPanel::GetNodeWidth(const Node& node) const {
     std::string displayTitle = node.title;
     for (char& c : displayTitle) if (c == '_') c = ' ';
     float titleW = (float)MeasureText(displayTitle.c_str(), 13);
+
+    if (IsRerouteNode(node)) return kRerouteWidth;
 
     if (IsPrimitiveNode(node)) {
         float needed = 16.0f + titleW + pinRadius * 2.0f + 16.0f;
@@ -185,12 +204,14 @@ float StargraphEditorPanel::GetNodeWidth(const Node& node) const {
         if (pin.name == "Variable_Name") continue;
         if (pin.name == "Component_Name") continue;
         if (pin.type == PinType::Exec) continue;
+        if (ActiveGraph().IsPinHidden(node, pin)) continue;
         float w = (float)MeasureText(pin.name.c_str(), 12);
         if (w > maxInputLabelW) maxInputLabelW = w;
     }
 
     float maxOutputLabelW = 0.0f;
     for (const Pin& pin : node.outputs) {
+        if (ActiveGraph().IsPinHidden(node, pin)) continue;
         float w = (float)MeasureText(pin.name.c_str(), 12);
         if (w > maxOutputLabelW) maxOutputLabelW = w;
     }
@@ -220,7 +241,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     float nodeY = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
     float nodeH = GetNodeHeight(node) * canvasState.zoom;
 
-    if (IsPrimitiveNode(node)) {
+    if (IsPrimitiveNode(node) || IsRerouteNode(node)) {
         float scaledRadius = pinRadius * canvasState.zoom;
         if (pin.isInput) {
             return {nodeX + scaledRadius + 2, nodeY + nodeH * 0.5f};
@@ -234,6 +255,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     for (const Pin& p : node.inputs) {
         if (p.name == "Variable_Name") continue;
         if (p.name == "Component_Name") continue;
+        if (ActiveGraph().IsPinHidden(node, p)) continue;
         if (p.id == pin.id) return {nodeX + pinRadius * canvasState.zoom + 2, y};
         y += scaledPinHeight;
         if (p.type != PinType::Exec && p.type != PinType::Array) {
@@ -246,6 +268,7 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     }
     y = nodeY + headerHeight * canvasState.zoom + scaledPinHeight * 0.5f;
     for (const Pin& p : node.outputs) {
+        if (ActiveGraph().IsPinHidden(node, p)) continue;
         if (p.id == pin.id) return {nodeX + GetNodeWidth(node) * canvasState.zoom - pinRadius * canvasState.zoom - 2, y};
         y += scaledPinHeight;
     }
@@ -263,6 +286,8 @@ bool StargraphEditorPanel::PinsCompatible(int outputPinId, int inputPinId) const
     }
     if (!out || !in) return false;
     if (out->fieldOnly || in->fieldOnly) return false;
+    if (outNode == inNode && IsRerouteNode(*outNode)) return false;
+    if ((IsRerouteNode(*outNode) && out->type == PinType::Wildcard) || (IsRerouteNode(*inNode) && in->type == PinType::Wildcard)) return true;
     if (out->type == PinType::Array || in->type == PinType::Array) {
         if (out->type != PinType::Array || in->type != PinType::Array) return false;
         if (out->elementType == PinType::Wildcard || in->elementType == PinType::Wildcard) return true;
@@ -292,11 +317,12 @@ static const char* StringConversionNodeType(PinType from) {
 }
 
 bool StargraphEditorPanel::ConnectPins(int outputPinId, int inputPinId) {
-    for (const Link& lk : ActiveGraph().GetLinks()) {
-        if (lk.inputPinId == inputPinId) return false;
-    }
+    if (ActiveGraph().HasLink(outputPinId, inputPinId)) return false;
 
     if (PinsCompatible(outputPinId, inputPinId)) {
+        for (int other : ActiveGraph().ReplaceLinksForConnection(outputPinId, inputPinId)) {
+            RefreshWildcardPins(ActiveGraph().FindNodeByPinId(other));
+        }
         ActiveGraph().AddLink({outputPinId, inputPinId});
         RefreshWildcardPins(ActiveGraph().FindNodeByPinId(outputPinId));
         RefreshWildcardPins(ActiveGraph().FindNodeByPinId(inputPinId));
@@ -336,6 +362,9 @@ bool StargraphEditorPanel::ConnectPins(int outputPinId, int inputPinId) {
     conversion->posX = position.x;
     conversion->posY = position.y;
 
+    for (int other : ActiveGraph().ReplaceLinksForConnection(resultPinId, inputPinId)) {
+        RefreshWildcardPins(ActiveGraph().FindNodeByPinId(other));
+    }
     ActiveGraph().AddLink({outputPinId, valuePinId});
     ActiveGraph().AddLink({resultPinId, inputPinId});
     RefreshWildcardPins(ActiveGraph().FindNodeByPinId(outputPinId));
@@ -373,15 +402,15 @@ void StargraphEditorPanel::CancelLink() {
 }
 
 void StargraphEditorPanel::RemoveLinkFromPin(int pinId) {
-    int otherPinId = -1;
+    std::vector<int> otherPinIds;
     for (const Link& lk : ActiveGraph().GetLinks()) {
-        if (lk.inputPinId == pinId)  { otherPinId = lk.outputPinId; break; }
-        if (lk.outputPinId == pinId) { otherPinId = lk.inputPinId;  break; }
+        if (lk.inputPinId == pinId) otherPinIds.push_back(lk.outputPinId);
+        else if (lk.outputPinId == pinId) otherPinIds.push_back(lk.inputPinId);
     }
     ActiveGraph().RemoveLink(pinId);
     isDirty = true;
     RefreshWildcardPins(ActiveGraph().FindNodeByPinId(pinId));
-    if (otherPinId != -1) RefreshWildcardPins(ActiveGraph().FindNodeByPinId(otherPinId));
+    for (int otherPinId : otherPinIds) RefreshWildcardPins(ActiveGraph().FindNodeByPinId(otherPinId));
 }
 
 void StargraphEditorPanel::OpenNodeContextMenu(Node& node) {
@@ -1138,25 +1167,26 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
         Rectangle nodeBounds = {nx, ny, scaledNodeWidth, nh};
         Rectangle headerBounds = {nx, ny, scaledNodeWidth, scaledHeaderHeight};
         
-        if (IsPrimitiveNode(node)) {
-            float scaledHeight = GetPrimitiveNodeHeight() * canvasState.zoom;
+        const bool isReroute = IsRerouteNode(node);
+        if (IsPrimitiveNode(node) || isReroute) {
+            float scaledHeight = (isReroute ? GetNodeHeight(node) : GetPrimitiveNodeHeight()) * canvasState.zoom;
             nodeBounds = {nx, ny, scaledNodeWidth, scaledHeight};
             headerBounds = nodeBounds;
             
             float scaledRadius = pinRadius * canvasState.zoom;
             const Pin* outputPin = nullptr;
             for (const Pin& p : node.outputs) {
-                if (p.name == "Value" || p.name == "Component") { outputPin = &p; break; }
+                if (isReroute ? p.name == "Out" : (p.name == "Value" || p.name == "Component")) { outputPin = &p; break; }
             }
             const Pin* targetPin = nullptr;
             for (const Pin& p : node.inputs) {
-                if (p.name == "Target") { targetPin = &p; break; }
+                if (p.name == (isReroute ? "In" : "Target")) { targetPin = &p; break; }
             }
             bool targetLinked = false;
             if (targetPin) {
                 for (const Link& lk : ActiveGraph().GetLinks()) if (lk.inputPinId == targetPin->id) { targetLinked = true; break; }
             }
-            bool showTargetPin = targetPin && (targetLinked || linkFromPin != -1 || CheckCollisionPointRec(mousePos, nodeBounds));
+            bool showTargetPin = targetPin && (isReroute || targetLinked || linkFromPin != -1 || CheckCollisionPointRec(mousePos, nodeBounds));
 
             if (showTargetPin && CheckCollisionPointCircle(mousePos, {nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
                 DrawCircleV({nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
@@ -1206,9 +1236,11 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 DrawPinShape(pinPos, scaledRadius, pinColor, linked, outputPin->type == PinType::Array);
             }
             
-            std::string displayTitle = node.title;
-            for (char& c : displayTitle) if (c == '_') c = ' ';
-            DrawText(displayTitle.c_str(), (int)nx + (targetPin ? 16 : 8), (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
+            if (!isReroute) {
+                std::string displayTitle = node.title;
+                for (char& c : displayTitle) if (c == '_') c = ' ';
+                DrawText(displayTitle.c_str(), (int)nx + (targetPin ? 16 : 8), (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
+            }
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
                 if (mouseInGraph && IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && !canvasState.didPan && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen() && !nodeContextMenu.IsOpen()) {
@@ -1294,6 +1326,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             Pin& pin = node.inputs[i];
             if (pin.name == "Variable_Name") continue;
             if (pin.name == "Component_Name") continue;
+            if (ActiveGraph().IsPinHidden(node, pin)) continue;
             Vector2 pinPos = {nx + pinRadius * canvasState.zoom + 2, inputY};
             Color pinColor = GetPinColor(pin);
 
@@ -1592,6 +1625,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
         float outputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.outputs.size(); i++) {
             const Pin& pin = node.outputs[i];
+            if (ActiveGraph().IsPinHidden(node, pin)) continue;
             Vector2 pinPos = {nx + scaledNodeWidth - pinRadius * canvasState.zoom - 2, outputY};
             Color pinColor = GetPinColor(pin);
 
@@ -1621,6 +1655,27 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                 } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && linkFromPin != -1) {
                     TryCompleteLink(pin.id, false);
                 }
+            }
+        }
+
+        if (ActiveGraph().HasCollapsiblePins(node)) {
+            float barHeight = kCollapseBarHeight * canvasState.zoom;
+            Rectangle collapseBar = {nx + 1, ny + nh - barHeight, scaledNodeWidth - 2, barHeight - 1};
+            bool barHovered = !WidgetInput::IsMouseBlocked() && CheckCollisionPointRec(mousePos, collapseBar) && CheckCollisionPointRec(mousePos, graphArea);
+            DrawRectangleRec(collapseBar, barHovered ? Color{58, 62, 72, 255} : Color{46, 49, 56, 255});
+            float arrowX = collapseBar.x + collapseBar.width * 0.5f;
+            float arrowY = collapseBar.y + collapseBar.height * 0.5f;
+            float arrowHalfWidth = 4.0f * canvasState.zoom;
+            float arrowHalfHeight = 2.5f * canvasState.zoom;
+            Color arrowColor = barHovered ? Color{220, 220, 225, 255} : Color{150, 152, 160, 255};
+            if (node.expanded) {
+                DrawTriangle({arrowX, arrowY - arrowHalfHeight}, {arrowX - arrowHalfWidth, arrowY + arrowHalfHeight}, {arrowX + arrowHalfWidth, arrowY + arrowHalfHeight}, arrowColor);
+            } else {
+                DrawTriangle({arrowX, arrowY + arrowHalfHeight}, {arrowX + arrowHalfWidth, arrowY - arrowHalfHeight}, {arrowX - arrowHalfWidth, arrowY - arrowHalfHeight}, arrowColor);
+            }
+            if (barHovered && pressedInGraph(MOUSE_BUTTON_LEFT) && linkFromPin == -1 && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
+                node.expanded = !node.expanded;
+                continue;
             }
         }
 
@@ -1702,9 +1757,11 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
             bool hitPin = false;
             for (const Node& node : ActiveGraph().GetNodes()) {
                 for (const Pin& pin : node.inputs) {
+                    if (ActiveGraph().IsPinHidden(node, pin)) continue;
                     if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * canvasState.zoom + 4)) { hitPin = true; break; }
                 }
                 for (const Pin& pin : node.outputs) {
+                    if (ActiveGraph().IsPinHidden(node, pin)) continue;
                     if (CheckCollisionPointCircle(mousePos, GetPinPos(node, pin), pinRadius * canvasState.zoom + 4)) { hitPin = true; break; }
                 }
                 if (hitPin) break;
@@ -2125,26 +2182,37 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
         }
         if (fromPin) {
             std::string sourceKind = EffectivePinObjectKind(fromNode, *fromPin);
-            if (fromIsOutput) {
+            auto linkSpawned = [&](int spawnedOutputPinId, int spawnedInputPinId) {
+                for (int other : ActiveGraph().ReplaceLinksForConnection(spawnedOutputPinId, spawnedInputPinId)) {
+                    RefreshWildcardPins(ActiveGraph().FindNodeByPinId(other));
+                }
+                ActiveGraph().AddLink({spawnedOutputPinId, spawnedInputPinId});
+            };
+            if (IsRerouteNode(*node)) {
+                if (fromIsOutput && !node->inputs.empty()) linkSpawned(filterCompatibleWithPin, node->inputs[0].id);
+                else if (!fromIsOutput && !node->outputs.empty()) linkSpawned(node->outputs[0].id, filterCompatibleWithPin);
+            } else if (fromIsOutput) {
                 for (const Pin& p : node->inputs) {
-                    if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; ActiveGraph().AddLink({filterCompatibleWithPin, p.id}); break; }
+                    if (p.collapsed) continue;
+                    if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; linkSpawned(filterCompatibleWithPin, p.id); break; }
                     if (p.type != fromPin->type) continue;
                     if (p.type == PinType::Array && !ArrayElementsCompatible(*fromPin, p)) continue;
                     if (p.type == PinType::Object) {
                         if (!ObjectKindRegistry::Get().IsCompatible(sourceKind, p.objectKind)) continue;
                     }
-                    ActiveGraph().AddLink({filterCompatibleWithPin, p.id});
+                    linkSpawned(filterCompatibleWithPin, p.id);
                     break;
                 }
             } else {
                 for (const Pin& p : node->outputs) {
-                    if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; ActiveGraph().AddLink({p.id, filterCompatibleWithPin}); break; }
+                    if (p.collapsed) continue;
+                    if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; linkSpawned(p.id, filterCompatibleWithPin); break; }
                     if (p.type != fromPin->type) continue;
                     if (p.type == PinType::Array && !ArrayElementsCompatible(*fromPin, p)) continue;
                     if (p.type == PinType::Object) {
                         if (!ObjectKindRegistry::Get().IsCompatible(p.objectKind, sourceKind)) continue;
                     }
-                    ActiveGraph().AddLink({p.id, filterCompatibleWithPin});
+                    linkSpawned(p.id, filterCompatibleWithPin);
                     break;
                 }
             }
@@ -2209,9 +2277,10 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
             const Pin* fromPin = dragFromPin;
             bool fromIsOutput = dragFromIsOutput;
             if (fromPin) {
-                bool hasCompatible = false;
+                bool hasCompatible = t.type == "Reroute";
                 if (fromIsOutput) {
                     for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.inputs; }() : std::vector<Pin>{}) {
+                        if (p.collapsed) continue;
                         if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; hasCompatible = true; break; }
                         if (p.type != fromPin->type) continue;
                         if (p.type == PinType::Array && !ArrayElementsCompatible(*fromPin, p)) continue;
@@ -2223,6 +2292,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
                     }
                 } else {
                     for (const Pin& p : t.createPins ? [&]() { Node tmp; t.createPins(&tmp); return tmp.outputs; }() : std::vector<Pin>{}) {
+                        if (p.collapsed) continue;
                         if (p.type == PinType::Wildcard) { if (fromPin->type == PinType::Array) continue; hasCompatible = true; break; }
                         if (p.type != fromPin->type) continue;
                         if (p.type == PinType::Array && !ArrayElementsCompatible(*fromPin, p)) continue;

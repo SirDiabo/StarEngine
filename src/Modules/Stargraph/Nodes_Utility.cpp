@@ -37,6 +37,24 @@ static float GetScalarValue(const Pin& p) {
 }
 
 void RegisterUtilityNodes() {
+    NodeTemplate reroute;
+    reroute.type = "Reroute";
+    reroute.category = "Utility";
+    reroute.moduleName = "Stargraph";
+    reroute.createPins = [](Node* node) {
+        node->inputs.push_back({"In", PinType::Wildcard, true, false});
+        node->outputs.push_back({"Out", PinType::Wildcard, false, true});
+    };
+    reroute.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
+        const Pin* in = nullptr;
+        Pin* out = nullptr;
+        for (const Pin& p : node.inputs) if (p.name == "In") in = &p;
+        for (Pin& p : node.outputs) if (p.name == "Out") out = &p;
+        if (!in || !out || in->type == PinType::Exec) return;
+        out->defaultValue = in->defaultValue;
+    };
+    NodeRegistry::Get().RegisterNode(reroute);
+
     NodeTemplate printString;
     printString.type = "Print_String";
     printString.category = "Utility";
