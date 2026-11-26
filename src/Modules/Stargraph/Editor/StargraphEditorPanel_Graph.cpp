@@ -111,10 +111,20 @@ Color StargraphEditorPanel::GetPinColor(const Pin& pin) const {
 
 static const float kCollapseBarHeight = 10.0f;
 static const float kRerouteWidth = 40.0f;
-static const float kRerouteHeight = 22.0f;
+static const float kRerouteHeight = 24.0f;
 
 static bool IsRerouteNode(const Node& node) {
     return node.type == "Reroute";
+}
+
+static int ScaledTextSize(float baseSize, float zoom) {
+    return (int)roundf(baseSize * zoom);
+}
+
+static void DrawNodeText(const char* text, float x, float y, int baseSize, float zoom, Color color) {
+    int size = ScaledTextSize((float)baseSize, zoom);
+    if (size < 4) return;
+    DrawText(text, (int)roundf(x), (int)roundf(y), size, color);
 }
 
 static void DrawPinShape(Vector2 center, float radius, Color color, bool filled, bool isArray) {
@@ -241,7 +251,11 @@ Vector2 StargraphEditorPanel::GetPinPos(const Node& node, const Pin& pin) const 
     float nodeY = graphArea.y + node.posY * canvasState.zoom + canvasState.scroll.y;
     float nodeH = GetNodeHeight(node) * canvasState.zoom;
 
-    if (IsPrimitiveNode(node) || IsRerouteNode(node)) {
+    if (IsRerouteNode(node)) {
+        return {nodeX + GetNodeWidth(node) * canvasState.zoom * 0.5f, nodeY + nodeH * 0.5f};
+    }
+
+    if (IsPrimitiveNode(node)) {
         float scaledRadius = pinRadius * canvasState.zoom;
         if (pin.isInput) {
             return {nodeX + scaledRadius + 2, nodeY + nodeH * 0.5f};
@@ -630,7 +644,7 @@ ClipNode CaptureNode(const Node& node) {
     for (int side = 0; side < 2; side++) {
         const bool isInput = (side == 0);
         for (const Pin& pin : (isInput ? node.inputs : node.outputs)) {
-            if (pin.type == PinType::Exec) continue;
+            if (pin.type == PinType::Exec && node.type != "Reroute") continue;
             ClipPin cp;
             cp.name = pin.name;
             cp.isInput = isInput;
@@ -677,7 +691,7 @@ Node* InstantiateNode(Stargraph& graph, const ClipNode& clip) {
         if (cp.isInput && cp.hasValue) target->defaultValue = cp.value;
     }
 
-    for (int side = 0; side < 2; side++) {
+    for (int side = 0; side < 2 && clip.type != "Reroute"; side++) {
         const bool isInput = (side == 0);
         std::vector<std::string> stale;
         for (const Pin& pin : (isInput ? node->inputs : node->outputs)) {
@@ -901,7 +915,7 @@ void StargraphEditorPanel::PasteNodes() {
     if (parsedNodes.empty()) return;
 
     Vector2 rawWorld = GraphCanvas::ScreenToWorld(canvasState, graphArea, GetMousePosition());
-    const float gridSnap = 16.0f;
+    const float gridSnap = 8.0f;
 
     std::vector<Node*> createdNodes;
     for (const ClipNode& clip : parsedNodes) {
@@ -1188,8 +1202,27 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             }
             bool showTargetPin = targetPin && (isReroute || targetLinked || linkFromPin != -1 || CheckCollisionPointRec(mousePos, nodeBounds));
 
-            if (showTargetPin && CheckCollisionPointCircle(mousePos, {nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
-                DrawCircleV({nx + scaledRadius + 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
+            const Vector2 rerouteCenter = {nx + scaledNodeWidth * 0.5f, ny + scaledHeight * 0.5f};
+            const Vector2 targetPinHitPos = isReroute ? rerouteCenter : Vector2{nx + scaledRadius + 2, ny + scaledHeight * 0.5f};
+            const Vector2 outputPinHitPos = isReroute ? rerouteCenter : Vector2{nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f};
+            bool overTargetPin = false;
+            bool overOutputPin = false;
+            if (isReroute) {
+                if (linkFromPin != -1) {
+                    bool insideNode = CheckCollisionPointRec(mousePos, nodeBounds);
+                    overTargetPin = insideNode && linkFromIsOutput;
+                    overOutputPin = insideNode && !linkFromIsOutput;
+                } else if (CheckCollisionPointCircle(mousePos, rerouteCenter, scaledRadius + 4)) {
+                    overTargetPin = mousePos.x < rerouteCenter.x;
+                    overOutputPin = !overTargetPin;
+                }
+            } else {
+                overTargetPin = CheckCollisionPointCircle(mousePos, targetPinHitPos, scaledRadius + 4);
+                overOutputPin = CheckCollisionPointCircle(mousePos, outputPinHitPos, scaledRadius + 4);
+            }
+
+            if (showTargetPin && overTargetPin && CheckCollisionPointRec(mousePos, graphArea)) {
+                DrawCircleV(targetPinHitPos, scaledRadius + 2, {255, 255, 255, 60});
                 if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (targetLinked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(targetPin->id);
@@ -1201,10 +1234,10 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 }
             }
 
-            if (outputPin && CheckCollisionPointCircle(mousePos, {nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 4) && CheckCollisionPointRec(mousePos, graphArea)) {
+            if (outputPin && overOutputPin && CheckCollisionPointRec(mousePos, graphArea)) {
                 bool linked = false;
                 for (const Link& lk : ActiveGraph().GetLinks()) if (lk.outputPinId == outputPin->id) { linked = true; break; }
-                DrawCircleV({nx + scaledNodeWidth - scaledRadius - 2, ny + scaledHeight * 0.5f}, scaledRadius + 2, {255, 255, 255, 60});
+                DrawCircleV(outputPinHitPos, scaledRadius + 2, {255, 255, 255, 60});
                 if (pressedInGraph(MOUSE_BUTTON_LEFT) && !keyPickerOpen && !nodeMenuOpen && !actorClassPicker.IsOpen()) {
                     if (linked && IsKeyDown(KEY_LEFT_ALT)) {
                         RemoveLinkFromPin(outputPin->id);
@@ -1218,17 +1251,29 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 }
             }
             
-            DrawRectangleRec(nodeBounds, {38, 40, 45, 255});
-            DrawRectangleLinesEx(nodeBounds, isSelected ? 2.0f : 1.0f,
-                                 isSelected ? Color{100, 160, 230, 255} : (outputPin ? GetPinColor(*outputPin) : GetPinColor(PinType::Object)));
-            
-            if (showTargetPin) {
+            if (isReroute) {
+                if (isSelected) DrawRectangleLinesEx(nodeBounds, 2.0f, Color{100, 160, 230, 255});
+            } else {
+                DrawRectangleRec(nodeBounds, {38, 40, 45, 255});
+                DrawRectangleLinesEx(nodeBounds, isSelected ? 2.0f : 1.0f,
+                                     isSelected ? Color{100, 160, 230, 255} : (outputPin ? GetPinColor(*outputPin) : GetPinColor(PinType::Object)));
+            }
+
+            if (isReroute && outputPin) {
+                bool anyLinked = false;
+                for (const Link& lk : ActiveGraph().GetLinks()) {
+                    if (lk.outputPinId == outputPin->id || (targetPin && lk.inputPinId == targetPin->id)) { anyLinked = true; break; }
+                }
+                DrawPinShape(rerouteCenter, scaledRadius, GetPinColor(*outputPin), anyLinked, outputPin->type == PinType::Array);
+            }
+
+            if (showTargetPin && !isReroute) {
                 Vector2 pinPos = {nx + scaledRadius + 2, ny + scaledHeight * 0.5f};
                 Color pinColor = GetPinColor(*targetPin);
                 DrawPinShape(pinPos, scaledRadius, pinColor, targetLinked, targetPin->type == PinType::Array);
             }
 
-            if (outputPin) {
+            if (outputPin && !isReroute) {
                 Vector2 pinPos = {nx + scaledNodeWidth - scaledRadius - 6, ny + scaledHeight * 0.5f};
                 Color pinColor = GetPinColor(*outputPin);
                 bool linked = false;
@@ -1239,7 +1284,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             if (!isReroute) {
                 std::string displayTitle = node.title;
                 for (char& c : displayTitle) if (c == '_') c = ' ';
-                DrawText(displayTitle.c_str(), (int)nx + (targetPin ? 16 : 8), (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
+                DrawNodeText(displayTitle.c_str(), nx + (targetPin ? 16 : 8) * canvasState.zoom, ny + 6 * canvasState.zoom, 13, canvasState.zoom, WHITE);
             }
             
             if (CheckCollisionPointRec(mousePos, nodeBounds) && CheckCollisionPointRec(mousePos, graphArea)) {
@@ -1319,7 +1364,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                              isSelected ? Color{100, 160, 230, 255} : Color{65, 65, 75, 255});
         std::string displayTitle = node.title;
         for (char& c : displayTitle) if (c == '_') c = ' ';
-        DrawText(displayTitle.c_str(), (int)nx + 8, (int)ny + 6, (int)(13 * canvasState.zoom), WHITE);
+        DrawNodeText(displayTitle.c_str(), nx + 8 * canvasState.zoom, ny + 6 * canvasState.zoom, 13, canvasState.zoom, WHITE);
 
         float inputY = ny + scaledHeaderHeight + scaledPinHeight * 0.5f;
         for (size_t i = 0; i < node.inputs.size(); i++) {
@@ -1366,7 +1411,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                 continue;
             }
 
-            DrawText(pin.name.c_str(), (int)pinPos.x + 12, (int)inputY - 8, 12, LIGHTGRAY);
+            DrawNodeText(pin.name.c_str(), pinPos.x + 12 * canvasState.zoom, inputY - 8 * canvasState.zoom, 12, canvasState.zoom, LIGHTGRAY);
             inputY += scaledPinHeight;
 
             if (!linked && pin.type != PinType::Array) {
@@ -1394,8 +1439,8 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     if (!keyPickerOpen || keyPickerPinId != pin.id) {
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                        DrawText(pin.defaultValue.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
-                        DrawText("v", (int)(fieldRect.x + fieldRect.width - 14), (int)fieldRect.y + 5, 11, LIGHTGRAY);
+                        DrawNodeText(pin.defaultValue.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
+                        DrawNodeText("v", fieldRect.x + fieldRect.width - 14 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, LIGHTGRAY);
                     }
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !keyPickerOpen && !nodeMenuOpen) {
                         keyPickerKind = PinPickerKind::NodeMode;
@@ -1419,12 +1464,12 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         for (char& c : display) if (c == '_') c = ' ';
                         DrawRectangleRec(textRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(textRect, 1, {60, 60, 70, 255});
-                        DrawText(display.c_str(), (int)textRect.x + 6, (int)textRect.y + 5, 11, WHITE);
+                        DrawNodeText(display.c_str(), textRect.x + 6 * canvasState.zoom, textRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
                     }
 
                     DrawRectangleRec(listenBtn, listening ? Color{160, 90, 30, 255} : Color{50, 50, 56, 255});
                     DrawRectangleLinesEx(listenBtn, 1, {80, 80, 90, 255});
-                    DrawText(listening ? "?" : "...", (int)listenBtn.x + 5, (int)listenBtn.y + 3, 11,
+                    DrawNodeText(listening ? "?" : "...", listenBtn.x + 5 * canvasState.zoom, listenBtn.y + 3 * canvasState.zoom, 11, canvasState.zoom,
                              listening ? WHITE : LIGHTGRAY);
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && !nodeMenuOpen) {
@@ -1448,7 +1493,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     if (!keyPickerOpen || keyPickerPinId != pin.id) {
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                        DrawText(pin.defaultValue.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                        DrawNodeText(pin.defaultValue.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
                     }
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
@@ -1467,7 +1512,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         for (char& c : display) if (c == '_') c = ' ';
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                        DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                        DrawNodeText(display.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
                     }
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
@@ -1491,7 +1536,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     }
                     DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                     DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                    DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                    DrawNodeText(display.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                         actorClassPickerPinId = pin.id;
@@ -1519,7 +1564,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     }
                     DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                     DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                    DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11,
+                    DrawNodeText(display.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom,
                              assetPath.empty() ? Color{140,140,150,255} : WHITE);
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
@@ -1541,7 +1586,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         for (char& c : display) if (c == '_') c = ' ';
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                        DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11, WHITE);
+                        DrawNodeText(display.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom, WHITE);
                     }
 
                     if (pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
@@ -1581,6 +1626,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                     }
 
                     if (allowActivate && editingPinId == pin.id) {
+                        pinEditField->fontSize = 11.0f * canvasState.zoom;
                         pinEditField->size = { fieldRect.width, fieldRect.height };
                         pinEditField->offset = { fieldRect.x, fieldRect.y };
                         pinEditField->placeholder = targetPlaceholder ? targetPlaceholder : "";
@@ -1593,7 +1639,7 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
                         std::string display = (pin.defaultValue.empty() && targetPlaceholder) ? targetPlaceholder : pin.defaultValue;
                         DrawRectangleRec(fieldRect, {35, 35, 40, 255});
                         DrawRectangleLinesEx(fieldRect, 1, {60, 60, 70, 255});
-                        DrawText(display.c_str(), (int)fieldRect.x + 6, (int)fieldRect.y + 5, 11,
+                        DrawNodeText(display.c_str(), fieldRect.x + 6 * canvasState.zoom, fieldRect.y + 5 * canvasState.zoom, 11, canvasState.zoom,
                                  pin.defaultValue.empty() ? Color{140,140,150,255} : WHITE);
                         if (allowActivate && pressedInGraph(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mousePos, fieldRect) && !nodeMenuOpen) {
                             editingPinId = pin.id;
@@ -1637,8 +1683,9 @@ void StargraphEditorPanel::RenderGraph(Rectangle area) {
             DrawPinShape(pinPos, scaledRadius, pinColor, linked, pin.type == PinType::Array);
 
             if (pin.name != "Out") {
-                float textW = (float)MeasureText(pin.name.c_str(), 12);
-                DrawText(pin.name.c_str(), (int)(pinPos.x - textW - 12), (int)outputY - 8, 12, LIGHTGRAY);
+                int labelSize = ScaledTextSize(12.0f, canvasState.zoom);
+                float textW = labelSize >= 4 ? (float)MeasureText(pin.name.c_str(), labelSize) : 0.0f;
+                DrawNodeText(pin.name.c_str(), pinPos.x - textW - 12 * canvasState.zoom, outputY - 8 * canvasState.zoom, 12, canvasState.zoom, LIGHTGRAY);
             }
             outputY += pinHeight * canvasState.zoom;
 
