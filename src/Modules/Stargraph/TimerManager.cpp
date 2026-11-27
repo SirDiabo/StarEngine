@@ -39,7 +39,7 @@ void TimerManager::CancelNodeTimers(StargraphBehavior* owner, Node* node) {
     }), timers.end());
 }
 
-void TimerManager::StartNodeTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration) {
+void TimerManager::StartNodeTimer(StargraphBehavior* owner, Stargraph& graph, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration) {
     if (timers.size() >= kMaxTimers) {
         TraceLog(LOG_WARNING, "TimerManager: timer limit reached, ignoring new Delay");
         return;
@@ -51,6 +51,11 @@ void TimerManager::StartNodeTimer(StargraphBehavior* owner, Actor* actor, Widget
     t.widget = widget;
     t.node = node;
     t.outPin = outPin;
+    if (&graph != &owner->GetGraph()) {
+        for (const FunctionDef& fn : owner->GetGraph().GetFunctions()) {
+            if (&fn.graph == &graph) { t.nodeFunction = fn.name; break; }
+        }
+    }
     t.remaining = duration;
     timers.push_back(t);
 }
@@ -115,6 +120,7 @@ void TimerManager::Tick(float deltaTime) {
         Node* node;
         std::string outPin;
         std::string functionName;
+        std::string nodeFunction;
     };
     std::vector<FireEvent> firing;
 
@@ -138,7 +144,7 @@ void TimerManager::Tick(float deltaTime) {
 
         int fires = 0;
         while (t.remaining <= 0.0f && fires < kMaxCatchUpFires) {
-            firing.push_back({t.owner, t.actor, t.widget, t.node, t.outPin, t.functionName});
+            firing.push_back({t.owner, t.actor, t.widget, t.node, t.outPin, t.functionName, t.nodeFunction});
             fires++;
             if (!t.loop) break;
             t.remaining += t.interval;
@@ -156,7 +162,14 @@ void TimerManager::Tick(float deltaTime) {
         ctx.widget = f.widget;
         ctx.deltaTime = deltaTime;
         if (f.node) {
-            GraphExecutor::RunFromPin(f.owner->GetGraph(), f.node, ctx, f.outPin);
+            Stargraph* nodeGraph = &f.owner->GetGraph();
+            ctx.rootGraph = nodeGraph;
+            if (!f.nodeFunction.empty()) {
+                FunctionDef* fn = nodeGraph->FindFunction(f.nodeFunction);
+                if (!fn) continue;
+                nodeGraph = &fn->graph;
+            }
+            GraphExecutor::RunFromPin(*nodeGraph, f.node, ctx, f.outPin);
         } else if (f.actor) {
             f.owner->OnCustomEvent(f.actor, f.functionName, {});
         } else if (f.widget) {

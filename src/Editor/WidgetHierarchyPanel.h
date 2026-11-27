@@ -13,6 +13,7 @@ class WidgetHierarchyPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.1f; }
     ~WidgetHierarchyPanel() override;
 
     void SetSession(WidgetEditorSession* s) { session = s; }

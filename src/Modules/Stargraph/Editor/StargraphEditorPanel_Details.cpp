@@ -403,6 +403,17 @@ void StargraphEditorPanel::BuildFunctionRows(std::vector<PropertyRow>& rows, int
         if (!value.empty()) graph.RenameFunction((size_t)fnIdx, value);
         isDirty = true;
     }));
+    rows.push_back(BoolRow("fn.pure", "Pure", fn.pure, [this, fnIdx](bool value) {
+        FunctionDef* f = DetailFunction(fnIdx);
+        if (!f || f->pure == value) return;
+        if (value && f->graph.HasLatentNodes()) {
+            TraceLog(LOG_WARNING, "Stargraph: function \"%s\" cannot be pure because it contains latent nodes (delays)", f->name.c_str());
+            return;
+        }
+        f->pure = value;
+        graph.SyncFunctionCallNodes(f->name);
+        isDirty = true;
+    }));
 
     Node* entryNode = fn.graph.FindNodeByType("Function_Entry");
     Node* returnNode = fn.graph.FindNodeByType("Return");

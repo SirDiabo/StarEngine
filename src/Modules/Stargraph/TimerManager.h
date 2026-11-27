@@ -5,6 +5,7 @@
 class Actor;
 class Widget;
 class StargraphBehavior;
+class Stargraph;
 struct Node;
 
 class TimerManager {
@@ -16,7 +17,7 @@ public:
     // Node-keyed timers
     bool IsNodeTimerActive(StargraphBehavior* owner, Node* node) const;
     void CancelNodeTimers(StargraphBehavior* owner, Node* node);
-    void StartNodeTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration);
+    void StartNodeTimer(StargraphBehavior* owner, Stargraph& graph, Actor* actor, Widget* widget, Node* node, const std::string& outPin, float duration);
 
     // Named timers
     void StartNamedTimer(StargraphBehavior* owner, Actor* actor, Widget* widget, const std::string& functionName,
@@ -38,6 +39,7 @@ private:
         Node* node = nullptr;
         std::string outPin;
         std::string functionName;
+        std::string nodeFunction;
         float remaining = 0.0f;
         float interval = 0.0f;
         bool loop = false;

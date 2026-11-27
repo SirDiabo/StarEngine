@@ -41,9 +41,15 @@ namespace fs = std::filesystem;
 static LogPanel* activeLogPanel = nullptr;
 
 static void ForwardTraceLogToPanel(int logLevel, const char* text, va_list args) {
-    char buffer[512];
-    vsnprintf(buffer, sizeof(buffer), text, args);
     if (!activeLogPanel) return;
+    va_list copy;
+    va_copy(copy, args);
+    int needed = vsnprintf(nullptr, 0, text, copy);
+    va_end(copy);
+    if (needed < 0) return;
+    std::string buffer((size_t)needed + 1, '\0');
+    vsnprintf(&buffer[0], buffer.size(), text, args);
+    buffer.resize((size_t)needed);
 
     LogLevel level = LogLevel::Info;
     if (logLevel == LOG_WARNING) level = LogLevel::Warning;

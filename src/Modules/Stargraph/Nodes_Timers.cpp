@@ -50,6 +50,7 @@ void RegisterTimerNodes() {
     NodeTemplate delay;
     delay.type = "Delay";
     delay.category = "Timers";
+    delay.latent = true;
     delay.moduleName = "Stargraph";
     delay.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
@@ -60,13 +61,14 @@ void RegisterTimerNodes() {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
         if (TimerManager::Get().IsNodeTimerActive(owner, &node)) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, graph, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(delay);
 
     NodeTemplate retriggerableDelay;
     retriggerableDelay.type = "Retriggerable_Delay";
     retriggerableDelay.category = "Timers";
+    retriggerableDelay.latent = true;
     retriggerableDelay.moduleName = "Stargraph";
     retriggerableDelay.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
@@ -77,13 +79,14 @@ void RegisterTimerNodes() {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
         TimerManager::Get().CancelNodeTimers(owner, &node);
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, graph, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(retriggerableDelay);
 
     NodeTemplate stackableDelay;
     stackableDelay.type = "Stackable_Delay";
     stackableDelay.category = "Timers";
+    stackableDelay.latent = true;
     stackableDelay.moduleName = "Stargraph";
     stackableDelay.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
@@ -93,13 +96,14 @@ void RegisterTimerNodes() {
     stackableDelay.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
+        TimerManager::Get().StartNodeTimer(owner, graph, ctx.actor, ctx.widget, &node, "Completed", ReadDuration(node));
     };
     NodeRegistry::Get().RegisterNode(stackableDelay);
 
     NodeTemplate delayNextFrame;
     delayNextFrame.type = "Delay_Until_Next_Frame";
     delayNextFrame.category = "Timers";
+    delayNextFrame.latent = true;
     delayNextFrame.moduleName = "Stargraph";
     delayNextFrame.createPins = [](Node* node) {
         node->inputs.push_back({"In", PinType::Exec, true, false});
@@ -108,7 +112,7 @@ void RegisterTimerNodes() {
     delayNextFrame.execute = [](Node& node, Stargraph& graph, ExecutionContext& ctx) {
         StargraphBehavior* owner = ResolveOwner(ctx);
         if (!owner) return;
-        TimerManager::Get().StartNodeTimer(owner, ctx.actor, ctx.widget, &node, "Completed", ctx.deltaTime);
+        TimerManager::Get().StartNodeTimer(owner, graph, ctx.actor, ctx.widget, &node, "Completed", ctx.deltaTime);
     };
     NodeRegistry::Get().RegisterNode(delayNextFrame);
 

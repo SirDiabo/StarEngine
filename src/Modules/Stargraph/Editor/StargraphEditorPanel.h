@@ -160,6 +160,10 @@ private:
             return graph.GetFunctions()[openFunctionIndex].graph;
         return graph;
     }
+    bool ActiveGraphIsPure() const {
+        return openFunctionIndex >= 0 && openFunctionIndex < (int)graph.GetFunctions().size()
+            && graph.GetFunctions()[openFunctionIndex].pure;
+    }
     void OpenFunctionGraph(int index);
     void CloseFunctionGraph();
 

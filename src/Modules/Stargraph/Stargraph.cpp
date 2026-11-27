@@ -6,6 +6,7 @@
 #include "Core/CookedFile.h"
 #include "Core/SafeParse.h"
 #include "Core/ObjectKindRegistry.h"
+#include "raylib.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -351,11 +352,77 @@ void Stargraph::RefreshCallEventPins(Node& callNode, Stargraph& host) {
     for (const std::string& name : toRemove) host.RemoveDynamicPin(callNode, false, name);
 }
 
+void Stargraph::ApplyCallFunctionPurity(Node& callNode, bool pure) {
+    auto isExecNamed = [](const Pin& p, const char* name) { return p.type == PinType::Exec && p.name == name; };
+
+    bool hasIn = false;
+    bool hasOut = false;
+    for (const Pin& p : callNode.inputs)  if (isExecNamed(p, "In"))  hasIn = true;
+    for (const Pin& p : callNode.outputs) if (isExecNamed(p, "Out")) hasOut = true;
+    if (pure ? (!hasIn && !hasOut) : (hasIn && hasOut)) return;
+
+    if (pure) {
+        for (auto it = callNode.inputs.begin(); it != callNode.inputs.end();) {
+            if (isExecNamed(*it, "In")) { RemoveLink(it->id); it = callNode.inputs.erase(it); }
+            else ++it;
+        }
+        for (auto it = callNode.outputs.begin(); it != callNode.outputs.end();) {
+            if (isExecNamed(*it, "Out")) { RemoveLink(it->id); it = callNode.outputs.erase(it); }
+            else ++it;
+        }
+    } else {
+        if (!hasIn) {
+            Pin pin;
+            pin.name = "In";
+            pin.type = PinType::Exec;
+            pin.isInput = true;
+            pin.id = nextPinId++;
+            callNode.inputs.insert(callNode.inputs.begin(), pin);
+        }
+        if (!hasOut) {
+            Pin pin;
+            pin.name = "Out";
+            pin.type = PinType::Exec;
+            pin.isOutput = true;
+            pin.id = nextPinId++;
+            callNode.outputs.insert(callNode.outputs.begin(), pin);
+        }
+    }
+    InvalidateCaches();
+}
+
+void Stargraph::SyncFunctionCallNodes(const std::string& functionName) {
+    const FunctionDef* target = FindFunction(functionName);
+    if (!target) return;
+    auto syncGraph = [&](Stargraph& g) {
+        for (Node& node : g.nodes) {
+            if (node.type != "Call_Function") continue;
+            for (const Pin& p : node.inputs) {
+                if (p.name == "Function Name" && p.defaultValue == functionName) {
+                    g.ApplyCallFunctionPurity(node, target->pure);
+                    break;
+                }
+            }
+        }
+    };
+    syncGraph(*this);
+    for (FunctionDef& fn : functions) syncGraph(fn.graph);
+}
+
+bool Stargraph::HasLatentNodes() const {
+    for (const Node& node : nodes) {
+        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node.type);
+        if (tmpl && tmpl->latent) return true;
+    }
+    return false;
+}
+
 void Stargraph::RefreshCallFunctionPins(Node& callNode, Stargraph& host) {
     std::string targetName;
     for (const Pin& p : callNode.inputs) if (p.name == "Function Name") targetName = p.defaultValue.c_str();
     FunctionDef* targetFn = FindFunction(targetName);
     if (!targetFn) return;
+    host.ApplyCallFunctionPurity(callNode, targetFn->pure);
     Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
     Node* returnNode = targetFn->graph.FindNodeByType("Return");
 
@@ -888,6 +955,7 @@ void Stargraph::SaveContent(std::ostream& out, const std::string& prefix) const 
     out << "Count=" << functions.size() << "\n";
     for (size_t i = 0; i < functions.size(); i++) {
         out << "Name" << i << "=" << functions[i].name << "\n";
+        if (functions[i].pure) out << "Pure" << i << "=true\n";
     }
     out << "\n";
 
@@ -1083,11 +1151,21 @@ bool Stargraph::LoadContent(const std::vector<SectionFileIO::ParsedSection>& sec
             if (const std::string* v = FindEntry(section, "Name" + std::to_string(i))) {
                 FunctionDef* fn = AddFunction(*v);
                 fn->graph.LoadGraphContent(sections, prefix + "Function" + std::to_string(i) + ".");
+                if (const std::string* p = FindEntry(section, "Pure" + std::to_string(i))) fn->pure = (*p == "true");
+                if (fn->pure && fn->graph.HasLatentNodes()) {
+                    TraceLog(LOG_WARNING, "Stargraph: function \"%s\" is marked pure but contains latent nodes, loaded as impure", fn->name.c_str());
+                    fn->pure = false;
+                }
             }
         }
     }
 
-    return LoadGraphContent(sections, prefix);
+    bool loaded = LoadGraphContent(sections, prefix);
+
+    for (const FunctionDef& fn : functions) {
+        if (fn.pure) SyncFunctionCallNodes(fn.name);
+    }
+    return loaded;
 }
 
 bool Stargraph::LoadGraphContent(const std::vector<SectionFileIO::ParsedSection>& sections, const std::string& prefix) {

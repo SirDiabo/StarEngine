@@ -8,6 +8,7 @@ class WidgetPalettePanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.25f; }
     ~WidgetPalettePanel() override;
 
     void SetSession(WidgetEditorSession* s) { session = s; }

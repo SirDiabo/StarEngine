@@ -133,3 +133,8 @@ star_add_test(test_input_keys
     SOURCES
         "${STAR_SRC}/Core/InputKeyNames.cpp"
     LIBRARIES raylib)
+
+star_add_test(test_log_file
+    SOURCES
+        "${STAR_SRC}/Editor/LogFile.cpp"
+        "${STAR_SRC}/Core/PathSafety.cpp")

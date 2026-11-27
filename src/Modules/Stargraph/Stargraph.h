@@ -239,6 +239,9 @@ public:
     bool ResolveNodeDetailTarget(const Node& node, Stargraph& host, int& kind, int& index);
     void RefreshCallEventPins(Node& callNode, Stargraph& host);
     void RefreshCallFunctionPins(Node& callNode, Stargraph& host);
+    void ApplyCallFunctionPurity(Node& callNode, bool pure);
+    void SyncFunctionCallNodes(const std::string& functionName);
+    bool HasLatentNodes() const;
     void RefreshWildcardPins(Node* node);
     void RebuildDynamicExecOutputs(Node& node);
     bool AddExecCase(Node& node, const std::string& input);
@@ -304,5 +307,6 @@ PinType PinTypeFromString(const std::string& text);
 
 struct FunctionDef {
     std::string name;
+    bool pure = false;
     Stargraph graph;
 };

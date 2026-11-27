@@ -902,6 +902,22 @@ void StargraphEditorPanel::CopySelectedNodes() {
     SetClipboardText(clipText.c_str());
 }
 
+static Node* FinishPastedNode(Stargraph& classGraph, Stargraph& active, Node* node, bool activeIsPure) {
+    if (!node) return nullptr;
+    const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(node->type);
+    if (activeIsPure && tmpl && tmpl->latent) {
+        TraceLog(LOG_WARNING, "Stargraph: %s is latent and cannot be used inside a pure function", node->type.c_str());
+        active.RemoveNode(std::stoi(node->id));
+        return nullptr;
+    }
+    if (node->type == "Call_Function") {
+        std::string name;
+        for (const Pin& p : node->inputs) if (p.name == "Function Name") name = p.defaultValue.c_str();
+        if (const FunctionDef* fn = classGraph.FindFunction(name)) active.ApplyCallFunctionPurity(*node, fn->pure);
+    }
+    return node;
+}
+
 void StargraphEditorPanel::PasteNodes() {
     const char* clipText = GetClipboardText();
     if (!clipText || clipText[0] == '\0') return;
@@ -919,7 +935,7 @@ void StargraphEditorPanel::PasteNodes() {
 
     std::vector<Node*> createdNodes;
     for (const ClipNode& clip : parsedNodes) {
-        Node* node = InstantiateNode(ActiveGraph(), clip);
+        Node* node = FinishPastedNode(graph, ActiveGraph(), InstantiateNode(ActiveGraph(), clip), ActiveGraphIsPure());
         if (node) {
             node->posX = roundf((rawWorld.x + clip.posX) / gridSnap) * gridSnap;
             node->posY = roundf((rawWorld.y + clip.posY) / gridSnap) * gridSnap;
@@ -952,7 +968,7 @@ void StargraphEditorPanel::DuplicateSelected() {
 
     std::vector<Node*> newNodes;
     for (const Node* src : sources) {
-        Node* node = InstantiateNode(ActiveGraph(), CaptureNode(*src));
+        Node* node = FinishPastedNode(graph, ActiveGraph(), InstantiateNode(ActiveGraph(), CaptureNode(*src)), ActiveGraphIsPure());
         if (node) {
             node->posX = src->posX + offset;
             node->posY = src->posY + offset;
@@ -1939,6 +1955,7 @@ if (CheckCollisionPointCircle(mousePos, pinPos, scaledRadius + 4) && CheckCollis
                     for (Pin& p : node->inputs) {
                         if (p.name == "Function Name") p.defaultValue = func.name;
                     }
+                    graph.RefreshCallFunctionPins(*node, ActiveGraph());
                     Vector2 snapped = GraphCanvas::SnapToGrid(GraphCanvas::ScreenToWorld(canvasState, graphArea, mp));
                     node->posX = snapped.x;
                     node->posY = snapped.y;
@@ -2166,44 +2183,7 @@ void StargraphEditorPanel::SpawnNodeFromMenu(const std::string& nodeTypeIdIn, co
                 break;
             }
         }
-        if (FunctionDef* targetFn = graph.FindFunction(functionName)) {
-            Node* entryNode = targetFn->graph.FindNodeByType("Function_Entry");
-            Node* returnNode = targetFn->graph.FindNodeByType("Return");
-
-            std::vector<std::string> keepInputs = {"Function Name"};
-            if (entryNode) {
-                for (const Pin& srcPin : entryNode->outputs) {
-                    if (srcPin.type == PinType::Exec) continue;
-                    ActiveGraph().AddDynamicPin(*node, false, srcPin.name, srcPin.type);
-                    keepInputs.push_back(srcPin.name);
-                }
-            }
-            std::vector<std::string> toRemoveIn;
-            for (Pin& p : node->inputs) {
-                if (p.type == PinType::Exec) continue;
-                bool keepIt = false;
-                for (const std::string& k : keepInputs) if (k == p.name) { keepIt = true; break; }
-                if (!keepIt) toRemoveIn.push_back(p.name);
-            }
-            for (const std::string& n : toRemoveIn) ActiveGraph().RemoveDynamicPin(*node, false, n);
-
-            std::vector<std::string> keepOutputs;
-            if (returnNode) {
-                for (const Pin& srcPin : returnNode->inputs) {
-                    if (srcPin.type == PinType::Exec) continue;
-                    ActiveGraph().AddDynamicPin(*node, true, srcPin.name, srcPin.type);
-                    keepOutputs.push_back(srcPin.name);
-                }
-            }
-            std::vector<std::string> toRemoveOut;
-            for (Pin& p : node->outputs) {
-                if (p.type == PinType::Exec) continue;
-                bool keepIt = false;
-                for (const std::string& k : keepOutputs) if (k == p.name) { keepIt = true; break; }
-                if (!keepIt) toRemoveOut.push_back(p.name);
-            }
-            for (const std::string& n : toRemoveOut) ActiveGraph().RemoveDynamicPin(*node, true, n);
-        }
+        graph.RefreshCallFunctionPins(*node, ActiveGraph());
     }
     if (!externalVarName.empty()) {
         for (Pin& p : node->inputs) {
@@ -2331,6 +2311,7 @@ void StargraphEditorPanel::RenderNodeContextMenu() {
         if (t.type == "Input_Mapping") continue;
         if (t.type == "Function_Entry") continue;
         if (t.type == "Return") continue;
+        if (t.latent && ActiveGraphIsPure()) continue;
         if (!t.boundElementClass.empty()) continue;
         if (t.type == "Get_Parent_Actor_From_Widget" && !listWidgetElements) continue;
         if (!t.boundComponentType.empty()) {

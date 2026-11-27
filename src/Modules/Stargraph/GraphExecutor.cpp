@@ -337,6 +337,7 @@ bool GraphExecutor::RunFunction(Stargraph& classGraph, const std::string& functi
     }
 
     ctx.callDepth++;
+    ctx.executedNodeIds.clear();
     ExecuteFromNode(fn->graph, entry, ctx);
 
     Node* ret = fn->graph.FindNodeByType("Return");

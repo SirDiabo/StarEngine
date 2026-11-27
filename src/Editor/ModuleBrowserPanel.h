@@ -19,6 +19,7 @@ class ModuleBrowserPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return rebuildRunning ? -1.0f : 0.1f; }
 
     void SetLogPanel(LogPanel* panel) { logPanel = panel; }
 

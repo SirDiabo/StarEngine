@@ -13,6 +13,7 @@ class DetailsPanel : public Panel {
 public:
     void Initialize() override;
     void Render() override;
+    float CacheRefreshInterval() const override { return 0.1f; }
     ~DetailsPanel() override;
 
     std::function<std::vector<PropertyRow>()> buildRows;
