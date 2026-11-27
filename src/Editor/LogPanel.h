@@ -19,6 +19,7 @@ struct LogEntry {
     std::string message;
     LogLevel level = LogLevel::Info;
     std::string time;
+    int seq = 0;
 };
 
 class LogPanel : public Panel {
@@ -38,6 +39,7 @@ public:
 
 private:
     enum class MenuAction { Live, Session, DeleteOld, OpenFolder };
+    enum class LineAction { Copy, CopyAll, SelectAll };
     struct MenuItem {
         MenuAction action = MenuAction::Live;
         std::string name;
@@ -54,6 +56,16 @@ private:
     void LoadViewedSession(const std::string& name);
     void ReturnToLive();
     void CopyShown();
+    void CopySelected();
+    bool HasSelection() const;
+    bool IsSelectedSeq(int seq) const;
+    int SelectedCount() const;
+    void ClearSelection();
+    void OnRowPressed(int index, bool extend);
+    void OnRowDragged(int index);
+    void OnRowContext(int index);
+    void HandleShortcuts();
+    bool FiltersActive() const;
     std::string FooterText() const;
 
     mutable std::mutex mutex;
@@ -82,6 +94,8 @@ private:
     std::string fileError;
 
     double copiedUntil = 0.0;
+    int selectionAnchor = -1;
+    int selectionActive = -1;
 
     Widget* chrome = nullptr;
     WidgetElement* chromeRoot = nullptr;
@@ -98,4 +112,6 @@ private:
     ChoicePopup sessionMenu;
     std::vector<MenuItem> menuItems;
     ConfirmPopup deleteConfirm;
+    ChoicePopup lineMenu;
+    std::vector<LineAction> lineMenuActions;
 };

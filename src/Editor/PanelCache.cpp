@@ -27,6 +27,12 @@ std::unordered_map<const Panel*, Entry> entries;
 long long frameIndex = 0;
 int dirtyAllFrames = 0;
 
+class QuietTraceLog {
+public:
+    QuietTraceLog() { SetTraceLogLevel(LOG_WARNING); }
+    ~QuietTraceLog() { SetTraceLogLevel(LOG_INFO); }
+};
+
 bool DisabledByEnvironment() {
 #ifdef _MSC_VER
 #pragma warning(suppress : 4996)
@@ -65,6 +71,7 @@ bool CaptureScreenRect(Surface& surface, Rectangle area) {
     if (r.x + r.width > framebufferWidth || r.y + r.height > framebufferHeight) return false;
 
     if (surface.target.id == 0 || surface.width != r.width || surface.height != r.height) {
+        QuietTraceLog quiet;
         if (surface.target.id != 0) UnloadRenderTexture(surface.target);
         surface.target = LoadRenderTexture(r.width, r.height);
         surface.width = r.width;

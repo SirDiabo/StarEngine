@@ -10,7 +10,9 @@
 #include "Core/Widgets/WidgetInput.h"
 #include "raylib.h"
 #include <algorithm>
+#include <cmath>
 #include <ctime>
+#include <functional>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -83,6 +85,12 @@ public:
 
     const std::vector<LogEntry>* rows = nullptr;
     bool* follow = nullptr;
+    std::function<bool(int)> isSelected;
+    std::function<void(int, bool)> onRowPressed;
+    std::function<void(int)> onRowDragged;
+    std::function<void(int)> onRowContext;
+    Color selectionColor{ 60, 90, 140, 255 };
+    bool dragging = false;
     float scroll = 0.0f;
     Color background{ 30, 30, 34, 255 };
     Color timeColor{ 130, 130, 135, 255 };
@@ -103,6 +111,32 @@ protected:
             if (follow) *follow = false;
         }
         scroll = std::clamp(scroll, 0.0f, maxScroll);
+
+        bool inside = CheckCollisionPointRec(mouse, rect);
+        auto rowAt = [&]() {
+            int index = (int)std::floor((mouse.y - rect.y - kPad + scroll) / kLineHeight);
+            return (rows && index >= 0 && index < (int)rows->size()) ? index : -1;
+        };
+        if (!WidgetInput::IsMouseBlocked() && inside) {
+            bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                dragging = true;
+                if (onRowPressed) onRowPressed(rowAt(), shift);
+            } else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                if (onRowContext) onRowContext(rowAt());
+            }
+        }
+        if (dragging) {
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                int index = rowAt();
+                if (mouse.y < rect.y) index = rows && !rows->empty() ? 0 : -1;
+                else if (mouse.y > rect.y + rect.height) index = rows && !rows->empty() ? (int)rows->size() - 1 : -1;
+                if (index >= 0 && onRowDragged) onRowDragged(index);
+            } else {
+                dragging = false;
+            }
+        }
+
         if (follow) {
             if (*follow) scroll = maxScroll;
             else if (maxScroll > 0.0f && scroll >= maxScroll - 0.5f && wheel < 0.0f) *follow = true;
@@ -118,6 +152,9 @@ protected:
         float y = rect.y + kPad - scroll + (float)first * kLineHeight;
         for (int i = first; i < (int)rows->size() && y < rect.y + rect.height; i++, y += kLineHeight) {
             const LogEntry& entry = (*rows)[i];
+            if (isSelected && isSelected(entry.seq)) {
+                DrawRectangleRec({ rect.x + 1.0f, y, rect.width - 10.0f, kLineHeight }, selectionColor);
+            }
             int x = (int)rect.x + 5;
             DrawText(entry.time.c_str(), x, (int)y + 1, 10, timeColor);
             DrawText(entry.message.c_str(), x + 54, (int)y + 1, 10, LogEntryColor(entry.level));
@@ -155,7 +192,7 @@ void LogPanel::AddLog(const std::string& message, LogLevel level) {
 
     std::lock_guard<std::mutex> lock(mutex);
     for (const std::string& line : lines) {
-        logs.push_back({ line, level, clock });
+        logs.push_back({ line, level, clock, totalPushed });
         levelCounts[LevelIndex(level)]++;
         totalPushed++;
         writer.Append(LevelToChar(level), clock, line);
@@ -171,6 +208,7 @@ void LogPanel::Clear() {
     std::lock_guard<std::mutex> lock(mutex);
     logs.clear();
     levelCounts[0] = levelCounts[1] = levelCounts[2] = 0;
+    selectionAnchor = selectionActive = -1;
     version++;
 }
 
@@ -232,10 +270,11 @@ void LogPanel::LoadViewedSession(const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex);
     viewed.clear();
     viewed.reserve(loaded.size());
-    for (const LogFile::Entry& entry : loaded) viewed.push_back({ entry.message, LevelFromChar(entry.level), entry.time });
+    for (const LogFile::Entry& entry : loaded) viewed.push_back({ entry.message, LevelFromChar(entry.level), entry.time, (int)viewed.size() });
     viewedName = name;
     viewedTruncated = truncated;
     follow = false;
+    selectionAnchor = selectionActive = -1;
     version++;
 }
 
@@ -244,6 +283,7 @@ void LogPanel::ReturnToLive() {
     viewedName.clear();
     viewed.clear();
     follow = true;
+    selectionAnchor = selectionActive = -1;
     version++;
 }
 
@@ -277,7 +317,10 @@ std::string LogPanel::FooterText() const {
     std::lock_guard<std::mutex> lock(mutex);
     std::string text;
     int total = viewedName.empty() ? (int)logs.size() : (int)viewed.size();
-    text = std::to_string(shown.size()) + " of " + std::to_string(total) + " lines";
+    if (FiltersActive()) text = std::to_string(shown.size()) + " of " + std::to_string(total) + " lines shown";
+    else text = std::to_string(total) + " lines";
+    int selected = SelectedCount();
+    if (selected > 0) text += "  |  " + std::to_string(selected) + " selected";
     if (!viewedName.empty()) {
         text += "  |  old session " + viewedName;
         if (viewedTruncated) text += " (start cut off, file larger than 8 MB)";
@@ -314,7 +357,7 @@ void LogPanel::EnsureChrome() {
     };
 
     clearButton = makeButton("Clear", [this]() { if (viewedName.empty()) Clear(); });
-    copyButton = makeButton("Copy", [this]() { CopyShown(); });
+    copyButton = makeButton("Copy", [this]() { if (SelectedCount() > 0) CopySelected(); else CopyShown(); });
     sessionButton = makeButton("Session", [this]() { OpenSessionMenu(sessionButton->lastResolvedRect); });
     for (int i = 0; i < 3; i++) {
         levelButtons[i] = makeButton("", [this, i]() { showLevel[i] = !showLevel[i]; shownDirty = true; });
@@ -322,6 +365,7 @@ void LogPanel::EnsureChrome() {
 
     searchField = new TextElement();
     searchField->editable = true;
+    searchField->text = "";
     searchField->fontSize = 12.0f;
     searchField->placeholder = "Search...";
     searchField->backgroundColor = theme.fieldBg;
@@ -356,6 +400,11 @@ void LogPanel::EnsureChrome() {
     list->follow = &follow;
     list->background = theme.panelBg;
     list->timeColor = theme.textSecondary;
+    list->selectionColor = theme.surfaceSelected;
+    list->isSelected = [this](int seq) { return IsSelectedSeq(seq); };
+    list->onRowPressed = [this](int index, bool extend) { OnRowPressed(index, extend); };
+    list->onRowDragged = [this](int index) { OnRowDragged(index); };
+    list->onRowContext = [this](int index) { OnRowContext(index); };
     chromeRoot->AddChild(list);
     listElement = list;
 
@@ -463,6 +512,19 @@ void LogPanel::OpenSessionMenu(Rectangle anchor) {
 }
 
 void LogPanel::PollPopups() {
+    int lineChoice = -1;
+    if (lineMenu.IsOpen() && lineMenu.Render(lineChoice) && lineChoice >= 0 && lineChoice < (int)lineMenuActions.size()) {
+        LineAction action = lineMenuActions[lineChoice];
+        if (action == LineAction::Copy) {
+            CopySelected();
+        } else if (action == LineAction::CopyAll) {
+            CopyShown();
+        } else if (!shown.empty()) {
+            selectionAnchor = shown.front().seq;
+            selectionActive = shown.back().seq;
+        }
+    }
+
     int choice = -1;
     if (sessionMenu.IsOpen() && sessionMenu.Render(choice) && choice >= 0 && choice < (int)menuItems.size()) {
         const MenuItem& item = menuItems[choice];
@@ -524,6 +586,87 @@ void LogPanel::Render() {
     chrome->Tick(dt, bounds, 1.0f);
     WidgetInput::ProcessInput(chrome, WidgetInput::kEditorDevice, dt, GetMousePosition(), 1.0f);
     chrome->Draw(bounds, 1.0f);
+    HandleShortcuts();
 
     DrawRectangleLinesEx(bounds, 1, theme.panelBorder);
+}
+
+bool LogPanel::FiltersActive() const {
+    return !searchLower.empty() || !showLevel[0] || !showLevel[1] || !showLevel[2];
+}
+
+bool LogPanel::HasSelection() const {
+    return selectionAnchor >= 0 && selectionActive >= 0;
+}
+
+bool LogPanel::IsSelectedSeq(int seq) const {
+    if (!HasSelection()) return false;
+    return seq >= std::min(selectionAnchor, selectionActive) && seq <= std::max(selectionAnchor, selectionActive);
+}
+
+int LogPanel::SelectedCount() const {
+    if (!HasSelection()) return 0;
+    int count = 0;
+    for (const LogEntry& entry : shown) if (IsSelectedSeq(entry.seq)) count++;
+    return count;
+}
+
+void LogPanel::ClearSelection() {
+    selectionAnchor = selectionActive = -1;
+}
+
+void LogPanel::OnRowPressed(int index, bool extend) {
+    if (index < 0 || index >= (int)shown.size()) {
+        ClearSelection();
+        return;
+    }
+    int seq = shown[index].seq;
+    if (extend && HasSelection()) selectionActive = seq;
+    else selectionAnchor = selectionActive = seq;
+    if (searchField) searchField->isEditing = false;
+}
+
+void LogPanel::OnRowDragged(int index) {
+    if (index < 0 || index >= (int)shown.size() || !HasSelection()) return;
+    selectionActive = shown[index].seq;
+}
+
+void LogPanel::OnRowContext(int index) {
+    if (index >= 0 && index < (int)shown.size() && !IsSelectedSeq(shown[index].seq)) {
+        selectionAnchor = selectionActive = shown[index].seq;
+    }
+    lineMenuActions.clear();
+    std::vector<ChoiceOption> choices;
+    ChoiceOption copy{ "Copy" };
+    copy.enabled = SelectedCount() > 0;
+    lineMenuActions.push_back(LineAction::Copy);
+    choices.push_back(copy);
+    lineMenuActions.push_back(LineAction::SelectAll);
+    choices.push_back({ "Select All" });
+    lineMenuActions.push_back(LineAction::CopyAll);
+    choices.push_back({ "Copy All Visible" });
+    lineMenu.Open(GetMousePosition(), 170.0f, choices);
+}
+
+void LogPanel::CopySelected() {
+    std::string text;
+    for (const LogEntry& entry : shown) {
+        if (IsSelectedSeq(entry.seq)) text += LogFile::FormatLine(LevelToChar(entry.level), entry.time, entry.message) + "\n";
+    }
+    if (text.empty()) return;
+    SetClipboardText(text.c_str());
+    copiedUntil = GetTime() + 1.5;
+}
+
+void LogPanel::HandleShortcuts() {
+    if (!listElement || (searchField && searchField->isEditing)) return;
+    if (!CheckCollisionPointRec(GetMousePosition(), listElement->lastResolvedRect)) return;
+    bool command = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
+    if (!command) return;
+    if (IsKeyPressed(KEY_C)) {
+        if (SelectedCount() > 0) CopySelected();
+    } else if (IsKeyPressed(KEY_A) && !shown.empty()) {
+        selectionAnchor = shown.front().seq;
+        selectionActive = shown.back().seq;
+    }
 }

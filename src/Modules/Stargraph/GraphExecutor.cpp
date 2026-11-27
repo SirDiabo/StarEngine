@@ -75,7 +75,7 @@ static void ResolveWildcardPins(Stargraph& graph, Node* node) {
     if (finalType != PinType::Wildcard) node->wildcardResolved = true;
 }
 
-static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx, std::vector<int>& visiting) {
+static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, ExecutionContext& ctx, std::vector<int>& visiting, std::vector<int>& evaluatedPure) {
     for (int id : visiting) if (id == inputPin.id) return; // cycle: this pin is already being resolved further up the chain
 
     Link* link = graph.GetLinkToPin(inputPin.id);
@@ -90,21 +90,29 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, Exec
     ResolveWildcardPins(graph, fromNode);
     ResolveWildcardPins(graph, toNode);
 
-    for (Pin& upPin : fromNode->inputs) {
-        if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx, visiting);
-    }
-
     bool fromNodeIsImpure = NodeHasExecPin(*fromNode);
-    bool alreadyExecuted = false;
-    if (fromNodeIsImpure) {
-        int fromId = std::stoi(fromNode->id);
-        for (int id : ctx.executedNodeIds) if (id == fromId) { alreadyExecuted = true; break; }
+    int fromId = std::stoi(fromNode->id);
+    bool pureAlreadyEvaluated = false;
+    if (!fromNodeIsImpure) {
+        for (int id : evaluatedPure) if (id == fromId) { pureAlreadyEvaluated = true; break; }
     }
 
-    if (!alreadyExecuted) {
-        const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
-        if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
-        if (fromNodeIsImpure) ctx.executedNodeIds.push_back(std::stoi(fromNode->id));
+    if (!pureAlreadyEvaluated) {
+        for (Pin& upPin : fromNode->inputs) {
+            if (upPin.type != PinType::Exec) PropagateDataPin(graph, fromNode, upPin, ctx, visiting, evaluatedPure);
+        }
+
+        bool alreadyExecuted = false;
+        if (fromNodeIsImpure) {
+            for (int id : ctx.executedNodeIds) if (id == fromId) { alreadyExecuted = true; break; }
+        }
+
+        if (!alreadyExecuted) {
+            const NodeTemplate* tmpl = NodeRegistry::Get().GetTemplate(fromNode->type);
+            if (tmpl && tmpl->execute) tmpl->execute(*fromNode, graph, ctx);
+            if (fromNodeIsImpure) ctx.executedNodeIds.push_back(fromId);
+        }
+        if (!fromNodeIsImpure) evaluatedPure.push_back(fromId);
     }
 
     for (const Pin& outPin : fromNode->outputs) {
@@ -121,9 +129,10 @@ static void PropagateDataPin(Stargraph& graph, Node* toNode, Pin& inputPin, Exec
 
 void GraphExecutor::PropagateDataPins(Stargraph& graph, Node* node, ExecutionContext& ctx) {
     std::vector<int> visiting;
+    std::vector<int> evaluatedPure;
     for (Pin& pin : node->inputs) {
         if (pin.type == PinType::Exec) continue;
-        PropagateDataPin(graph, node, pin, ctx, visiting);
+        PropagateDataPin(graph, node, pin, ctx, visiting, evaluatedPure);
     }
 }
 
