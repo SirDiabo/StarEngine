@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/ImportHandlerRegistry.h"
+#include "PopupWindow.h"
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@ public:
 private:
     bool open = false;
     bool preventClose = false;
+    PopupWindow window;
     float scroll = 0.0f;
     std::string title;
     std::vector<ImportMessage> messages;

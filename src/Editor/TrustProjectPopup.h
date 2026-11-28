@@ -12,7 +12,6 @@ public:
 
 private:
     bool open = false;
-    Rectangle area{};
 
     bool hasPending = false;
     bool pendingTrusted = false;

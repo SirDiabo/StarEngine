@@ -1,5 +1,6 @@
 #include "ContentBrowserPanel.h"
 #include "ContentUndo.h"
+#include "PopupLayer.h"
 #include "Core/Project.h"
 #include "Core/StarAsset.h"
 #include "Core/StarMaterial.h"
@@ -111,6 +112,8 @@ void ContentBrowserPanel::UnloadIcons() {
 }
 
 ContentBrowserPanel::~ContentBrowserPanel() {
+    PopupLayer::Remove(this);
+    WidgetInput::PopModal(this, WidgetInput::kEditorDevice);
     UnloadIcons();
     delete chrome;
     delete materialChrome;
@@ -151,6 +154,20 @@ const Texture2D* ContentBrowserPanel::GetIconTexturePtr(const ContentEntry& entr
     auto fallback = icons.find("asset");
     if (fallback != icons.end() && fallback->second.id != 0) return &fallback->second;
     return nullptr;
+}
+
+void ContentBrowserPanel::ResetForProjectChange() {
+    currentRelativeFolder.clear();
+    selectedIndex = -1;
+    tilesDirty = true;
+    clipboardPath.clear();
+    clipboardIsFolder = false;
+    isRenamingItem = false;
+    isCreatingNewItem = false;
+    importStatus.clear();
+    materialEditorOpen = false;
+    materialTexturePicker.Close();
+    materialColorPicker.Close();
 }
 
 std::string ContentBrowserPanel::GetCurrentFolderPath() const {
@@ -552,11 +569,10 @@ void ContentBrowserPanel::HandleFileDrop() {
 void ContentBrowserPanel::BuildMaterialEditorChrome() {
     materialChrome = new Widget();
     auto* panel = new RectangleElement();
-    panel->cornerRadius = 0.05f;
     materialChrome->SetRoot(panel);
 
     const UIPalette& theme = UITheme::Get();
-    panel->color = theme.panelBg;
+    panel->color = { 0, 0, 0, 0 };
 
     materialTitle = new TextElement();
     materialTitle->fontSize = 13.0f;
@@ -751,21 +767,34 @@ void ContentBrowserPanel::OpenMaterialEditor(const std::string& fullPath) {
     materialTexturePicker.Close();
     materialColorPicker.Close();
     materialEditorOpen = true;
+    materialWindow.ResetPosition();
     delete materialChrome;
     materialChrome = nullptr;
+    PopupLayer::Add(this, [this]() { RenderMaterialEditor(); });
 }
 
 void ContentBrowserPanel::RenderMaterialEditor() {
-    if (!materialEditorOpen) return;
+    if (!materialEditorOpen) {
+        WidgetInput::PopModal(this, WidgetInput::kEditorDevice);
+        PopupLayer::Remove(this);
+        return;
+    }
     if (!materialChrome) BuildMaterialEditorChrome();
 
     Vector2 mp = GetMousePosition();
     bool pickerBlocksInput = materialTexturePicker.ContainsPoint(mp) || materialColorPicker.ContainsPoint(mp);
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-    Rectangle box = {screenW * 0.5f - 160, screenH * 0.5f - 111, 320, 222};
 
-    DrawRectangleRec({0, 0, screenW, screenH}, {0, 0, 0, 120});
+    WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
+    PopupWindowOptions windowOptions;
+    windowOptions.escapeCloses = !materialTexturePicker.IsOpen() && !materialColorPicker.IsOpen();
+    PopupWindow::Frame frame = materialWindow.Draw("Starmat", { 320.0f, 222.0f }, windowOptions);
+    Rectangle box = frame.content;
+    if (frame.closeRequested) {
+        materialEditorOpen = false;
+        materialTexturePicker.Close();
+        materialColorPicker.Close();
+        return;
+    }
 
     materialTitle->text = fs::path(materialEditorPath).stem().string();
 
@@ -808,11 +837,13 @@ void ContentBrowserPanel::RenderMaterialEditor() {
     if (materialTexturePicker.Render(pickedTex)) materialEditorData.textureAssetPath = pickedTex;
 
     float dt = GetFrameTime();
+    WidgetInput::SetInputScope(this);
     materialChrome->Tick(dt, box, 1.0f);
     if (!pickerBlocksInput) {
         WidgetInput::ProcessInput(materialChrome, WidgetInput::kEditorDevice, dt, mp, 1.0f);
     }
     materialChrome->Draw(box, 1.0f);
+    WidgetInput::SetInputScope(nullptr);
 }
 
 void ContentBrowserPanel::BuildChrome() {
@@ -1356,6 +1387,4 @@ void ContentBrowserPanel::Render() {
         DrawText(importStatus.c_str(), (int)client.x + 8, (int)(client.y + client.height - 16), 11,
                   theme.success);
     }
-
-    RenderMaterialEditor();
 }

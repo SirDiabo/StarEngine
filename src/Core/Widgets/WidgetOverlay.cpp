@@ -10,6 +10,8 @@ Rectangle g_overlayRect{};
 std::function<void()> g_onClosed;
 bool g_justOpened = false;
 bool g_dimBackground = false;
+std::function<WidgetOverlay::FrameResult()> g_drawFrame;
+std::function<void()> g_onCloseRequested;
 
 const char* kOverlayDevice = "Editor";
 
@@ -25,13 +27,24 @@ void Open(WidgetElement* content, Vector2 anchorPos, Vector2 desiredSize, std::f
     g_onClosed = onClosed;
     g_justOpened = true;
     g_dimBackground = dimBackground;
+    g_drawFrame = nullptr;
+    g_onCloseRequested = nullptr;
     WidgetInput::PushModal(g_overlayWidget, kOverlayDevice);
+}
+
+void OpenFramed(WidgetElement* content, Vector2 contentSize, std::function<FrameResult()> drawFrame,
+                std::function<void()> onClosed, std::function<void()> onCloseRequested) {
+    Open(content, { 0.0f, 0.0f }, contentSize, std::move(onClosed), false);
+    g_drawFrame = std::move(drawFrame);
+    g_onCloseRequested = std::move(onCloseRequested);
 }
 
 void Close() {
     if (!g_overlayWidget) return;
     Widget* closing = g_overlayWidget;
     g_overlayWidget = nullptr;
+    g_drawFrame = nullptr;
+    g_onCloseRequested = nullptr;
     WidgetInput::PopModal(closing, kOverlayDevice);
     delete closing;
     if (g_onClosed) {
@@ -47,6 +60,24 @@ bool IsOpen() {
 
 void TickAndDraw(float deltaTime, Rectangle screenBounds) {
     if (!g_overlayWidget) return;
+
+    if (g_drawFrame) {
+        FrameResult frame = g_drawFrame();
+        g_overlayRect = frame.content;
+        if (frame.closeRequested) {
+            std::function<void()> handler = g_onCloseRequested;
+            if (handler) handler();
+            else Close();
+            return;
+        }
+        float dt = deltaTime;
+        Vector2 framedMouse = GetMousePosition();
+        g_justOpened = false;
+        g_overlayWidget->Tick(dt, g_overlayRect, 1.0f);
+        WidgetInput::ProcessInput(g_overlayWidget, kOverlayDevice, dt, framedMouse, 1.0f);
+        g_overlayWidget->Draw(g_overlayRect, 1.0f);
+        return;
+    }
 
     if (g_overlayRect.x + g_overlayRect.width > screenBounds.x + screenBounds.width)
         g_overlayRect.x = screenBounds.x + screenBounds.width - g_overlayRect.width;

@@ -25,6 +25,7 @@ public:
     ~ViewportPanel() override;
 
     void LoadMap(const std::string& path);
+    void UnloadMap();
     void SaveMap();
     void MarkDirty() { mapDirty = true; }
     void DropActorAsset(const std::string& assetPath, Vector2 screenPos);

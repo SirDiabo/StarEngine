@@ -30,6 +30,7 @@ public:
     void ResetCancelFlag();
 
     void CloseAllAssetEditorTabs();
+    void ResetProjectState();
 
     void SaveLayout() const;
     void LoadLayout();

@@ -47,6 +47,7 @@ void ImportOptionsDialog::Activate() {
         }
     }
     active = true;
+    window.ResetPosition();
 }
 
 void ImportOptionsDialog::Finish(bool confirmed) {
@@ -140,19 +141,12 @@ void ImportOptionsDialog::Render() {
     const std::string label = current.handler.label.empty() ? std::string("Import") : current.handler.label;
     const std::string title = label + " Import - " + fs::path(current.sourcePath).stem().string();
 
-    const float screenW = (float)GetScreenWidth();
-    const float screenH = (float)GetScreenHeight();
-    const float titleH = 30.0f;
     const float boxWidth = 380.0f;
-    float boxHeight = titleH + (float)rows.size() * panel->rowHeight + 14.0f;
-    boxHeight = std::min(boxHeight, screenH - 40.0f);
-    Rectangle box = { screenW * 0.5f - boxWidth * 0.5f, screenH * 0.5f - boxHeight * 0.5f, boxWidth, boxHeight };
-    Rectangle body = { box.x + 6.0f, box.y + titleH, boxWidth - 12.0f, boxHeight - titleH - 6.0f };
+    float bodyHeight = (float)rows.size() * panel->rowHeight + 14.0f;
+    bodyHeight = std::min(bodyHeight, (float)GetScreenHeight() - 40.0f - PopupWindow::kHeaderHeight);
 
-    DrawRectangle(0, 0, (int)screenW, (int)screenH, { 0, 0, 0, 140 });
-    DrawRectangleRec(box, theme.panelBg);
-    DrawRectangleLinesEx(box, 1, theme.panelBorder);
-    DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, theme.sectionHeader);
+    PopupWindow::Frame frame = window.Draw(title, { boxWidth, bodyHeight }, PopupWindow::Options());
+    Rectangle body = { frame.content.x + 6.0f, frame.content.y + 6.0f, boxWidth - 12.0f, bodyHeight - 6.0f };
 
     WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
     WidgetInput::SetInputScope(this);
@@ -162,5 +156,5 @@ void ImportOptionsDialog::Render() {
     chrome->Draw(body, 1.0f);
     WidgetInput::SetInputScope(nullptr);
 
-    if (active && IsKeyPressed(KEY_ESCAPE) && !WidgetInput::IsKeyboardCaptured()) Finish(false);
+    if (active && frame.closeRequested) Finish(false);
 }

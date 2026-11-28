@@ -3,6 +3,7 @@
 #include "Core/Widgets/WidgetElementFields.h"
 #include "Core/Widgets/WidgetAssetCache.h"
 #include "Core/Widgets/WidgetObjectElement.h"
+#include "Core/Widgets/TextElement.h"
 #include "Core/ProgrammingInterfaceRegistry.h"
 
 bool WidgetEditorSession::Open(const std::string& path) {
@@ -87,6 +88,7 @@ WidgetEditorSession::~WidgetEditorSession() {
 WidgetElement* WidgetEditorSession::AddElement(const std::string& className, WidgetElement* parent) {
     WidgetElement* element = CreateDefaultWidgetElement(className);
     if (!element) return nullptr;
+    if (className == "TextElement") static_cast<TextElement*>(element)->text = "Text";
 
     if (!parent) parent = data.rootElement;
     if (parent) {

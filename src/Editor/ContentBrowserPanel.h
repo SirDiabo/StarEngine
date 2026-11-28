@@ -2,6 +2,7 @@
 #include "Core/Panel.h"
 #include "Core/AssetTypeRegistry.h"
 #include "Core/StarMaterial.h"
+#include "PopupWindow.h"
 #include "AssetPickerPopup.h"
 #include "ColorPickerPopup.h"
 #include "ConfirmPopup.h"
@@ -35,6 +36,7 @@ public:
     void Render() override;
     float CacheRefreshInterval() const override { return 0.1f; }
     ~ContentBrowserPanel() override;
+    void ResetForProjectChange();
 
     std::function<void(const std::string& fullPath, const std::string& extension)> onAssetOpened;
     std::function<void(const std::string& fullPath, const std::string& extension, Vector2 dropPos)> onAssetDragged;
@@ -139,6 +141,7 @@ private:
     bool iconsLoaded = false;
 
     bool materialEditorOpen = false;
+    PopupWindow materialWindow;
     std::string materialEditorPath;
     StarMaterial materialEditorData;
     AssetPickerPopup materialTexturePicker;

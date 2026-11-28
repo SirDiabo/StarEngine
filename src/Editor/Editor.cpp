@@ -26,6 +26,8 @@
 #include "ImportDetailsPanel.h"
 #include "ImportOptionsDialog.h"
 #include "ImportReportPanel.h"
+#include "PopupLayer.h"
+#include "ContentBrowserPanel.h"
 #include "AboutPanel.h"
 #include "LoadingPanel.h"
 #include "Core/LayoutSerializer.h"
@@ -163,6 +165,7 @@ void Editor::Render() {
     ImportDetailsPanel::Get().Render();
     ImportOptionsDialog::Get().Render();
     ImportReportPanel::Get().Render();
+    PopupLayer::RenderAll();
 
     // Layer 7: about panel (floating modal).
     AboutPanel::Get().Render();
@@ -518,6 +521,12 @@ void Editor::ResetSaveProjectFlag() {
 
 void Editor::ResetCancelFlag() {
     if (projectBrowser) projectBrowser->ResetCancelFlag();
+}
+
+void Editor::ResetProjectState() {
+    if (!levelTab) return;
+    if (levelTab->GetContentPanel()) levelTab->GetContentPanel()->ResetForProjectChange();
+    if (levelTab->GetViewport()) levelTab->GetViewport()->UnloadMap();
 }
 
 void Editor::CloseAllAssetEditorTabs() {

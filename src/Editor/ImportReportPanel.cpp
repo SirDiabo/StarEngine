@@ -47,6 +47,7 @@ void ImportReportPanel::Open(const std::string& newTitle, const std::vector<Impo
     scroll = 0.0f;
     open = true;
     preventClose = true;
+    window.ResetPosition();
 }
 
 void ImportReportPanel::Close() {
@@ -61,17 +62,18 @@ void ImportReportPanel::Render() {
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
     float boxW = std::min(560.0f, screenW - 40.0f);
-    float boxH = std::min(380.0f, screenH - 40.0f);
-    Rectangle box = { screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH };
+    float boxH = std::min(358.0f, screenH - 40.0f - PopupWindow::kHeaderHeight);
 
     WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
 
-    DrawRectangle(0, 0, (int)screenW, (int)screenH, { 0, 0, 0, 140 });
-    DrawRectangleRec(box, theme.panelBg);
-    DrawRectangleLinesEx(box, 1, theme.panelBorder);
-    DrawText(title.c_str(), (int)box.x + 12, (int)box.y + 10, 13, theme.sectionHeader);
+    PopupWindow::Frame frame = window.Draw(title, { boxW, boxH }, PopupWindow::Options());
+    Rectangle box = frame.content;
+    if (frame.closeRequested) {
+        Close();
+        return;
+    }
 
-    Rectangle list = { box.x + 10, box.y + 34, boxW - 20, boxH - 34 - 42 };
+    Rectangle list = { box.x + 10, box.y + 10, boxW - 20, boxH - 10 - 42 };
     DrawRectangleRec(list, theme.fieldBg);
     DrawRectangleLinesEx(list, 1, theme.fieldBorder);
 
@@ -117,9 +119,7 @@ void ImportReportPanel::Render() {
 
     if (preventClose) {
         preventClose = false;
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, box)) {
-        Close();
-    } else if (IsKeyPressed(KEY_ESCAPE)) {
+    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, frame.area)) {
         Close();
     }
 }

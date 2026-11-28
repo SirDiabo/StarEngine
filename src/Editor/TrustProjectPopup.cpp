@@ -4,7 +4,8 @@
 #include "Core/PathSafety.h"
 #include "Core/Project.h"
 #include "Core/Widgets/WidgetOverlay.h"
-#include "Core/Widgets/RectangleElement.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "PopupWindow.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/ButtonElement.h"
 #include <algorithm>
@@ -97,30 +98,16 @@ void TrustProjectPopup::Open(const std::string& projectName, const std::string& 
     }
 
     const float lineHeight = 16.0f;
-    const float titleHeight = 34.0f;
+    const float topPad = 12.0f;
     const float buttonRow = 52.0f;
-    float sw = (float)GetScreenWidth();
-    float sh = (float)GetScreenHeight();
     float w = 520.0f;
-    float h = titleHeight + (float)lines.size() * lineHeight + buttonRow;
-    area = { (sw - w) * 0.5f, (sh - h) * 0.5f, w, h };
+    float h = topPad + (float)lines.size() * lineHeight + buttonRow;
 
     const UIPalette& theme = UITheme::Get();
 
-    auto* panel = new RectangleElement();
-    panel->color = theme.panelBg;
+    auto* panel = new WidgetElement();
 
-    auto* title = new TextElement();
-    title->text = "Trust this project?";
-    title->color = theme.textPrimary;
-    title->fontSize = 16.0f;
-    title->anchor = {0.0f, 0.0f};
-    title->pivot = {0.0f, 0.0f};
-    title->offset = {16.0f, 10.0f};
-    title->size = {w - 32.0f, 20.0f};
-    panel->AddChild(title);
-
-    float y = titleHeight;
+    float y = topPad;
     for (const std::string& line : lines) {
         auto* text = new TextElement();
         text->text = line;
@@ -180,9 +167,12 @@ void TrustProjectPopup::Open(const std::string& projectName, const std::string& 
     trustBtn->AddChild(trustLabel);
     panel->AddChild(trustBtn);
 
-    WidgetOverlay::Open(panel, { area.x, area.y }, { area.width, area.height }, [this]() {
+    PopupWindow::OpenOverlay("Trust this project?", panel, { w, h }, [this]() {
         open = false;
-    }, true);
+    }, [this]() {
+        pendingTrusted = false;
+        hasPending = true;
+    });
 }
 
 void TrustProjectPopup::Close() {

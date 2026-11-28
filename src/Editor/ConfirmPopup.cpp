@@ -1,34 +1,38 @@
 #include "ConfirmPopup.h"
 #include "UITheme.h"
 #include "Core/Widgets/WidgetOverlay.h"
-#include "Core/Widgets/RectangleElement.h"
+#include "Core/Widgets/WidgetElement.h"
+#include "PopupWindow.h"
 #include "Core/Widgets/TextElement.h"
 #include "Core/Widgets/ButtonElement.h"
+#include <vector>
 
 void ConfirmPopup::Open(const std::string& msg, const std::string& confirm) {
     open = true;
     hasPending = false;
 
-    float sw = (float)GetScreenWidth();
-    float sh = (float)GetScreenHeight();
     float w = 340.0f;
-    float h = 100.0f;
-    area = { (sw - w) * 0.5f, (sh - h) * 0.5f, w, h };
+    std::vector<std::string> lines = PopupWindow::WrapText(msg, 13, w - 32.0f);
+    const float lineHeight = 18.0f;
+    float h = 16.0f + (float)lines.size() * lineHeight + 14.0f + 24.0f + 12.0f;
 
     const UIPalette& theme = UITheme::Get();
 
-    auto* panel = new RectangleElement();
-    panel->color = theme.panelBg;
+    auto* panel = new WidgetElement();
 
-    auto* messageText = new TextElement();
-    messageText->text = msg;
-    messageText->color = theme.textPrimary;
-    messageText->fontSize = 13.0f;
-    messageText->anchor = {0.5f, 0.0f};
-    messageText->pivot = {0.5f, 0.0f};
-    messageText->offset = {0.0f, 18.0f};
-    messageText->size = {w - 32.0f, 18.0f};
-    panel->AddChild(messageText);
+    float textY = 16.0f;
+    for (const std::string& line : lines) {
+        auto* messageText = new TextElement();
+        messageText->text = line;
+        messageText->color = theme.textPrimary;
+        messageText->fontSize = 13.0f;
+        messageText->anchor = {0.0f, 0.0f};
+        messageText->pivot = {0.0f, 0.0f};
+        messageText->offset = {16.0f, textY};
+        messageText->size = {w - 32.0f, lineHeight};
+        panel->AddChild(messageText);
+        textY += lineHeight;
+    }
 
     float btnW = w * 0.5f - 24.0f;
 
@@ -76,9 +80,12 @@ void ConfirmPopup::Open(const std::string& msg, const std::string& confirm) {
     confirmBtn->AddChild(confirmLabel);
     panel->AddChild(confirmBtn);
 
-    WidgetOverlay::Open(panel, { area.x, area.y }, { area.width, area.height }, [this]() {
+    PopupWindow::OpenOverlay("Confirm", panel, { w, h }, [this]() {
         open = false;
-    }, true);
+    }, [this]() {
+        pendingConfirmed = false;
+        hasPending = true;
+    });
 }
 
 void ConfirmPopup::Close() {

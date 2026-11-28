@@ -9,6 +9,7 @@ LoadingPanel& LoadingPanel::Get() {
 
 void LoadingPanel::Show(const std::string& titleText) {
     visible = true;
+    window.ResetPosition();
     title = titleText;
     statusLine.clear();
 }
@@ -25,27 +26,21 @@ void LoadingPanel::Render() {
     if (!visible) return;
 
     const UIPalette& theme = UITheme::Get();
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-
-    DrawRectangleRec({0, 0, screenW, screenH}, {0, 0, 0, 160});
-
     float boxW = 520.0f;
-    float boxH = 110.0f;
-    Rectangle box = {screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH};
-    DrawRectangleRec(box, theme.panelBg);
-    DrawRectangleLinesEx(box, 1, theme.panelBorder);
-
-    DrawText(title.c_str(), (int)box.x + 16, (int)box.y + 16, 16, theme.textPrimary);
+    float boxH = 70.0f;
+    PopupWindowOptions windowOptions;
+    windowOptions.closable = false;
+    PopupWindow::Frame frame = window.Draw(title, { boxW, boxH }, windowOptions);
+    Rectangle box = frame.content;
 
     std::string line = statusLine;
     size_t maxChars = 78;
     if (line.size() > maxChars) {
         line = "..." + line.substr(line.size() - (maxChars - 3));
     }
-    DrawText(line.c_str(), (int)box.x + 16, (int)box.y + 48, 11, theme.textSecondary);
+    DrawText(line.c_str(), (int)box.x + 16, (int)box.y + 12, 11, theme.textSecondary);
 
-    Rectangle barBg = {box.x + 16, box.y + 74, boxW - 32, 14};
+    Rectangle barBg = {box.x + 16, box.y + 36, boxW - 32, 14};
     DrawRectangleRec(barBg, theme.fieldBg);
     DrawRectangleLinesEx(barBg, 1, theme.fieldBorder);
 

@@ -260,6 +260,7 @@ void Application::Run() {
             if (!path.empty()) {
                 if (World::Get().IsPlaying()) World::Get().EndPlay();
                 editor->CloseAllAssetEditorTabs();
+                editor->ResetProjectState();
                 UndoManager::Get().Clear();
                 AssetCache::Get().Clear();
                 ActorClassCache::Get().Clear();

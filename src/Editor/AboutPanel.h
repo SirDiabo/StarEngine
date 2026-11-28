@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "PopupWindow.h"
 #include <string>
 
 class AboutPanel {
@@ -15,6 +16,7 @@ public:
 private:
     bool open = false;
     bool preventClose = false;
+    PopupWindow window;
     Texture2D logo = { 0 };
     bool logoLoaded = false;
 };

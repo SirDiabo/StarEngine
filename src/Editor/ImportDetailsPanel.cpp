@@ -96,6 +96,7 @@ void ImportDetailsPanel::Open(const std::string& path, const std::string& type, 
     materialSlotPickerIndex = -1;
     LoadFromAsset();
     open = true;
+    window.ResetPosition();
 }
 
 void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::string& type,
@@ -160,6 +161,7 @@ void ImportDetailsPanel::OpenForImport(const std::string& srcPath, const std::st
     }
 
     open = true;
+    window.ResetPosition();
 }
 
 void ImportDetailsPanel::EnsureInline(const std::string& path, const std::string& type) {
@@ -419,20 +421,13 @@ void ImportDetailsPanel::Render() {
     ApplyPanelTheme();
     panel->SetProperties(rows);
 
-    float titleH = 30.0f;
     float boxWidth = 340.0f;
-    float boxHeight = titleH + (float)rows.size() * panel->rowHeight + 14.0f;
+    float bodyHeight = std::min((float)rows.size() * panel->rowHeight + 14.0f, (float)GetScreenHeight() - 40.0f - PopupWindow::kHeaderHeight);
 
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-    Rectangle box = { screenW * 0.5f - boxWidth * 0.5f, screenH * 0.5f - boxHeight * 0.5f, boxWidth, boxHeight };
-    Rectangle body = { box.x + 6.0f, box.y + titleH, boxWidth - 12.0f, boxHeight - titleH - 6.0f };
-
-    DrawRectangle(0, 0, (int)screenW, (int)screenH, { 0, 0, 0, 140 });
-    const UIPalette& theme = UITheme::Get();
-    DrawRectangleRec(box, theme.panelBg);
-    DrawRectangleLinesEx(box, 1, theme.panelBorder);
-    DrawText(title.c_str(), (int)box.x + 10, (int)box.y + 8, 12, theme.sectionHeader);
+    PopupWindowOptions windowOptions;
+    windowOptions.escapeCloses = !materialPicker.IsOpen();
+    PopupWindow::Frame frame = window.Draw(title, { boxWidth, bodyHeight }, windowOptions);
+    Rectangle body = { frame.content.x + 6.0f, frame.content.y + 6.0f, boxWidth - 12.0f, bodyHeight - 6.0f };
 
     WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
     WidgetInput::SetInputScope(this);
@@ -445,6 +440,11 @@ void ImportDetailsPanel::Render() {
     }
     chrome->Draw(body, 1.0f);
     WidgetInput::SetInputScope(nullptr);
+
+    if (frame.closeRequested) {
+        Close();
+        return;
+    }
 
     std::string picked;
     if (materialPicker.Render(picked)) {

@@ -258,6 +258,16 @@ void ViewportPanel::LoadMap(const std::string& path) {
     if (onMapReplaced) onMapReplaced();
 }
 
+void ViewportPanel::UnloadMap() {
+    starMap = StarMap();
+    mapPath.clear();
+    mapLoaded = false;
+    mapDirty = false;
+    selectedActorIndex = -1;
+    ActorClassCache::Get().Clear();
+    if (onMapReplaced) onMapReplaced();
+}
+
 void ViewportPanel::CaptureUndoState(std::string& content, std::string& selection) const {
     content = starMap.SerializeToString();
     selection = std::to_string(selectedActorIndex);

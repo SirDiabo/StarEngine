@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/ImportHandlerRegistry.h"
+#include "PopupWindow.h"
 #include <deque>
 #include <functional>
 #include <map>
@@ -34,6 +35,7 @@ private:
 
     std::deque<Request> queue;
     bool active = false;
+    PopupWindow window;
     Request current;
     std::map<std::string, std::string> values;
     std::map<std::string, std::map<std::string, std::string>> remembered;

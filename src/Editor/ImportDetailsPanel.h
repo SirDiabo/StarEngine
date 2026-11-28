@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "AssetPickerPopup.h"
 #include "PropertyPanel.h"
+#include "PopupWindow.h"
 #include "Core/StarAsset.h"
 #include <string>
 #include <vector>
@@ -40,6 +41,7 @@ private:
     int settingsRevision = 0;
     bool open = false;
     bool inlinePanel = false;
+    PopupWindow window;
     std::string assetPath;
     std::string assetType;
 

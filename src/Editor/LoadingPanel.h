@@ -1,5 +1,6 @@
 #pragma once
 #include "raylib.h"
+#include "PopupWindow.h"
 #include <string>
 
 class LoadingPanel {
@@ -16,6 +17,7 @@ public:
 
 private:
     bool visible = false;
+    PopupWindow window;
     std::string title;
     std::string statusLine;
 };

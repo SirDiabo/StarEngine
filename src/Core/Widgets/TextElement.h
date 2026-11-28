@@ -8,7 +8,7 @@ public:
     const char* GetClassName() const override { return "TextElement"; }
     std::string GetObjectKind() const override { return "TextElement"; }
 
-    std::string text = "Text";
+    std::string text;
     Color color{ 255, 255, 255, 255 };
     float fontSize = 16.0f;
 

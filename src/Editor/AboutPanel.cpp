@@ -13,6 +13,7 @@ AboutPanel& AboutPanel::Get() {
 void AboutPanel::Open() {
     open = true;
     preventClose = true;
+    window.ResetPosition();
     if (!logoLoaded) {
         logo = EmbeddedAssets::Get().LoadTextureAsset("logo.png");
         if (logo.id != 0) logoLoaded = true;
@@ -29,17 +30,17 @@ void AboutPanel::Render() {
 
     const UIPalette& theme = UITheme::Get();
 
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
     float boxW = 360.0f;
-    float boxH = 280.0f;
-    Rectangle box = { screenW * 0.5f - boxW * 0.5f, screenH * 0.5f - boxH * 0.5f, boxW, boxH };
+    float boxH = 258.0f;
 
     WidgetInput::PushModal(this, WidgetInput::kEditorDevice);
 
-    DrawRectangle(0, 0, (int)screenW, (int)screenH, {0, 0, 0, 140});
-    DrawRectangleRec(box, theme.panelBg);
-    DrawRectangleLinesEx(box, 1, theme.panelBorder);
+    PopupWindow::Frame frame = window.Draw("About StarEngine", { boxW, boxH }, PopupWindow::Options());
+    Rectangle box = frame.content;
+    if (frame.closeRequested) {
+        Close();
+        return;
+    }
 
     float y = box.y + 16;
     float cx = box.x + boxW * 0.5f;
@@ -98,7 +99,7 @@ void AboutPanel::Render() {
 
     if (preventClose) {
         preventClose = false;
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, box)) {
+    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mp, frame.area)) {
         Close();
     }
 }
